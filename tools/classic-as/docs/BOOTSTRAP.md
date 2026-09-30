@@ -36,7 +36,10 @@ crexx tools/build.crexx --args sanitize
 The optional CMake configuration selects strict C90 and warnings as errors on
 Clang/GCC. The sanitizer build adds address and undefined-behaviour checks. The
 cREXX script only orchestrates development tools; it is not an assembler runtime
-dependency. Equivalent direct CMake invocation is:
+dependency. If `crexx` is available, CMake registers the additional desktop CLI
+contract script; its process adapter uses shell quoting and CMake file helpers.
+The C unit suites and independent positive deck checks remain available without
+cREXX. Equivalent direct CMake invocation is:
 
 ```sh
 cmake -S . -B build/classic-as

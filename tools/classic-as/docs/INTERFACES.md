@@ -23,6 +23,13 @@ changed replay and object-format errors. Core diagnostics have stable project
 categories and borrowed detail spans. The host owns readable messages and
 process return codes; IBM diagnostic wording and identifiers are not copied.
 
+An assembly context accepts one assembly attempt. Create a fresh context for
+another input, and release session storage only after its users have finished.
+If a provider returns an error, only its original source coordinates are usable;
+the engine must not inspect statement spans from that failed call. A non-null
+assembly result carries the returned status and marks failed output invalid,
+including rejected API arguments. Missing diagnostics callbacks are allowed.
+
 Sections and symbols have session-local IDs. Serialized ESD IDs are assigned
 by the writer. A fixup identifies its owning section and location separately
 from its target. A/V address kind is distinct from section/external target kind;

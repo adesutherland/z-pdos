@@ -5,8 +5,8 @@
 implementation. It is intended to grow into the cross-assembler for native
 runtime/OS source and later run on z/PDOS.
 
-The [local checkpoint](docs/CHECKPOINT.md) records completed component QA and
-the pending engine unit/integration work at the migration snapshot.
+The [checkpoint](docs/CHECKPOINT.md) distinguishes the published migration
+snapshot from the completed local implementation and independent host QA.
 
 Build and run from the repository root:
 

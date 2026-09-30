@@ -8,7 +8,7 @@
 #include <string.h>
 #include <errno.h>
 
-#define HOST_BUDGET ((size_t)32 * 1024 * 1024)
+#define HOST_BUDGET 33554432UL
 #define CARD_CAPACITY 256
 
 struct allocation { struct allocation *next; void *bytes; };
@@ -20,7 +20,7 @@ static void *host_acquire(void *cookie, size_t n)
 {
     struct host_storage *storage; struct allocation *node; void *bytes;
     storage = (struct host_storage *)cookie;
-    if (n > storage->limit - storage->used) return NULL;
+    if (storage->used > storage->limit || n > storage->limit - storage->used) return NULL;
     node = (struct allocation *)malloc(sizeof *node); if (!node) return NULL;
     bytes = malloc(n ? n : 1);
     if (!bytes) { free(node); return NULL; }
@@ -41,7 +41,8 @@ static enum mf_status host_next(void *cookie, struct mf_record *record)
 {
     struct host_source *source; size_t n; int c, too_long;
     source = (struct host_source *)cookie; n = 0; too_long = 0;
-    record->origin.source = 1; record->origin.line = source->line + 1; record->origin.column = 1;
+    record->origin.source = 1; record->origin.line = source->line; record->origin.column = 1;
+    if (source->line != ULONG_MAX) ++record->origin.line;
     while ((c = fgetc(source->file)) != EOF) {
         if (c == 0x0a) break;
         if (n == sizeof source->card) too_long = 1;
@@ -142,6 +143,15 @@ int main(int argc, char **argv)
     mf_octet reader_buffer[CARD_CAPACITY]; enum mf_status status;
     enum mf_profile profile; const char *input_path, *output_path; int arg, rc;
     profile = MF_S360; arg = 1; as = NULL; obj = NULL;
+    if (argc == 2 && strcmp(argv[1], "--version") == 0) {
+        puts("mf-classic-as 0.1.0-bootstrap"); return 0;
+    }
+    if (argc == 2 && strcmp(argv[1], "--help") == 0) {
+        puts("usage: mf-classic-as [--profile s360|s370] input.asm output.obj"); return 0;
+    }
+    if ((size_t)-1 < HOST_BUDGET || (size_t)-1 < 65536UL) {
+        fprintf(stderr, "desktop storage configuration exceeds host size_t range\n"); return 2;
+    }
     if (argc > arg && strcmp(argv[arg], "--profile") == 0) {
         if (argc <= arg + 1) { fprintf(stderr, "missing --profile value\n"); return 2; }
         if (strcmp(argv[arg + 1], "s360") == 0) profile = MF_S360;
@@ -156,7 +166,7 @@ int main(int argc, char **argv)
     if (strcmp(input_path, output_path) == 0 || !target_absent(output_path)) {
         fprintf(stderr, "output target already exists or cannot be checked: %s\n", output_path); return 2;
     }
-    memset(&memory, 0, sizeof memory); memory.limit = HOST_BUDGET;
+    memset(&memory, 0, sizeof memory); memory.limit = (size_t)HOST_BUDGET;
     memset(&input, 0, sizeof input); memset(&output, 0, sizeof output);
     input.file = fopen(input_path, "rb");
     if (!input.file) { fprintf(stderr, "cannot open input: %s\n", input_path); return 2; }
@@ -167,7 +177,7 @@ int main(int argc, char **argv)
     sink.cookie = &output; sink.begin = sink_begin; sink.write = sink_write; sink.finish = sink_finish;
     diagnostics.cookie = (void *)input_path; diagnostics.report = report;
     config.profile = profile; config.max_sections = 64; config.max_symbols = 4096;
-    config.max_fixups = 65536; config.max_statement = 256; config.max_expression_depth = 32;
+    config.max_fixups = (size_t)65536UL; config.max_statement = 256; config.max_expression_depth = 32;
     status = mf_reader_init(&reader, &records, reader_buffer, sizeof reader_buffer, &source);
     if (status == MF_OK) status = mf_as_create(&config, &storage, &as);
     if (status == MF_OK) status = mf_obj_create(&storage, &sink, config.max_sections, config.max_symbols, &obj, &writer);

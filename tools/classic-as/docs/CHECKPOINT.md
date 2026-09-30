@@ -1,4 +1,4 @@
-# Local implementation checkpoint
+# Bootstrap implementation checkpoint
 
 30 September 2026. The user requested a clean pause, migration into this
 repository, a local snapshot commit, and then restarted agents working here.
@@ -7,6 +7,57 @@ assembler/naming/design/inventory documents formerly held in the research
 repository are now owned here; only a short ownership pointer remains there.
 Historical licensed tools, private guest outputs and unrelated changes remain
 outside this source tree.
+
+The migration snapshot was committed as
+`04d41ecf1cf1f89f7125a2a127cc53cd5e5b0be5` and, on the user's subsequent
+instruction, pushed to [adesutherland/z-pdos](https://github.com/adesutherland/z-pdos)
+on `develop`. The remote branch was read back at that exact commit. The saved
+state below describes that snapshot; follow-on QA and repairs are recorded
+separately.
+
+## Completed local implementation after restart
+
+The original bootstrap slice is implemented and independently reviewed in this
+repository. On 30 September 2026 the user approved committing and pushing these
+completed changes, then qualifying the 31-bit entry adapter, PDPCLIB and PDOS
+support in that order. `04d41ec` identifies the earlier migration snapshot;
+the bootstrap completion is recorded separately in Git history.
+
+- `crexx tools/build.crexx --args test` passed all **19** registered checks
+  using Apple Clang 21.0.0, strict C90, warnings as errors and no C extensions.
+  Engine registration is now mandatory. Six C unit suites cover values, reader,
+  encoder, object writer, engine and independently authored contract controls.
+- `crexx tools/build.crexx --args sanitize` passed the same **19** checks with
+  address and undefined-behaviour sanitizers. The engine suite has **2,881**
+  assertions; the independent contract suite has **45**. Both implementer and
+  independent reviewer ran focused QA before the coordinator's integrated run.
+- Reviewed repairs cover returning to empty sections, failed API result status,
+  parenthesized displacement expressions and malformed provider spans. Layout
+  counts known duplicated constants in aggregate; it does not iterate billions
+  of elements before the classic writer can reject an oversized section.
+- Engine controls verify H/F signed bounds, absolute AD extremes, A/V fixup
+  identity and sign, modes, forward references, long internal/DSECT names,
+  USING/DROP and all selected operand formats. Limits, changed replay, provider
+  errors, and writer/sink failures through END and completion invalidate output.
+  One and 10,000 unlabeled instructions request identical allocator storage;
+  the independent reviewer also checked repeated unlabeled DC statements.
+- Actual CLI decks pass independent ESD/TXT/RLD/END semantic checks: bootstrap
+  **149**, constants **141**, formats **139** and selected S/370 BASR **26**.
+  The optional retained cREXX suite checks help/version, return codes, profiles,
+  existing binary preservation, failed output absence, CRLF and final EOF.
+  The CLI reviewer separately rejected eleven targeted deck corruptions.
+- The coordinator compiled the documented direct C89 recipe with `-O2` and
+  assembled the bootstrap fixture without CMake or cREXX. Its 13-card output
+  passed the same 149 independent semantic checks. Documentation and build
+  integration were reviewed against the actual command and core contracts.
+
+This qualifies the documented host component subset. Native z/PDOS hosting,
+16/32-bit host execution and non-ASCII C execution-character-set hosts have not
+been run. The core's numeric character handling and bounded arithmetic were
+reviewed; the desktop configuration explicitly rejects an insufficient
+`size_t` range. Complete newlib/PDPCLIB/PDOS assembly and downstream link/load or
+source-to-IPL qualification remain open. No guest run, compiler repair or
+OS-service implementation was started.
 
 ## Saved state before restart
 
@@ -29,23 +80,23 @@ outside this source tree.
   checks. Engine unit registration is visibly conditional at this checkpoint;
   seven passing checks do not imply completion of that pending suite.
 
-## Restart scope
+## Completed restart scope
 
-Work only in this repository. Finish the engine's original unit suite, including
-replay change, symbol/section/fixup/expression/storage limits, invalid operands,
-unresolved/duplicate names and failing providers/writers. Verify constant widths,
-signed bounds and long internal names. Resource use must not grow with the count
-of repeated unlabeled statements.
+Restarted work was confined to this repository. The engine unit suite now covers
+replay changes, symbol/section/fixup/expression/storage limits, invalid operands,
+unresolved/duplicate names and failing providers/writers. Constant widths,
+signed bounds, long internal names and storage independent of repeated unlabeled
+statements were checked.
 
-Then run the integrated strict-C89 build, independent deck checker and focused
-sanitizer QA. Review CLI output preservation and diagnostics; check that the user
-guide describes actual support. Remove the temporary conditional engine-test
-registration once its source exists so later builds require the complete suite.
+The integrated strict-C89 build, independent deck checker and sanitizer QA
+passed. CLI output preservation, diagnostics and the user guide were reviewed.
+The temporary conditional engine-test registration was removed; builds now
+require the complete suite.
 Retained development orchestration is `tools/build.crexx`; direct C compilation
 remains documented for hosts without cREXX/CMake.
 
 The implementer owns QA and the coordinator independently validates delivery.
 Agents use GPT-6.1 Sol Extra High for the engine/complex work and High for defined
 review tasks. No inherited assembler code, opcode table, private macro source,
-guest run, OS-service work, compiler repair or public push is part of this seed.
+guest run, OS-service work or compiler repair is part of this seed.
 Complete runtime/OS assembly and native z/PDOS hosting remain later gates.

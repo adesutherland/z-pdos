@@ -6,6 +6,7 @@ separately qualified compatible linker/loader. It does not link or execute code.
 ```text
 mf-classic-as [--profile s360|s370] input.asm output.obj
 mf-classic-as --version
+mf-classic-as --help
 ```
 
 The default instruction profile is `s360`. Source files contain ASCII bytes in
@@ -18,11 +19,13 @@ constants and doubled apostrophes are preserved; whitespace after an unquoted
 operand begins a remark. Do not insert spaces inside ordinary operands.
 
 Output is binary octets; do not apply text/EBCDIC conversion to the deck. The
-desktop driver stages output and refuses existing or uncheckable targets. Source
+desktop driver stages output and refuses readable existing or uncheckable targets. Source
 and assembly failures leave the requested output absent. A failed final write
 removes the new incomplete file. Standard C stdio does not provide exclusive
-atomic publication against a concurrent creator; callers must own their output
-path. A different host adapter may supply stronger publication semantics.
+atomic publication against a concurrent creator, or detect a dangling symbolic
+link through its existence check. Callers must own the output pathname and use
+an absent regular-file destination. A different host adapter may supply stronger
+publication semantics.
 
 ## Bootstrap language
 
@@ -70,13 +73,17 @@ Register/mask fields are 0–15, displacements 0–4095 and byte immediates 0–
 Character SS length is 1–256; decimal lengths are 1–16 with MP/DP restrictions.
 Register-pair restrictions are checked. Values are rejected before narrowing.
 The core encoder takes resolved fields; the engine owns expressions and USING.
+Write `0(12)` for zero displacement with base register 12. A parenthesized
+displacement expression such as `(4+1)` is an expression, and can precede an
+explicit suffix as in `(TARGET+4)(,12)`.
 
 ## Object and failure contract
 
 The writer emits SD/PC/ER/LD ESD identities, TXT bytes, four-byte A/V RLD fixups
 and END. Internal and serialized IDs are separate. It preserves section-relative
-entry, mode metadata and gaps. External names must fit eight CP037 bytes without
-truncation; record addresses/section lengths must fit 24 bits. Overlays and wider
+entry, mode metadata and gaps. Serialized CSECT, exported and external symbol
+names must fit eight CP037 bytes without truncation; record addresses/section
+lengths must fit 24 bits. Overlays and wider
 relocations are rejected. Local symbols and DSECT names remain internal.
 
 An artifact is usable only after successful assembly, writer and sink completion.
