@@ -4,7 +4,7 @@ The `0.1.0-bootstrap` build produces binary classic object decks, ready for a
 separately qualified compatible linker/loader. It does not link or execute code.
 
 ```text
-mf-classic-as [--profile s360|s370] input.asm output.obj
+mf-classic-as [--profile s360|s370] [--macros] input.asm output.obj
 mf-classic-as --version
 mf-classic-as --help
 ```
@@ -31,14 +31,15 @@ publication semantics.
 
 | Construct | Initial support |
 | --- | --- |
-| Sections | Named CSECT, internal DSECT layout, implicit unnamed section for ordinary statements; no overlays |
+| Sections | Named CSECT, one unnamed CSECT created/restored by an unlabeled CSECT, internal named DSECT layout, implicit unnamed section for ordinary statements; no overlays |
 | Symbols | ASCII names, case-insensitive identifiers, longer internal labels; bounded caller storage |
 | Expressions | Decimal and `X'hex'` integers, symbols, `*`, parentheses, unary signs, addition/subtraction and supported single-target relocation expressions |
 | EQU | Values resolvable in the layout pass; forward EQU chains are unsupported |
 | DC | H/F integers, A addresses, absolute eight-byte AD, external V, hexadecimal X and CP037 C/CL character constants; checked duplication and target length |
 | DS | Reservation/alignment for the documented constant types, including `0H`, `0F`, `0D`; no emitted bytes for gaps |
 | Addressability | One base per USING statement, DROP, explicit base/index fields; same-section symbolic addresses need a matching USING |
-| Visibility and entry | ENTRY, EXTRN and END with an optional section-relative entry |
+| Visibility and entry | ENTRY, EXTRN, implicit externals for a single-name V constant, and END with an optional section-relative entry |
+| Literals | Selected `=F'number'`, `=X'hex'` and `=V(name)`, explicit LTORG and implicit END pool |
 | Modes | AMODE 24/31; RMODE 24/ANY, checked independently of the instruction profile |
 
 H and F are signed 16- and 32-bit constants. Positive A values can use all 32
@@ -46,10 +47,32 @@ bits; absolute AD uses two 32-bit parts, including sign-extended negative values
 Eight-byte relocatable AD is unsupported. C/CL constants are sized after CP037
 conversion and padded with target spaces; X constants preserve explicit bytes.
 
-Multiplication/division, literals/LTORG, COPY, ORG, branch aliases, traditional
-macro/conditional assembly and cREXX expansion are not implemented. Unsupported
+A zero-duplication DC aligns and defines its label without emitting a value,
+creating an implicit external or recording a fixup. H/F/A/AD/V may omit their
+nominal in this case; C/X may omit it when an explicit length is present.
+Omitted plain `0C`/`0X` remain unsupported. A supplied numeric/address nominal
+is checked for the selected expression syntax and the 64-bit numeric-atom
+limit, but its value is not computed or checked against the field width.
+Symbol references in an ungenerated nominal need not resolve. Character/hex
+nominals still undergo the documented lexical and explicit-length checks.
+This does not yet implement symbol length/type attributes.
+
+Multiplication/division, COPY, ORG, conditional assembly and
+cREXX expansion are not implemented. Traditional definitions require the
+optional provider selected below. Unsupported
 constructs fail explicitly. The source parser's documented subset is distinct
 from the pure encoder's instruction descriptions.
+
+The selected literals have no duplication, explicit length, expression addend
+or nested nominal list. F literals are signed decimal; X literals contain an
+even, nonzero number of hexadecimal digits; V takes one external name. Identity
+is case-insensitive source spelling within one pool: differently spelled
+numeric values are not automatically merged. Pending literals collect globally
+across sections. LTORG emits them in the current real section; END emits the
+remaining pool at the end of the first real section. The pool starts on an
+eight-byte boundary and groups lengths divisible by 16, then 8, 4, 2, then odd,
+preserving encounter order within each group. A 16-byte literal need not start
+on a 16-byte boundary. Gaps remain reserved, without emitted fill bytes.
 
 ## Instruction profiles
 
@@ -69,13 +92,25 @@ attributes; it does not grant a historical CPU a new address mode.
 | SS decimal | MVO, PACK, UNPK, ZAP, CP, AP, SP, MP, DP: `d1(length1,b1),d2(length2,b2)` |
 | Selected S/370 additions | BASR, BAS, STCM, ICM, CS, CDS, MVCL, CLCL |
 
+Branch aliases lower to the ordinary BC/BCR encodings: B, BO, BH/BP, BL/BM,
+BNE/BNZ, BE/BZ, BNL/BNM, BNH/BNP, BNO and NOP. Each takes an address operand;
+append R for the register form, including BR and NOPR. NOP still requires its
+address operand in this subset. Alias handling belongs to the source engine,
+so replacement providers can use the same encoder with resolved BC/BCR fields.
+
 Register/mask fields are 0–15, displacements 0–4095 and byte immediates 0–255.
-Character SS length is 1–256; decimal lengths are 1–16 with MP/DP restrictions.
+The encoder's character SS length is 1–256; decimal lengths are 1–16 with MP/DP restrictions.
+An explicit source length of zero is normalized to one: both encode a zero
+length field. This supports EX templates without wrapping zero to 255.
 Register-pair restrictions are checked. Values are rejected before narrowing.
 The core encoder takes resolved fields; the engine owns expressions and USING.
 Write `0(12)` for zero displacement with base register 12. A parenthesized
 displacement expression such as `(4+1)` is an expression, and can precede an
 explicit suffix as in `(TARGET+4)(,12)`.
+For an SS length operand, `AREA(20)` supplies the length and infers a matching
+base from USING; `AREA(20,12)` selects base 12 explicitly. The second character
+SS operand may also infer its base, as in `XC AREA(20),AREA`. Implied lengths
+from symbol attributes remain unsupported.
 
 ## Object and failure contract
 
@@ -94,6 +129,39 @@ unsupported feature, range, duplicate, undefined, capacity, changed replay,
 object representation and I/O failure.
 
 The desktop configuration has 64 sections, 4096 symbols, 65536 fixups, 256
-statement bytes and expression depth 32, with a 32 MiB allocation-payload budget.
+literal identities across all pools, 256 statement bytes and expression depth
+32, with a 32 MiB allocation-payload budget.
 Allocator metadata and host buffers are additional. Other adapters choose their
 own explicit limits; this does not qualify a 24-bit native host's memory fit.
+
+## Optional traditional macros
+
+The ordinary CLI uses the identity reader. A CMake build includes the optional
+traditional provider by default; `--macros` selects it for that input. Configure
+with `-DMF_TRADITIONAL_MACROS=OFF` to omit its source and library entirely. The
+direct bootstrap recipe also omits it. Such builds reject `--macros` with return
+code 2; neither build silently expands macros without the option.
+
+The first provider supports inline MACRO/prototype/MEND definitions, invocation
+labels, positional arguments, keyword defaults and overrides, explicit empty
+arguments, parameter substitution, period delimiters and nested calls. Quoted
+commas and balanced parentheses stay inside one argument. Missing positional
+arguments are empty; missing keywords keep their literal default. Positional
+actuals fill only positional formal slots and must precede keyword actuals.
+Definitions cannot be redefined. It accepts both `*` and `.*` comment cards.
+A comma on MACRO/MEND is an empty marker operand; a comma on a call represents
+two empty positional arguments and is checked against the prototype.
+
+The provider explicitly rejects continuation, COPY, conditional controls and
+variables, attributes, SYSNDX, sublist indexing, escaped ampersands and nested
+definitions. The [macro guide](MACROS.md) gives an original example and the
+storage/replay/provenance contract. This is a language subset; it supplies no
+IBM service or mapping macros.
+
+Desktop limits are 64 definitions, 16 parameters per definition, 1,024 total
+model statements, 256 KiB definition bytes, nesting depth 16, 4,096 argument
+bytes per frame, 256 total field bytes per yielded statement and 1,000,000
+raw-record/model steps per pass. They share the driver's 32 MiB payload budget.
+Definitions, frames and workspaces are acquired at creation; advancing/replaying
+does not acquire per-invocation storage. Failures invalidate output through the
+same assembler/writer contract.

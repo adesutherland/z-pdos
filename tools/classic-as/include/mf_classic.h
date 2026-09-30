@@ -157,6 +157,7 @@ void mf_obj_destroy(struct mf_obj *);
 struct mf_as_config {
     enum mf_profile profile;
     size_t max_sections, max_symbols, max_fixups;
+    size_t max_literals; /* total pooled identities; zero disables literals */
     size_t max_statement, max_expression_depth;
 };
 struct mf_as_result {

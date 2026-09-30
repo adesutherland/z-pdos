@@ -8,9 +8,15 @@ assembly and object conventions.
 The first component is [Mainframe Classic Assembler](tools/classic-as/README.md),
 command `mf-classic-as`. Its original portable C core has a small bootstrap
 language and explicit interfaces for source records, storage and object output.
-Richer traditional macros and optional cREXX integration follow through those
-interfaces. The initial implementation is a host component proof; complete
+The first optional traditional macro provider uses those interfaces; conditional
+assembly and optional cREXX integration follow. This is a host component proof; complete
 runtime/OS assembly and native z/PDOS hosting remain future qualification steps.
+
+The first real consumer, the [TSO31 entry adapter](runtime/tso31/README.md), now
+assembles with independent object checks and passes target C layout assertions.
+Its [checkpoint](runtime/tso31/CHECKPOINT.md) records entry-only host link
+qualification and an inherited PDPCLIB relocation defect. Full
+link/execution acceptance and complete PDPCLIB/PDOS assembly remain open.
 
 **Mainframe Classic C**, command `mf-classic-cc`, is the intended classic
 GCC/cc370 lineage. Its maintained implementation and OS source are not yet

@@ -3,6 +3,9 @@
 The authoritative C declarations are [mf_classic.h](../include/mf_classic.h).
 They are source-level contracts, not a stable binary ABI. No native C structure
 is serialized into an object deck.
+The optional provider has a separate public header,
+[mf_classic_macro.h](../include/mf_classic_macro.h), and emits the existing
+statement interface without changing the bootstrap core's dependency graph.
 
 | Contract | Meaning and ownership |
 | --- | --- |
@@ -11,6 +14,8 @@ is serialized into an object deck.
 | `mf_storage.acquire` | Caller allocator supplies aligned session-lifetime storage; no per-block free or realloc required |
 | `mf_records.next/replay` | Supply raw records in declared encoding; borrowed record lasts until next/replay |
 | `mf_reader_init` | Bind the reader to caller storage and a record provider; returned statement fields last until next/replay |
+| `mf_macro_create/destroy` | Optional fixed-capacity traditional provider; creation acquires session arenas, next/replay reuse them; caller owns record/storage lifetimes |
+| `mf_macro_observer.notify` | Synchronous statement/failure observation with borrowed definition/model/invocation frames, outermost first; callback must copy anything retained |
 | `mf_statements.next/replay` | Supply identical logical statements and original coordinates for both passes |
 | `mf_machine_lookup`, `mf_encode` | Profile lookup and pure encoding of checked typed fields; no expressions or USING state |
 | `mf_as_create/assemble/destroy` | Per-assembly context, pass sequencing and diagnostics; context never closes devices or resets shared storage |
@@ -25,6 +30,10 @@ process return codes; IBM diagnostic wording and identifiers are not copied.
 
 An assembly context accepts one assembly attempt. Create a fresh context for
 another input, and release session storage only after its users have finished.
+`mf_as_config.max_literals` bounds total retained literal identities, including
+identities in pools already emitted. Zero disables literal syntax and avoids
+allocating its metadata table. Each unique selected literal spelling is copied
+into session storage; repeated instruction lines are not retained.
 If a provider returns an error, only its original source coordinates are usable;
 the engine must not inspect statement spans from that failed call. A non-null
 assembly result carries the returned status and marks failed output invalid,
@@ -56,3 +65,13 @@ malformed input, changed replay, storage exhaustion, partial/failing output and
 invalidation. Richer providers must preserve results for overlapping supported
 subsets. Optional resolvers, macro queries, listing observers and richer writers
 are future additions with their own contracts.
+
+Macro replay requires a completed EOF. It resets definition visibility, depth,
+workspaces and counters, then rebuilds definitions in the existing arenas.
+Changes in ignored comments, unused definitions, sequence fields or original
+coordinates still fail the raw-record consistency check. A yielded statement
+uses its outermost invocation as primary origin; observer frame names and all
+spans are borrowed only through callback return. The engine does not retain
+those frames for delayed diagnostics. Macro creation failure may have acquired
+some blocks; the supplied allocator owns their session cleanup, just as for the
+assembly and writer contexts.

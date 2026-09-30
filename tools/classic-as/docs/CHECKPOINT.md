@@ -21,7 +21,17 @@ The original bootstrap slice is implemented and independently reviewed in this
 repository. On 30 September 2026 the user approved committing and pushing these
 completed changes, then qualifying the 31-bit entry adapter, PDPCLIB and PDOS
 support in that order. `04d41ec` identifies the earlier migration snapshot;
-the bootstrap completion is recorded separately in Git history.
+the completed bootstrap was committed and pushed as
+[`e87652d2bc1efdee4439302be4420a5c3ac8911e`](https://github.com/adesutherland/z-pdos/commit/e87652d2bc1efdee4439302be4420a5c3ac8911e).
+The remote `develop` branch was read back at that exact SHA before consumer work.
+
+The subsequent local [TSO31 consumer checkpoint](../../../runtime/tso31/CHECKPOINT.md)
+records its source variant, expanded language subset, independent object QA,
+target C compilation and the downstream link audit. It is separate from the
+published bootstrap results below.
+The subsequent [PDPCLIB language checkpoint](PDPCLIB-CHECKPOINT.md) records
+ordinary layout semantics, the optional macro provider, actual source-owned
+consumer bytes and final independent host QA.
 
 - `crexx tools/build.crexx --args test` passed all **19** registered checks
   using Apple Clang 21.0.0, strict C90, warnings as errors and no C extensions.

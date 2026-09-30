@@ -126,6 +126,7 @@ static struct mf_as_config configuration(void)
 {
     struct mf_as_config c;
     c.profile = MF_S360; c.max_sections = 8; c.max_symbols = 64;
+    c.max_literals = 0;
     c.max_fixups = 64; c.max_statement = 256; c.max_expression_depth = 32;
     return c;
 }

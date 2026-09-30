@@ -190,6 +190,7 @@ static void init(struct fixture *f, const char *source)
     memset(f, 0, sizeof *f); f->first = f->source = source; f->pass = 1;
     f->budget = (size_t)-1; f->storage.cookie = f; f->storage.acquire = acquire;
     f->config.profile = MF_S360; f->config.max_sections = 8; f->config.max_symbols = 64;
+    f->config.max_literals = 0;
     f->config.max_fixups = 64; f->config.max_statement = 256; f->config.max_expression_depth = 32;
     f->records.cookie = f; f->records.encoding = MF_ASCII; f->records.next = record_next; f->records.replay = replay;
     CHECK(mf_reader_init(&f->reader, &f->records, f->buffer, sizeof f->buffer, &f->statements) == MF_OK);
@@ -344,7 +345,7 @@ static void bad_sources(void)
         {" L 1,0(16,1)\n END\n", MF_RANGE},
         {" SLL 1,0(16)\n END\n", MF_RANGE},
         {" MVI 0,256\n END\n", MF_RANGE},
-        {" MVC 0(0,1),0(2)\n END\n", MF_RANGE},
+        {" MVC 0(-1,1),0(2)\n END\n", MF_RANGE},
         {" MVC 0(257,1),0(2)\n END\n", MF_RANGE},
         {" ZAP 0(17,1),0(2,2)\n END\n", MF_RANGE},
         {" MP 0(2,1),0(2,2)\n END\n", MF_RANGE},
@@ -359,13 +360,13 @@ static void bad_sources(void)
         {"S CSECT\n RMODE 31\n LR 1,2\n END\n", MF_UNSUPPORTED},
         {" MACRO\n END\n", MF_UNSUPPORTED},
         {" COPY MEMBER\n END\n", MF_UNSUPPORTED},
-        {" LTORG\n END\n", MF_UNSUPPORTED},
+        {" ORG 0\n END\n", MF_UNSUPPORTED},
         {" L 1,=F'1'\n END\n", MF_UNSUPPORTED},
         {" DC A(2*3)\n END\n", MF_UNSUPPORTED},
         {" DC A(2/3)\n END\n", MF_UNSUPPORTED},
         {"S CSECT\nT CSECT\n DC A(S+T)\n END\n", MF_UNSUPPORTED},
         {"S CSECT\n DC A(S+S)\n END\n", MF_UNSUPPORTED},
-        {" DC 0F'1'\n END\n", MF_RANGE},
+        {" DC 4294967296F'1'\n END\n", MF_RANGE},
         {" DC CL1'AB'\n END\n", MF_RANGE},
         {" DC XL1'ABC'\n END\n", MF_RANGE},
         {" DC X'G0'\n END\n", MF_SOURCE},

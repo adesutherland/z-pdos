@@ -10,9 +10,10 @@ system. The initial implementation uses the C89/C90 common subset.
 | Module | Responsibility | Inputs and outputs |
 | --- | --- | --- |
 | `reader.c` | Decode raw ASCII or CP037 records, preserve card columns, recognize fields, provide identity preprocessing | Record callbacks to replayable statement callbacks |
+| `macro_cards.c`, `macro_provider.c` | Optional original fixed-card scanner and bounded traditional substitution provider | Raw records to the same replayable statements; separate library, explicit selection |
 | `values.c` | Checked two-part wide values and explicit ASCII/CP037 conversion | Numeric text and octets; no host locale |
 | `machine.c` | Original instruction descriptions and pure checked encoding | Profile, mnemonic and typed fields to instruction bytes |
-| `assemble.c` | Two passes, expressions, symbols, sections, layout, supported directives and addressability | Statement stream to checked writer events and diagnostics |
+| `assemble.c` | Two passes, expressions, symbols, sections, layout, branch aliases, bounded literal pools and addressability | Statement stream to checked writer events and diagnostics |
 | `object.c` | Classic ESD/TXT/RLD/END serialization and format limits | Final sections/symbols, bytes, gaps, fixups and entry to byte sink |
 | `main.c` | Desktop arguments, source files, bounded storage, diagnostics and output ownership | Standard C host adapter; the core exposes no `FILE` or paths |
 
@@ -25,7 +26,9 @@ justifies splitting them.
 ```mermaid
 flowchart LR
   Host[Host record adapter] --> Reader[Card reader and identity provider]
+  Host --> Macros[Optional traditional provider]
   Reader --> Engine[Layout and emission passes]
+  Macros --> Engine
   Engine --> Encoder[Machine encoder]
   Encoder --> Engine
   Engine --> Writer[Classic object writer]
@@ -40,6 +43,11 @@ replayed for validated emission. Replay fingerprints, counts and layout checks
 detect inconsistent input; this is a consistency check, not an adversarial
 cryptographic guarantee. The provider owns stable replay. The engine does not
 retain a copy of every statement or complete output image.
+Literal identities retain only selected unique spellings and final section/
+offset assignments. LTORG chooses the current real section; the implicit END
+pool chooses the first real section. Pool collection crosses section borders.
+Alias masks and pool placement remain source-language responsibilities; the
+machine encoder receives only resolved architectural fields.
 
 The driver owns storage, source/provider and sink/writer lifetimes. Each
 assembly has its own context. Borrowed statement fields last until the provider
@@ -77,8 +85,14 @@ retain longer internal names.
 ## Growth
 
 Bootstrap, standard and extended are intended capability sets of one product.
-Only bootstrap is implemented in this seed. A richer traditional macro provider
-will emit the same statements and provenance. Service/layout definitions belong
+The bootstrap core and first optional traditional provider are implemented.
+The provider acquires fixed definition/frame/argument workspaces at creation,
+then streams expansions without retaining an expanded compilation unit or call
+history. It fingerprints every raw record on replay, including comments and
+unused definitions. Synchronous observers expose borrowed nesting coordinates;
+delayed engine diagnostics retain only the outermost invocation. See
+[the macro contract and subsequent gates](MACROS.md).
+Service/layout definitions belong
 to their runtime or OS component and are independently written or imported with
 confirmed rights. Assembly-state macro queries require an explicit phase/query
 contract. An optional later cREXX provider uses that contract; neither backend

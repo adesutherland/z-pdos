@@ -51,3 +51,11 @@ Tests use original independent instruction vectors and object-record assertions,
 with invalid ranges, malformed input, replay changes, capacity exhaustion and
 sink failures. Encoding/decoding round trips cannot replace those controls.
 This host suite does not establish native z/PDOS hosting or complete source-to-IPL.
+
+The optional traditional provider is a separate C89 library, included by the
+development CMake build and selected only by `--macros`. Use
+`-DMF_TRADITIONAL_MACROS=OFF` for the small CMake configuration; the direct recipe
+above already excludes it. Its public header is `mf_classic_macro.h`. A direct
+capable-host build can add `macro_cards.c` and `macro_provider.c` and define
+`MF_WITH_TRADITIONAL_MACROS` for the desktop driver. No cREXX runtime, resolver,
+heap API or external macro library becomes a core dependency.

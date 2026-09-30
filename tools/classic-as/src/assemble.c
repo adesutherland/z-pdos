@@ -15,8 +15,12 @@ struct value {
     enum mf_reference_kind kind;
     unsigned target;
 };
-struct symbol_state { struct value value; int defined; };
+struct symbol_state { struct value value; int defined, implicit_external; };
 struct section_state { mf_u32 position; unsigned mode_mask; };
+struct literal {
+    struct mf_span text; unsigned section, alignment; size_t pool;
+    mf_u32 offset; int placed, seen;
+};
 struct base_state { int active; unsigned section; mf_u32 offset; };
 struct fingerprint { mf_u32 a, b; struct mf_u64 bytes; unsigned long count; int complete; };
 struct mf_as {
@@ -27,6 +31,7 @@ struct mf_as {
     struct section_state *section_state;
     struct mf_symbol *symbols;
     struct symbol_state *symbol_state;
+    struct literal *literals; size_t literal_count, pool;
     struct base_state bases[16];
     struct mf_statement statement;
     const struct mf_object_writer *writer;
@@ -34,7 +39,7 @@ struct mf_as {
     int pass, ended, used;
     struct mf_entry entry;
 };
-struct parser { struct mf_as *as; struct mf_span text; size_t at, depth; };
+struct parser { struct mf_as *as; struct mf_span text; size_t at, depth; int syntax_only; };
 
 static mf_octet upper(mf_octet c)
 { return c >= 0x61 && c <= 0x7a ? (mf_octet)(c - 0x20) : c; }
@@ -168,7 +173,7 @@ static enum mf_status add_symbol(struct mf_as *as, struct mf_span name, size_t *
     as->symbols[i].id = (unsigned)(i + 1);
     as->symbols[i].kind = MF_LOCAL;
     as->symbols[i].section = 0; as->symbols[i].offset = 0;
-    as->symbol_state[i].defined = 0;
+    as->symbol_state[i].defined = 0; as->symbol_state[i].implicit_external = 0;
     as->symbol_state[i].value = zero_value();
     ++as->symbol_count; *index = i;
     return MF_OK;
@@ -224,8 +229,10 @@ static enum mf_status atom(struct parser *p, struct value *out)
         status = expression(p, &v); skip(p);
         if (status == MF_OK && (p->at == p->text.length || p->text.data[p->at++] != 0x29)) status = MF_SOURCE;
     } else if (c == 0x2a) {
-        if (p->as->current == NIL) status = MF_SOURCE;
-        else v = current_value(p->as);
+        if (!p->syntax_only) {
+            if (p->as->current == NIL) status = MF_SOURCE;
+            else v = current_value(p->as);
+        }
     } else if (c >= 0x30 && c <= 0x39) {
         start = p->at - 1;
         while (p->at < p->text.length && p->text.data[p->at] >= 0x30 && p->text.data[p->at] <= 0x39) ++p->at;
@@ -247,9 +254,12 @@ static enum mf_status atom(struct parser *p, struct value *out)
     } else if (name_start(c)) {
         start = p->at - 1;
         while (p->at < p->text.length && name_char(p->text.data[p->at])) ++p->at;
-        s = subspan(p->text, start, p->at - start); i = find_symbol(p->as, s);
-        if (i == NIL || !p->as->symbol_state[i].defined) status = MF_UNDEFINED;
-        else v = p->as->symbol_state[i].value;
+        s = subspan(p->text, start, p->at - start);
+        if (!p->syntax_only) {
+            i = find_symbol(p->as, s);
+            if (i == NIL || !p->as->symbol_state[i].defined) status = MF_UNDEFINED;
+            else v = p->as->symbol_state[i].value;
+        }
     } else status = c == 0x3d || c == 0x26 ? MF_UNSUPPORTED : MF_SOURCE;
     --p->depth;
     if (status == MF_OK) *out = v;
@@ -265,20 +275,22 @@ static enum mf_status expression(struct parser *p, struct value *out)
         c = p->text.data[p->at];
         if (c != 0x2b && c != 0x2d) break;
         ++p->at; status = atom(p, &b);
-        if (status == MF_OK) status = combine(a, b, c == 0x2d, &a);
+        if (status == MF_OK && !p->syntax_only) status = combine(a, b, c == 0x2d, &a);
     }
     if (status == MF_OK) *out = a;
     return status;
 }
-static enum mf_status evaluate(struct mf_as *as, struct mf_span s, struct value *v)
+static enum mf_status evaluate_mode(struct mf_as *as, struct mf_span s, struct value *v, int syntax_only)
 {
     struct parser p; enum mf_status status;
-    p.as = as; p.text = s; p.at = 0; p.depth = 0;
+    p.as = as; p.text = s; p.at = 0; p.depth = 0; p.syntax_only = syntax_only;
     status = expression(&p, v); skip(&p);
     if (status == MF_OK && p.at != p.text.length)
         status = p.text.data[p.at] == 0x2a || p.text.data[p.at] == 0x2f ? MF_UNSUPPORTED : MF_SOURCE;
     return status;
 }
+static enum mf_status evaluate(struct mf_as *as, struct mf_span s, struct value *v)
+{ return evaluate_mode(as, s, v, 0); }
 /* Split only at top-level commas. Nested parentheses/quotes belong to values. */
 static enum mf_status split(struct mf_span s, struct mf_span *parts, size_t capacity, size_t *count)
 {
@@ -329,15 +341,18 @@ static enum mf_status ensure_section(struct mf_as *as)
 static enum mf_status select_section(struct mf_as *as, int dummy)
 {
     size_t i, symbol; enum mf_status status; int declared;
-    if (as->statement.operand.length || !valid_name(as->statement.label)) return MF_SOURCE;
+    if (as->statement.operand.length ||
+        (as->statement.label.length ? !valid_name(as->statement.label) : dummy)) return MF_SOURCE;
     for (i = 0; i < as->section_count; ++i)
         if (same_name(as->sections[i].name, as->statement.label)) break;
     declared = i != as->section_count;
     if (!declared) {
         if (as->pass == 2) return MF_REPLAY;
         if (i == as->config.max_sections) return MF_LIMIT;
-        status = copy_name(as, as->statement.label, &as->sections[i].name);
-        if (status != MF_OK) return status;
+        if (as->statement.label.length) {
+            status = copy_name(as, as->statement.label, &as->sections[i].name);
+            if (status != MF_OK) return status;
+        } else { as->sections[i].name.data = NULL; as->sections[i].name.length = 0; }
         as->sections[i].id = (unsigned)(i + 1); as->sections[i].length = 0;
         as->sections[i].amode = 24; as->sections[i].rmode = 24;
         as->sections[i].dummy = dummy;
@@ -346,6 +361,7 @@ static enum mf_status select_section(struct mf_as *as, int dummy)
     } else if (as->sections[i].dummy != dummy) return as->pass == 1 ? MF_DUPLICATE : MF_REPLAY;
     as->current = i;
     if (declared) {
+        if (!as->statement.label.length) return MF_OK;
         symbol = find_symbol(as, as->statement.label);
         if (symbol == NIL || !as->symbol_state[symbol].defined ||
             as->symbols[symbol].section != as->sections[i].id ||
@@ -390,7 +406,9 @@ static enum mf_status symbol_list(struct mf_as *as, int external)
         } else {
             if (i == NIL) { status = add_symbol(as, name, &i); if (status != MF_OK) return status; }
             if (external) {
-                if (as->symbol_state[i].defined || as->symbols[i].kind != MF_LOCAL) return MF_DUPLICATE;
+                if (as->symbols[i].kind == MF_EXTERNAL && as->symbol_state[i].implicit_external) {
+                    as->symbol_state[i].implicit_external = 0;
+                } else if (as->symbol_state[i].defined || as->symbols[i].kind != MF_LOCAL) return MF_DUPLICATE;
                 as->symbols[i].kind = MF_EXTERNAL; as->symbol_state[i].defined = 1;
                 v = zero_value(); v.coefficient = 1; v.kind = MF_REF_EXTERNAL; v.target = as->symbols[i].id;
                 as->symbol_state[i].value = v;
@@ -404,6 +422,23 @@ static enum mf_status symbol_list(struct mf_as *as, int external)
     }
     return MF_OK;
 }
+/* A single V name declares an ordinary external identity. Repeated V uses
+ * reuse it; a local/export declaration cannot silently change its meaning. */
+static enum mf_status implicit_external(struct mf_as *as, struct mf_span name)
+{
+    size_t i; struct value v; enum mf_status status;
+    if (!valid_name(name)) return MF_SOURCE;
+    i = find_symbol(as, name);
+    if (i != NIL) return as->symbols[i].kind == MF_EXTERNAL ? MF_OK : MF_DUPLICATE;
+    if (as->pass == 2) return MF_REPLAY;
+    status = add_symbol(as, name, &i); if (status != MF_OK) return status;
+    as->symbols[i].kind = MF_EXTERNAL; as->symbol_state[i].defined = 1;
+    as->symbol_state[i].implicit_external = 1;
+    v = zero_value(); v.coefficient = 1; v.kind = MF_REF_EXTERNAL; v.target = as->symbols[i].id;
+    as->symbol_state[i].value = v; return MF_OK;
+}
+static enum mf_status literal_value(struct mf_as *, struct mf_span, struct value *);
+static enum mf_status literal_pool(struct mf_as *, int);
 static enum mf_status mode(struct mf_as *as, int address)
 {
     static const mf_octet any[] = { 0x41, 0x4e, 0x59 };
@@ -454,17 +489,21 @@ static enum mf_status address(struct mf_as *as, struct mf_span s, int indexed,
     unsigned *index_or_length)
 {
     struct mf_span fields[2], value_text; size_t i, open, count, depth; struct value v;
-    enum mf_status status; mf_u32 n, d, best; unsigned r, chosen; int explicit_base, group_comma;
+    enum mf_status status; mf_u32 n, d, best; unsigned r, chosen; int explicit_base, group_comma, quoted;
     s = trim(s); open = NIL; explicit_base = 0; *index_or_length = 0;
-    depth = 0; group_comma = 0;
+    depth = 0; group_comma = quoted = 0;
     for (i = 0; i < s.length; ++i) {
+        if (s.data[i] == 0x27) { quoted = !quoted; continue; }
+        if (quoted) continue;
         if (s.data[i] == 0x28) {
             if (!depth) { open = i; group_comma = 0; }
             ++depth;
         } else if (s.data[i] == 0x29) { if (!depth) return MF_SOURCE; --depth; }
         else if (s.data[i] == 0x2c && depth == 1) group_comma = 1;
     }
-    if (depth) return MF_SOURCE;
+    if (depth || quoted) return MF_SOURCE;
+    if (open != NIL && open && s.data[0] == 0x3d &&
+        upper(s.data[open - 1]) >= 0x41 && upper(s.data[open - 1]) <= 0x5a) open = NIL;
     /* A suffix follows a complete displacement expression. An initial group,
      * or one following an arithmetic sign, belongs to that expression. */
     if (open != NIL && ((!open && !group_comma) || s.data[s.length - 1] != 0x29 ||
@@ -479,25 +518,33 @@ static enum mf_status address(struct mf_as *as, struct mf_span s, int indexed,
                 if (fields[0].length) {
                     status = number(as, fields[0], length_field ? max_length : 15, &n);
                     if (status != MF_OK) return status;
-                    if (length_field && !n) return MF_RANGE;
-                    *index_or_length = (unsigned)n;
+                    *index_or_length = (unsigned)(length_field && !n ? 1 : n);
                 } else if (length_field) return MF_SOURCE;
                 status = number(as, fields[1], 15, &n);
-            } else if (count == 1 && !length_field) status = number(as, fields[0], 15, &n);
-            else return MF_SOURCE;
+            } else if (count == 1) {
+                status = number(as, fields[0], length_field ? max_length : 15, &n);
+                if (status != MF_OK) return status;
+                if (length_field) {
+                    *index_or_length = (unsigned)(n ? n : 1);
+                }
+            } else return MF_SOURCE;
         } else {
             if (count != 1) return MF_SOURCE;
             status = number(as, fields[0], 15, &n);
         }
         if (status != MF_OK) return status;
-        *base = (unsigned)n; explicit_base = 1;
+        if (!length_field || count == 2) { *base = (unsigned)n; explicit_base = 1; }
     } else {
         if (length_field) return MF_SOURCE;
         value_text = s;
     }
     if (!value_text.length) v = zero_value();
     else {
-        status = evaluate(as, value_text, &v);
+        if (value_text.data[0] == 0x3d) {
+            status = literal_value(as, value_text, &v);
+            if (status != MF_OK) return status;
+            if (as->pass == 1) { *disp = 0; if (!explicit_base) *base = 0; return MF_OK; }
+        } else status = evaluate(as, value_text, &v);
         /* Forward instruction labels do not affect layout. Pass 2 resolves. */
         if (status == MF_UNDEFINED && as->pass == 1) { *disp = 0; if (!explicit_base) *base = 0; return MF_OK; }
         if (status != MF_OK) return status;
@@ -572,6 +619,51 @@ static enum mf_status instruction(struct mf_as *as, const struct mf_instruction 
     return advance(as, (mf_u32)length, bytes);
 }
 
+struct branch_name { mf_octet name[5]; unsigned length, mask; };
+static int branch_alias(struct mf_span name, unsigned *mask, int *reg)
+{
+    static const struct branch_name aliases[] = {
+        {{0x42},1,15}, {{0x42,0x4f},2,1}, {{0x42,0x48},2,2},
+        {{0x42,0x50},2,2}, {{0x42,0x4c},2,4}, {{0x42,0x4d},2,4},
+        {{0x42,0x4e,0x45},3,7}, {{0x42,0x4e,0x5a},3,7},
+        {{0x42,0x45},2,8}, {{0x42,0x5a},2,8},
+        {{0x42,0x4e,0x4c},3,11}, {{0x42,0x4e,0x4d},3,11},
+        {{0x42,0x4e,0x48},3,13}, {{0x42,0x4e,0x50},3,13},
+        {{0x42,0x4e,0x4f},3,14}, {{0x4e,0x4f,0x50},3,0}
+    };
+    size_t i; struct mf_span base;
+    *reg = name.length > 1 && upper(name.data[name.length - 1]) == 0x52;
+    base = name; if (*reg) --base.length;
+    for (i = 0; i < sizeof aliases / sizeof aliases[0]; ++i)
+        if (word(base, aliases[i].name, aliases[i].length)) { *mask = aliases[i].mask; return 1; }
+    return 0;
+}
+static enum mf_status branch(struct mf_as *as, unsigned mask, int reg)
+{
+    static const mf_octet bc[] = {0x42,0x43}, bcr[] = {0x42,0x43,0x52};
+    struct mf_span name, parts[1]; struct mf_operands op; const struct mf_instruction *ins;
+    enum mf_status status; size_t count; unsigned length; mf_u32 n; mf_octet bytes[4];
+    status = ensure_section(as); if (status != MF_OK) return status;
+    if (as->sections[as->current].dummy) return MF_SOURCE;
+    status = align_position(as, 2); if (status != MF_OK) return status;
+    status = define(as, as->statement.label, current_value(as)); if (status != MF_OK) return status;
+    status = split(as->statement.operand, parts, 1, &count); if (status != MF_OK) return status;
+    if (!parts[0].length) return MF_SOURCE;
+    memset(&op, 0, sizeof op); op.r1 = mask;
+    if (reg) {
+        status = number(as, parts[0], 15, &n); if (status != MF_OK) return status;
+        op.r2 = (unsigned)n; name.data = bcr; name.length = sizeof bcr;
+    } else {
+        status = address(as, parts[0], 1, 0, 0, &op.d2, &op.b2, &op.x2);
+        if (status != MF_OK) return status;
+        name.data = bc; name.length = sizeof bc;
+    }
+    ins = mf_machine_lookup(as->config.profile, name);
+    if (!ins) return MF_UNSUPPORTED;
+    status = mf_encode(as->config.profile, ins, &op, bytes, sizeof bytes, &length);
+    return status == MF_OK ? advance(as, length, bytes) : status;
+}
+
 struct constant {
     unsigned type, width, alignment;
     mf_u32 repeat;
@@ -611,8 +703,11 @@ static enum mf_status constant_parse(struct mf_as *as, struct mf_span s, int res
         if (type != 0x43 && type != 0x58) return MF_UNSUPPORTED;
     }
     if (reserve) return at == s.length ? MF_OK : MF_UNSUPPORTED;
-    if (!c->repeat) return MF_RANGE;
-    if (at == s.length) return MF_SOURCE;
+    if (at == s.length) {
+        if (c->repeat) return MF_SOURCE;
+        if ((type == 0x43 || type == 0x58) && !c->explicit_length) return MF_UNSUPPORTED;
+        return MF_OK;
+    }
     if (type == 0x41 || type == 0x56) {
         if (s.data[at] != 0x28 || s.data[s.length - 1] != 0x29) return MF_SOURCE;
         c->value = trim(subspan(s, at + 1, s.length - at - 2));
@@ -620,6 +715,7 @@ static enum mf_status constant_parse(struct mf_as *as, struct mf_span s, int res
     }
     if (s.data[at] != 0x27 || s.data[s.length - 1] != 0x27 || s.length - at < 2) return MF_SOURCE;
     c->value = subspan(s, at + 1, s.length - at - 2);
+    if ((type == 0x48 || type == 0x46) && !c->value.length) return MF_SOURCE;
     if (type == 0x58) {
         if (!c->value.length) return MF_SOURCE;
         for (i = 0; i < c->value.length; ++i) if (hex_digit(c->value.data[i]) < 0) return MF_SOURCE;
@@ -664,8 +760,12 @@ static enum mf_status emit_constant(struct mf_as *as, const struct constant *c)
     enum mf_status status; struct value v; struct mf_fixup fixup;
     mf_octet bytes[256]; mf_u32 repetition, offset; size_t i, written, chunk, input;
     unsigned width; int nibble;
+    if (!c->repeat) return MF_OK;
     v = zero_value();
     if (c->type == 0x48 || c->type == 0x46 || c->type == 0x41 || c->type == 0x44 || c->type == 0x56) {
+        if (c->type == 0x56 && valid_name(c->value)) {
+            status = implicit_external(as, c->value); if (status != MF_OK) return status;
+        }
         status = evaluate(as, c->value, &v);
         if (status == MF_UNDEFINED && as->pass == 1) return advance(as, c->width * c->repeat, NULL);
         if (status != MF_OK) return status;
@@ -726,10 +826,98 @@ static enum mf_status emit_constant(struct mf_as *as, const struct constant *c)
     }
     return MF_OK;
 }
+/* Only F signed decimal, X octets and V(single-name) literals are selected.
+ * The table owns identities, not source statements or complete pool images. */
+static enum mf_status literal_constant(struct mf_as *as, struct mf_span text,
+    struct constant *c)
+{
+    struct value v; enum mf_status status; mf_octet bytes[4];
+    if (!text.length || text.data[0] != 0x3d) return MF_SOURCE;
+    status = constant_parse(as, subspan(text, 1, text.length - 1), 0, c);
+    if (status != MF_OK) return status;
+    if (c->repeat != 1 || c->explicit_length ||
+        (c->type != 0x46 && c->type != 0x58 && c->type != 0x56)) return MF_UNSUPPORTED;
+    if (c->type == 0x46) {
+        v = zero_value();
+        status = mf_u64_parse(c->value, &v.magnitude, &v.negative);
+        if (status != MF_OK) return status;
+        status = numeric_bytes(v, 4, 1, bytes); if (status != MF_OK) return status;
+    } else if (c->type == 0x56) {
+        status = implicit_external(as, c->value); if (status != MF_OK) return status;
+    } else {
+        c->alignment = c->width % 16 == 0 ? 16 : c->width % 8 == 0 ? 8 :
+            c->width % 4 == 0 ? 4 : c->width % 2 == 0 ? 2 : 1;
+    }
+    return MF_OK;
+}
+static enum mf_status literal_value(struct mf_as *as, struct mf_span text, struct value *v)
+{
+    struct literal *literal; struct constant c; size_t i, j; enum mf_status status; mf_octet *copy;
+    if (!as->config.max_literals) return MF_UNSUPPORTED;
+    status = literal_constant(as, text, &c); if (status != MF_OK) return status;
+    for (i = 0; i < as->literal_count; ++i) {
+        literal = &as->literals[i];
+        if (literal->pool == as->pool && same_name(literal->text, text)) break;
+    }
+    if (i == as->literal_count) {
+        if (as->pass == 2) return MF_REPLAY;
+        if (i == as->config.max_literals) return MF_LIMIT;
+        copy = (mf_octet *)acquire(as, text.length); if (!copy) return MF_LIMIT;
+        for (j = 0; j < text.length; ++j) copy[j] = upper(text.data[j]);
+        literal = &as->literals[i]; memset(literal, 0, sizeof *literal);
+        literal->text.data = copy; literal->text.length = text.length;
+        literal->pool = as->pool; literal->alignment = c.alignment;
+        ++as->literal_count;
+    }
+    literal = &as->literals[i]; literal->seen = 1;
+    *v = zero_value(); v->coefficient = 1; v->kind = MF_REF_SECTION; v->target = literal->section;
+    v->magnitude.lo = literal->offset;
+    return as->pass == 2 && !literal->placed ? MF_REPLAY : MF_OK;
+}
+static enum mf_status literal_pool(struct mf_as *as, int labeled)
+{
+    size_t i; unsigned alignment; struct literal *literal; struct constant c; enum mf_status status; int pending;
+    if (as->current == NIL || as->sections[as->current].dummy) return MF_SOURCE;
+    pending = 0;
+    for (i = 0; i < as->literal_count; ++i)
+        if (as->literals[i].pool == as->pool) pending = 1;
+    if (pending) { status = align_position(as, 8); if (status != MF_OK) return status; }
+    if (labeled) {
+        status = define(as, as->statement.label, current_value(as)); if (status != MF_OK) return status;
+    }
+    for (alignment = 16; alignment; alignment /= 2) {
+        for (i = 0; i < as->literal_count; ++i) {
+            literal = &as->literals[i];
+            if (literal->pool != as->pool || literal->alignment != alignment) continue;
+            if (as->pass == 2 && !literal->seen) return MF_REPLAY;
+            status = literal_constant(as, literal->text, &c); if (status != MF_OK) return status;
+            status = align_position(as, alignment > 8 ? 8 : alignment); if (status != MF_OK) return status;
+            if (as->pass == 1) {
+                literal->offset = as->section_state[as->current].position;
+                literal->section = as->sections[as->current].id; literal->placed = 1;
+            } else if (literal->section != as->sections[as->current].id ||
+                literal->offset != as->section_state[as->current].position) return MF_REPLAY;
+            status = emit_constant(as, &c); if (status != MF_OK) return status;
+        }
+    }
+    if (as->pool == (size_t)-1) return MF_LIMIT;
+    ++as->pool; return MF_OK;
+}
+static enum mf_status end_literal_pool(struct mf_as *as)
+{
+    size_t i, saved; enum mf_status status;
+    saved = as->current;
+    for (i = 0; i < as->section_count; ++i) {
+        if (as->sections[i].dummy) continue;
+        as->current = i; status = literal_pool(as, 0); as->current = saved;
+        return status;
+    }
+    return MF_OK;
+}
 static enum mf_status data_statement(struct mf_as *as, int reserve)
 {
     struct mf_span s, item; struct constant c; enum mf_status status;
-    size_t at, first, depth; int quoted, first_item; mf_u32 total;
+    size_t at, first, depth; int quoted, first_item; mf_u32 total; struct value ignored;
     status = ensure_section(as); if (status != MF_OK) return status;
     s = as->statement.operand; at = first = depth = 0; quoted = 0; first_item = 1;
     while (at <= s.length) {
@@ -742,6 +930,10 @@ static enum mf_status data_statement(struct mf_as *as, int reserve)
             if (quoted || depth) return MF_SOURCE;
             item = trim(subspan(s, first, at - first));
             status = constant_parse(as, item, reserve, &c); if (status != MF_OK) return status;
+            if (!reserve && !c.repeat && c.value.length &&
+                (c.type == 0x48 || c.type == 0x46 || c.type == 0x41 || c.type == 0x44 || c.type == 0x56)) {
+                status = evaluate_mode(as, c.value, &ignored, 1); if (status != MF_OK) return status;
+            }
             if (c.repeat && c.width > U32MAX / c.repeat) return MF_RANGE;
             total = c.repeat * c.width;
             status = align_position(as, c.alignment); if (status != MF_OK) return status;
@@ -763,16 +955,16 @@ static enum mf_status end_statement(struct mf_as *as)
     struct value v; enum mf_status status;
     if (as->statement.label.length) return MF_SOURCE;
     as->ended = 1;
-    if (!as->statement.operand.length) return MF_OK;
+    if (!as->statement.operand.length) return end_literal_pool(as);
     status = evaluate(as, as->statement.operand, &v);
-    if (status == MF_UNDEFINED && as->pass == 1) return MF_OK;
+    if (status == MF_UNDEFINED && as->pass == 1) return end_literal_pool(as);
     if (status != MF_OK) return status;
     if (v.coefficient != 1 || v.kind != MF_REF_SECTION || v.negative || v.magnitude.hi) return MF_SOURCE;
     if (v.target == 0 || v.target > as->section_count || as->sections[v.target - 1].dummy) return MF_SOURCE;
     if (as->pass == 2) {
         as->entry.present = 1; as->entry.section = v.target; as->entry.offset = v.magnitude.lo;
     }
-    return MF_OK;
+    return end_literal_pool(as);
 }
 static enum mf_status process(struct mf_as *as)
 {
@@ -787,7 +979,9 @@ static enum mf_status process(struct mf_as *as)
     static const mf_octet end[] = {0x45,0x4e,0x44};
     static const mf_octet using[] = {0x55,0x53,0x49,0x4e,0x47};
     static const mf_octet drop[] = {0x44,0x52,0x4f,0x50};
+    static const mf_octet ltorg[] = {0x4c,0x54,0x4f,0x52,0x47};
     struct mf_span op; struct value v; const struct mf_instruction *ins; enum mf_status status;
+    unsigned mask; int reg;
     op = as->statement.operation;
     if (!op.length) return as->statement.label.length || as->statement.operand.length ? MF_SOURCE : MF_OK;
     if (as->ended) return MF_SOURCE;
@@ -807,6 +1001,11 @@ static enum mf_status process(struct mf_as *as)
     if (word(op, using, sizeof using)) return using_statement(as, 0);
     if (word(op, drop, sizeof drop)) return using_statement(as, 1);
     if (word(op, end, sizeof end)) return end_statement(as);
+    if (word(op, ltorg, sizeof ltorg)) {
+        if (as->statement.operand.length) return MF_SOURCE;
+        return literal_pool(as, 1);
+    }
+    if (branch_alias(op, &mask, &reg)) return branch(as, mask, reg);
     ins = mf_machine_lookup(as->config.profile, op);
     return ins ? instruction(as, ins) : MF_UNSUPPORTED;
 }
@@ -856,7 +1055,11 @@ static enum mf_status run_pass(struct mf_as *as, const struct mf_statements *sou
     struct fingerprint *fingerprint)
 {
     enum mf_status status, semantic_error; size_t n, i; struct mf_origin error_origin;
-    for (i = 0; i < as->section_count; ++i) as->section_state[i].position = 0;
+    for (i = 0; i < as->section_count; ++i) {
+        as->section_state[i].position = 0;
+    }
+    as->pool = 0;
+    if (as->pass == 2) for (i = 0; i < as->literal_count; ++i) as->literals[i].seen = 0;
     memset(as->bases, 0, sizeof as->bases); as->current = NIL; as->ended = 0; as->fixup_count = 0;
     fingerprint_init(fingerprint);
     semantic_error = MF_OK; memset(&error_origin, 0, sizeof error_origin);
@@ -906,7 +1109,7 @@ static enum mf_status run_pass(struct mf_as *as, const struct mf_statements *sou
 enum mf_status mf_as_create(const struct mf_as_config *config,
     const struct mf_storage *storage, struct mf_as **out)
 {
-    struct mf_as *as; size_t a, b, c, d, total;
+    struct mf_as *as; size_t a, b, c, d, e, total;
     if (out) *out = NULL;
     if (!config || !storage || !storage->acquire || !out) return MF_SOURCE;
     if (config->profile != MF_S360 && config->profile != MF_S370) return MF_UNSUPPORTED;
@@ -915,7 +1118,8 @@ enum mf_status mf_as_create(const struct mf_as_config *config,
     if (!allocation_size(config->max_sections, sizeof(struct mf_section), &a) ||
         !allocation_size(config->max_sections, sizeof(struct section_state), &b) ||
         !allocation_size(config->max_symbols, sizeof(struct mf_symbol), &c) ||
-        !allocation_size(config->max_symbols, sizeof(struct symbol_state), &d)) return MF_LIMIT;
+        !allocation_size(config->max_symbols, sizeof(struct symbol_state), &d) ||
+        !allocation_size(config->max_literals, sizeof(struct literal), &e)) return MF_LIMIT;
     total = sizeof *as;
     if (a > (size_t)-1 - total) return MF_LIMIT;
     total += a;
@@ -924,6 +1128,8 @@ enum mf_status mf_as_create(const struct mf_as_config *config,
     if (c > (size_t)-1 - total) return MF_LIMIT;
     total += c;
     if (d > (size_t)-1 - total) return MF_LIMIT;
+    total += d;
+    if (e > (size_t)-1 - total) return MF_LIMIT;
     as = (struct mf_as *)storage->acquire(storage->cookie, sizeof *as);
     if (!as) return MF_LIMIT;
     memset(as, 0, sizeof *as); as->config = *config; as->storage = *storage; as->requested = sizeof *as;
@@ -932,6 +1138,10 @@ enum mf_status mf_as_create(const struct mf_as_config *config,
     as->symbols = (struct mf_symbol *)acquire(as, c);
     as->symbol_state = (struct symbol_state *)acquire(as, d);
     if (!as->sections || !as->section_state || !as->symbols || !as->symbol_state) return MF_LIMIT;
+    if (e) {
+        as->literals = (struct literal *)acquire(as, e);
+        if (!as->literals) return MF_LIMIT;
+    }
     memset(as->section_state, 0, b); as->current = NIL; *out = as;
     return MF_OK;
 }

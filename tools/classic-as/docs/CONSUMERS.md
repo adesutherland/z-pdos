@@ -24,6 +24,19 @@ variant must be explicit, live with its component and be checked against the
 maintained source. We do not hide an automatic rewrite or claim to rebuild an
 unmodified source through a transformed variant.
 
+The approved order is the [original TSO31 entry bridge](../../../runtime/tso31/README.md),
+PDPCLIB MVSSUPA, then PDOS loader/kernel support. The
+[native-support inventory](NATIVE-SUPPORT-INVENTORY.md) records the exact later
+inputs and the additional macro, layout, instruction and relocation work.
+The supplied PDPTOP selects S/380 and z/Architecture options unconditionally;
+a historical build needs a separately identified target configuration.
+I selected MVS 3.8 / real System/370 / AMODE 24 and RMODE 24 for the first
+complete PDPCLIB qualification. The configuration member and service-definition
+edition still need implementation and review.
+The [first PDPCLIB checkpoint](PDPCLIB-CHECKPOINT.md) qualifies ordinary layout
+changes and three unchanged source-owned macro definitions through the original
+optional provider. It does not qualify the complete library or its services.
+
 Traditional service and control-block macros need individual rights review.
 Where suitable, independently written small definitions or explicit source code
 can replace them. Public availability or an old system's provenance does not
