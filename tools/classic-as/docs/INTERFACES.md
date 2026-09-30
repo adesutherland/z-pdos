@@ -1,0 +1,51 @@
+# Component interfaces
+
+The authoritative C declarations are [mf_classic.h](../include/mf_classic.h).
+They are source-level contracts, not a stable binary ABI. No native C structure
+is serialized into an object deck.
+
+| Contract | Meaning and ownership |
+| --- | --- |
+| `mf_span` | Borrowed numeric UTF-8 bytes with an explicit length; ASCII subset initially |
+| `mf_origin` | Source identifier, original line/record and column; the host renders the source name |
+| `mf_storage.acquire` | Caller allocator supplies aligned session-lifetime storage; no per-block free or realloc required |
+| `mf_records.next/replay` | Supply raw records in declared encoding; borrowed record lasts until next/replay |
+| `mf_reader_init` | Bind the reader to caller storage and a record provider; returned statement fields last until next/replay |
+| `mf_statements.next/replay` | Supply identical logical statements and original coordinates for both passes |
+| `mf_machine_lookup`, `mf_encode` | Profile lookup and pure encoding of checked typed fields; no expressions or USING state |
+| `mf_as_create/assemble/destroy` | Per-assembly context, pass sequencing and diagnostics; context never closes devices or resets shared storage |
+| `mf_obj_create/destroy` | Bind classic writer to storage and sink; writer validates object representation independently |
+| `mf_sink.begin/write/finish` | Sequential binary output, explicit I/O failure and validity completion |
+
+The status separates normal EOF, source/semantic errors, unsupported features,
+capacity exhaustion, I/O failures, range errors, duplicates, unresolved names,
+changed replay and object-format errors. Core diagnostics have stable project
+categories and borrowed detail spans. The host owns readable messages and
+process return codes; IBM diagnostic wording and identifiers are not copied.
+
+Sections and symbols have session-local IDs. Serialized ESD IDs are assigned
+by the writer. A fixup identifies its owning section and location separately
+from its target. A/V address kind is distinct from section/external target kind;
+an external A reference cannot silently become V. Constant addends are already
+in emitted bytes. The first writer supports four-byte relocations only.
+
+Writer operations are `begin`, `text`, `gap`, `fixup`, `entry`, `finish`. Begin
+receives final sections/symbols; later events do not mutate their identities.
+Gaps preserve reserved storage without inventing bytes. Ordered events cannot
+overlay previous text. Dummy sections describe layout without emitted storage.
+A fixup follows its field's text before a gap or noncontiguous text event in
+that section, so the writer can validate written coverage with bounded state.
+Local symbols and dummy-section names remain internal and are not serialized.
+An entry owns a section and offset. Format widths, name lengths, modes and all
+references are checked before successful completion.
+
+Driver cleanup order is: complete/invalidate output, destroy assembly and writer
+contexts, release source/provider ownership, then release the storage session.
+A sink failure after END bytes have been written still makes the artifact
+unusable. Completion status is part of the contract, not merely presence of END.
+
+Replacement providers, allocators and sinks must pass common tests for EOF,
+malformed input, changed replay, storage exhaustion, partial/failing output and
+invalidation. Richer providers must preserve results for overlapping supported
+subsets. Optional resolvers, macro queries, listing observers and richer writers
+are future additions with their own contracts.
