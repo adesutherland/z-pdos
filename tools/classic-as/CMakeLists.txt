@@ -18,7 +18,7 @@ else()
   target_link_libraries(mf-classic-as PRIVATE mf_classic)
 endif()
 
-foreach(component values reader machine machine_float object assemble contracts consumer_engine pdpclib_engine)
+foreach(component values reader machine machine_float machine_system object assemble contracts consumer_engine pdpclib_engine)
   add_executable(test_${component} tests/test_${component}.c)
   target_link_libraries(test_${component} PRIVATE mf_classic)
   add_test(NAME classic_${component} COMMAND test_${component})

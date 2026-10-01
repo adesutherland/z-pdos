@@ -76,8 +76,8 @@ struct mf_reader {
 enum mf_status mf_reader_init(struct mf_reader *, const struct mf_records *,
     mf_octet *, size_t, struct mf_statements *);
 
-enum mf_profile { MF_S360, MF_S370 };
-enum mf_format { MF_RR, MF_RX, MF_RS, MF_SI, MF_SS };
+enum mf_profile { MF_S360, MF_S370, MF_ESA390, MF_Z900 };
+enum mf_format { MF_RR, MF_RX, MF_RS, MF_SI, MF_SS, MF_S, MF_E, MF_RSY, MF_RIL };
 struct mf_instruction {
     struct mf_span mnemonic;
     enum mf_profile minimum_profile;

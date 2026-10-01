@@ -126,7 +126,47 @@ static const mf_octet name_CDS[] = { 0x43, 0x44, 0x53 };
 static const mf_octet name_MVCL[] = { 0x4d, 0x56, 0x43, 0x4c };
 static const mf_octet name_CLCL[] = { 0x43, 0x4c, 0x43, 0x4c };
 
+static const mf_octet name_LPSW[] = { 0x4c, 0x50, 0x53, 0x57 };
+static const mf_octet name_SIO[] = { 0x53, 0x49, 0x4f };
+static const mf_octet name_LCTL[] = { 0x4c, 0x43, 0x54, 0x4c };
+static const mf_octet name_STCTL[] = { 0x53, 0x54, 0x43, 0x54, 0x4c };
+static const mf_octet name_SIGP[] = { 0x53, 0x49, 0x47, 0x50 };
+static const mf_octet name_STCK[] = { 0x53, 0x54, 0x43, 0x4b };
+static const mf_octet name_STNSM[] = { 0x53, 0x54, 0x4e, 0x53, 0x4d };
+static const mf_octet name_STOSM[] = { 0x53, 0x54, 0x4f, 0x53, 0x4d };
+static const mf_octet name_BSM[] = { 0x42, 0x53, 0x4d };
+static const mf_octet name_MSCH[] = { 0x4d, 0x53, 0x43, 0x48 };
+static const mf_octet name_SSCH[] = { 0x53, 0x53, 0x43, 0x48 };
+static const mf_octet name_STSCH[] = { 0x53, 0x54, 0x53, 0x43, 0x48 };
+static const mf_octet name_TSCH[] = { 0x54, 0x53, 0x43, 0x48 };
+static const mf_octet name_PR[] = { 0x50, 0x52 };
+static const mf_octet name_LPSWE[] = { 0x4c, 0x50, 0x53, 0x57, 0x45 };
+static const mf_octet name_STMG[] = { 0x53, 0x54, 0x4d, 0x47 };
+static const mf_octet name_LMG[] = { 0x4c, 0x4d, 0x47 };
+static const mf_octet name_BRCL[] = { 0x42, 0x52, 0x43, 0x4c };
+static const mf_octet name_LARL[] = { 0x4c, 0x41, 0x52, 0x4c };
+
 static const struct mf_instruction instructions[] = {
+    { { name_LPSW, 4 }, MF_S360, MF_S, 0x8200, 4 },
+    { { name_SIO, 3 }, MF_S360, MF_S, 0x9c00, 4 },
+    { { name_LCTL, 4 }, MF_S370, MF_RS, 0xb7, 4 },
+    { { name_STCTL, 5 }, MF_S370, MF_RS, 0xb6, 4 },
+    { { name_SIGP, 4 }, MF_S370, MF_RS, 0xae, 4 },
+    { { name_STCK, 4 }, MF_S370, MF_S, 0xb205, 4 },
+    { { name_STNSM, 5 }, MF_S370, MF_SI, 0xac, 4 },
+    { { name_STOSM, 5 }, MF_S370, MF_SI, 0xad, 4 },
+    { { name_BSM, 3 }, MF_ESA390, MF_RR, 0x0b, 2 },
+    { { name_MSCH, 4 }, MF_ESA390, MF_S, 0xb232, 4 },
+    { { name_SSCH, 4 }, MF_ESA390, MF_S, 0xb233, 4 },
+    { { name_STSCH, 5 }, MF_ESA390, MF_S, 0xb234, 4 },
+    { { name_TSCH, 4 }, MF_ESA390, MF_S, 0xb235, 4 },
+    { { name_PR, 2 }, MF_ESA390, MF_E, 0x0101, 2 },
+    { { name_LPSWE, 5 }, MF_Z900, MF_S, 0xb2b2, 4 },
+    { { name_STMG, 4 }, MF_Z900, MF_RSY, 0xeb24, 6 },
+    { { name_LMG, 3 }, MF_Z900, MF_RSY, 0xeb04, 6 },
+    { { name_BRCL, 4 }, MF_Z900, MF_RIL, 0xc04, 6 },
+    { { name_LARL, 4 }, MF_Z900, MF_RIL, 0xc00, 6 },
+
     { { name_BALR, 4 }, MF_S360, MF_RR, 0x05, 2 },
     { { name_BCTR, 4 }, MF_S360, MF_RR, 0x06, 2 },
     { { name_BCR, 3 }, MF_S360, MF_RR, 0x07, 2 },
@@ -247,7 +287,7 @@ const struct mf_instruction *mf_machine_lookup(enum mf_profile profile,
 {
     size_t i, j;
     mf_octet ch;
-    if ((profile != MF_S360 && profile != MF_S370) ||
+    if ((profile != MF_S360 && profile != MF_S370 && profile != MF_ESA390 && profile != MF_Z900) ||
         (!mnemonic.data && mnemonic.length)) return 0;
     for (i = 0; i < sizeof(instructions) / sizeof(instructions[0]); ++i) {
         if (instructions[i].mnemonic.length != mnemonic.length) continue;
@@ -276,14 +316,14 @@ enum mf_status mf_encode(enum mf_profile profile,
     unsigned i, code;
     if (length) *length = 0;
     if (!instruction || !op || !out || !length) return MF_SOURCE;
-    if (profile != MF_S360 && profile != MF_S370) return MF_UNSUPPORTED;
+    if (profile != MF_S360 && profile != MF_S370 && profile != MF_ESA390 && profile != MF_Z900) return MF_UNSUPPORTED;
     known = mf_machine_lookup(profile, instruction->mnemonic);
     if (!known || known->opcode != instruction->opcode ||
         known->format != instruction->format ||
         known->length != instruction->length ||
         known->minimum_profile != instruction->minimum_profile)
         return MF_UNSUPPORTED;
-    if (profile < known->minimum_profile) return MF_UNSUPPORTED;
+    if (profile < known->minimum_profile || (known->opcode == 0x9c00 && profile >= MF_ESA390)) return MF_UNSUPPORTED;
     if (capacity < known->length) return MF_LIMIT;
     for (i = 0; i < 6; ++i) bytes[i] = 0;
     code = known->opcode;
@@ -323,6 +363,24 @@ enum mf_status mf_encode(enum mf_profile profile,
         bytes[1] = (mf_octet)((op->r1 << 4) | op->r3);
         address(bytes + 2, op->b2, op->d2);
         break;
+    case MF_S:
+        if (op->b2 > 15 || op->d2 > 4095 || op->r1 || op->r2 || op->r3 || op->x2 || op->immediate) return MF_RANGE;
+        bytes[0] = (mf_octet)(code >> 8); bytes[1] = (mf_octet)code;
+        address(bytes + 2, op->b2, op->d2); break;
+    case MF_E:
+        if (op->r1 || op->r2 || op->r3 || op->x2 || op->b1 || op->b2 || op->d1 || op->d2 || op->immediate) return MF_RANGE;
+        bytes[0] = (mf_octet)(code >> 8); bytes[1] = (mf_octet)code; break;
+    case MF_RSY:
+        /* d2 is the checked signed displacement's 20-bit representation. */
+        if (op->r1 > 15 || op->r3 > 15 || op->b2 > 15 || op->d2 > 0xfffffUL || op->x2) return MF_RANGE;
+        bytes[0] = (mf_octet)(code >> 8); bytes[1] = (mf_octet)((op->r1 << 4) | op->r3);
+        address(bytes + 2,op->b2,op->d2 & 0xfffUL);
+        bytes[4] = (mf_octet)(op->d2 >> 12); bytes[5] = (mf_octet)code; break;
+    case MF_RIL:
+        if (op->r1 > 15 || op->immediate > 0xffffffffUL) return MF_RANGE;
+        bytes[0] = (mf_octet)(code >> 4); bytes[1] = (mf_octet)((op->r1 << 4) | (code & 15));
+        bytes[2] = (mf_octet)(op->immediate >> 24); bytes[3] = (mf_octet)(op->immediate >> 16);
+        bytes[4] = (mf_octet)(op->immediate >> 8); bytes[5] = (mf_octet)op->immediate; break;
     case MF_SI:
         if (op->immediate > 255 || op->b1 > 15 || op->d1 > 4095)
             return MF_RANGE;

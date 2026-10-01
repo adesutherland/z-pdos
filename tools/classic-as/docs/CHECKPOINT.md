@@ -222,3 +222,17 @@ now advances past its duplication expression. Independent data/instruction
 bytes cover expressions, binary masks, signed boundaries and incrementing
 location-counter address constants. Undefined layout factors, negative sizes
 and malformed binary terms fail. Forward duplication dependencies remain open.
+
+## Reached system instruction checkpoint
+
+Original instruction descriptions add the reached S/370 control/mask/clock
+operations, ESA/390 BSM/subchannel/PR forms and z900 LPSWE, STMG/LMG and
+BRCL/LARL. Nineteen independent architectural vectors cover opcode fields,
+capacity, architecture exclusion and displacement limits. Source tests cover
+forward and backward halfword-relative targets, odd-target rejection and both
+signed RSY bounds. SIO is explicitly excluded from ESA/390 and z900.
+
+The raw kernel probe now advances into source scanning, SAPSTART reaches ORG,
+and PLOADSUP reaches missing public control-block mappings. OS service macros
+remain real dependencies. Normal and sanitizer suites pass 47 affected tests;
+no named kernel profile, full build or guest acceptance is claimed.

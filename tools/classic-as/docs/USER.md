@@ -86,7 +86,9 @@ on a 16-byte boundary. Gaps remain reserved, without emitted fill bytes.
 `s360` is a selected common S/360 instruction subset, excluding Model 67
 extensions. `s370` adds selected S/370 forms, including the optional Branch and
 Save facility documented in the March 1981 manual. It does not promise those
-facilities on every historical S/370 machine. Mode metadata selects object
+facilities on every historical S/370 machine. `esa390` and `z900` add the
+selected architectural forms below; they are language coverage selectors, not
+qualified shared machine/ABI selectors. Mode metadata selects object
 attributes; it does not grant a historical CPU a new address mode.
 
 | Format | Selected mnemonics and operand shape |
@@ -98,7 +100,10 @@ attributes; it does not grant a historical CPU a new address mode.
 | SS character | MVC, NC, CLC, OC, XC, TR, TRT, ED, EDMK: `d1(length,b1),d2(b2)` |
 | SS decimal | MVO, PACK, UNPK, ZAP, CP, AP, SP, MP, DP: `d1(length1,b1),d2(length2,b2)` |
 | HFP subset | LPDR, LTDR, LCDR, LDR, CDR, ADR, SDR, MDR, DDR: `f1,f2`; STD, LD, CD, AD, SD, MD, DD, STE, LE, AE: `f1,d(x,b)`; historical FPRs 0,2,4,6 only |
-| Selected S/370 additions | BASR, BAS, CLM, LRER (long-to-short HFP), STCM, ICM, CS, CDS, MVCL, CLCL |
+| Selected S/370 additions | BASR, BAS, CLM, LRER (long-to-short HFP), STCM, ICM, CS, CDS, MVCL, CLCL; LCTL/STCTL/SIGP `r1,r3,d(b)`; STCK `d(b)`; STNSM/STOSM `d(b),byte` |
+| System S format | LPSW `d(b)`; SIO `d(b)` only in s360/s370, excluded from ESA/390 and z900 |
+| ESA/390 subset | BSM `r1,r2`; MSCH/SSCH/STSCH/TSCH `d(b)`; PR with no operand |
+| z900 subset | LPSWE `d(b)`; STMG/LMG `r1,r3,d(b)` with signed 20-bit displacement; BRCL/LARL `mask-or-register,same-section-target` |
 
 Branch aliases lower to the ordinary BC/BCR encodings: B, BO, BH/BP, BL/BM,
 BNE/BNZ, BE/BZ, BNL/BNM, BNH/BNP, BNO and NOP. Each takes an address operand;
@@ -198,3 +203,12 @@ never produce a successful deck. Other PUSH/POP state classes remain unsupported
 DC/DS duplication factors also accept parenthesized absolute expressions whose
 layout values are already defined. Forward layout dependencies are rejected.
 Repeated address constants reevaluate the location counter for each element.
+
+For RSY, explicit signed displacements range from -524288 to 524287. The
+encoder receives their checked 20-bit representation. Implicit symbolic
+RSY addresses currently select nonnegative displacement mappings only. RIL
+targets must be even addresses in the current section; the engine computes
+the signed halfword distance from the instruction. Cross-section and external
+relative fixups are unsupported. Named machine profiles and final-object
+code-role audits remain separate gates. Privileged encodings confer no guest
+service or permission.

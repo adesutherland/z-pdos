@@ -550,12 +550,12 @@ static enum mf_status using_stack(struct mf_as *as, int pop)
 /* Address operand: displacement, optional index/length, and explicit base.
  * A symbolic displacement needs a matching USING even with explicit base. */
 static enum mf_status address(struct mf_as *as, struct mf_span s, int indexed,
-    int length_field, unsigned max_length, mf_u32 *disp, unsigned *base,
+    int length_field, unsigned max_length, int wide, mf_u32 *disp, unsigned *base,
     unsigned *index_or_length)
 {
     struct mf_span fields[2], value_text; size_t i, open, count, depth; struct value v;
-    enum mf_status status; mf_u32 n, d, best; unsigned r, chosen; int explicit_base, group_comma, quoted;
-    s = trim(s); open = NIL; explicit_base = 0; *index_or_length = 0;
+    enum mf_status status; mf_u32 n, d, best, maximum; unsigned r, chosen; int explicit_base, group_comma, quoted;
+    s = trim(s); open = NIL; explicit_base = 0; *index_or_length = 0; maximum = wide ? 524287UL : 4095UL;
     depth = 0; group_comma = quoted = 0;
     for (i = 0; i < s.length; ++i) {
         if (s.data[i] == 0x27) { quoted = !quoted; continue; }
@@ -614,17 +614,21 @@ static enum mf_status address(struct mf_as *as, struct mf_span s, int indexed,
         if (status == MF_UNDEFINED && as->pass == 1) { *disp = 0; if (!explicit_base) *base = 0; return MF_OK; }
         if (status != MF_OK) return status;
     }
-    if (v.negative || v.magnitude.hi || v.coefficient < 0 || v.coefficient > 1 ||
-        (v.coefficient && v.kind != MF_REF_SECTION)) return MF_SOURCE;
-    if (!v.coefficient && explicit_base) return small_value(v, 4095, disp);
-    chosen = 16; best = 4096;
-    if (!v.coefficient && v.magnitude.lo <= 4095) { chosen = 0; best = v.magnitude.lo; }
+    if (v.magnitude.hi || v.coefficient < 0 || v.coefficient > 1 ||
+        (v.coefficient && (v.kind != MF_REF_SECTION || v.negative))) return MF_SOURCE;
+    if (!v.coefficient && v.negative) {
+        if (!wide || v.magnitude.lo > 524288UL) return MF_RANGE;
+        *disp = ((~v.magnitude.lo) + 1) & 0xfffffUL; if (!explicit_base) *base = 0; return MF_OK;
+    }
+    if (!v.coefficient && explicit_base) return small_value(v, maximum, disp);
+    chosen = 16; best = maximum + 1;
+    if (!v.coefficient && v.magnitude.lo <= maximum) { chosen = 0; best = v.magnitude.lo; }
     for (r = 0; r <= 15; ++r) {
         if (explicit_base && r != *base) continue;
         if (!as->bases[r].active || as->bases[r].section != (v.coefficient ? v.target : 0) ||
             v.magnitude.lo < as->bases[r].offset) continue;
         d = v.magnitude.lo - as->bases[r].offset;
-        if (d <= 4095 && d <= best) { chosen = r; best = d; }
+        if (d <= maximum && d <= best) { chosen = r; best = d; }
     }
     if (chosen == 16) {
         if (as->pass == 1) for (r = 0; r <= 15; ++r) if (as->bases[r].pending &&
@@ -656,27 +660,50 @@ static enum mf_status instruction(struct mf_as *as, const struct mf_instruction 
     } else if (ins->format == MF_RX) {
         if (count != 2) return MF_SOURCE;
         status = number(as, parts[0], 15, &n); operands.r1 = (unsigned)n;
-        if (status == MF_OK) status = address(as, parts[1], 1, 0, 0, &operands.d2, &operands.b2, &operands.x2);
-    } else if (ins->format == MF_RS) {
+        if (status == MF_OK) status = address(as, parts[1], 1, 0, 0, 0, &operands.d2, &operands.b2, &operands.x2);
+    } else if (ins->format == MF_RS || ins->format == MF_RSY) {
         if (ins->opcode >= 0x88 && ins->opcode <= 0x8f) {
             if (count != 2) return MF_SOURCE;
             status = number(as, parts[0], 15, &n); operands.r1 = (unsigned)n;
-            if (status == MF_OK) status = address(as, parts[1], 0, 0, 0, &operands.d2, &operands.b2, &operands.x2);
+            if (status == MF_OK) status = address(as, parts[1], 0, 0, 0, 0, &operands.d2, &operands.b2, &operands.x2);
         } else {
             if (count != 3) return MF_SOURCE;
             status = number(as, parts[0], 15, &n); operands.r1 = (unsigned)n;
             if (status == MF_OK) { status = number(as, parts[1], 15, &n); operands.r3 = (unsigned)n; }
-            if (status == MF_OK) status = address(as, parts[2], 0, 0, 0, &operands.d2, &operands.b2, &operands.x2);
+            if (status == MF_OK) status = address(as, parts[2], 0, 0, 0, ins->format == MF_RSY, &operands.d2, &operands.b2, &operands.x2);
+        }
+    } else if (ins->format == MF_S) {
+        if (count != 1) return MF_SOURCE;
+        status = address(as,parts[0],0,0,0,0,&operands.d2,&operands.b2,&operands.x2);
+    } else if (ins->format == MF_E) {
+        if (trim(as->statement.operand).length) return MF_SOURCE;
+        status = MF_OK;
+    } else if (ins->format == MF_RIL) {
+        struct value target; mf_u32 position, delta;
+        if (count != 2) return MF_SOURCE;
+        status = number(as,parts[0],15,&n); operands.r1 = (unsigned)n;
+        if (status == MF_OK) {
+            status = evaluate(as,parts[1],&target);
+            if (status == MF_UNDEFINED && as->pass == 1) status = MF_OK;
+            else if (status == MF_OK) {
+                if (target.coefficient != 1 || target.kind != MF_REF_SECTION ||
+                    target.target != as->sections[as->current].id || target.negative || target.magnitude.hi) return MF_UNSUPPORTED;
+                position = as->section_state[as->current].position;
+                delta = target.magnitude.lo >= position ? target.magnitude.lo - position : position - target.magnitude.lo;
+                if (delta & 1) return MF_RANGE;
+                delta /= 2;
+                operands.immediate = target.magnitude.lo >= position ? delta : ((~delta)+1) & U32MAX;
+            }
         }
     } else if (ins->format == MF_SI) {
         if (count != 2) return MF_SOURCE;
-        status = address(as, parts[0], 0, 0, 0, &operands.d1, &operands.b1, &operands.x2);
+        status = address(as, parts[0], 0, 0, 0, 0, &operands.d1, &operands.b1, &operands.x2);
         if (status == MF_OK) status = number(as, parts[1], 255, &operands.immediate);
     } else if (ins->format == MF_SS) {
         if (count != 2) return MF_SOURCE;
-        status = address(as, parts[0], 0, 1, ins->opcode >= 0xf0 ? 16U : 256U,
+        status = address(as, parts[0], 0, 1, ins->opcode >= 0xf0 ? 16U : 256U, 0,
             &operands.d1, &operands.b1, &operands.length1);
-        if (status == MF_OK) status = address(as, parts[1], 0, ins->opcode >= 0xf0, 16,
+        if (status == MF_OK) status = address(as, parts[1], 0, ins->opcode >= 0xf0, 16, 0,
             &operands.d2, &operands.b2, &operands.length2);
     } else return MF_UNSUPPORTED;
     if (status != MF_OK) return status;
@@ -721,7 +748,7 @@ static enum mf_status branch(struct mf_as *as, unsigned mask, int reg)
         status = number(as, parts[0], 15, &n); if (status != MF_OK) return status;
         op.r2 = (unsigned)n; name.data = bcr; name.length = sizeof bcr;
     } else {
-        status = address(as, parts[0], 1, 0, 0, &op.d2, &op.b2, &op.x2);
+        status = address(as, parts[0], 1, 0, 0, 0, &op.d2, &op.b2, &op.x2);
         if (status != MF_OK) return status;
         name.data = bc; name.length = sizeof bc;
     }
@@ -1261,7 +1288,7 @@ enum mf_status mf_as_create(const struct mf_as_config *config,
     struct mf_as *as; size_t a, b, c, d, e, f, total;
     if (out) *out = NULL;
     if (!config || !storage || !storage->acquire || !out) return MF_SOURCE;
-    if (config->profile != MF_S360 && config->profile != MF_S370) return MF_UNSUPPORTED;
+    if (config->profile != MF_S360 && config->profile != MF_S370 && config->profile != MF_ESA390 && config->profile != MF_Z900) return MF_UNSUPPORTED;
     if (!config->max_sections || !config->max_symbols || !config->max_statement ||
         !config->max_expression_depth || config->max_sections > UINT_MAX || config->max_symbols > UINT_MAX) return MF_LIMIT;
     if (!allocation_size(config->max_sections, sizeof(struct mf_section), &a) ||

@@ -613,9 +613,26 @@ static void source_metadata(void)
     init(&f, " PRINT UNKNOWN\n LR 1,2\n END\n"); CHECK(run(&f) == MF_UNSUPPORTED); clean(&f);
     init(&f, "X PRINT GEN\n LR 1,2\n END\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
 }
+static void system_instructions(void)
+{
+    static const mf_octet expected[] = {
+        0xb7,0x66,0x01,0x20, 0xae,0x10,0,0x12, 0xb2,0x33,0xa0,0,
+        0xb2,0xb2,0x01,0x80, 0xeb,0x0f,0xd0,0x80,0,0x24,
+        0xeb,0x0f,0xd0,0,0x80,4, 0xc0,0xf4,0,0,0,7,
+        0xc0,0xc0,0xff,0xff,0xff,0xef, 1,1
+    };
+    struct fixture f;
+    init(&f,"S CSECT\n LCTL 6,6,288\n SIGP 1,0,18\n SSCH 0(10)\n LPSWE 384\n STMG 0,15,128(13)\n LMG 0,15,-524288(13)\n BRCL 15,DONE\n LARL 12,S\n PR\nDONE DS 0H\n END S\n"); f.config.profile = MF_Z900;
+    successful(&f); CHECK(f.sections[0].length == sizeof expected);
+    CHECK(!memcmp(f.data[0],expected,sizeof expected)); clean(&f);
+    init(&f,"S CSECT\n BRCL 15,ODD\nODD EQU S+1\n END S\n"); f.config.profile = MF_Z900; CHECK(run(&f) == MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n LMG 0,15,524288(13)\n END S\n"); f.config.profile = MF_Z900; CHECK(run(&f) == MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n LMG 0,15,-524289(13)\n END S\n"); f.config.profile = MF_Z900; CHECK(run(&f) == MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n PR 1\n END S\n"); f.config.profile = MF_Z900; CHECK(run(&f) == MF_SOURCE); clean(&f);
+}
 int main(void)
 {
-    declaration_expressions(); address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
+    system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
     printf("assemble: %lu checks passed\n", checks); return 0;

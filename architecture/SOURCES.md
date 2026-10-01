@@ -38,3 +38,11 @@ the same internal representation. That future host remains to be qualified.
 - IBM HLASM Language Reference SC26-4940-09, chapter 2, binary self-defining
   terms, defines binary digits and the signed 32-bit interpretation. Wider
   existing hexadecimal expressions remain a separately documented extension.
+
+- IBM z/Architecture Principles of Operation SA22-7832-14, chapters 5, 7, 10
+  and 14, supplies the reached S/E/RS/RSY/RIL field and opcode facts. Chapter
+  7-47/7-305 defines signed halfword-relative BRCL/LARL addresses; 7-451 and
+  7-323 define STMG/LMG; chapter 10 supplies LCTL/STCTL/SIGP/PR/mask/PSW
+  facts and chapter 14 the subchannel operations. Historical S/370 sources
+  above supply older membership; SIO is deliberately rejected for ESA/390+.
+  Only facts were used to write the original descriptions and independent tests.

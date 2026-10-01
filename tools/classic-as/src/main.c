@@ -223,9 +223,9 @@ int main(int argc, char **argv)
     }
     if (argc == 2 && strcmp(argv[1], "--help") == 0) {
 #ifdef MF_WITH_TRADITIONAL_MACROS
-        puts("usage: mf-classic-as [--profile s360|s370] [--literal-limit 0..65536] [--macros] [-I directory] input.asm output.obj"); return 0;
+        puts("usage: mf-classic-as [--profile s360|s370|esa390|z900] [--literal-limit 0..65536] [--macros] [-I directory] input.asm output.obj"); return 0;
 #else
-        puts("usage: mf-classic-as [--profile s360|s370] [--literal-limit 0..65536] input.asm output.obj"); return 0;
+        puts("usage: mf-classic-as [--profile s360|s370|esa390|z900] [--literal-limit 0..65536] input.asm output.obj"); return 0;
 #endif
     }
     if ((size_t)-1 < HOST_BUDGET || (size_t)-1 < 65536UL) {
@@ -236,6 +236,8 @@ int main(int argc, char **argv)
             if (argc <= arg + 1) { fprintf(stderr, "missing --profile value\n"); return 2; }
             if (strcmp(argv[arg + 1], "s360") == 0) profile = MF_S360;
             else if (strcmp(argv[arg + 1], "s370") == 0) profile = MF_S370;
+            else if (strcmp(argv[arg + 1], "esa390") == 0) profile = MF_ESA390;
+            else if (strcmp(argv[arg + 1], "z900") == 0) profile = MF_Z900;
             else { fprintf(stderr, "unsupported profile: %s\n", argv[arg + 1]); return 2; }
             arg += 2;
         } else if (strcmp(argv[arg], "--literal-limit") == 0) {
@@ -269,9 +271,9 @@ int main(int argc, char **argv)
     }
     if (argc != arg + 2) {
 #ifdef MF_WITH_TRADITIONAL_MACROS
-        fprintf(stderr, "usage: mf-classic-as [--profile s360|s370] [--literal-limit 0..65536] [--macros] [-I directory] input.asm output.obj\n"); return 2;
+        fprintf(stderr, "usage: mf-classic-as [--profile s360|s370|esa390|z900] [--literal-limit 0..65536] [--macros] [-I directory] input.asm output.obj\n"); return 2;
 #else
-        fprintf(stderr, "usage: mf-classic-as [--profile s360|s370] [--literal-limit 0..65536] input.asm output.obj\n"); return 2;
+        fprintf(stderr, "usage: mf-classic-as [--profile s360|s370|esa390|z900] [--literal-limit 0..65536] input.asm output.obj\n"); return 2;
 #endif
     }
     input_path = argv[arg]; output_path = argv[arg + 1];
