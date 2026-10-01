@@ -222,3 +222,10 @@ require the writer's optional origin callback; backward origins below prior
 relocated fields are conservatively rejected. Forward moves emit no fill.
 Extra boundary/offset operands and unresolved layout expressions are unsupported.
 Section length is its high water, independent of the final cursor.
+
+CCW1 emits a doubleword-aligned, eight-byte format-1 channel command word.
+Command/flags are checked bytes and count is 0..65535. An absolute or
+single-section address is checked to 31 bits at assembly time; relocatable
+addresses receive an ordinary four-byte A fixup at offset four. Alignment
+fill is emitted as zeros. Final relocated channel addresses still require the
+load-image audit. CCW/CCW0 remain unsupported.

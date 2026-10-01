@@ -52,3 +52,9 @@ the same internal representation. That future host remains to be qualified.
   next available location, later TXT overlays and the stale-relocation hazard.
   Original selected implementation uses high water and a conservative
   relocation-free suffix policy, with independently checked linked bytes.
+
+- IBM HLASM [CCW1](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=statements-ccw1-instruction)
+  defines the eight-byte command/flags/count/address arrangement, zero
+  alignment fill and A-type address treatment. The architecture channel
+  chapter defines 31-bit format-1 data addresses. Original code and
+  independently stated object/link bytes use these facts.

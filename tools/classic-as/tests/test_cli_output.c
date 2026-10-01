@@ -52,6 +52,14 @@ int main(int argc, char **argv)
     FILE *input;
 
     CHECK(argc == 3);
+    if (!strcmp(argv[1], "channel-word")) {
+        static const unsigned char linked[30] = {0xaa,0,0,0,0,0,0,0,7,0x40,0,6,0,0,0x10,0x18,0x1d,0,0x7f,0xff,0,0,0,0,0,0,0,0,0,0};
+        input = fopen(argv[2], "rb"); CHECK(input != NULL);
+        got = fread(card,1,sizeof card,input);
+        CHECK(got == sizeof linked && !memcmp(card,linked,sizeof linked));
+        CHECK(!ferror(input) && fclose(input) == 0);
+        puts("CCW1: all 30 linked bytes, zero alignment and relocated address pass"); return 0;
+    }
     if (!strcmp(argv[1], "overlays")) {
         static const unsigned char linked[10] = {0,0x11,0xab,0xcd,0x44,0x55,0x66,0x77,0x18,0x12};
         input = fopen(argv[2], "rb"); CHECK(input != NULL);

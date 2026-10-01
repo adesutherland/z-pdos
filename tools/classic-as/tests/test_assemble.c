@@ -667,9 +667,22 @@ static void character_and_location_literals(void)
     init(&f,"S CSECT\n USING S,12\n L 1,=CL2'ABC'\n END S\n"); f.config.max_literals = 4;
     CHECK(run(&f) == MF_RANGE); clean(&f);
 }
+static void channel_words(void)
+{
+    static const mf_octet expected[24] = {0xaa,0,0,0,0,0,0,0,7,0x40,0,6,0,0,0,24,0x1d,0,0x7f,0xff,0,0,0,0};
+    struct fixture f;
+    init(&f,"S CSECT\n DC X'AA'\nCC CCW1 7,DATA,X'40',6\n CCW1 X'1D',0,0,32767\nDATA DS 6C\n END CC\n");
+    successful(&f); CHECK(f.sections[0].length == 30 && !memcmp(f.data[0],expected,sizeof expected));
+    CHECK(f.present[0][1] && f.present[0][7] && f.fixup_count == 1 && f.fixups[0].offset == 12 && f.fixups[0].width == 4); clean(&f);
+    init(&f,"S CSECT\n CCW1 256,0,0,0\n END S\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n CCW1 1,2147483648,0,0\n END S\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n CCW1 1,0,256,0\n END S\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n CCW1 1,0,0,65536\n END S\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n CCW1 1,ABSENT,0,0\n END S\n"); CHECK(run(&f) == MF_UNDEFINED); clean(&f);
+}
 int main(void)
 {
-    character_and_location_literals(); origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
+    channel_words(); character_and_location_literals(); origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
     printf("assemble: %lu checks passed\n", checks); return 0;

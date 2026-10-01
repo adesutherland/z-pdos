@@ -1133,6 +1133,46 @@ static enum mf_status end_statement(struct mf_as *as)
     }
     return end_literal_pool(as);
 }
+static enum mf_status ccw1_statement(struct mf_as *as)
+{
+    struct mf_span parts[4]; size_t count; struct value address_value;
+    struct mf_fixup fixup; enum mf_status status; mf_u32 command, flags, length, padding, offset;
+    mf_octet bytes[8];
+    status = ensure_section(as); if (status != MF_OK) return status;
+    memset(bytes,0,sizeof bytes);
+    padding = as->section_state[as->current].position % 8;
+    if (padding) { status = advance(as,8-padding,bytes); if (status != MF_OK) return status; }
+    offset = as->section_state[as->current].position;
+    status = define(as,as->statement.label,current_value(as)); if (status != MF_OK) return status;
+    status = split(as->statement.operand,parts,4,&count); if (status != MF_OK) return status;
+    if (count != 4) return MF_SOURCE;
+    status = number(as,parts[0],255,&command); if (status != MF_OK) return status;
+    status = number(as,parts[2],255,&flags); if (status != MF_OK) return status;
+    status = number(as,parts[3],65535,&length); if (status != MF_OK) return status;
+    bytes[0] = (mf_octet)command; bytes[1] = (mf_octet)flags;
+    bytes[2] = (mf_octet)(length >> 8); bytes[3] = (mf_octet)length;
+    status = evaluate(as,parts[1],&address_value);
+    if (status == MF_UNDEFINED && as->pass == 1) return advance(as,8,NULL);
+    if (status != MF_OK) return status;
+    if (address_value.negative || address_value.magnitude.hi || address_value.magnitude.lo > 0x7fffffffUL) return MF_RANGE;
+    if (address_value.coefficient < 0 || address_value.coefficient > 1 ||
+        (address_value.coefficient && address_value.kind != MF_REF_SECTION)) return MF_UNSUPPORTED;
+    if (address_value.coefficient && as->sections[as->current].dummy) return MF_UNSUPPORTED;
+    if (address_value.coefficient && as->fixup_count == as->config.max_fixups) return MF_LIMIT;
+    mf_u64_store(address_value.magnitude,bytes+4,4);
+    status = advance(as,8,bytes); if (status != MF_OK) return status;
+    if (address_value.coefficient) {
+        ++as->fixup_count;
+        if (as->pass == 2) {
+            as->section_state[as->current].relocation_end = offset+8;
+            memset(&fixup,0,sizeof fixup); fixup.section = as->sections[as->current].id;
+            fixup.offset = offset+4; fixup.width = 4; fixup.target_kind = MF_REF_SECTION;
+            fixup.target = address_value.target; fixup.address_kind = MF_ADDRESS_A;
+            return as->writer->fixup(as->writer->cookie,&fixup);
+        }
+    }
+    return MF_OK;
+}
 /* Validated listing controls have no code effect; TITLE also has a concrete
  * classic-record identity. The writer receives it before any record is emitted. */
 static enum mf_status title_statement(struct mf_as *as)
@@ -1198,6 +1238,7 @@ static enum mf_status process(struct mf_as *as)
     static const mf_octet drop[] = {0x44,0x52,0x4f,0x50};
     static const mf_octet ltorg[] = {0x4c,0x54,0x4f,0x52,0x47};
     static const mf_octet org[] = {0x4f,0x52,0x47};
+    static const mf_octet ccw1[] = {0x43,0x43,0x57,0x31};
     struct mf_span op; struct value v; const struct mf_instruction *ins; enum mf_status status;
     unsigned mask; int reg;
     op = as->statement.operation;
@@ -1208,6 +1249,7 @@ static enum mf_status process(struct mf_as *as)
     if (word(op, title, sizeof title)) return title_statement(as);
     if (word(op, print, sizeof print)) return print_statement(as);
     if (word(op, org, sizeof org)) return origin_statement(as);
+    if (word(op, ccw1, sizeof ccw1)) return ccw1_statement(as);
     if (word(op, csect, sizeof csect)) return select_section(as, 0);
     if (word(op, dsect, sizeof dsect)) return select_section(as, 1);
     if (word(op, equ, sizeof equ)) {

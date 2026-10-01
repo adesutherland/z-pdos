@@ -46,6 +46,11 @@ if(CREXX_EXECUTABLE)
         --args $<TARGET_FILE:mf-classic-as> $<TARGET_FILE:mf-classic-ld>
         $<TARGET_FILE:test_cli_output> ${PROJECT_BINARY_DIR}/overlays-link)
     set_tests_properties(classic_overlays_link PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    add_test(NAME classic_channel_word_link
+      COMMAND ${CREXX_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check-channel-word.crexx
+        --args $<TARGET_FILE:mf-classic-as> $<TARGET_FILE:mf-classic-ld>
+        $<TARGET_FILE:test_cli_output> ${PROJECT_BINARY_DIR}/channel-word-link)
+    set_tests_properties(classic_channel_word_link PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
   endif()
   add_test(NAME pdpclib_profile_sources
     COMMAND ${CREXX_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check-pdpclib-profiles.crexx

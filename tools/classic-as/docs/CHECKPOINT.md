@@ -261,3 +261,12 @@ Original pool tests distinguish lower/upper text and reject truncation. A(*)
 literals capture the referencing instruction's section and offset; independently
 expected bytes and fixups prove that two references have different values.
 SAPSTART now passes its SAPLOAD character literal and advances to CCW1.
+
+## Channel word checkpoint
+
+Original CCW1 encoding uses the public format-1 fields and zero alignment
+fill. Independent source and link checks validate command, flags, count,
+forward A relocation and all 30 final bytes at image base 4096. Oversized
+fields, a 32nd address bit and missing addresses fail. The repaired kernel
+advances beyond its write CCW chain. Channel execution and final OS address
+constraints remain unqualified; CCW0 support remains open.
