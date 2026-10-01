@@ -141,3 +141,14 @@ fixture now names its CODE and SECOND mode declarations correctly; the expected
 object bytes remain unchanged. The selected PDPTOP is consumed unchanged and
 the real ASSERT output reaches the prologue's external SAVE dependency.
 Normal and sanitizer affected checks pass 37/37, including the TSO31 consumer.
+
+## Local V-reference namespace — 1 October 2026
+
+V constants retain a separate external identity when their name also defines
+a local entry or CSECT. Independent engine/writer checks preserve A versus V
+relocation kinds and reject ordinary references to an undeclared V-only name.
+The original `local-v.asm` fixture links through Classic Linker at image base
+4096; all 14 resulting bytes are checked independently, including entry address
+4108 and section address 4096. This is a flat-binary host path, not OS loading
+or guest execution.
+Affected Classic checks pass 33/33 in normal and sanitizer builds.

@@ -52,6 +52,14 @@ int main(int argc, char **argv)
     FILE *input;
 
     CHECK(argc == 3);
+    if (!strcmp(argv[1], "local-v")) {
+        static const unsigned char linked[14] = {0,0,0x10,0x0c,0,0,0x10,0x0c,0,0,0x10,0,7,0xfe};
+        input = fopen(argv[2], "rb"); CHECK(input != NULL);
+        got = fread(card, 1, sizeof card, input);
+        CHECK(got == sizeof linked && !memcmp(card, linked, sizeof linked));
+        CHECK(!ferror(input) && fclose(input) == 0);
+        puts("local V: independent entry/section self-reference link bytes passed"); return 0;
+    }
     if (!strcmp(argv[1], "sentinel")) {
         static const unsigned char sentinel[] = {
             0x6b,0x65,0x65,0x70,0x00,0xff,0x75,0x6e,0x63,0x68,0x61,0x6e,0x67,0x65,0x64

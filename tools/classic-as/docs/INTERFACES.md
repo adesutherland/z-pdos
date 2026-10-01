@@ -43,7 +43,12 @@ Sections and symbols have session-local IDs. Serialized ESD IDs are assigned
 by the writer. A fixup identifies its owning section and location separately
 from its target. A/V address kind is distinct from section/external target kind;
 an external A reference cannot silently become V. Constant addends are already
-in emitted bytes. The first writer supports four-byte relocations only.
+in emitted bytes. The first writer supports four-byte relocations only. V-only external names
+are separate from ordinary symbols; the symbol array can contain an ER and
+LD with the same name and different IDs, or an ER matching a named section.
+Explicit EXTRN binds the ordinary namespace and still excludes local definition.
+Writer name uniqueness is per exported/external identity class; A and V keep
+their distinct relocation kinds when referring to the same eventual address.
 
 Writer operations are `begin`, `text`, `gap`, `fixup`, `entry`, `finish`. Begin
 receives final sections/symbols; later events do not mutate their identities.

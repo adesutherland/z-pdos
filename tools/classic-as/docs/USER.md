@@ -124,7 +124,10 @@ and END. Internal and serialized IDs are separate. It preserves section-relative
 entry, mode metadata and gaps. Serialized CSECT, exported and external symbol
 names must fit eight CP037 bytes without truncation; record addresses/section
 lengths must fit 24 bits. Overlays and wider
-relocations are rejected. Local symbols and DSECT names remain internal.
+relocations are rejected. Local symbols and DSECT names remain internal. V names occupy a separate
+external-reference namespace and can match a local ENTRY or CSECT name. The
+object retains ER plus LD/SD identities and a V relocation for linker resolution;
+an ordinary A expression requires a local definition or explicit EXTRN.
 
 An artifact is usable only after successful assembly, writer and sink completion.
 Return code 0 means success; 1 means assembly or output failure; 2 means command,

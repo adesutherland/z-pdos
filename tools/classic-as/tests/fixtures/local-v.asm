@@ -1,0 +1,6 @@
+* SPDX-License-Identifier: MIT
+S CSECT
+ DC V(LOCAL),A(LOCAL),V(S)
+ ENTRY LOCAL
+LOCAL BR 14
+ END S

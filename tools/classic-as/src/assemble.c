@@ -162,7 +162,14 @@ static size_t find_symbol(struct mf_as *as, struct mf_span name)
 {
     size_t i;
     for (i = 0; i < as->symbol_count; ++i)
-        if (same_name(as->symbols[i].name, name)) return i;
+        if (!as->symbol_state[i].implicit_external && same_name(as->symbols[i].name, name)) return i;
+    return NIL;
+}
+static size_t find_external(struct mf_as *as, struct mf_span name)
+{
+    size_t i;
+    for (i = 0; i < as->symbol_count; ++i)
+        if (as->symbols[i].kind == MF_EXTERNAL && same_name(as->symbols[i].name, name)) return i;
     return NIL;
 }
 static enum mf_status add_symbol(struct mf_as *as, struct mf_span name, size_t *index)
@@ -403,6 +410,7 @@ static enum mf_status symbol_list(struct mf_as *as, int external)
         name = trim(subspan(s, start, at - start));
         if (!valid_name(name)) return MF_SOURCE;
         i = find_symbol(as, name);
+        if (external && i == NIL) i = find_external(as, name);
         if (as->pass == 2) {
             if (i == NIL || as->symbols[i].kind != (external ? MF_EXTERNAL : MF_EXPORT)) return MF_REPLAY;
         } else {
@@ -424,20 +432,25 @@ static enum mf_status symbol_list(struct mf_as *as, int external)
     }
     return MF_OK;
 }
-/* A single V name declares an ordinary external identity. Repeated V uses
- * reuse it; a local/export declaration cannot silently change its meaning. */
-static enum mf_status implicit_external(struct mf_as *as, struct mf_span name)
+/* V reference names have external identities separate from ordinary labels.
+ * IBM HLASM Language Reference, ENTRY and symbolic linkage: the same name may
+ * be defined locally. EXTRN, in contrast, binds the ordinary symbol namespace. */
+static enum mf_status implicit_external(struct mf_as *as, struct mf_span name,
+    struct value *out)
 {
     size_t i; struct value v; enum mf_status status;
     if (!valid_name(name)) return MF_SOURCE;
-    i = find_symbol(as, name);
-    if (i != NIL) return as->symbols[i].kind == MF_EXTERNAL ? MF_OK : MF_DUPLICATE;
-    if (as->pass == 2) return MF_REPLAY;
-    status = add_symbol(as, name, &i); if (status != MF_OK) return status;
-    as->symbols[i].kind = MF_EXTERNAL; as->symbol_state[i].defined = 1;
-    as->symbol_state[i].implicit_external = 1;
+    i = find_external(as, name);
+    if (i == NIL) {
+        if (as->pass == 2) return MF_REPLAY;
+        status = add_symbol(as, name, &i); if (status != MF_OK) return status;
+        as->symbols[i].kind = MF_EXTERNAL; as->symbol_state[i].defined = 1;
+        as->symbol_state[i].implicit_external = 1;
+    }
     v = zero_value(); v.coefficient = 1; v.kind = MF_REF_EXTERNAL; v.target = as->symbols[i].id;
-    as->symbol_state[i].value = v; return MF_OK;
+    as->symbol_state[i].value = v;
+    if (out) *out = v;
+    return MF_OK;
 }
 static enum mf_status literal_value(struct mf_as *, struct mf_span, struct value *);
 static enum mf_status literal_pool(struct mf_as *, int);
@@ -780,10 +793,8 @@ static enum mf_status emit_constant(struct mf_as *as, const struct constant *c)
     if (!c->repeat) return MF_OK;
     v = zero_value();
     if (c->type == 0x48 || c->type == 0x46 || c->type == 0x41 || c->type == 0x44 || c->type == 0x56) {
-        if (c->type == 0x56 && valid_name(c->value)) {
-            status = implicit_external(as, c->value); if (status != MF_OK) return status;
-        }
-        status = evaluate(as, c->value, &v);
+        if (c->type == 0x56) status = implicit_external(as, c->value, &v);
+        else status = evaluate(as, c->value, &v);
         if (status == MF_UNDEFINED && as->pass == 1) return advance(as, c->width * c->repeat, NULL);
         if (status != MF_OK) return status;
         if ((c->type == 0x48 || c->type == 0x46 || c->type == 0x44) && v.coefficient) return MF_UNSUPPORTED;
@@ -861,7 +872,7 @@ static enum mf_status literal_constant(struct mf_as *as, struct mf_span text,
         if (status != MF_OK) return status;
         status = numeric_bytes(v, 4, 1, bytes); if (status != MF_OK) return status;
     } else if (c->type == 0x56) {
-        status = implicit_external(as, c->value); if (status != MF_OK) return status;
+        status = implicit_external(as, c->value, NULL); if (status != MF_OK) return status;
     } else {
         c->alignment = c->width % 16 == 0 ? 16 : c->width % 8 == 0 ? 8 :
             c->width % 4 == 0 ? 4 : c->width % 2 == 0 ? 2 : 1;

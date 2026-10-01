@@ -118,6 +118,31 @@ static void implicit_externals(void)
     successful(&f); CHECK(f.symbol_count == 2 && f.fixup_count == 2);
     CHECK(f.fixups[0].target == f.fixups[1].target); clean(&f);
 }
+static void local_v_names(void)
+{
+    struct fixture f; size_t i, exports, externals;
+    consumer_init(&f, "S CSECT\n DC V(LOCAL),A(LOCAL),V(S)\n ENTRY LOCAL\nLOCAL BR 14\n END S\n");
+    successful(&f); CHECK(f.symbol_count == 4 && f.fixup_count == 3);
+    CHECK(f.sections[0].length == 14 && f.data[0][7] == 12);
+    CHECK(f.data[0][12] == 7 && f.data[0][13] == 0xfe);
+    CHECK(f.fixups[0].address_kind == MF_ADDRESS_V && f.fixups[0].target_kind == MF_REF_EXTERNAL);
+    CHECK(f.fixups[1].address_kind == MF_ADDRESS_A && f.fixups[1].target_kind == MF_REF_SECTION);
+    CHECK(f.fixups[2].address_kind == MF_ADDRESS_V && f.fixups[2].target_kind == MF_REF_EXTERNAL);
+    exports = externals = 0;
+    for (i = 0; i < f.symbol_count; ++i) {
+        if (f.symbols[i].kind == MF_EXPORT) { ++exports; CHECK(f.symbols[i].offset == 12); }
+        if (f.symbols[i].kind == MF_EXTERNAL) { ++externals; CHECK(!f.symbols[i].offset && !f.symbols[i].section); }
+    }
+    CHECK(exports == 1 && externals == 2); clean(&f);
+    consumer_init(&f, " DC V(ONLYV)\n DC A(ONLYV)\n END\n");
+    CHECK(run(&f) == MF_UNDEFINED); clean(&f);
+    consumer_init(&f, " ENTRY LOCAL\nLOCAL DC F'1'\n DC V(LOCAL)\n END LOCAL\n");
+    real_writer(&f); CHECK(run(&f) == MF_OK && f.sink_valid);
+    /* PC, ER LOCAL, LD LOCAL, TXT, V RLD, END. */
+    CHECK(f.deck_length == 480 && f.deck[80+24] == 2 && f.deck[160+24] == 1);
+    CHECK(!memcmp(f.deck+80+16, f.deck+160+16, 8));
+    CHECK(f.deck[320+20] == 0x1c); clean(&f);
+}
 static void symbolic_ss(void)
 {
     static const mf_octet expected[] = {
@@ -141,13 +166,7 @@ static void consumer_failures(void)
         {"S CSECT\n USING S,12\n L 1,=X''\n END\n",MF_SOURCE},
         {"S CSECT\n USING S,12\n L 1,=V(EXT+1)\n END\n",MF_SOURCE},
         {"S CSECT\n USING S,12\n L 1,=V(1)\n END\n",MF_SOURCE},
-        {"S CSECT\n DC V(S)\n END\n",MF_DUPLICATE},
-        {"EXT EQU 1\n DC V(EXT)\n END\n",MF_DUPLICATE},
-        {" ENTRY EXT\n DC V(EXT)\n END\n",MF_DUPLICATE},
-        {" DC V(EXT)\nEXT DC F'1'\n END\n",MF_DUPLICATE},
-        {" DC V(EXT)\n ENTRY EXT\n END\n",MF_DUPLICATE},
         {" DC V(EXT)\n EXTRN EXT,EXT\n END\n",MF_DUPLICATE},
-        {"S CSECT\n USING S,12\n L 1,=V(EXT)\nEXT DC F'1'\n END\n",MF_DUPLICATE},
         {" L 1,=F'1'\n END\n",MF_RANGE},
         {"S CSECT\n USING S,12\n L 1,=F'1'\n DROP 12\n END\n",MF_OK},
         {"S CSECT\n USING S,12\n L 1,=F'1'\n DS 4096C\n END\n",MF_RANGE},
@@ -237,7 +256,7 @@ static void repeated_literal_storage(void)
 int main(void)
 {
     aliases(); address_literal(); literal_bytes(); pool_grouping(); multiple_pools_and_sections();
-    implicit_externals(); symbolic_ss(); consumer_failures();
+    implicit_externals(); local_v_names(); symbolic_ss(); consumer_failures();
     literal_replay_and_writer_errors(); literal_sink_contract(); repeated_literal_storage();
     printf("consumer engine: %lu checks passed\n", checks); return 0;
 }

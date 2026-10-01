@@ -154,10 +154,10 @@ static enum mf_status begin(void *cookie, const struct mf_section *secs,
         st = name(syms[i].name, y->name, 0);
         if (st != MF_OK) return fail(o, st);
         for (j = 0; j < i; ++j)
-            if (o->symbols[j].kind != MF_LOCAL &&
+            if (o->symbols[j].kind == y->kind &&
                 !memcmp(y->name, o->symbols[j].name, 8)) return fail(o, MF_DUPLICATE);
         for (j = 0; j < ns; ++j)
-            if (!o->sections[j].dummy && o->sections[j].named &&
+            if (y->kind != MF_EXTERNAL && !o->sections[j].dummy && o->sections[j].named &&
                 !memcmp(y->name, o->sections[j].name, 8)) return fail(o, MF_DUPLICATE);
         if (y->kind == MF_EXPORT) {
             owner = section(o, y->section);
