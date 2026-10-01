@@ -291,12 +291,30 @@ static void short_writes(void)
         CHECK(f.length==(i-1)*80+7);clean(&f);
     }
 }
+static void origin_events(void)
+{
+    struct fixture f; struct mf_section s; struct mf_fixup r;
+    static const mf_octet data[8] = {0,0,0,0,0xaa,0xbb,0xcc,0xdd};
+    init(&f); s = sec(1,8);
+    CHECK(f.writer.begin(f.writer.cookie,&s,1,NULL,0) == MF_OK);
+    CHECK(f.writer.text(f.writer.cookie,1,0,data,8) == MF_OK);
+    memset(&r,0,sizeof r); r.section = r.target = 1; r.width = 4;
+    r.target_kind = MF_REF_SECTION; r.address_kind = MF_ADDRESS_A;
+    CHECK(f.writer.fixup(f.writer.cookie,&r) == MF_OK);
+    CHECK(f.writer.origin(f.writer.cookie,1,4) == MF_OK);
+    CHECK(f.writer.text(f.writer.cookie,1,4,data+4,2) == MF_OK);
+    CHECK(f.writer.origin(f.writer.cookie,1,3) == MF_UNSUPPORTED);
+    CHECK(f.writer.finish(f.writer.cookie,1) == MF_UNSUPPORTED && !f.valid); clean(&f);
+    init(&f); s = sec(1,8); CHECK(f.writer.begin(f.writer.cookie,&s,1,NULL,0) == MF_OK);
+    CHECK(f.writer.origin(f.writer.cookie,1,9) == MF_RANGE);
+    CHECK(f.writer.finish(f.writer.cookie,0) == MF_RANGE && !f.valid); clean(&f);
+}
 int main(void)
 {
     static const enum mf_status expected[]={MF_UNSUPPORTED,MF_RANGE,MF_LIMIT,MF_UNSUPPORTED,
         MF_DUPLICATE,MF_IO,MF_IO,MF_RANGE,MF_UNSUPPORTED,MF_OBJECT,MF_RANGE,
         MF_UNSUPPORTED,MF_UNDEFINED,MF_RANGE,MF_RANGE,MF_IO,MF_IO,MF_SOURCE,MF_SOURCE};
     unsigned i;any_mode();good_deck();for(i=0;i<sizeof(expected)/sizeof(expected[0]);++i)failure(i,expected[i]);
-    edges();definitions();relocation_failures();short_writes();
+    origin_events();edges();definitions();relocation_failures();short_writes();
     printf("object: %u checks passed\n",checks);return 0;
 }

@@ -142,9 +142,13 @@ struct mf_object_writer {
     /* Optional, before begin. Initialize to NULL when unsupported. A named
      * TITLE requires this callback; the span is borrowed only for the call. */
     enum mf_status (*deck_id)(void *, struct mf_span);
+    /* Optional ORG event. Resets the section cursor, not its contents.
+     * Backward positions below prior relocated fields are unsupported. */
+    enum mf_status (*origin)(void *, unsigned, mf_u32);
 };
 /* Writer owns bounded caller-supplied session storage, never host devices.
- * Events are ordered within each section. Overlays are unsupported initially.
+ * Events are ordered within each section unless an origin event resets it.
+ * Selected overlays are limited to a suffix without earlier relocations.
  * A fixup follows its field's text before a gap/noncontiguous text in that
  * section; the writer validates the most recent contiguous text range.
  * Local symbols and dummy-section names are internal, not serialized.

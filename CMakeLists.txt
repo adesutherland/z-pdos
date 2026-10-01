@@ -41,6 +41,11 @@ if(CREXX_EXECUTABLE)
         --args $<TARGET_FILE:mf-classic-as> $<TARGET_FILE:mf-classic-ld>
         $<TARGET_FILE:test_cli_output> ${PROJECT_BINARY_DIR}/local-v-link)
     set_tests_properties(classic_local_v_link PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    add_test(NAME classic_overlays_link
+      COMMAND ${CREXX_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check-overlays.crexx
+        --args $<TARGET_FILE:mf-classic-as> $<TARGET_FILE:mf-classic-ld>
+        $<TARGET_FILE:test_cli_output> ${PROJECT_BINARY_DIR}/overlays-link)
+    set_tests_properties(classic_overlays_link PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
   endif()
   add_test(NAME pdpclib_profile_sources
     COMMAND ${CREXX_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check-pdpclib-profiles.crexx

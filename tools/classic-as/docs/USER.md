@@ -31,7 +31,7 @@ publication semantics.
 
 | Construct | Initial support |
 | --- | --- |
-| Sections | Named CSECT, one unnamed CSECT created/restored by an unlabeled CSECT, internal named DSECT layout, implicit unnamed section for ordinary statements; no overlays |
+| Sections | Named CSECT, one unnamed CSECT created/restored by an unlabeled CSECT, internal named DSECT layout, implicit unnamed section for ordinary statements; selected ORG overlays |
 | Symbols | ASCII names, case-insensitive identifiers, longer internal labels; bounded caller storage |
 | Expressions | Decimal, `X'hex'` wide integers and signed 32-bit `B'bits'` terms, symbols, `*`, parentheses, unary signs, addition/subtraction and supported single-target relocation expressions |
 | EQU | Values resolvable in the layout pass; forward EQU chains are unsupported |
@@ -212,3 +212,11 @@ the signed halfword distance from the instruction. Cross-section and external
 relative fixups are unsupported. Named machine profiles and final-object
 code-role audits remain separate gates. Privileged encodings confer no guest
 service or permission.
+
+ORG accepts a previously resolved same-section expression, or a missing
+operand/single comma to resume at the section's high water. It defines a
+label at the pre-ORG position. DSECT redefinitions are supported. Real sections
+require the writer's optional origin callback; backward origins below prior
+relocated fields are conservatively rejected. Forward moves emit no fill.
+Extra boundary/offset operands and unresolved layout expressions are unsupported.
+Section length is its high water, independent of the final cursor.

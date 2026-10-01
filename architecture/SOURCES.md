@@ -46,3 +46,9 @@ the same internal representation. That future host remains to be qualified.
   facts and chapter 14 the subchannel operations. Historical S/370 sources
   above supply older membership; SIO is deliberately rejected for ESA/390+.
   Only facts were used to write the original descriptions and independent tests.
+
+- IBM HLASM [ORG](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=statements-org-instruction)
+  defines the pre-ORG label value, no-fill cursor moves, restoration to the
+  next available location, later TXT overlays and the stale-relocation hazard.
+  Original selected implementation uses high water and a conservative
+  relocation-free suffix policy, with independently checked linked bytes.

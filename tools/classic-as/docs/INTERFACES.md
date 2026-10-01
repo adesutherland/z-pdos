@@ -57,10 +57,14 @@ copies and CP037-encodes the ID, bounds it to eight bytes, and space pads the
 remaining identification bytes. It emits the same ID on ESD/TXT/RLD/END cards,
 without generating a sequence suffix. TITLE names do not define ordinary symbols.
 
-Writer operations are `begin`, `text`, `gap`, `fixup`, `entry`, `finish`. Begin
+Writer operations are `begin`, `text`, `gap`, `fixup`, `entry`, `finish`, plus
+optional `origin` and `deck_id` callbacks initialized to NULL when unsupported. Begin
 receives final sections/symbols; later events do not mutate their identities.
-Gaps preserve reserved storage without inventing bytes. Ordered events cannot
-overlay previous text. Dummy sections describe layout without emitted storage.
+Gaps preserve reserved storage without inventing bytes. An explicit origin event flushes pending TXT and resets a section cursor
+without writing fill. Later TXT can overlay earlier absolute bytes. The
+selected writer rejects origins below the end of any prior relocated field;
+this conservative suffix restriction prevents stale RLD from corrupting an
+overlay and needs only bounded per-section state. Dummy sections describe layout without emitted storage.
 A fixup follows its field's text before a gap or noncontiguous text event in
 that section, so the writer can validate written coverage with bounded state.
 Local symbols and dummy-section names remain internal and are not serialized.

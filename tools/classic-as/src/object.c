@@ -9,7 +9,7 @@
 
 struct obj_section {
     unsigned id, esdid;
-    mf_u32 length, cursor, text_start, text_end;
+    mf_u32 length, cursor, text_start, text_end, relocation_end;
     unsigned amode, rmode;
     int dummy;
     mf_octet name[8];
@@ -253,6 +253,17 @@ static enum mf_status gap(void *cookie, unsigned id, mf_u32 off, mf_u32 length)
     s->text_start = s->cursor; s->text_end = s->cursor;
     return MF_OK;
 }
+static enum mf_status origin(void *cookie, unsigned id, mf_u32 off)
+{
+    struct mf_obj *o; struct obj_section *s;
+    o = (struct mf_obj *)cookie;
+    if (active(o) != MF_OK) return o->error;
+    s = section(o,id); if (!s || s->dummy) return fail(o,MF_OBJECT);
+    if (off > s->length) return fail(o,MF_RANGE);
+    if (off < s->relocation_end) return fail(o,MF_UNSUPPORTED);
+    if (flush(o) != MF_OK) return o->error;
+    s->cursor = s->text_start = s->text_end = off; return MF_OK;
+}
 static enum mf_status fixup(void *cookie, const struct mf_fixup *f)
 {
     struct mf_obj *o = (struct mf_obj *)cookie;
@@ -286,6 +297,7 @@ static enum mf_status fixup(void *cookie, const struct mf_fixup *f)
     store(p + 16, target, 2); store(p + 18, s->esdid, 2);
     p[20] = (mf_octet)(0x0c | (f->address_kind == MF_ADDRESS_V ? 0x10 : 0) |
         (f->subtract ? 2 : 0)); store(p + 21, f->offset, 3);
+    if (f->offset + 4 > s->relocation_end) s->relocation_end = f->offset + 4;
     return emit(o, p);
 }
 static enum mf_status entry(void *cookie, const struct mf_entry *e)
@@ -356,7 +368,7 @@ enum mf_status mf_obj_create(const struct mf_storage *storage,
     }
     *result = o; writer->cookie = o; writer->begin = begin; writer->text = text;
     writer->gap = gap; writer->fixup = fixup; writer->entry = entry;
-    writer->finish = finish; writer->deck_id = deck_id; return MF_OK;
+    writer->finish = finish; writer->deck_id = deck_id; writer->origin = origin; return MF_OK;
 }
 void mf_obj_destroy(struct mf_obj *o)
 {

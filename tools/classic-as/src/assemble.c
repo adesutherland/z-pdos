@@ -16,7 +16,7 @@ struct value {
     unsigned target;
 };
 struct symbol_state { struct value value; int defined, implicit_external; };
-struct section_state { mf_u32 position; unsigned mode_mask; };
+struct section_state { mf_u32 position, high_water, relocation_end; unsigned mode_mask; };
 struct mode_declaration { struct mf_span name; unsigned mask, amode, rmode; };
 struct literal {
     struct mf_span text; unsigned section, alignment; size_t pool;
@@ -399,13 +399,38 @@ static enum mf_status advance(struct mf_as *as, mf_u32 n, const mf_octet *bytes)
         else status = as->writer->gap(as->writer->cookie, section->id, s->position, n);
     }
     if (status != MF_OK) return status;
-    s->position += n; return MF_OK;
+    s->position += n;
+    if (s->position > s->high_water) s->high_water = s->position;
+    return MF_OK;
 }
 static enum mf_status align_position(struct mf_as *as, unsigned alignment)
 {
     mf_u32 remainder;
     remainder = as->section_state[as->current].position % alignment;
     return remainder ? advance(as, alignment - remainder, NULL) : MF_OK;
+}
+static enum mf_status origin_statement(struct mf_as *as)
+{
+    struct section_state *s; struct value v; enum mf_status status; mf_u32 target;
+    struct mf_span operand;
+    status = ensure_section(as); if (status != MF_OK) return status;
+    s = as->section_state + as->current;
+    status = define(as,as->statement.label,current_value(as)); if (status != MF_OK) return status;
+    operand = trim(as->statement.operand);
+    if (!operand.length || (operand.length == 1 && operand.data[0] == 0x2c)) target = s->high_water;
+    else {
+        status = evaluate(as,operand,&v); if (status != MF_OK) return status;
+        if (v.coefficient != 1 || v.kind != MF_REF_SECTION || v.target != as->sections[as->current].id) return MF_UNSUPPORTED;
+        if (v.negative || v.magnitude.hi) return MF_RANGE;
+        target = v.magnitude.lo;
+    }
+    if (!as->sections[as->current].dummy && as->pass == 2) {
+        if (target < s->relocation_end || !as->writer->origin) return MF_UNSUPPORTED;
+        status = as->writer->origin(as->writer->cookie,as->sections[as->current].id,target);
+        if (status != MF_OK) return status;
+    }
+    s->position = target; if (target > s->high_water) s->high_water = target;
+    return MF_OK;
 }
 static enum mf_status symbol_list(struct mf_as *as, int external)
 {
@@ -902,6 +927,8 @@ static enum mf_status emit_constant(struct mf_as *as, const struct constant *c)
             if (v.coefficient) {
                 ++as->fixup_count;
                 if (as->pass == 2) {
+                    if (offset + c->width > as->section_state[as->current].relocation_end)
+                        as->section_state[as->current].relocation_end = offset + c->width;
                     fixup.section = as->sections[as->current].id; fixup.offset = offset;
                     fixup.target_kind = v.kind; fixup.target = v.target;
                     fixup.address_kind = c->type == 0x56 ? MF_ADDRESS_V : MF_ADDRESS_A;
@@ -1145,6 +1172,7 @@ static enum mf_status process(struct mf_as *as)
     static const mf_octet using[] = {0x55,0x53,0x49,0x4e,0x47};
     static const mf_octet drop[] = {0x44,0x52,0x4f,0x50};
     static const mf_octet ltorg[] = {0x4c,0x54,0x4f,0x52,0x47};
+    static const mf_octet org[] = {0x4f,0x52,0x47};
     struct mf_span op; struct value v; const struct mf_instruction *ins; enum mf_status status;
     unsigned mask; int reg;
     op = as->statement.operation;
@@ -1154,6 +1182,7 @@ static enum mf_status process(struct mf_as *as)
     if (word(op, pop, sizeof pop)) return using_stack(as, 1);
     if (word(op, title, sizeof title)) return title_statement(as);
     if (word(op, print, sizeof print)) return print_statement(as);
+    if (word(op, org, sizeof org)) return origin_statement(as);
     if (word(op, csect, sizeof csect)) return select_section(as, 0);
     if (word(op, dsect, sizeof dsect)) return select_section(as, 1);
     if (word(op, equ, sizeof equ)) {
@@ -1225,7 +1254,7 @@ static enum mf_status run_pass(struct mf_as *as, const struct mf_statements *sou
 {
     enum mf_status status, semantic_error; size_t n, i, j; struct mf_origin error_origin;
     for (i = 0; i < as->section_count; ++i) {
-        as->section_state[i].position = 0;
+        as->section_state[i].position = as->section_state[i].high_water = as->section_state[i].relocation_end = 0;
     }
     as->pool = 0; as->title_names = 0; as->base_depth = 0;
     if (as->pass == 2) for (i = 0; i < as->literal_count; ++i) as->literals[i].seen = 0;
@@ -1277,8 +1306,8 @@ static enum mf_status run_pass(struct mf_as *as, const struct mf_statements *sou
         if (as->modes[i].mask & 2U) as->sections[j].rmode = as->modes[i].rmode;
     }
     for (i = 0; i < as->section_count; ++i) {
-        if (as->pass == 1) as->sections[i].length = as->section_state[i].position;
-        else if (as->sections[i].length != as->section_state[i].position) return MF_REPLAY;
+        if (as->pass == 1) as->sections[i].length = as->section_state[i].high_water;
+        else if (as->sections[i].length != as->section_state[i].high_water) return MF_REPLAY;
     }
     return MF_OK;
 }

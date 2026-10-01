@@ -52,6 +52,14 @@ int main(int argc, char **argv)
     FILE *input;
 
     CHECK(argc == 3);
+    if (!strcmp(argv[1], "overlays")) {
+        static const unsigned char linked[10] = {0,0x11,0xab,0xcd,0x44,0x55,0x66,0x77,0x18,0x12};
+        input = fopen(argv[2], "rb"); CHECK(input != NULL);
+        got = fread(card,1,sizeof card,input);
+        CHECK(got == sizeof linked && !memcmp(card,linked,sizeof linked));
+        CHECK(!ferror(input) && fclose(input) == 0);
+        puts("overlays: later TXT bytes and section high water pass independent link check"); return 0;
+    }
     if (!strcmp(argv[1], "fullword-bits")) {
         static const unsigned char words[28] = {0,0,0,0,0x7f,0xff,0xff,0xff,
             0x80,0,0,0,0xff,0xff,0xff,0xff,0xa8,0x88,0x5a,0x31,

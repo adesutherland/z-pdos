@@ -243,3 +243,13 @@ Forward conditional searches no longer diagnose operands in bypassed source
 records. Original tests cover malformed inactive operands, macro-scope target
 isolation, malformed active targets and changed inactive replay. The repaired
 kernel's bypassed S/370 channel-status branch now reaches subsequent source.
+
+## Selected ORG checkpoint
+
+The engine retains section high water independently of position. An explicit
+optional writer origin event flushes TXT before a cursor change; subsequent
+absolute TXT overlays survive independent Classic linking. Original tests
+check ten final bytes, three TXT records, label/layout semantics, DSECT
+redefinitions, default restoration, missing callbacks and invalid origins.
+Both engine and writer reject origins below prior relocation fields. This
+bounded suffix policy deliberately leaves arbitrary relocation overlays open.

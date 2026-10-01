@@ -630,9 +630,30 @@ static void system_instructions(void)
     init(&f,"S CSECT\n LMG 0,15,-524289(13)\n END S\n"); f.config.profile = MF_Z900; CHECK(run(&f) == MF_RANGE); clean(&f);
     init(&f,"S CSECT\n PR 1\n END S\n"); f.config.profile = MF_Z900; CHECK(run(&f) == MF_SOURCE); clean(&f);
 }
+static void origin_layout(void)
+{
+    struct fixture f; size_t i,j,n,offset; mf_octet image[10]; unsigned txts;
+    static const mf_octet expected[] = {0,0x11,0xab,0xcd,0x44,0x55,0x66,0x77,0x18,0x12};
+    init(&f,"S CSECT\n DC X'0011223344556677'\nBEFORE ORG S+2\n DC X'ABCD'\n ORG ,\nE LR 1,2\n END E\n");
+    real_writer(&f); CHECK(run(&f) == MF_OK && f.sink_valid);
+    CHECK(f.deck[29] == 0 && f.deck[30] == 0 && f.deck[31] == 10);
+    memset(image,0,sizeof image); txts = 0;
+    for (i=0;i<f.deck_length;i+=80) if (f.deck[i+1] == 0xe3) {
+        ++txts; offset = (size_t)f.deck[i+5]*65536+(size_t)f.deck[i+6]*256+f.deck[i+7];
+        n = (size_t)f.deck[i+10]*256+f.deck[i+11]; CHECK(offset <= sizeof image && n <= sizeof image-offset);
+        for (j=0;j<n;++j) image[offset+j] = f.deck[i+16+j];
+    }
+    CHECK(txts == 3 && !memcmp(image,expected,sizeof image)); clean(&f);
+    init(&f,"D DSECT\n DS 10C\n ORG D+2\nFIELD DS H\n ORG\nTAIL DS F\nS CSECT\n DC A(FIELD-D),A(TAIL-D)\n END S\n");
+    successful(&f); CHECK(f.sections[0].length == 16 && f.data[1][3] == 2 && f.data[1][7] == 12); clean(&f);
+    init(&f,"S CSECT\n DC A(S)\n ORG S\n DC F'1'\n END S\n"); real_writer(&f); CHECK(run(&f) == MF_UNSUPPORTED && !f.sink_valid); clean(&f);
+    init(&f,"S CSECT\n DC X'00'\n ORG S\n END S\n"); CHECK(run(&f) == MF_UNSUPPORTED); clean(&f);
+    init(&f,"S CSECT\n ORG S-1\n END S\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n ORG MISSING\n END S\n"); CHECK(run(&f) == MF_UNDEFINED); clean(&f);
+}
 int main(void)
 {
-    system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
+    origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
     printf("assemble: %lu checks passed\n", checks); return 0;
