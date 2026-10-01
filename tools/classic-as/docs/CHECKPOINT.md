@@ -164,3 +164,14 @@ the earlier eight successful units. PDOS and STDIO reach the desktop literal
 capacity; MATH/STDLIB/TIME still reach fixed/floating constant/instruction gaps.
 These are host language/object checks, not the kernel ISA or complete OS build.
 Affected Classic checks pass 33/33 in normal and sanitizer builds.
+
+## Explicit desktop literal bound — 1 October 2026
+
+`--literal-limit` selects a checked decimal count from zero through 65536; the
+default remains 256 and the unchanged 32 MiB payload budget still bounds all
+allocations. Invalid/overflowing arguments fail before opening source or output.
+CLI controls reject insufficient capacity and pass an explicitly sufficient
+count in normal and sanitizer builds. With a selected limit of 4096, the actual
+PDOS C output assembles: 13,349 statements, 1,043 symbols and 670 fixups. The
+remaining four C units first require floating-point forms; raw support and
+complete linking remain open.

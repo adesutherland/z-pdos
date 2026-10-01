@@ -36,6 +36,16 @@ main: procedure = .int
   call run_case cli, "--profile", 2, stdout_path, stderr_path, "missing profile value"
   call run_case cli, "--profile z64", 2, stdout_path, stderr_path, "unsupported profile"
   call run_case cli, shellquote(forms), 2, stdout_path, stderr_path, "missing output"
+  call run_case cli, "--literal-limit", 2, stdout_path, stderr_path, "missing literal capacity"
+  call run_case cli, "--literal-limit -1", 2, stdout_path, stderr_path, "negative literal capacity"
+  call run_case cli, "--literal-limit 65537", 2, stdout_path, stderr_path, "excessive literal capacity"
+  call run_case cli, "--literal-limit 9999999999999999999999", 2, stdout_path, stderr_path, "overflowing literal capacity"
+  limits_source = work || "/limits.asm"; limits_deck = work || "/limits.obj"
+  call writefile limits_source, "S CSECT" || '0a'x || " USING S,12" || '0a'x || " L 1,=F'1'" || '0a'x || " L 2,=F'2'" || '0a'x || " END S" || '0a'x
+  call erase limits_deck
+  call run_case cli, "--literal-limit 1 " || shellquote(limits_source) || " " || shellquote(limits_deck), 1, stdout_path, stderr_path, "literal capacity enforced"
+  call absent limits_deck
+  call run_case cli, "--literal-limit 2 " || shellquote(limits_source) || " " || shellquote(limits_deck), 0, stdout_path, stderr_path, "explicit sufficient literal capacity"
   output = work || "/extra.obj"; call erase output
   call run_case cli, shellquote(forms) || " " || shellquote(output) || " extra", 2, stdout_path, stderr_path, "extra argument"
   call absent output
