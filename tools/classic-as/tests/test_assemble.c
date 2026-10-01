@@ -803,11 +803,24 @@ static void channel_words(void)
     init(&f,"S CSECT\n CCW0 1,0,3,0\n END S\n"); failed(&f,MF_RANGE); clean(&f);
     init(&f,"S CSECT\n CCW 1,S,0,0\n END S\n"); failed(&f,MF_UNSUPPORTED); clean(&f);
 }
+static void executable_alignment(void)
+{
+    static const mf_octet expected[18] = {7,0,7,0,7,0,0xaa,0,7,0,0xbb,0,7,0,7,0,7,0};
+    struct fixture f;
+    init(&f,"S CSECT\n CNOP 6,8\n DC X'AA'\nLABEL CNOP 2,4\n DC X'BB'\n CNOP 0,8\n CNOP 0,8\n BCR 0,0\n END LABEL\n");
+    successful(&f); CHECK(f.sections[0].length == sizeof expected);
+    CHECK(!memcmp(f.data[0],expected,sizeof expected));
+    CHECK(f.entry.offset == 8 && f.present[0][7] && f.present[0][11]); clean(&f);
+    init(&f,"S CSECT\n CNOP 4,4\n END S\n"); failed(&f,MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n CNOP 1,4\n END S\n"); failed(&f,MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n CNOP 0,16\n END S\n"); failed(&f,MF_UNSUPPORTED); clean(&f);
+    init(&f,"S CSECT\nHERE CNOP 0,4\n DC AL1(L'HERE)\n END S\n"); failed(&f,MF_UNSUPPORTED); clean(&f);
+}
 int main(void)
 {
     no_operand_sections(); symbol_lengths(); channel_words(); character_and_location_literals(); origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); nominal_lists(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
-    forward_branch_registers();
+    forward_branch_registers(); executable_alignment();
     printf("assemble: %lu checks passed\n", checks); return 0;
 }
