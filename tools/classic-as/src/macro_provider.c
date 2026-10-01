@@ -185,7 +185,13 @@ static enum mf_status joined(struct mf_macro *m, struct mf_records *records,
             if (used == m->config.max_statement_bytes) return MF_LIMIT;
             m->logical[used++] = c;
             if (!first || i >= operand) {
-                if (c == 0x27 && (quoted || used < 2 || mf_macro_upper(m->logical[used-2]) != 0x4c)) quoted = !quoted;
+                if (c == 0x27) {
+                    int attribute; mf_octet before, after;
+                    before = used >= 2 ? mf_macro_upper(m->logical[used-2]) : 0;
+                    st = card_byte(r,records->encoding,i+1,&after); if (st != MF_OK) return st;
+                    attribute = before == 0x4c || ((before == 0x54 || before == 0x4b || before == 0x4e) && after == 0x26);
+                    if (quoted || !attribute) quoted = !quoted;
+                }
                 else if (!quoted && c == 0x28) ++level;
                 else if (!quoted && c == 0x29) { if (!level) return MF_SOURCE; --level; }
                 if (c != 0x20) previous = c;

@@ -400,7 +400,7 @@ static enum mf_status ensure_section(struct mf_as *as)
 static enum mf_status select_section(struct mf_as *as, int dummy)
 {
     size_t i, symbol; enum mf_status status; int declared;
-    if (as->statement.operand.length ||
+    if ((as->statement.operand.length && (as->statement.operand.length != 1 || as->statement.operand.data[0] != 0x2c)) ||
         (as->statement.label.length ? !valid_name(as->statement.label) : dummy)) return MF_SOURCE;
     for (i = 0; i < as->section_count; ++i)
         if (same_name(as->sections[i].name, as->statement.label)) break;

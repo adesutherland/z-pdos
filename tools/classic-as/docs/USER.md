@@ -254,3 +254,8 @@ synchronously and are not retained as an expansion history.
 absolute expression; `EJECT` accepts omitted/single-comma operands. They
 validate listing requests and emit no object events. This driver has no
 listing output. Ordinary labels and invalid operands fail.
+
+A single comma is accepted as the absent operand on CSECT/DSECT, including
+section reselection. Additional operand slots remain unsupported. The physical
+card joiner distinguishes T'/K'/N' immediate parameter attributes from quoted
+character strings, including mixed logical conditions in definitions.

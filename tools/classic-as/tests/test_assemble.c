@@ -673,6 +673,14 @@ static void character_and_location_literals(void)
     init(&f,"S CSECT\n USING S,12\n L 1,=CL2'ABC'\n END S\n"); f.config.max_literals = 4;
     CHECK(run(&f) == MF_RANGE); clean(&f);
 }
+static void no_operand_sections(void)
+{
+    struct fixture f;
+    init(&f,"S CSECT ,\n LR 1,2\nD DSECT ,\nFIELD DS F\nS CSECT ,\n LR 3,4\n END S\n");
+    successful(&f); CHECK(f.section_count == 2 && f.sections[0].length == 4 && f.sections[1].dummy);
+    CHECK(f.data[0][0] == 0x18 && f.data[0][1] == 0x12 && f.data[0][2] == 0x18 && f.data[0][3] == 0x34); clean(&f);
+    init(&f,"S CSECT ,,\n END S\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
+}
 static void symbol_lengths(void)
 {
     static const mf_octet expected[18] = {0xd2,7,0xc0,18,0xc0,42,0xd2,6,0xc0,18,0xc0,42,0xd2,7,0xc0,19,0xc0,42};
@@ -702,7 +710,7 @@ static void channel_words(void)
 }
 int main(void)
 {
-    symbol_lengths(); channel_words(); character_and_location_literals(); origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
+    no_operand_sections(); symbol_lengths(); channel_words(); character_and_location_literals(); origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
     printf("assemble: %lu checks passed\n", checks); return 0;

@@ -321,6 +321,9 @@ static void replay_and_io(void)
 static void continuation_cards(void)
 {
     struct fixture f; unsigned long n; size_t calls; char source[320], changed[320], operand[80];
+    init(&f," MACRO\n Z &P=A\n AIF (K'&P EQ 1 AND '&P' EQ 'A').YES\n LR 3,4\n.YES ANOP\n LR 1,2\n MEND\n Z\n");
+    CHECK(create(&f) == MF_OK); expected(&f,"","LR","1,2",8);
+    CHECK(drain(&f,&n) == MF_EOF); clean(&f);
     memset(source,' ',sizeof source); memcpy(source," LR 1,",6);
     source[71] = '+'; source[72] = '\n'; memcpy(source+88,"2\n",2); source[90] = 0;
     init(&f," DC AL1(L'LABEL)\n"); CHECK(create(&f) == MF_OK);
