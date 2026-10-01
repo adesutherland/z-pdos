@@ -153,3 +153,26 @@ hashes, final payload/image hashes, versions and check logs there. The locally
 built image is a new candidate. PD-05 is complete; PD-06 boot and PD-07 cREXX
 application acceptance remain open. The accepted Lab image and guest state
 were not accessed or changed.
+
+Two complete fresh runs from clean committed source
+`6aaaba84757c2b00d7edb3a06a73dc4edf9c8d57` pass: normal and sanitizer
+assembler/linker builds. All 23 object decks, three RDW modules and six flat
+links are byte identical across the two runs. The same checker also compares
+both disks and finds every guest byte identical, allowing only the regenerated
+container serial. Source manifests, repaired-function controls, loader checks,
+IPL/payload checks, compression readback and all corruption controls pass in
+each run. The earlier 53/53 normal and sanitizer regression results are reused;
+this final increment changes host image orchestration/checks and documentation,
+with no further assembler core or selected OS/runtime change.
+
+The normal candidate is in ignored `build/pdos/pdio1-6aaaba8/media/`:
+
+| Private generated output | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `pdos00.ckd` | 85,248,512 | `16a1573313396b5c4c5261a2387107aa056545465c56a4fab7bbcb5c4c93250a` |
+| `pdos00.cckd` | 161,582 | `486e36460804ea44579fd38051665d4db22b5559d17f407d09ddaf7c41845d0a` |
+
+`inputs.sha256`, `outputs.sha256`, `versions.log` and the stage logs are in
+`build/pdos/pdio1-6aaaba8/`; the matching sanitizer run is in
+`build/pdos/pdio1-6aaaba8-sanitize/`. These identify this built candidate and
+do not replace the historical accepted Lab kernel or establish boot success.
