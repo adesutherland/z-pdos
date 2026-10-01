@@ -173,6 +173,20 @@ static void report(void *cookie, const struct mf_diagnostic *diagnostic)
         diagnostic->origin.line, diagnostic->origin.column,
         status_name(diagnostic->code), (int)diagnostic->code);
 }
+#ifdef MF_WITH_TRADITIONAL_MACROS
+static void macro_report(void *cookie, const struct mf_macro_event *event)
+{
+    struct host_library *library; size_t i; const char *path;
+    if (event->status == MF_OK) return;
+    library = (struct host_library *)cookie;
+    for (i = 0; i < event->depth; ++i) {
+        const struct mf_macro_frame_info *f; f = event->frames+i;
+        path = f->model.source && f->model.source <= library->known ?
+            library->paths[f->model.source-1] : library->paths[0];
+        fprintf(stderr,"macro model %s:%lu:%u\n",path,f->model.line,f->model.column);
+    }
+}
+#endif
 /* A standard-C existence check, conservative on systems exposing ENOENT.
  * Exclusive atomic publication is not provided by ISO C89 stdio. */
 static int target_absent(const char *path)
@@ -211,7 +225,7 @@ int main(int argc, char **argv)
     mf_octet reader_buffer[CARD_CAPACITY]; enum mf_status status;
     enum mf_profile profile; const char *input_path, *output_path; int arg, rc, use_macros; size_t literal_limit;
 #ifdef MF_WITH_TRADITIONAL_MACROS
-    struct mf_macro_config macro_config; struct mf_macro *macros;
+    struct mf_macro_config macro_config; struct mf_macro *macros; struct mf_macro_observer macro_observer;
     struct host_library library; struct mf_macro_library resolver;
     memset(&library, 0, sizeof library);
     macros = NULL;
@@ -312,7 +326,8 @@ int main(int argc, char **argv)
         macro_config.max_model_statements = 1024; macro_config.max_definition_bytes = 262144UL;
         macro_config.max_depth = 16; macro_config.max_argument_bytes = 4096;
         macro_config.max_statement_bytes = CARD_CAPACITY; macro_config.max_steps = 1000000UL;
-        status = mf_macro_create(&macro_config, &storage, &records, NULL, &macros, &source);
+        macro_observer.cookie = &library; macro_observer.notify = macro_report;
+        status = mf_macro_create(&macro_config, &storage, &records, &macro_observer, &macros, &source);
         if (status == MF_OK && library.directory_count) {
             resolver.cookie = &library; resolver.open = library_open; resolver.close = library_close;
             status = mf_macro_set_library(macros, &resolver);

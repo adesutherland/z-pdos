@@ -245,3 +245,7 @@ An omitted SS length uses the first displacement term's attribute, including
 `FIELD+offset` and `FIELD(,base)`. Explicit lengths override it. Forward
 lengths in fixed-size instructions resolve on pass two; layout declarations
 remain strict. Conditional macro lookahead and general attributes remain open.
+
+The macro-enabled CLI reports failing nested macro model coordinates before
+its primary invocation diagnostic. Borrowed observer frames are printed
+synchronously and are not retained as an expansion history.
