@@ -9,7 +9,7 @@ if(MF_TRADITIONAL_MACROS)
   target_compile_definitions(mf-classic-as PRIVATE MF_WITH_TRADITIONAL_MACROS)
   target_link_libraries(mf-classic-as PRIVATE mf_classic_macro)
   add_executable(test_macro_deck tests/test_macro_deck.c)
-  foreach(component macro macro_assemble)
+  foreach(component macro macro_assemble macro_library)
     add_executable(test_${component} tests/test_${component}.c)
     target_link_libraries(test_${component} PRIVATE mf_classic_macro)
     add_test(NAME classic_${component} COMMAND test_${component})
@@ -59,6 +59,17 @@ classic_cli_fixture(forms forms.asm)
 classic_cli_fixture(profile cli-profile.asm --profile s370)
 
 if(MF_TRADITIONAL_MACROS)
+  set(library_deck ${CMAKE_CURRENT_BINARY_DIR}/library.obj)
+  add_test(NAME classic_library_cli_prepare
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${library_deck})
+  set_tests_properties(classic_library_cli_prepare PROPERTIES FIXTURES_SETUP library_path)
+  add_test(NAME classic_library_cli COMMAND mf-classic-as --profile s370 --macros
+    -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/library
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/library-client.asm ${library_deck})
+  set_tests_properties(classic_library_cli PROPERTIES
+    FIXTURES_REQUIRED library_path FIXTURES_SETUP library_deck)
+  add_test(NAME classic_library_cli_semantics COMMAND test_cli_output profile ${library_deck})
+  set_tests_properties(classic_library_cli_semantics PROPERTIES FIXTURES_REQUIRED library_deck)
   set(macro_deck ${CMAKE_CURRENT_BINARY_DIR}/macros.obj)
   add_test(NAME classic_macro_cli_prepare
     COMMAND ${CMAKE_COMMAND} -E rm -f ${macro_deck})

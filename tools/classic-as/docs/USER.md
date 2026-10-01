@@ -4,7 +4,7 @@ The `0.1.0-bootstrap` build produces binary classic object decks, ready for a
 separately qualified compatible linker/loader. It does not link or execute code.
 
 ```text
-mf-classic-as [--profile s360|s370] [--macros] input.asm output.obj
+mf-classic-as [--profile s360|s370] [--macros] [-I directory] input.asm output.obj
 mf-classic-as --version
 mf-classic-as --help
 ```
@@ -57,7 +57,7 @@ Symbol references in an ungenerated nominal need not resolve. Character/hex
 nominals still undergo the documented lexical and explicit-length checks.
 This does not yet implement symbol length/type attributes.
 
-Multiplication/division, COPY, ORG, conditional assembly and
+Multiplication/division, ORG, conditional assembly and
 cREXX expansion are not implemented. Traditional definitions require the
 optional provider selected below. Unsupported
 constructs fail explicitly. The source parser's documented subset is distinct
@@ -152,7 +152,16 @@ Definitions cannot be redefined. It accepts both `*` and `.*` comment cards.
 A comma on MACRO/MEND is an empty marker operand; a comma on a call represents
 two empty positional arguments and is checked against the prototype.
 
-The provider explicitly rejects continuation, COPY, conditional controls and
+With `--macros`, repeat `-I directory` to select ordered library directories.
+The host searches lower-case and original-case member names with `.mac`, `.asm`,
+then no suffix. COPY inserts library records; an unknown operation can load a
+member containing exactly one matching macro definition. Missing COPY members,
+cycles, depth limits, I/O errors and changed dependency records fail explicitly.
+The core uses host-supplied record handles and source identities, never paths.
+Library diagnostics name the supplying file. Desktop bounds are 16 directories,
+256 source identities, 16 simultaneous members and 1,024 path bytes.
+
+The provider explicitly rejects continuation, COPY inside macro definitions, conditional controls and
 variables, attributes, SYSNDX, sublist indexing, escaped ampersands and nested
 definitions. The [macro guide](MACROS.md) gives an original example and the
 storage/replay/provenance contract. This is a language subset; it supplies no

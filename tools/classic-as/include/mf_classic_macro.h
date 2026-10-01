@@ -28,6 +28,19 @@ struct mf_macro_observer {
     void (*notify)(void *, const struct mf_macro_event *);
 };
 struct mf_macro;
+/* Host-owned library handles; identity must be stable and nonzero, including
+ * across passes. open returns MF_UNDEFINED only for an absent member. close
+ * releases the handle, including when expansion fails. No paths in the core.
+ * Records retain their own encoding and original source coordinates. */
+struct mf_macro_library {
+    void *cookie;
+    enum mf_status (*open)(void *, struct mf_span, struct mf_records *, unsigned *);
+    enum mf_status (*close)(void *, struct mf_records *);
+};
+/* Bind before the first next call. COPY depth shares the explicit max_depth
+ * bound; active member identities detect cycles. Library macro lookup occurs
+ * only after inline definitions, and absent names still reach the engine. */
+enum mf_status mf_macro_set_library(struct mf_macro *, const struct mf_macro_library *);
 enum mf_status mf_macro_create(const struct mf_macro_config *,
     const struct mf_storage *, const struct mf_records *,
     const struct mf_macro_observer *, struct mf_macro **,
@@ -45,7 +58,7 @@ void mf_macro_destroy(struct mf_macro *);
  * Only declared positional slots are accepted; extra slots are unsupported.
  * A single comma is accepted as the empty operand on MACRO/MEND markers only;
  * comma-separated empty actuals retain their positional slots.
- * COPY, continuation, conditional controls/variables, attributes, SYSNDX,
+ * COPY without a library or inside definitions, continuation, conditional controls/variables, attributes, SYSNDX,
  * parameter indexing, escaped ampersands and nested definitions are unsupported.
  * Definitions cannot be redefined. Names compare case-insensitively; character
  * argument values retain their original octets. ASCII and CP037 records use

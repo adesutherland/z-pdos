@@ -110,3 +110,13 @@ Agents use GPT-6.1 Sol Extra High for the engine/complex work and High for defin
 review tasks. No inherited assembler code, opcode table, private macro source,
 guest run, OS-service work or compiler repair is part of this seed.
 Complete runtime/OS assembly and native z/PDOS hosting remain later gates.
+
+## PDOS-driven source resolution, 1 October 2026
+
+The optional provider now resolves open-code COPY and library macro definitions
+through explicit host-owned record handles. No filesystem or heap service enters
+the core. Bounded nesting, active-member cycles, per-member encoding and original
+coordinates, replay of unused/comment records, and failed-open/close cleanup have
+original independent unit checks. A CLI fixture checks copied source and a
+library-loaded macro against independently fixed BASR bytes and deck semantics.
+PDPTOP is now reached; its conditional variables remain the next build gap.

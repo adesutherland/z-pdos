@@ -15,6 +15,7 @@ does not establish that all its contents are public domain.
 | IBM HLASM [LTORG](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=statements-ltorg-instruction) and [literal pools](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=instruction-literal-pool) | Global collection across sections, first-section implicit END pool, eight-byte default pool boundary and descending length groups; selected F/X/V literals only |
 | IBM *OS Assembler Language*, GC28-6514-9, January 1974, p30, [transcribed scan](https://manuals.plus/m/17b6feca60f26515201385a6b4d06b419dad686ab7faea35b82105a555d1ae0b) | Source SS lengths zero and one both select a zero encoded length field; source-language handling remains separate from the pure architectural encoder |
 | IBM HLASM [DC duplication factor](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=instruction-subfield-1-duplication-factor) | A zero factor produces alignment and label semantics without a value; a nominal may be omitted; zero-duplication literals are not permitted |
+| IBM HLASM [COPY](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=statements-copy-instruction) | Library member insertion, distinct from a macro call; definition-time COPY remains outside the first resolver slice |
 | [RFC 3629](https://www.rfc-editor.org/rfc/rfc3629.html) | UTF-8 text contract; ASCII is a valid subset |
 
 Character constants and external names select IBM CP037 explicitly. The

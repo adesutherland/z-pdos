@@ -54,7 +54,15 @@ It neither imports definitions into the source tree nor uses an expanded
 replacement assembly file. That external consumer is additional to the ordinary
 public test suite, which uses only original fixtures.
 
-The first gate explicitly rejects continuation cards, COPY, conditional
+The provider now accepts open-code COPY and automatic library macro lookup
+through `mf_macro_set_library`. The host owns library records and handles;
+the provider bounds nesting, detects active-member cycles, fingerprints copied
+comments and definitions, and closes every opened handle. Independent in-memory
+and CLI fixtures exercise lookup, nesting, CP037 members, missing/cyclic inputs,
+capacity, I/O failures and changed unused records across replay. COPY inside
+a macro definition still requires definition-time insertion and is rejected.
+
+The first gate explicitly rejects continuation cards, conditional
 controls and variables, argument sublist indexing, SYSNDX and assembler-state
 attributes. Passing an invocation through as an unexplained no-op would hide a
 missing build dependency. Ordinary instructions and directives emitted by the

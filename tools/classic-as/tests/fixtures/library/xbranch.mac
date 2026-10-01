@@ -1,0 +1,4 @@
+         MACRO
+         XBRANCH &R,&S
+         BASR  &R,&S
+         MEND

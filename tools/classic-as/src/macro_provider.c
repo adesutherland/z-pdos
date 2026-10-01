@@ -14,18 +14,23 @@ struct definition {
     size_t parameters, first, count;
 };
 struct frame { size_t definition, pc; };
+struct member { struct mf_records records; unsigned identity; size_t owner; };
 struct fingerprint { mf_u32 a, b; struct mf_u64 records, bytes; };
 struct mf_macro {
     struct mf_macro_config config;
     struct mf_records records;
     struct mf_macro_observer observer;
+    struct mf_macro_library library;
+    struct member *members;
+    size_t member_depth;
+    int started;
     struct definition *definitions;
     struct parameter *parameters;
     struct mf_statement *models;
     struct frame *frames;
     struct mf_macro_frame_info *trace;
     struct mf_span *values;
-    mf_octet *assigned, *arguments, *definition_bytes, *output;
+    mf_octet *assigned, *arguments, *definition_bytes, *output, *pending;
     mf_octet card[80];
     size_t definition_count, model_count, definition_used, depth;
     unsigned long steps;
@@ -55,7 +60,7 @@ static int word(struct mf_span s, size_t k)
 static int blocked(struct mf_span s)
 {
     size_t i;
-    for (i = 2; i < 20; ++i) if (word(s, i)) return 1;
+    for (i = 3; i < 20; ++i) if (word(s, i)) return 1;
     return 0;
 }
 static struct mf_span slice(struct mf_span s, size_t at, size_t n)
@@ -125,17 +130,18 @@ static enum mf_status step(struct mf_macro *m)
 }
 static enum mf_status raw(struct mf_macro *m, struct mf_statement *s)
 {
-    struct mf_record r; enum mf_status st; int skip;
+    struct mf_record r; struct mf_records *records; enum mf_status st; int skip;
     for (;;) {
         memset(&r, 0, sizeof r);
-        st = m->records.next(m->records.cookie, &r);
+        records = m->member_depth ? &m->members[m->member_depth - 1].records : &m->records;
+        st = records->next(records->cookie, &r);
         m->last_origin = r.origin;
         if (st != MF_OK) return st;
         if (r.bytes.length > 80 || (r.bytes.length && !r.bytes.data))
             return r.bytes.length > 80 ? MF_LIMIT : MF_SOURCE;
         st = step(m); if (st != MF_OK) return st;
         st = hash_record(&m->current, &r); if (st != MF_OK) return st;
-        st = mf_macro_card(&r, m->records.encoding, m->card, sizeof m->card, s, &skip);
+        st = mf_macro_card(&r, records->encoding, m->card, sizeof m->card, s, &skip);
         m->last_origin = s->origin;
         if (st != MF_OK) return st;
         if (!skip) return MF_OK;
@@ -226,7 +232,7 @@ static enum mf_status capture(struct mf_macro *m, const struct mf_statement *mar
             if (!empty(s.operand)) return MF_SOURCE;
             ++m->definition_count; return MF_OK;
         }
-        if (word(s.operation, 0) || blocked(s.operation) ||
+        if (word(s.operation, 0) || word(s.operation, 2) || blocked(s.operation) ||
             (s.label.length && s.label.data[0] == 0x2e)) return MF_UNSUPPORTED;
         if (m->model_count == m->config.max_model_statements) return MF_LIMIT;
         st = retain(m, &s, m->models + m->model_count); if (st != MF_OK) return st;
@@ -333,19 +339,59 @@ static void observe(struct mf_macro *m, enum mf_status status, struct mf_span de
     e.frames = m->depth ? m->trace : NULL; e.depth = m->depth;
     m->observer.notify(m->observer.cookie, &e);
 }
+static enum mf_status member_pop(struct mf_macro *m)
+{
+    if (!m->member_depth) return MF_SOURCE;
+    --m->member_depth;
+    return m->library.close(m->library.cookie, &m->members[m->member_depth].records);
+}
+static enum mf_status member_push(struct mf_macro *m, struct mf_span name)
+{
+    struct member *v; size_t i; enum mf_status st;
+    if (!m->library.open) return MF_UNSUPPORTED;
+    if (!name_valid(name)) return MF_SOURCE;
+    if (m->member_depth == m->config.max_depth) return MF_LIMIT;
+    v = m->members + m->member_depth; memset(v, 0, sizeof *v);
+    st = m->library.open(m->library.cookie, name, &v->records, &v->identity);
+    if (st != MF_OK) return st;
+    if (!v->identity || !v->records.next || !v->records.replay ||
+        (v->records.encoding != MF_ASCII && v->records.encoding != MF_CP037)) st = MF_SOURCE;
+    for (i = 0; st == MF_OK && i < m->member_depth; ++i)
+        if (m->members[i].identity == v->identity) st = MF_SOURCE;
+    if (st != MF_OK) { m->library.close(m->library.cookie, &v->records); return st; }
+    v->owner = m->depth; ++m->member_depth; return MF_OK;
+}
+static enum mf_status library_macro(struct mf_macro *m, struct mf_span name, size_t *index)
+{
+    struct mf_statement s; enum mf_status st, closed;
+    st = member_push(m, name); if (st != MF_OK) return st;
+    st = raw(m, &s);
+    if (st == MF_OK && !word(s.operation, 0)) st = MF_SOURCE;
+    if (st == MF_OK) st = capture(m, &s);
+    if (st == MF_OK) {
+        *index = find(m, name);
+        if (*index == NONE) st = MF_SOURCE;
+    }
+    if (st == MF_OK) {
+        st = raw(m, &s);
+        st = st == MF_EOF ? MF_OK : (st == MF_OK ? MF_SOURCE : st);
+    }
+    closed = member_pop(m); return st == MF_OK ? closed : st;
+}
 static enum mf_status provider_next(void *cookie, struct mf_statement *out)
 {
     struct mf_macro *m; struct mf_statement s, expanded;
     enum mf_status st; size_t k; struct definition *d;
     struct mf_span detail;
-    m = (struct mf_macro *)cookie;
+    m = (struct mf_macro *)cookie; m->started = 1;
     if (!out) return MF_SOURCE;
     memset(out, 0, sizeof *out); memset(&s, 0, sizeof s);
     if (m->terminal != MF_OK) { out->origin = m->last_origin; return m->terminal; }
     for (;;) {
         while (m->depth && m->frames[m->depth - 1].pc ==
             m->definitions[m->frames[m->depth - 1].definition].count) --m->depth;
-        if (m->depth) {
+        if (m->depth && (!m->member_depth ||
+            m->members[m->member_depth - 1].owner != m->depth)) {
             d = m->definitions + m->frames[m->depth - 1].definition;
             s = m->models[d->first + m->frames[m->depth - 1].pc++];
             m->trace[m->depth - 1].model = s.origin;
@@ -354,6 +400,7 @@ static enum mf_status provider_next(void *cookie, struct mf_statement *out)
         } else {
             st = raw(m, &s);
             if (st == MF_EOF) {
+                if (m->member_depth) { st = member_pop(m); if (st != MF_OK) break; continue; }
                 if (m->replaying && !hashes_equal(&m->first, &m->current)) st = MF_REPLAY;
                 else {
                     if (!m->replaying) m->first = m->current;
@@ -371,7 +418,25 @@ static enum mf_status provider_next(void *cookie, struct mf_statement *out)
         if (blocked(expanded.operation) || word(expanded.operation, 0) || word(expanded.operation, 1)) {
             st = MF_UNSUPPORTED; break;
         }
+        if (word(expanded.operation, 2)) {
+            if (expanded.label.length) { st = MF_UNSUPPORTED; break; }
+            st = member_push(m, expanded.operand); if (st != MF_OK) break; continue;
+        }
         k = find(m, expanded.operation);
+        if (k == NONE && m->library.open) {
+            /* The temporary output spans are overwritten by raw/capture.
+             * Retain this one pending call in bounded workspace. */
+            struct mf_statement pending; size_t used;
+            used = 0;
+            pending.origin = expanded.origin;
+            st = copy(expanded.label, m->pending, m->config.max_statement_bytes, &used, &pending.label);
+            if (st == MF_OK) st = copy(expanded.operation, m->pending, m->config.max_statement_bytes, &used, &pending.operation);
+            if (st == MF_OK) st = copy(expanded.operand, m->pending, m->config.max_statement_bytes, &used, &pending.operand);
+            if (st != MF_OK) break;
+            st = library_macro(m, pending.operation, &k);
+            expanded = pending;
+            if (st != MF_OK && st != MF_UNDEFINED) break;
+        }
         if (k != NONE) { st = push(m, k, &expanded); if (st != MF_OK) break; continue; }
         if (m->depth) expanded.origin = m->trace[0].invocation;
         m->last_origin = expanded.origin; *out = expanded;
@@ -435,10 +500,19 @@ enum mf_status mf_macro_create(const struct mf_macro_config *c,
     ALLOC(arguments, c->max_depth * c->max_argument_bytes, mf_octet);
     ALLOC(definition_bytes, c->max_definition_bytes, mf_octet);
     ALLOC(output, c->max_statement_bytes, mf_octet);
+    ALLOC(pending, c->max_statement_bytes, mf_octet);
+    ALLOC(members, c->max_depth, struct member);
 #undef ALLOC
     hash_init(&m->current);
     *out = m; statements->cookie = m; statements->next = provider_next;
     statements->replay = provider_replay; return MF_OK;
 }
+enum mf_status mf_macro_set_library(struct mf_macro *m, const struct mf_macro_library *library)
+{
+    if (!m || m->started || !library || !library->open || !library->close) return MF_SOURCE;
+    m->library = *library; return MF_OK;
+}
 void mf_macro_destroy(struct mf_macro *m)
-{ (void)m; }
+{
+    if (m) while (m->member_depth) { (void)member_pop(m); }
+}

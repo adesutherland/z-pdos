@@ -16,7 +16,7 @@
 
 struct allocation { struct allocation *next; void *bytes; };
 struct host_storage { struct allocation *head; size_t used, limit; };
-struct host_source { FILE *file; mf_octet card[CARD_CAPACITY]; unsigned long line; };
+struct host_source { FILE *file; mf_octet card[CARD_CAPACITY]; unsigned long line; unsigned identity; };
 struct host_sink { FILE *file; int completed; };
 
 static void *host_acquire(void *cookie, size_t n)
@@ -44,7 +44,7 @@ static enum mf_status host_next(void *cookie, struct mf_record *record)
 {
     struct host_source *source; size_t n; int c, too_long;
     source = (struct host_source *)cookie; n = 0; too_long = 0;
-    record->origin.source = 1; record->origin.line = source->line; record->origin.column = 1;
+    record->origin.source = source->identity; record->origin.line = source->line; record->origin.column = 1;
     if (source->line != ULONG_MAX) ++record->origin.line;
     while ((c = fgetc(source->file)) != EOF) {
         if (c == 0x0a) break;
@@ -67,6 +67,63 @@ static enum mf_status host_replay(void *cookie)
     if (fseek(source->file, 0L, SEEK_SET) != 0) return MF_IO;
     clearerr(source->file); source->line = 0; return MF_OK;
 }
+#ifdef MF_WITH_TRADITIONAL_MACROS
+#define LIB_DIRS 16
+#define LIB_MEMBERS 256
+#define LIB_PATH 1024
+struct host_library {
+    const char *directories[LIB_DIRS]; size_t directory_count, known;
+    char paths[LIB_MEMBERS][LIB_PATH];
+    struct host_source handles[16];
+};
+static enum mf_status library_open(void *cookie, struct mf_span name,
+    struct mf_records *records, unsigned *identity)
+{
+    struct host_library *library; struct host_source *source;
+    char member[128], path[LIB_PATH]; size_t i, j, k, n; FILE *file;
+    static const char *suffixes[] = {".mac", ".asm", ""};
+    library = (struct host_library *)cookie;
+    if (name.length >= sizeof member) return MF_LIMIT;
+    for (i = 0; i < name.length; ++i) {
+        mf_octet c; c = name.data[i];
+        member[i] = (char)(c >= 0x41 && c <= 0x5a ? c + 0x20 : c);
+    }
+    member[name.length] = 0; source = NULL;
+    for (i = 0; i < 16; ++i) if (!library->handles[i].file) { source = library->handles + i; break; }
+    if (!source) return MF_LIMIT;
+    file = NULL;
+    for (i = 0; i < library->directory_count && !file; ++i) {
+        for (j = 0; j < 6 && !file; ++j) {
+            if (j == 3) for (k = 0; k < name.length; ++k) member[k] = (char)name.data[k];
+            n = strlen(library->directories[i]);
+            if (n + name.length + strlen(suffixes[j % 3]) + 2 > sizeof path) return MF_LIMIT;
+            strcpy(path, library->directories[i]); strcat(path, "/");
+            strcat(path, member); strcat(path, suffixes[j % 3]);
+            errno = 0; file = fopen(path, "rb");
+            if (!file && errno != ENOENT) return MF_IO;
+        }
+        for (k = 0; k < name.length; ++k) {
+            mf_octet c; c = name.data[k]; member[k] = (char)(c >= 0x41 && c <= 0x5a ? c + 0x20 : c);
+        }
+    }
+    if (!file) return MF_UNDEFINED;
+    for (i = 0; i < library->known; ++i) if (!strcmp(path, library->paths[i])) break;
+    if (i == library->known) {
+        if (i == LIB_MEMBERS) { fclose(file); return MF_LIMIT; }
+        strcpy(library->paths[i], path); ++library->known;
+    }
+    memset(source, 0, sizeof *source); source->file = file; source->identity = (unsigned)i + 1;
+    records->cookie = source; records->encoding = MF_ASCII;
+    records->next = host_next; records->replay = host_replay; *identity = source->identity;
+    return MF_OK;
+}
+static enum mf_status library_close(void *cookie, struct mf_records *records)
+{
+    struct host_source *source; int rc; (void)cookie;
+    source = (struct host_source *)records->cookie; rc = fclose(source->file);
+    source->file = NULL; return rc ? MF_IO : MF_OK;
+}
+#endif
 static enum mf_status sink_begin(void *cookie)
 { ((struct host_sink *)cookie)->completed = 0; return MF_OK; }
 static enum mf_status sink_write(void *cookie, const mf_octet *data, size_t n)
@@ -103,7 +160,15 @@ static const char *status_name(enum mf_status status)
 static void report(void *cookie, const struct mf_diagnostic *diagnostic)
 {
     const char *path;
+#ifdef MF_WITH_TRADITIONAL_MACROS
+    {
+        struct host_library *library; library = (struct host_library *)cookie;
+        path = diagnostic->origin.source && diagnostic->origin.source <= library->known ?
+            library->paths[diagnostic->origin.source - 1] : library->paths[0];
+    }
+#else
     path = (const char *)cookie;
+#endif
     fprintf(stderr, "%s:%lu:%u: %s (status %d)\n", path,
         diagnostic->origin.line, diagnostic->origin.column,
         status_name(diagnostic->code), (int)diagnostic->code);
@@ -147,6 +212,8 @@ int main(int argc, char **argv)
     enum mf_profile profile; const char *input_path, *output_path; int arg, rc, use_macros;
 #ifdef MF_WITH_TRADITIONAL_MACROS
     struct mf_macro_config macro_config; struct mf_macro *macros;
+    struct host_library library; struct mf_macro_library resolver;
+    memset(&library, 0, sizeof library);
     macros = NULL;
 #endif
     profile = MF_S360; arg = 1; as = NULL; obj = NULL;
@@ -156,7 +223,7 @@ int main(int argc, char **argv)
     }
     if (argc == 2 && strcmp(argv[1], "--help") == 0) {
 #ifdef MF_WITH_TRADITIONAL_MACROS
-        puts("usage: mf-classic-as [--profile s360|s370] [--macros] input.asm output.obj"); return 0;
+        puts("usage: mf-classic-as [--profile s360|s370] [--macros] [-I directory] input.asm output.obj"); return 0;
 #else
         puts("usage: mf-classic-as [--profile s360|s370] input.asm output.obj"); return 0;
 #endif
@@ -177,11 +244,20 @@ int main(int argc, char **argv)
 #else
             fprintf(stderr, "traditional macro provider is not included in this build\n"); return 2;
 #endif
+        } else if (strcmp(argv[arg], "-I") == 0) {
+#ifdef MF_WITH_TRADITIONAL_MACROS
+            if (argc <= arg + 1 || library.directory_count == LIB_DIRS) {
+                fprintf(stderr, "missing or excessive library directory\n"); return 2;
+            }
+            library.directories[library.directory_count++] = argv[arg + 1]; arg += 2;
+#else
+            fprintf(stderr, "library provider is not included in this build\n"); return 2;
+#endif
         } else break;
     }
     if (argc != arg + 2) {
 #ifdef MF_WITH_TRADITIONAL_MACROS
-        fprintf(stderr, "usage: mf-classic-as [--profile s360|s370] [--macros] input.asm output.obj\n"); return 2;
+        fprintf(stderr, "usage: mf-classic-as [--profile s360|s370] [--macros] [-I directory] input.asm output.obj\n"); return 2;
 #else
         fprintf(stderr, "usage: mf-classic-as [--profile s360|s370] input.asm output.obj\n"); return 2;
 #endif
@@ -192,6 +268,14 @@ int main(int argc, char **argv)
     }
     memset(&memory, 0, sizeof memory); memory.limit = (size_t)HOST_BUDGET;
     memset(&input, 0, sizeof input); memset(&output, 0, sizeof output);
+    input.identity = 1;
+#ifdef MF_WITH_TRADITIONAL_MACROS
+    if (strlen(input_path) >= LIB_PATH) { fprintf(stderr, "input path too long\n"); return 2; }
+    strcpy(library.paths[0], input_path); library.known = 1;
+    if (library.directory_count && !use_macros) {
+        fprintf(stderr, "-I requires --macros\n"); return 2;
+    }
+#endif
     input.file = fopen(input_path, "rb");
     if (!input.file) { fprintf(stderr, "cannot open input: %s\n", input_path); return 2; }
     output.file = tmpfile();
@@ -199,7 +283,12 @@ int main(int argc, char **argv)
     storage.cookie = &memory; storage.acquire = host_acquire;
     records.cookie = &input; records.encoding = MF_ASCII; records.next = host_next; records.replay = host_replay;
     sink.cookie = &output; sink.begin = sink_begin; sink.write = sink_write; sink.finish = sink_finish;
-    diagnostics.cookie = (void *)input_path; diagnostics.report = report;
+#ifdef MF_WITH_TRADITIONAL_MACROS
+    diagnostics.cookie = &library;
+#else
+    diagnostics.cookie = (void *)input_path;
+#endif
+    diagnostics.report = report;
     config.profile = profile; config.max_sections = 64; config.max_symbols = 4096;
     config.max_literals = 256;
     config.max_fixups = (size_t)65536UL; config.max_statement = 256; config.max_expression_depth = 32;
@@ -210,6 +299,10 @@ int main(int argc, char **argv)
         macro_config.max_depth = 16; macro_config.max_argument_bytes = 4096;
         macro_config.max_statement_bytes = CARD_CAPACITY; macro_config.max_steps = 1000000UL;
         status = mf_macro_create(&macro_config, &storage, &records, NULL, &macros, &source);
+        if (status == MF_OK && library.directory_count) {
+            resolver.cookie = &library; resolver.open = library_open; resolver.close = library_close;
+            status = mf_macro_set_library(macros, &resolver);
+        }
     } else
 #else
     (void)use_macros;
