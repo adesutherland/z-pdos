@@ -8,10 +8,10 @@ main: procedure = .int
   if work = "" | work = "." | work = "/" then return 2
   address crexx "run cmake -E make_directory :work"
   if rc <> 0 then return rc
-  do i = 1 to 12
-    source = word("pdos31-io-templates pdos31-get pdos31-io-maps pdos31-io-services pdos31-directory pdos31-wto pdos31-diagnostics pdos31-trkcalc pdos31-basic-dcb pdos31-bsam pdos31-sync pdos31-freepool",i)
-    entry = word("IOTEST GETTEST IOMAPS IOSVCS DIRTEST WTOTEST DIAGTEST TRKTEST BASICTST BSAMTEST SYNCTEST POOLTEST",i)
-    mode = word("pdos31-io pdos31-get pdos31-io-maps pdos31-io-services pdos31-directory pdos31-wto pdos31-diagnostics pdos31-trkcalc pdos31-basic-dcb pdos31-bsam pdos31-sync pdos31-freepool",i)
+  do i = 1 to 13
+    source = word("pdos31-io-templates pdos31-get pdos31-io-maps pdos31-io-services pdos31-directory pdos31-wto pdos31-diagnostics pdos31-trkcalc pdos31-basic-dcb pdos31-bsam pdos31-sync pdos31-freepool pdos31-task",i)
+    entry = word("IOTEST GETTEST IOMAPS IOSVCS DIRTEST WTOTEST DIAGTEST TRKTEST BASICTST BSAMTEST SYNCTEST POOLTEST TASKTEST",i)
+    mode = word("pdos31-io pdos31-get pdos31-io-maps pdos31-io-services pdos31-directory pdos31-wto pdos31-diagnostics pdos31-trkcalc pdos31-basic-dcb pdos31-bsam pdos31-sync pdos31-freepool pdos31-task",i)
     deck = work || "/" || source || ".obj"
     binary = work || "/" || source || ".bin"
     source = "tools/classic-as/tests/fixtures/" || source || ".asm"
@@ -24,8 +24,8 @@ main: procedure = .int
     address crexx "run :checker :mode :binary"
     if rc <> 0 then return rc
   end
-  do i = 1 to 9
-    source = "tools/classic-as/tests/fixtures/" || word("pdos31-io-unsupported pdos31-directory-unsupported pdos31-camlst-unsupported pdos31-wto-unsupported pdos31-snap-unsupported pdos31-trkcalc-unsupported pdos31-bsam-unsupported pdos31-sync-unsupported pdos31-freepool-unsupported",i) || ".asm"
+  do i = 1 to 10
+    source = "tools/classic-as/tests/fixtures/" || word("pdos31-io-unsupported pdos31-directory-unsupported pdos31-camlst-unsupported pdos31-wto-unsupported pdos31-snap-unsupported pdos31-trkcalc-unsupported pdos31-bsam-unsupported pdos31-sync-unsupported pdos31-freepool-unsupported pdos31-task-unsupported",i) || ".asm"
     failed = work || "/io-failed.obj"
     address crexx "run cmake -E rm -f :failed"
     if rc <> 0 then return rc

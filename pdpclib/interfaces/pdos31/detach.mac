@@ -1,0 +1,9 @@
+* SPDX-License-Identifier: MIT; original selected SVC62 token linkage.
+         MACRO
+&N       DETACH &TOKEN
+         AIF   ('&TOKEN' EQ '').BAD
+&N       MF$REG 1,&TOKEN
+         SVC   62
+         MEXIT
+.BAD     MNOTE 8,'DETACH requires a TCB-address word'
+         MEND

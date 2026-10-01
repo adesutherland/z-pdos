@@ -1,0 +1,36 @@
+* SPDX-License-Identifier: MIT; original selected PDOS SVC42 adapter.
+* PDOS's first word is an entry-NAME pointer, not a modern entry address.
+         MACRO
+&N       ATTACH &EPLOC=,&ECB=,&SHSPV=,&SZERO=,&SF=
+         LCLA  &SHARE,&FLAGS
+         AIF   ('&SZERO' EQ '' OR '&SZERO' EQ 'YES').YESZERO
+         AIF   ('&SZERO' NE 'NO').BAD
+&FLAGS   SETA  8
+.YESZERO ANOP
+         AIF   ('&SHSPV' EQ '').FORM
+&SHARE   SETA  &SHSPV
+         AIF   (&SHARE LT 0 OR &SHARE GT 127).BAD
+.FORM    AIF   ('&SF' NE 'L').EXEC
+         AIF   ('&EPLOC' EQ '' OR '&ECB' EQ '').BAD
+         DS    0F
+&N       DC    A(&EPLOC,0,&ECB,0,&SHARE,0)
+         DC    H'0',X'00',AL1(&FLAGS)
+         MEXIT
+.EXEC    AIF   (N'&SF NE 2).BAD
+         AIF   ('&SF(1)' NE 'E' OR '&SF(2)' EQ '').BAD
+&N       LA    15,&SF(2)
+         AIF   ('&EPLOC' EQ '').EVENT
+         MF$REG 0,&EPLOC
+         ST    0,0(,15)
+.EVENT   AIF   ('&ECB' EQ '').SHARE
+         MF$REG 0,&ECB
+         ST    0,8(,15)
+.SHARE   AIF   ('&SHSPV' EQ '').ZERO
+         LA    0,&SHARE
+         ST    0,16(,15)
+.ZERO    AIF   ('&SZERO' EQ '').CALL
+         MVI   27(15),&FLAGS
+.CALL    SVC   42
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected PDOS ATTACH request'
+         MEND

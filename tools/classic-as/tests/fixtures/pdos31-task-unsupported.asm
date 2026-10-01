@@ -1,0 +1,3 @@
+BADTASK  CSECT
+         ATTACH EP=PROG,SF=L
+         END   BADTASK

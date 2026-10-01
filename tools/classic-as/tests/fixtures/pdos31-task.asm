@@ -1,0 +1,11 @@
+TASKTEST CSECT
+         USING TASKTEST,12
+LIST     ATTACH EPLOC=PGM,ECB=EVENT,SHSPV=78,SZERO=NO,SF=L
+         ATTACH EPLOC=(R2),ECB=(R3),SF=(E,LIST)
+         DETACH TOKEN
+         BR    14
+         DS    0F
+PGM      DC    CL8'PROG'
+EVENT    DC    F'0'
+TOKEN    DC    A(0)
+         END   TASKTEST

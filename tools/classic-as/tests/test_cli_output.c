@@ -175,6 +175,21 @@ int main(int argc, char **argv)
 
     CHECK(argc == 3);
     if (!strcmp(argv[1],"pdos31-io")) { io_templates(argv[2]); return 0; }
+    if (!strcmp(argv[1],"pdos31-task")) {
+        static const unsigned char code[26] = {
+            0x41,0xf0,0xc0,0,0x18,2,0x50,0,0xf0,0,0x18,3,0x50,0,0xf0,8,
+            0x0a,0x2a,0x41,0x10,0xc0,0x44,0x0a,0x3e,7,0xfe};
+        static const unsigned char name[8] = {0xd7,0xd9,0xd6,0xc7,0x40,0x40,0x40,0x40};
+        unsigned char actual[73], expected[72];
+        memset(expected,0,sizeof expected);
+        expected[2] = expected[10] = 0x10; expected[3] = 0x38; expected[11] = 0x40;
+        expected[19] = 78; expected[27] = 8;
+        memcpy(expected+28,code,sizeof code); memcpy(expected+56,name,sizeof name);
+        input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(actual,1,sizeof actual,input);
+        CHECK(got == sizeof expected && !memcmp(actual,expected,sizeof expected));
+        CHECK(!ferror(input) && fclose(input) == 0);
+        puts("PDOS task adapter: independent 28-byte list and SVC linkage pass"); return 0;
+    }
     if (!strcmp(argv[1],"pdos31-sync")) {
         static const unsigned char linked[44] = {
             0x18,0x15,0x0a,0,0x18,0x12,0x41,0,0,1,0x0a,1,0x18,0x1a,0x1b,0,0x0a,0x37,

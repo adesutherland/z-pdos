@@ -250,3 +250,23 @@ R2–R14 are preserved. The selected layout and extent follow the public
 No access-method implementation was used. All 66 linked bytes and synthetic
 pool/null/invalid/alignment execution controls pass independently; an omitted
 DCB fails without a deck. Actual guest storage release remains unqualified.
+
+The selected ATTACH is an explicit PDOS SVC42 adapter. Its fullword-aligned
+28-byte SF=L prefix contains entry-name address, reserved word, ECB address,
+give/share/exit words, reserved halfword and option bytes. SF=(E,list) updates
+supplied EPLOC/ECB/SHSPV/SZERO fields and preserves R1's program parameters;
+R0/R15 are scratch. SHSPV is 0–127, SZERO is YES/NO, and ordinary list
+addresses must fit LA. PDOS consumes the first three words and implements
+program loading and completion within its existing context model; the higher
+options do not add services to that handler. This adapter is selected only by
+the named PDOS interface library. It is not the modern IBM ATTACH parameter
+list, whose first word denotes an entry address.
+
+DETACH supplies the address of a TCB-address word in R1 and issues SVC62.
+The public register and service facts follow IBM's
+[SVC42 description](https://www.ibm.com/docs/en/zos/3.2.0?topic=descriptions-svc-42-0a2a)
+and [Diagnosis: Reference](https://publibz.boulder.ibm.com/epubs/pdf/iea1v231.pdf)
+(printed page 4-60 for SVC62), checked against the owned PDOS handlers.
+An original consumer independently checks all 72 linked list, name and
+instruction bytes; unsupported EP= fails without a deck. Neither these
+host checks nor the adapter establish concurrent task support in a guest.
