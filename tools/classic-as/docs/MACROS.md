@@ -71,6 +71,11 @@ Arithmetic uses checked signed 32-bit values, decimal terms, parentheses and
 +/-/*/division. Logical expressions support NOT, AND, OR and EQ/NE/LT/LE/GT/GE;
 character comparisons use CP037 order and right-space padding. Quoted character
 values preserve case. The expression nesting bound is 32.
+Quoted character primaries accept substring notation `(start,count)`, with
+one-based arithmetic start and nonnegative count or `*` for the remainder.
+Doubled apostrophes count as one character. This selected subset rejects
+out-of-range slices instead of silently accepting warning-producing forms;
+concatenation and character duplication remain unsupported.
 
 Macro sequence branches can go forward or backward in their own definition;
 the step limit bounds loops. Open-code branches currently scan forward within

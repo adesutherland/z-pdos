@@ -83,6 +83,21 @@ static void label_attributes(void)
     }
     clean(&f);
 }
+static void substrings(void)
+{
+    struct fixture f; unsigned long n;
+    init(&f," LCLC &C\n&C SETC 'ABCDE'(2,3)\n"
+        " AIF ('AB''CD'(2,3) EQ 'B''C' AND 'ABCDE'(4,*) EQ 'DE').YES\n"
+        " BAD &UNDEF\n.YES DC C'&C'\n&C SETC 'ABC'(4,0)\n DC C'X&C.Y'\n");
+    CHECK(create(&f) == MF_OK);
+    expected(&f,"","DC","C'BCD'",5);
+    expected(&f,"","DC","C'XY'",7);
+    CHECK(drain(&f,&n) == MF_EOF); clean(&f);
+    bad_source(" LCLC &C\n&C SETC 'ABC'(0,1)\n",MF_RANGE);
+    bad_source(" LCLC &C\n&C SETC 'ABC'(2,-1)\n",MF_RANGE);
+    bad_source(" LCLC &C\n&C SETC 'ABC'(3,2)\n",MF_RANGE);
+    bad_source(" AIF ('ABC'('x',1) EQ 'A').YES\n.YES ANOP\n",MF_SOURCE);
+}
 static void inactive_source(void)
 {
     struct fixture f; unsigned pass; unsigned long n;
@@ -102,5 +117,5 @@ static void inactive_source(void)
 }
 int main(void)
 {
-    inactive_source(); scoped(); expressions(); argument_attributes(); label_attributes(); printf("conditional macros: %lu checks passed\n", checks); return 0;
+    inactive_source(); scoped(); expressions(); argument_attributes(); label_attributes(); substrings(); printf("conditional macros: %lu checks passed\n", checks); return 0;
 }

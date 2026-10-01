@@ -17,6 +17,44 @@ static int token(struct expression *p, const mf_octet *word, size_t n)
     p->at += n; return 1;
 }
 static enum mf_status logical(struct expression *, struct mf_macro_value *);
+static enum mf_status sum(struct expression *, struct mf_macro_value *);
+static enum mf_status substring(struct expression *p, struct mf_macro_value *v)
+{
+    struct mf_macro_value first, count; enum mf_status st;
+    size_t i, chars, begin, end, index; int rest;
+    spaces(p);
+    if (p->at == p->text.length || p->text.data[p->at] != 0x28) return MF_OK;
+    if (p->depth == p->limit) return MF_LIMIT;
+    ++p->depth; ++p->at; st = sum(p,&first); spaces(p);
+    if (st == MF_OK && (p->at == p->text.length || p->text.data[p->at++] != 0x2c)) st = MF_SOURCE;
+    spaces(p); rest = p->at < p->text.length && p->text.data[p->at] == 0x2a;
+    memset(&count,0,sizeof count);
+    if (st == MF_OK) { if (rest) ++p->at; else st = sum(p,&count); }
+    --p->depth; spaces(p);
+    if (st != MF_OK) return st;
+    if (p->at == p->text.length || p->text.data[p->at++] != 0x29 || first.character || count.character) return MF_SOURCE;
+    if (first.number <= 0 || count.number < 0) return MF_RANGE;
+    chars = 0;
+    for (i = 0; i < v->text.length; ++i) {
+        if (v->text.data[i] == 0x27 && i + 1 < v->text.length && v->text.data[i+1] == 0x27) ++i;
+        ++chars;
+    }
+    if ((unsigned long)(first.number-1) > chars) return MF_RANGE;
+    begin = (size_t)(first.number-1);
+    if (!rest && (unsigned long)count.number > chars-begin) return MF_RANGE;
+    end = rest ? chars : begin+(size_t)count.number;
+    i = index = 0;
+    while (index < begin) {
+        if (v->text.data[i] == 0x27 && i + 1 < v->text.length && v->text.data[i+1] == 0x27) ++i;
+        ++i; ++index;
+    }
+    begin = i;
+    while (index < end) {
+        if (v->text.data[i] == 0x27 && i + 1 < v->text.length && v->text.data[i+1] == 0x27) ++i;
+        ++i; ++index;
+    }
+    v->text.data += begin; v->text.length = i-begin; return MF_OK;
+}
 static enum mf_status primary(struct expression *p, struct mf_macro_value *v)
 {
     enum mf_status st; size_t start; mf_octet c; unsigned long n, maximum; int negative;
@@ -36,7 +74,7 @@ static enum mf_status primary(struct expression *p, struct mf_macro_value *v)
             if (p->text.data[p->at] == 0x27) {
                 if (p->at + 1 < p->text.length && p->text.data[p->at + 1] == 0x27) { p->at += 2; continue; }
                 v->character = 1; v->text.data = p->text.data + start;
-                v->text.length = p->at++ - start; return MF_OK;
+                v->text.length = p->at++ - start; return substring(p,v);
             }
             ++p->at;
         }
