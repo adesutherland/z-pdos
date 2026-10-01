@@ -379,8 +379,8 @@ static void bad_sources(void)
         {" COPY MEMBER\n END\n", MF_UNSUPPORTED},
         {" ORG 0\n END\n", MF_UNSUPPORTED},
         {" L 1,=F'1'\n END\n", MF_UNSUPPORTED},
-        {" DC A(2*3)\n END\n", MF_UNSUPPORTED},
-        {" DC A(2/3)\n END\n", MF_UNSUPPORTED},
+        {"S CSECT\n DC A(S*3)\n END\n", MF_UNSUPPORTED},
+        {"S CSECT\n DC A(S/3)\n END\n", MF_UNSUPPORTED},
         {"S CSECT\nT CSECT\n DC A(S+T)\n END\n", MF_UNSUPPORTED},
         {"S CSECT\n DC A(S+S)\n END\n", MF_UNSUPPORTED},
         {" DC 4294967296F'1'\n END\n", MF_RANGE},
@@ -588,6 +588,10 @@ static void address_state(void)
 static void declaration_expressions(void)
 {
     static const mf_octet expected[] = {0xaa,0xaa,0xaa,0xaa,0x58,0x1f,0,0,0,0,0,0};
+    static const mf_octet arithmetic[] = {
+        0xff,0xff,0xff,0xfe,0,0,0,1, 0,0,0,0,0xff,0xff,0xff,0xff,
+        0,0,0,0,0,0,0,1, 0,0,0,14, 0xff,0xff,0xff,0xfe, 0,0,0,2
+    };
     struct fixture f;
     init(&f,"S CSECT\nSIZE EQU 4\n DC (SIZE)X'AA'\n L 1,0(B'1111',0)\n DS (SIZE-2)H\n END S\n");
     successful(&f); CHECK(f.sections[0].length == sizeof expected);
@@ -613,6 +617,15 @@ static void declaration_expressions(void)
     init(&f," DC CL(-1)'A'\n END\n"); failed(&f,MF_RANGE); clean(&f);
     init(&f,"S CSECT\n DC CL(S)'A'\n END\n"); failed(&f,MF_SOURCE); clean(&f);
     init(&f," DC CL((3)'A'\n END\n"); failed(&f,MF_SOURCE); clean(&f);
+    init(&f," DC AD(4294967295*4294967295)\n DC AD(18446744073709551615/4294967296)\n DC AD(18446744073709551615/9223372036854775808)\n DC F'2+3*4',F'-7/3',F'(-7)/(-3)'\n END\n");
+    successful(&f); CHECK(f.sections[0].length == 36);
+    CHECK(!memcmp(f.data[0],arithmetic,sizeof arithmetic)); clean(&f);
+    init(&f,"S CSECT\nB DC CL(3*2)'A'\nE DS 0C\n DC AL4((E-B)*4)\n END\n");
+    successful(&f); CHECK(f.sections[0].length == 10 && f.data[0][9] == 24); clean(&f);
+    init(&f," DC AD(18446744073709551615*2)\n END\n"); failed(&f,MF_RANGE); clean(&f);
+    init(&f," DC F'1/0'\n END\n"); failed(&f,MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n DC A(S*2)\n END\n"); failed(&f,MF_UNSUPPORTED); clean(&f);
+    init(&f," DC 0F'1/0'\n END\n"); successful(&f); clean(&f);
 }
 static void source_metadata(void)
 {

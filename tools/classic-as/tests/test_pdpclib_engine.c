@@ -80,6 +80,8 @@ static void unnamed_sections(void)
 static void zero_constants(void)
 {
     struct fixture f;
+    init(&f," DC 0A(MISSING*2),0F'1/2'\n END\n");
+    pdp_successful(&f); CHECK(f.symbol_count == 0 && f.fixup_count == 0); clean(&f);
     init(&f, "S CSECT\n DC X'11'\nH DC 0H\n DC X'22'\nF DC 0F'FORWARD'\nA DC 0A(MISSING+1)\nV DC 0V(UNDECLARED)\nAD DC 0AD\nC DC 0CL4\nX DC 0XL2\nH2 DS 0H\nF2 DS 0F\nD2 DS 0D\nFORWARD DC F'7'\n END S\n");
     pdp_successful(&f); CHECK(f.sections[0].length == 12 && f.fixup_count == 0 && f.result.fixups == 0);
     CHECK(f.data[0][0] == 0x11 && f.data[0][2] == 0x22 && f.data[0][11] == 7);
@@ -126,8 +128,8 @@ static void pdp_failures(void)
         {" DC 0A()\n END\n",MF_SOURCE},
         {" DC 0V()\n END\n",MF_SOURCE},
         {" DC 0A(MISSING+)\n END\n",MF_SOURCE},
-        {" DC 0A(MISSING*2)\n END\n",MF_UNSUPPORTED},
-        {" DC 0F'1/2'\n END\n",MF_UNSUPPORTED},
+        {" DC 0A(MISSING*)\n END\n",MF_SOURCE},
+        {" DC 0F'1/'\n END\n",MF_SOURCE},
         {" DC 0X'GG'\n END\n",MF_SOURCE},
         {" DC 0X''\n END\n",MF_SOURCE},
         {" DC 0CL1'AB'\n END\n",MF_RANGE},

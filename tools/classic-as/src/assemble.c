@@ -303,16 +303,64 @@ static enum mf_status atom(struct parser *p, struct value *out)
     if (status == MF_OK) *out = v;
     return status;
 }
+static struct mf_u64 shift_left(struct mf_u64 v)
+{
+    v.hi = ((v.hi << 1) | (v.lo >> 31)) & U32MAX;
+    v.lo = (v.lo << 1) & U32MAX; return v;
+}
+static enum mf_status absolute_product(struct value a, struct value b, int divide,
+    struct value *out)
+{
+    struct value r; struct mf_u64 x, y, remainder; enum mf_status st;
+    unsigned i; mf_u32 bit, carry;
+    if (a.coefficient || b.coefficient) return MF_UNSUPPORTED;
+    r = zero_value(); x = a.magnitude; y = b.magnitude;
+    if (divide) {
+        if (zero(y)) return MF_RANGE;
+        remainder.hi = remainder.lo = 0;
+        for (i = 0; i < 64; ++i) {
+            bit = x.hi >> 31; x = shift_left(x);
+            carry = remainder.hi >> 31;
+            remainder = shift_left(remainder); remainder.lo |= bit;
+            r.magnitude = shift_left(r.magnitude);
+            if (carry || compare(remainder,y) >= 0) {
+                remainder = difference(remainder,y); r.magnitude.lo |= 1;
+            }
+        }
+    } else {
+        while (!zero(y)) {
+            if (y.lo & 1) {
+                st = mf_u64_add(r.magnitude,x,&r.magnitude); if (st != MF_OK) return st;
+            }
+            y.lo = ((y.lo >> 1) | ((y.hi & 1) << 31)) & U32MAX; y.hi >>= 1;
+            if (!zero(y)) { if (x.hi & 0x80000000UL) return MF_RANGE; x = shift_left(x); }
+        }
+    }
+    r.negative = !zero(r.magnitude) && (a.negative != b.negative);
+    *out = r; return MF_OK;
+}
+static enum mf_status product(struct parser *p, struct value *out)
+{
+    struct value a, b; enum mf_status st; mf_octet c;
+    st = atom(p,&a);
+    while (st == MF_OK) {
+        skip(p); if (p->at == p->text.length) break;
+        c = p->text.data[p->at]; if (c != 0x2a && c != 0x2f) break;
+        ++p->at; st = atom(p,&b);
+        if (st == MF_OK && !p->syntax_only) st = absolute_product(a,b,c == 0x2f,&a);
+    }
+    if (st == MF_OK) *out = a; return st;
+}
 static enum mf_status expression(struct parser *p, struct value *out)
 {
     struct value a, b; enum mf_status status; mf_octet c;
-    status = atom(p, &a);
+    status = product(p, &a);
     while (status == MF_OK) {
         skip(p);
         if (p->at == p->text.length) break;
         c = p->text.data[p->at];
         if (c != 0x2b && c != 0x2d) break;
-        ++p->at; status = atom(p, &b);
+        ++p->at; status = product(p, &b);
         if (status == MF_OK && !p->syntax_only) status = combine(a, b, c == 0x2d, &a);
     }
     if (status == MF_OK) *out = a;

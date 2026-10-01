@@ -33,7 +33,7 @@ publication semantics.
 | --- | --- |
 | Sections | Named CSECT, one unnamed CSECT created/restored by an unlabeled CSECT, internal named DSECT layout, implicit unnamed section for ordinary statements; selected ORG overlays |
 | Symbols | ASCII names, case-insensitive identifiers, longer internal labels; bounded caller storage |
-| Expressions | Decimal, `X'hex'` wide integers and signed 32-bit `B'bits'` terms, symbols, `*`, parentheses, unary signs, addition/subtraction and supported single-target relocation expressions |
+| Expressions | Decimal, `X'hex'` wide integers and signed 32-bit `B'bits'` terms, symbols, `*`, parentheses, unary signs, addition/subtraction and absolute multiplication/division; supported single-target relocation expressions |
 | EQU | Values resolvable in the layout pass; forward EQU chains are unsupported |
 | TITLE | One named deck ID up to eight characters; 1..100-character quoted heading. CP037 deck IDs occupy bytes 73..80, space padded, without generated sequence suffixes. Headings/listings are not produced. |
 | PRINT | Validated ON/OFF, GEN/NOGEN, DATA/NODATA controls and null operands; no listing output in this component. Labels and other control forms are rejected. |
@@ -64,8 +64,10 @@ Symbol references in an ungenerated nominal need not resolve. Character/hex
 nominals still undergo the documented lexical and explicit-length checks.
 This does not yet implement symbol length/type attributes.
 
-Ordinary assembler multiplication/division and cREXX expansion remain
-unimplemented. The optional provider has its separate scalar conditional subset. Traditional definitions require the
+Multiplication/division take absolute operands, including same-section
+differences; products are checked to 64-bit magnitude and division truncates
+toward zero. Division by zero fails. cREXX expansion remains unimplemented.
+The optional provider has its separate scalar conditional subset. Traditional definitions require the
 optional provider selected below. Unsupported
 constructs fail explicitly. The source parser's documented subset is distinct
 from the pure encoder's instruction descriptions.
