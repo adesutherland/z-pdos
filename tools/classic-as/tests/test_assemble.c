@@ -566,6 +566,13 @@ static void address_state(void)
 {
     static const mf_octet expected[] = {0x58,0x10,0,4,0x58,0x20,0xa0,0,0x58,0x30,0xa0,0,0x58,0x40,0xc0,8};
     struct fixture f; char source[512]; unsigned i;
+    init(&f,"S CSECT\n USING S,R12\n L 1,S\n PUSH USING\n DROP R12\n USING S,R11\n L 2,S\n POP USING\n L 3,S\nR11 EQU 11\nR12 EQU 12\n END S\n");
+    successful(&f); CHECK(f.sections[0].length == 12);
+    CHECK(f.data[0][0] == 0x58 && f.data[0][1] == 0x10 && f.data[0][2] == 0xc0);
+    CHECK(f.data[0][5] == 0x20 && f.data[0][6] == 0xb0);
+    CHECK(f.data[0][9] == 0x30 && f.data[0][10] == 0xc0); clean(&f);
+    init(&f,"S CSECT\n USING S,UNDEF\n L 1,S\n END\n"); failed(&f,MF_UNDEFINED); clean(&f);
+    init(&f,"S CSECT\n USING S,RBAD\n L 1,S\nRBAD EQU 16\n END\n"); failed(&f,MF_RANGE); clean(&f);
     init(&f, "S CSECT\n USING D,0\n L 1,FIELD\n USING S,12\n PUSH USING\n USING S+8,10\n L 2,S+8\n DROP ,\n USING S+8,10\n L 3,S+8\n POP USING\n L 4,S+8\nD DSECT\n DS F\nFIELD DS F\n END S\n");
     successful(&f); CHECK(f.sections[0].length == sizeof expected);
     CHECK(!memcmp(f.data[0],expected,sizeof expected)); clean(&f);

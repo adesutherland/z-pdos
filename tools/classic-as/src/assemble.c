@@ -35,6 +35,7 @@ struct mf_as {
     struct symbol_state *symbol_state;
     struct literal *literals, *evaluating_literal; size_t literal_count, pool;
     struct base_state bases[16], base_stack[16][16]; size_t base_depth;
+    int pending_registers, pending_stack[16];
     struct mf_statement statement;
     const struct mf_object_writer *writer;
     const struct mf_diagnostics *diagnostics;
@@ -567,13 +568,15 @@ static enum mf_status using_statement(struct mf_as *as, int drop)
     if (as->statement.label.length) return MF_SOURCE;
     operand = trim(as->statement.operand);
     if (drop && (!operand.length || (operand.length == 1 && operand.data[0] == 0x2c))) {
-        memset(as->bases, 0, sizeof as->bases); return MF_OK;
+        memset(as->bases, 0, sizeof as->bases); as->pending_registers = 0; return MF_OK;
     }
     status = split(operand, parts, 16, &count);
     if (status != MF_OK) return status;
     if (drop) {
         for (i = 0; i < count; ++i) {
-            status = number(as, parts[i], 15, &reg); if (status != MF_OK) return status;
+            status = number(as, parts[i], 15, &reg);
+            if (status == MF_UNDEFINED && as->pass == 1) { as->pending_registers = 1; continue; }
+            if (status != MF_OK) return status;
             memset(as->bases + reg, 0, sizeof as->bases[reg]);
         }
         return MF_OK;
@@ -590,7 +593,13 @@ static enum mf_status using_statement(struct mf_as *as, int drop)
     }
     for (i = 1; i < count; ++i) {
         enum mf_status reg_status;
-        reg_status = number(as, parts[i], 15, &reg); if (reg_status != MF_OK) return reg_status;
+        reg_status = number(as, parts[i], 15, &reg);
+        if (reg_status == MF_UNDEFINED && as->pass == 1) {
+            as->pending_registers = 1;
+            if (i + 1 < count) offset += 4096UL;
+            continue;
+        }
+        if (reg_status != MF_OK) return reg_status;
         if (!reg && (i != 1 || (status == MF_OK && offset))) return MF_RANGE;
         as->bases[reg].active = status == MF_OK; as->bases[reg].pending = status == MF_UNDEFINED;
         as->bases[reg].section = status == MF_OK && v.coefficient ? v.target : 0;
@@ -607,8 +616,10 @@ static enum mf_status using_stack(struct mf_as *as, int pop)
     if (pop) {
         if (!as->base_depth) return MF_SOURCE;
         memcpy(as->bases, as->base_stack[--as->base_depth], sizeof as->bases);
+        as->pending_registers = as->pending_stack[as->base_depth];
     } else {
         if (as->base_depth == 16) return MF_LIMIT;
+        as->pending_stack[as->base_depth] = as->pending_registers;
         memcpy(as->base_stack[as->base_depth++], as->bases, sizeof as->bases);
     }
     return MF_OK;
@@ -715,6 +726,7 @@ static enum mf_status address(struct mf_as *as, struct mf_span s, int indexed,
         if (d <= maximum && d <= best) { chosen = r; best = d; }
     }
     if (chosen == 16) {
+        if (as->pass == 1 && as->pending_registers) { *base = 0; *disp = 0; return MF_OK; }
         if (as->pass == 1) for (r = 0; r <= 15; ++r) if (as->bases[r].pending &&
             (!explicit_base || r == *base)) { *base = r; *disp = 0; return MF_OK; }
         return MF_RANGE;
@@ -1407,7 +1419,7 @@ static enum mf_status run_pass(struct mf_as *as, const struct mf_statements *sou
     for (i = 0; i < as->section_count; ++i) {
         as->section_state[i].position = as->section_state[i].high_water = as->section_state[i].relocation_end = 0;
     }
-    as->pool = 0; as->title_names = 0; as->base_depth = 0;
+    as->pool = 0; as->title_names = 0; as->base_depth = 0; as->pending_registers = 0;
     if (as->pass == 2) for (i = 0; i < as->literal_count; ++i) as->literals[i].seen = 0;
     memset(as->bases, 0, sizeof as->bases); as->current = NIL; as->ended = 0; as->fixup_count = 0;
     fingerprint_init(fingerprint);

@@ -201,6 +201,8 @@ fail explicitly. `DROP` with no operand or a single comma drops every mapping.
 Absolute implicit addresses also use applicable absolute USING mappings.
 Forward USING expressions defer resolution to pass two; unresolved mappings
 never produce a successful deck. Other PUSH/POP state classes remain unsupported.
+Forward register symbols in USING/DROP likewise defer validation to pass two;
+pending register mappings follow PUSH/POP and are cleared by DROP-all.
 
 DC/DS duplication factors also accept parenthesized absolute expressions whose
 layout values are already defined. Forward layout dependencies are rejected.
