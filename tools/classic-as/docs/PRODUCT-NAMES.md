@@ -18,6 +18,10 @@ projects provide the named commands. Naming adoption does not claim a new
 compiler build, assembler repair or guest qualification. Upstream names,
 versions, attribution and component licences remain visible.
 
+The 1 October [Classic C source checkpoint](../../classic-cc/CHECKPOINT.md)
+now provides `mf-classic-cc` for native host assembly-text generation. Its
+independent assembler integration and guest qualification remain open.
+
 The same scheme can extend to linkers and librarians, such as `mf-classic-ld`
 and `mf-classic-ar`, when those components are selected and qualified.
 
@@ -43,6 +47,8 @@ Addressing widths and machine generations belong to profiles, rather than
 separate product names. Real 24-bit, 31-bit and 64-bit targets acquire their own
 supported contracts and checks. Counterfactual profiles require separately
 agreed ISA and ABI definitions; their names do not imply historical IBM support.
+The [shared machine-profile direction](../../../architecture/MACHINE-PROFILES.md)
+records consistent names and instruction ceilings across Classic and ELF routes.
 
 ## Macro policy
 
@@ -64,6 +70,6 @@ Mainframe ELF SDK's GitHub home is
 [adesutherland/mainframe-elf-sdk](https://github.com/adesutherland/mainframe-elf-sdk).
 The modern repository owns the maintained GCC/ELF route.
 
-[adesutherland/z-pdos](https://github.com/adesutherland/z-pdos) owns Mainframe Classic Tools and the OS. The original assembler seed, its own licences, source, documentation and tests live here. Inherited tools, manual downloads and private native qualification outputs remain outside this source tree. A local seed is not a public release.
+[adesutherland/z-pdos](https://github.com/adesutherland/z-pdos) owns Mainframe Classic Tools and the OS. The original assembler and explicitly attributed inherited compiler, linker and PDPCLIB components live here with their own licences, source, documentation and tests. Manual downloads, mail archives and private native qualification outputs remain outside the retained source. A local checkpoint is not a public release.
 
 The [assembler guide](../README.md), [plan](PLAN.md) and [checkpoint](CHECKPOINT.md) own current implementation status and next steps.

@@ -45,12 +45,18 @@ Use `-DMF_CLASSIC_LINKER=OFF` when configuring a build that needs only the
 assembler and its current consumers. The linker can also be built separately
 using its [component instructions](tools/classic-ld/README.md).
 
-**Mainframe Classic C**, command `mf-classic-cc`, is the intended classic
-GCC/cc370 lineage. Its maintained implementation and OS source are not yet
-included. Each future import retains its actual licence. See [licences](LICENSES.md)
-and [agent guidance](AGENTS.md).
+**[Mainframe Classic C](tools/classic-cc/README.md)**, command `mf-classic-cc`,
+now maintains the GCC 3.4.6 / cc370 compiler source with the reconciled upstream,
+Mike Beer and Mainframe Lab repairs. Native MVS and CMS cross-builds pass the
+code-generation checks. The independent assembler integration and complete
+compile/assemble/link/guest route remain open. See its
+[checkpoint](tools/classic-cc/CHECKPOINT.md), [roadmap](tools/classic-cc/ROADMAP.md),
+[licences](LICENSES.md) and [agent guidance](AGENTS.md).
 
 The separate [Mainframe ELF SDK](https://github.com/adesutherland/mainframe-elf-sdk)
 owns the modern GCC and GNU assembler route, with `mf-elf-cc`, `mf-elf-as` and
 `mf-elf-pack`. Real 24-, 31- and 64-bit architectures and any future
 counterfactual machines are explicit profiles, not different product names.
+The [shared machine-profile direction](architecture/MACHINE-PROFILES.md)
+aligns names and instruction ceilings while preserving each tool family's
+ABI, object, character and runtime contracts.

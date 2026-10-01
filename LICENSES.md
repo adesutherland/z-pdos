@@ -13,12 +13,15 @@ The assembler also has its [own licence](tools/classic-as/LICENSE).
 | `runtime/tso31/` | Original project-authored TSO entry bridge, preserved reference and maintained explicit-service variant, ABI documentation and tests, MIT |
 | Upstream files in `pdpclib/` | Paul Edwards's Public Domain C Library, pinned PDOS mirror revision `0fe81209e78d022b40301f86f97c7f4d3e406d0a`; upstream public-domain dedication and fallback permission, with original contributor notices retained; see its [licence](pdpclib/LICENSE) and [source record](pdpclib/SOURCES.md) |
 | Original PDPCLIB changes, integration guides, patches and tests | MIT; this grant does not alter the imported library's public-domain terms |
+| Inherited compiler source and derived repairs in `tools/classic-cc/source/`, and the consolidated recovery patch | GCC 3.4.6 / cc370 lineage from revision `ece26349fc1096804e82e5618bb8255054035247`, with Mike Beer and Mainframe Lab repairs; GCC GPL version 2 or later, with individual library/header notices and exceptions retained, including `COPYING.LIB`; see [COPYING](tools/classic-cc/COPYING) and [source record](tools/classic-cc/SOURCES.md) |
+| Original Classic C host launcher, cREXX orchestration, new fixtures and documentation | MIT; this grant does not relicense the inherited compiler or its derived repairs |
 | Root documentation and build configuration | Original project material, MIT |
 
-This tree contains no imported as370 implementation, upstream opcode table,
-IBM macro library, guest object/listing, compiler source or OS source. It is
-an original assembler plus the explicitly attributed inherited runtime and linker above;
-no formal clean-room claim is made. Architecture and object-format facts are
+This tree contains no imported as370 implementation or assembler opcode table,
+IBM macro library, guest object/listing or OS source. It contains the original
+assembler and the explicitly attributed inherited compiler, runtime and linker
+above; the GCC compiler retains its own inherited machine descriptions.
+No formal clean-room claim is made. Architecture and object-format facts are
 cited in [the source guide](architecture/SOURCES.md).
 The cited manuals and websites are not included and are not relicensed here.
 

@@ -11,3 +11,7 @@ execution, registers, memory, faults, interrupts and devices need separate
 interfaces and independent semantic tests. There is no emulator in this seed.
 Historical S/360 and S/370 profiles are distinct; later real IBM, community
 S/380 and counterfactual profiles need their own decisions and qualification.
+
+[The shared machine-profile direction](MACHINE-PROFILES.md) aligns the Classic
+and ELF tool families' machine names and instruction ceilings. It records
+the current implementation gaps without claiming ABI or object compatibility.

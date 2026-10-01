@@ -80,7 +80,8 @@ z-pdos/
 This is the selected layout. Create shared libraries and optional directories only
 when they have actual contents/consumers; no empty emulator implementation or
 placeholder compiler is required. The classic linker and PDPCLIB now have their
-own components. OS and future compiler/librarian source areas are separate
+own components. The compiler now has its own source and host-codegen component
+in `tools/classic-cc/`. OS and future librarian source areas are separate
 additions. The assembler's documented direct C compile/link
 recipe must work without cREXX or a code generator on a bootstrap host. Retained
 project orchestration/generation scripts use cREXX on hosts that can run it.

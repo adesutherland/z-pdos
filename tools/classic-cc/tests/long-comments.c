@@ -1,0 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+int variable_with_a_very_long_name_which_must_not_turn_the_next_assembly_record_into_a_continuation = 7;
+int common_with_a_very_long_name_which_must_not_turn_the_next_assembly_record_into_a_continuation;
+int function_with_a_very_long_name_which_must_not_turn_the_next_assembly_record_into_a_continuation(void)
+{ return variable_with_a_very_long_name_which_must_not_turn_the_next_assembly_record_into_a_continuation; }

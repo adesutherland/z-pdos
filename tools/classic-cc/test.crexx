@@ -1,0 +1,155 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Adrian Sutherland
+ * Compiler consolidation checks. These do not execute target code.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 1 then return 2
+  variant = args.1
+  if variant <> "mvs" & variant <> "cms" then return 2
+  command = "build/classic-cc/" || variant || "/gcc/mf-classic-cc"
+  work = "build/classic-cc/" || variant || "/checks"
+  address crexx "mkdir -p :work"
+  call require rc = 0, "create checks directory"
+  target_flag = "-DTEST_MVS"
+  if variant = "cms" then target_flag = "-DTEST_CMS"
+  address crexx "run :command -fsyntax-only :target_flag tools/classic-cc/tests/target.c"
+  call require rc = 0, "OS predefines and Classic C widths"
+  files = "names callee nested far-goto di-helpers long-comments oversize-comment newline store-motion store-callee"
+  modes = "-O0 -O1 -O2 -Os"
+  i = .int; j = .int
+  input = .string; output = .string
+  value = .string; stores = .string
+  first_store = .int; first_call = .int
+  second_store = .int; second_call = .int
+  do i = 1 to words(modes)
+    mode = word(modes, i)
+    do j = 1 to words(files)
+      name = word(files, j)
+      input = "tools/classic-cc/tests/" || name || ".c"
+      output = work || "/" || name || mode || ".asm"
+      address crexx "run :command -S :mode :input -o :output"
+      call require rc = 0, name || " " || mode || " compiles"
+    end
+    names = readfile(work || "/names" || mode || ".asm")
+    callee = readfile(work || "/callee" || mode || ".asm")
+    call require pos("C0EHKXH7", names) > 0 & pos("C0DNXCUP", names) > 0 & pos("C0DNXCUP", callee) > 0, "fixed32 aliases agree across units"
+    call require pos("V(LOCTIME)", names) > 0, "pragma map retains runtime linkage"
+    helpers = readfile(work || "/di-helpers" || mode || ".asm")
+    call require pos("V(@@UDIVDI)", helpers) > 0 & pos("V(@@UMODDI)", helpers) > 0 & pos("V(@@FIXDFD)", helpers) > 0, "existing helper ABI names"
+    far = readfile(work || "/far-goto" || mode || ".asm")
+    call require pos(" BR    0", far) = 0, "computed goto excludes R0"
+    call require pos("@P1", far) > 0, "computed goto fixture spans pages"
+    call require pos("BALR  12,0", far) > 0, "base reload uses BALR"
+    goto_lines = readlines(work || "/far-goto" || mode || ".asm")
+    goto_refs = " "
+    goto_reloads = 0
+    do j = 1 to goto_lines.0
+      if word(goto_lines[j],1) = "DC" then do
+        value = word(goto_lines[j],2)
+        /* Prefix is five columns: A( plus the @@L local-label prefix. */
+        if left(value,5) = "A(@@L" then do
+          value = substr(value,3,length(value)-3)
+          goto_refs = goto_refs || value || " "
+        end
+      end
+    end
+    call require words(goto_refs) = 2, "dispatch table names both taken labels"
+    do j = 1 to goto_lines.0 - 1
+      value = word(goto_lines[j],1)
+      if value <> "" & pos(" " || value || " ", goto_refs) > 0 then do
+        call require word(goto_lines[j+1],1) = "L" & left(word(goto_lines[j+1],2),3) = "12,", "computed-goto target reloads code base before use"
+        goto_reloads = goto_reloads + 1
+      end
+    end
+    call require goto_reloads = 2, "both computed-goto targets reload"
+    /* At optimization, implicit conversion libcalls must finish before the
+       enclosing call publishes arguments in the shared outgoing slots. */
+    nested = readfile(work || "/nested" || mode || ".asm")
+    if mode <> "-O0" then do
+      helper = pos("V(@@FXUNDF)", nested)
+      outer = pos("V(COLLECT)", nested)
+      call require helper > 0 & outer > helper, "hidden libcall precedes enclosing call"
+      finished = pos("BALR  14,15", nested, helper)
+      publish = pos("MVC   88(8,13),0(11)", nested, helper)
+      call require finished > helper & publish > finished & publish < outer, "first outer argument is published after hidden libcall"
+    end
+    do comment_case = 1 to 2
+      comment_name = word("long-comments oversize-comment", comment_case)
+      comments = readlines(work || "/" || comment_name || mode || ".asm")
+      do j = 1 to comments.0
+        if left(comments[j],1) = "*" then call require length(comments[j]) <= 71, "comments cannot create fixed-card continuations"
+      end
+    end
+    newline = readfile(work || "/newline" || mode || ".asm")
+    if mode <> "-O0" then call require pos("=F'21'", newline) > 0 & pos("V(PUTCHAR)", newline) > 0, "optimized newline is target EBCDIC NEL"
+    stores = readfile(work || "/store-motion" || mode || ".asm")
+    /* The callee overwrites its incoming argument. Each subsequent call must
+       republish the value, even if GCSE sees a repeated outgoing-slot store. */
+    first_store = pos("88(4,13),=F'17'", stores)
+    first_call = pos("V(TAKE)", stores, first_store)
+    second_store = pos("88(4,13),=F'17'", stores, first_call)
+    second_call = pos("V(TAKE)", stores, first_call + 1)
+    call require first_store > 0 & first_call > first_store & second_store > first_call & second_call > second_store, "repeated call argument survives store motion"
+    say variant mode "consolidation fixtures pass"
+  end
+  input = "tools/classic-cc/tests/store-motion.c"
+  output = work || "/store-motion-O3.asm"
+  address crexx "run :command -S -O3 :input -o :output"
+  call require rc = 0, "O3 store-motion fixture compiles"
+  stores = readfile(output)
+  first_store = pos("88(4,13),=F'17'", stores)
+  first_call = pos("V(TAKE)", stores, first_store)
+  second_store = pos("88(4,13),=F'17'", stores, first_call)
+  second_call = pos("V(TAKE)", stores, first_call + 1)
+  call require first_store > 0 & first_call > first_store & second_store > first_call & second_call > second_store, "O3 repeated call argument survives store motion"
+  input = "tools/classic-cc/tests/names.c"
+  output = work || "/names-unit-at-a-time.asm"
+  address crexx "run :command -S -O2 -funit-at-a-time :input -o :output"
+  call require rc = 0, "explicit callgraph static rename compiles"
+  lines = readlines(output)
+  labels = " "
+  refs = ""
+  do i = 1 to lines.0
+    line = lines[i]
+    label = word(line, 1)
+    if left(label, 2) = "@V" then labels = labels || label || " "
+    at = pos("A(@V", line)
+    if at > 0 then do
+      ref = substr(line, at + 2)
+      ending = pos(")", ref)
+      call require ending > 0, "static relocation closes"
+      ref = left(ref, ending - 1)
+      refs = refs || ref || " "
+    end
+  end
+  call require words(refs) > 0, "callgraph fixture has static references"
+  do i = 1 to words(refs)
+    call require pos(" " || word(refs,i) || " ", labels) > 0, "renamed static relocation has definition"
+  end
+  source = "tools/classic-cc/tests/callee.c"
+  address crexx "run :command -c :source -o :work/rejected.obj"
+  call require rc <> 0, "object path held until independent assembler integration"
+  address crexx "run :command --profile=tso-zos64-v1 -S :source -o :work/rejected.asm"
+  call require rc <> 0, "unqualified named profile rejected"
+  say "Classic compiler source and code generation pass; target assembly and execution remain open."
+  return 0
+
+readfile: procedure = .string
+  arg path = .string
+  lines = readlines(path)
+  result = ""
+  do k = 1 to lines.0
+    result = result || lines[k] || "0a"x
+  end
+  return result
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED:" detail
+    exit 1
+  end
+  return 0

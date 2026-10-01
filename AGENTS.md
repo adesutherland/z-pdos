@@ -10,6 +10,10 @@ new product fixes must not live only in Lab patches or generated build copies.
 Mainframe Classic Linker lives in `tools/classic-ld/`, command `mf-classic-ld`,
 as a sibling of `mf-classic-as`. Its inherited implementation is attributed to
 PDLD; read its component guide and source record before changing it.
+Mainframe Classic C lives in `tools/classic-cc/`, command `mf-classic-cc`.
+Read its component guide and source record. Its GCC-derived implementation
+retains GPL terms and is separate from the original assembler. The current
+native host build emits assembly text; complete toolchain qualification is open.
 
 - Read the component guide and inspect Git status before editing. Preserve
   unrelated changes. Do not commit, push or publish without session authority.
