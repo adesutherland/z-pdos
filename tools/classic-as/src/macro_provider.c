@@ -211,7 +211,7 @@ static enum mf_status capture(struct mf_macro *m, const struct mf_statement *mar
         if (!name_valid(d->label) || word(d->label, 20)) return MF_UNSUPPORTED;
     }
     a = m->parameters ? m->parameters + m->definition_count * m->config.max_parameters : NULL;
-    if (p.operand.length) {
+    if (!empty(p.operand)) {
         cur = 0;
         while ((st = mf_macro_arguments(p.operand, &cur, &arg)) == MF_OK) {
             if (d->parameters == m->config.max_parameters) return MF_LIMIT;
@@ -264,7 +264,7 @@ static enum mf_status push(struct mf_macro *m, size_t definition, const struct m
     if (call->label.length && !d->label.length) return MF_UNSUPPORTED;
     st = copy(call->label, b, m->config.max_argument_bytes, &used, v + m->config.max_parameters);
     if (st != MF_OK) return st;
-    if (call->operand.length) {
+    if (call->operand.length && !(d->parameters == 0 && empty(call->operand))) {
         cur = positional = 0; keywords_seen = 0;
         while ((st = mf_macro_arguments(call->operand, &cur, &arg)) == MF_OK) {
             eq = equals(arg); value = arg;

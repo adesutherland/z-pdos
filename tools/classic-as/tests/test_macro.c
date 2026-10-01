@@ -171,7 +171,15 @@ static void templates(void)
 }
 static void binding(void)
 {
-    struct fixture f; unsigned long n;
+    struct fixture f; unsigned long n; unsigned pass;
+    init(&f," MACRO ,\n&N NOPAR , remarks\n&N LR 1,2\n MEND ,\nA NOPAR , remarks\nB NOPAR\n");
+    CHECK(create(&f) == MF_OK);
+    for (pass = 0; pass < 2; ++pass) {
+        expected(&f,"A","LR","1,2",5); expected(&f,"B","LR","1,2",6);
+        CHECK(drain(&f,&n) == MF_EOF && n == 0);
+        if (!pass) CHECK(f.statements.replay(f.statements.cookie) == MF_OK);
+    }
+    clean(&f);
     init(&f, " MACRO\n&N INNER &A,&B=C'yes'\n&N DC &A,&B\n MEND\n MACRO\n&N OUTER &P,&Q=C'no'\n&N INNER &P,B=&Q\n MEND\nLBL OUTER (A,(B,C)),Q=C'a b,('\n OUTER C'q''q',Q=\n");
     CHECK(create(&f) == MF_OK);
     expected(&f, "LBL", "DC", "(A,(B,C)),C'a b,('", 9);
@@ -231,8 +239,8 @@ static void failures(void)
     bad_source(" LR 1,2)\n", MF_SOURCE);
     bad_source(" \tLR 1,2\n", MF_SOURCE);
     bad_source(" MEND\n", MF_UNSUPPORTED);
-    bad_source(" MACRO\n X ,\n MEND\n", MF_SOURCE);
-    bad_source(" MACRO\n X\n MEND\n X ,\n", MF_UNSUPPORTED);
+    bad_source(" MACRO\n X ,,\n MEND\n", MF_SOURCE);
+    bad_source(" MACRO\n X\n MEND\n X ,,\n", MF_UNSUPPORTED);
     bad_source(" MACRO\n X &A\n LR &A,2\n MEND\n X ,\n", MF_UNSUPPORTED);
     bad_source(" DC AL1(L'LABEL)\n", MF_UNSUPPORTED);
     bad_source(" DC N'NAME\n", MF_UNSUPPORTED);

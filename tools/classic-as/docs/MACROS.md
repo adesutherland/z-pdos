@@ -141,3 +141,9 @@ dependencies. Each service replacement needs a selected OS edition, public
 interface facts and independent field/byte checks. Original simplified
 definitions must identify their supported forms. A traditional macro parser
 does not grant rights to IBM macro source or establish those service layouts.
+
+A single comma can mark absent prototype operands and absent call operands
+for a macro with no formal parameters, including a label-only parameter.
+Commas in a macro with formal parameters continue to denote positional null
+arguments. Other empty prototype slots remain unsupported. This follows IBM
+HLASM [macro instruction prototype](https://www.ibm.com/docs/en/hla-and-tf/1.6?topic=definitions-macro-instruction-prototype).
