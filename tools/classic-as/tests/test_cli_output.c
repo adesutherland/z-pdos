@@ -144,6 +144,30 @@ static void io_templates(const char *path)
     puts("I/O templates: all 308 independent field, reserved and relocation bytes pass");
 }
 
+static void runtime_maps(const char *path)
+{
+    /* Literal public/PDOS coordinates, independent of macro output. */
+    static const unsigned expected[] = {
+        21, 26, 29, 33, 36, 37, 40, 40, 44, 44, 48, 50,
+        52, 62, 82, 16, 68, 3, 8, 2, 44, 60, 82, 84,
+        86, 88, 94, 98, 140, 62, 74, 105, 10, 17, 18, 28,
+        6, 24, 0, 1, 4, 12, 17, 8, 3, 4, 5, 16,
+        25, 32, 14, 11, 0, 44, 52, 86, 98, 98, 99, 102,
+        106, 118, 174, 30, 64, 2, 1, 8, 64, 16, 4, 16,
+        32, 128, 8, 128, 1, 2, 1, 2, 3, 4, 16, 28,
+        85, 1, 2, 192, 32, 32, 1, 16, 8, 128, 64, 192,
+        224, 32, 16, 8, 128, 64, 8, 1, 64, 2, 8, 128,
+        64, 16, 1};
+    unsigned char actual[512]; size_t i, got; FILE *input;
+    input = fopen(path,"rb"); CHECK(input != NULL);
+    got = fread(actual,1,sizeof actual,input);
+    CHECK(got == 4+2*(sizeof expected/sizeof expected[0]));
+    CHECK(actual[0] == 0x0a && actual[1] == 99 && actual[2] == 7 && actual[3] == 0xfe);
+    for (i = 0; i < sizeof expected/sizeof expected[0]; ++i)
+        CHECK(be(actual+4+2*i,2) == expected[i]);
+    CHECK(!ferror(input) && fclose(input) == 0);
+    puts("runtime maps: independent relative coordinates, lengths, flags and SVC99 pass");
+}
 int main(int argc, char **argv)
 {
     static const unsigned char constants[40] = {
@@ -201,16 +225,20 @@ int main(int argc, char **argv)
         CHECK(!ferror(input) && fclose(input) == 0); puts("classic synchronization: register and entry bytes pass"); return 0;
     }
     if (!strcmp(argv[1],"pdos31-basic-dcb")) {
-        static const unsigned char names[24] = {
+        static const unsigned char names[32] = {
             0xc2,0xe2,0xc1,0xd4,0x40,0x40,0x40,0x40,
             0xc2,0xd7,0xc1,0xd4,0x40,0x40,0x40,0x40,
-            0xc5,0xe7,0xc3,0xd7,0x40,0x40,0x40,0x40};
-        unsigned char actual[249], expected[248];
+            0xc5,0xe7,0xc3,0xd7,0x40,0x40,0x40,0x40,
+            0xe2,0xe8,0xe2,0xe3,0xc5,0xd9,0xd4,0x40};
+        unsigned char actual[337], expected[336];
         memset(expected,0,sizeof expected);
         expected[26] = 0x40; expected[50] = expected[51] = 0x24; expected[72] = 1;
         expected[114] = 2; expected[138] = expected[139] = 0x20; expected[160] = 1;
         expected[202] = 0x40; expected[212] = 0xc0; expected[226] = 0xd4; expected[227] = 8;
         memcpy(expected+40,names,8); memcpy(expected+128,names+8,8); memcpy(expected+216,names+16,8);
+        expected[274] = 0x40; expected[284] = 0x54; expected[299] = 0x20;
+        expected[310] = 6; expected[311] = 0x60; expected[320] = 1; expected[331] = 125;
+        memcpy(expected+288,names+24,8);
         input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(actual,1,sizeof actual,input);
         CHECK(got == sizeof expected && !memcmp(actual,expected,sizeof expected));
         CHECK(!ferror(input) && fclose(input) == 0); puts("basic DCB templates: sizes, organization, modes and fields pass"); return 0;
@@ -295,6 +323,16 @@ int main(int argc, char **argv)
         CHECK(got == sizeof linked && !memcmp(card,linked,sizeof linked));
         CHECK(!ferror(input) && fclose(input) == 0); puts("JFCB/IOB: 20 independent field and length values pass"); return 0;
     }
+    if (!strcmp(argv[1],"classic-partial-save")) {
+        static const unsigned char linked[34] = {
+            0x47,0xf0,0xf0,8,2,0xc9,0xc4,0,0x90,0x0b,0xd0,20,
+            0x98,0x0b,0xd0,20,7,0xfe,0x90,0xec,0xd0,12,0x1b,0xff,
+            0x58,0xe0,0xd0,12,0x98,0x0c,0xd0,20,7,0xfe};
+        input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(card,1,sizeof card,input);
+        CHECK(got == sizeof linked && !memcmp(card,linked,sizeof linked));
+        CHECK(!ferror(input) && fclose(input) == 0); puts("partial save: all 34 independent bytes pass"); return 0;
+    }
+    if (!strcmp(argv[1],"pdos31-runtime-maps")) { runtime_maps(argv[2]); return 0; }
     if (!strcmp(argv[1],"pdos31-get")) {
         static const unsigned char linked[20] = {0x18,0x12,0x58,0xf0,0x10,0x30,0x54,0xf0,0xc0,0x10,5,0xef,7,0xfe,0,0,0,0xff,0xff,0xff};
         input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(card,1,sizeof card,input);

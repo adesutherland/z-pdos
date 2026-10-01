@@ -1,0 +1,20 @@
+* SPDX-License-Identifier: MIT; original sparse DEB basic/DASD maps.
+         MACRO
+&N       IEZDEB
+         AIF   ('&N' NE '').BAD
+DEBBASIC DSECT
+         DS    CL4
+DEBAMLNG DS    C
+DEBDEBB  DS    CL3
+         DS    CL8
+DEBNMEXT DS    C
+         DS    CL8
+DEBDCBB  DS    CL3
+         DS    CL4
+DEBBASND DS    0C
+DEBDASD  DSECT
+         DS    CL14
+DEBNMTRK DS    CL2
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected DEB maps'
+         MEND

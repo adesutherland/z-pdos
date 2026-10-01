@@ -1,0 +1,9 @@
+* SPDX-License-Identifier: MIT; original selected SVC99 verb constants.
+         MACRO
+&N       IEFZB4D0
+         AIF   ('&N' NE '').BAD
+S99VRBAL EQU   1
+S99VRBUN EQU   2
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected SVC99 constants'
+         MEND

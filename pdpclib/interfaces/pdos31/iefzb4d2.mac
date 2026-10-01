@@ -1,0 +1,15 @@
+* SPDX-License-Identifier: MIT; original selected public text-unit keys.
+         MACRO
+&N       IEFZB4D2
+         AIF   ('&N' NE '').BAD
+DALDDNAM EQU   1
+DALDSNAM EQU   2
+DALMEMBR EQU   3
+DALSTATS EQU   4
+DALVLSER EQU   16
+DALCLOSE EQU   28
+DALRTDDN EQU   85
+DUNDDNAM EQU   1
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected SVC99 text-unit keys'
+         MEND

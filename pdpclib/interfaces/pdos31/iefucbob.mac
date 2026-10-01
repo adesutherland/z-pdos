@@ -1,0 +1,17 @@
+* SPDX-License-Identifier: MIT; original sparse PDOS legacy UCB map.
+         MACRO
+&N       IEFUCBOB
+         AIF   ('&N' NE '').BAD
+UCBOB    DS    0C
+         DS    CL17
+UCBTBYT2 DS    C
+UCBTBYT3 DS    C
+         DS    CL9
+UCBVOLI  DS    CL6
+UCBRPS   EQU   16
+UCB3DACC EQU   32
+UCB3TAPE EQU   128
+UCB3UREC EQU   8
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected PDOS legacy UCB map'
+         MEND

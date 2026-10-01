@@ -11,7 +11,8 @@ TCB and RBBASIC denote the basic areas addressed by the PDOS pointers. Dummy
 sections emit no payload. Their selected extents end at the last mapped field;
 only PSA reserves a 4 KiB extent. These extents must not be used to allocate a
 complete IBM control block. CVT accepts only DSECT=YES without a label; other
-mappings accept no operands and no label.
+initial mappings accept no operands and no label. Additional selected forms
+are documented below.
 
 | Mapping | Selected facts |
 | --- | --- |
@@ -205,8 +206,10 @@ channel-word storage after this block. These layouts and mode bits follow
 [public DCB fields](https://www.ibm.com/docs/en/zos/3.1.0?topic=aids-dcb-excp-sam-bpam)
 and the [BPAM](https://www.ibm.com/docs/en/zos/3.1.0?topic=descriptions-dcbconstruct-data-control-block-bpam)
 and [BSAM](https://www.ibm.com/docs/en/zos/3.1.0?topic=descriptions-dcbconstruct-data-control-block-bsam)
-parameter contracts. A linked original fixture checks all 248 bytes of
-three templates, including their distinct sizes, names, bits and zero fields.
+parameter contracts. BSAM also accepts `MACRF=(W)`, and the selected
+QSAM/BSAM templates accept RECFM=VBA and an absolute halfword LRECL at
+offset 82. EXCP rejects LRECL. A linked original fixture checks all 336 bytes
+of four templates, including the VBA/125-byte SYSTERM form.
 
 READ/WRITE support SF with `MF=L` and `MF=E`. The list is a fullword-aligned
 20-byte DECB: ECB, operation/length halfwords, DCB and area addresses, and
@@ -270,3 +273,38 @@ and [Diagnosis: Reference](https://publibz.boulder.ibm.com/epubs/pdf/iea1v231.pd
 An original consumer independently checks all 72 linked list, name and
 instruction bytes; unsupported EP= fails without a deck. Neither these
 host checks nor the adapter establish concurrent task support in a guest.
+
+## Additional runtime maps
+
+These sparse original definitions close the selected MVSSUPA references.
+They supply layout facts and constants, and do not implement access methods.
+An original fixture independently checks 111 relative coordinates, lengths
+and flag/key values, plus the two-byte DYNALLOC SVC instruction.
+
+| Definition | Selected contract |
+| --- | --- |
+| DCBD | DSORG=PS, DEVD=(DA,TA); 96-byte IHADCB dummy map. Buffer pointer21, DSORG26, IOB pointer29, EOD33, RECFM36, exits37, DDNAME/TIOT40, DEB/flags44, open flags48, MACRF50, OPTCD52, block size62, IOB68, LRECL82; public SAM flag constants |
+| IECSDSL1 | Unlabelled format1 inline 140-byte DSCB; format4 supplies its 96-byte data portion at the caller's current position, normally an ORG to format1's FMTID. Selected DSORG, RECFM, size, allocation and VTOC fields |
+| IEFUCBOB | Inline legacy PDOS UCB subset: type bytes17/18 and six-byte serial28. This serial coordinate belongs to PDOS's compatibility UCB; it is not a modern z/OS UCB map |
+| IEFTIOT1 | Inline 24-byte header plus one 20-byte entry; length0, status1, DDNAME4, three-byte JFCB12, first-reference17 relative to the entry |
+| IEZDEB | Separate 32-byte basic and 16-byte DASD dummy subsets; AMLNG4, DEB chain5, extent count16, DCB25, first extent32; extent track count14 |
+| IHAPDS | PDSBLDL=YES only; PDS2 concatenation byte11 |
+| IEFZB4D0/2 | No-operand SVC99 verb and selected allocation/unallocation text-unit constants; no block storage |
+| DYNALLOC | No-operand SVC99; caller prepares R1 and the request list |
+
+IEFJFCBN additionally aliases INFMJFCB to its inline JFCB start and supplies
+the reached member, status, DSORG, buffer-size, volume-list and flag fields.
+IEZIOB adds the reached data/command chaining, error-routine and unit-exception
+bits. Other maps and operand forms remain explicit errors.
+
+Sources for layout/register facts: IBM public [DCB fields](https://www.ibm.com/docs/en/zos/3.2.0?topic=aids-dcb-excp-sam-bpam),
+[format1 DSCB](https://www.ibm.com/support/pages/zvm/pubs/cp740/ds1label.html),
+[format4 DSCB](https://www.ibm.com/support/pages/zvm/pubs/cp740/ds4label.html),
+[TIOT](https://www.ibm.com/docs/en/zos/3.1.0?topic=xtl-tiot-information),
+[DEB](https://www.ibm.com/docs/en/zos/3.2.0?topic=blocks-data-extent-block-deb-fields),
+[BLDL entry](https://www.ibm.com/docs/en/zos/3.1.0?topic=areas-pds-directory-entry-format-returned-by-bldl),
+[allocation keys](https://www.ibm.com/docs/en/zos/3.1.0?topic=isg-iefzb4d2-information)
+and [DYNALLOC register contract](https://www.ibm.com/docs/en/zos/2.5.0?topic=hsp-dynalloc-dynamic-allocation).
+The owned PDOS C declarations and its UCB initialization independently specify
+its compatibility layouts. No IBM macro implementation or native expansion
+was copied. Successful assembly does not establish guest service behavior.

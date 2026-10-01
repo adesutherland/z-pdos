@@ -1,0 +1,18 @@
+* SPDX-License-Identifier: MIT; original sparse inline TIOT map.
+         MACRO
+&N       IEFTIOT1
+         AIF   ('&N' NE '').BAD
+TIOT1    DS    0F
+         DS    CL24
+TIOENTRY DS    0C
+TIOELNGH DS    C
+TIOESTTA DS    C
+         DS    CL2
+TIOEDDNM DS    CL8
+TIOEJFCB DS    CL3
+         DS    CL2
+TIOEFSRT DS    CL3
+TIOSLTYP EQU   128
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected inline TIOT map'
+         MEND

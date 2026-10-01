@@ -5,14 +5,14 @@ from the public 72-byte register save-area contract. They contain no inherited
 IBM macro source or native expansion. They are an explicit library input for
 Classic assembly, separate from the source-owned PDP macros.
 
-SAVE accepts `(14,12)`, an empty trace operand, and an optional explicit ASCII
+SAVE accepts `(14,12)` or `(0,11)`, an empty trace operand, and an optional explicit ASCII
 identifier up to 70 characters. R13 addresses the caller's 18-word save area;
 R15 still addresses the entry. An identifier uses a branch at the entry, its
 length byte at offset 4 and CP037 text at offset 5, then halfword alignment
 and the register store. Omitting the identifier emits just the store; automatic
 CSECT identification and `*` selection remain unsupported.
 
-RETURN accepts `(14,12)`, an empty trace operand, and absent RC, `RC=0`, or
+RETURN accepts `(14,12)` or `(0,11)`, an empty trace operand, and absent RC, `RC=0`, or
 `RC=(15)`. The caller's R13 must already be restored. A supplied return code
 preserves R15 while restoring R14 and R0–R12, then returns through R14.
 Other operand forms fail through a severity-8 MNOTE. No OS service is supplied.
@@ -39,3 +39,10 @@ other link instructions are rejected. This is original code based on the
 public [CALL interface](https://www.ibm.com/docs/en/zos/3.1.0?topic=section-call-description).
 An independent assemble/link fixture checks all 12 bytes at a nonzero image
 base, local V resolution and rejection without publishing a deck.
+
+The `(0,11)` subset stores/restores only R0–R11 at save-area offset 20.
+RETURN leaves R12, R14 and R15 unchanged (except RC=0 clears R15), then
+branches through R14. The caller owns the preserved return address. A labeled
+SAVE with an identifier defines the label only at its entry branch. An original
+fixture independently checks 34 bytes across this subset and the ordinary
+zero-return path, and rejects an unsupported register range without a deck.

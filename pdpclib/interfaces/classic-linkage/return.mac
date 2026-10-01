@@ -2,11 +2,22 @@
 * Original selected 72-byte save-area interface. See README.md.
          MACRO
 &N       RETURN &REG,&TRACE,&RC=
-         AIF   ('&REG' NE '(14,12)' OR '&TRACE' NE '').BAD
+         AIF   ('&TRACE' NE '').BAD
+         AIF   ('&REG' EQ '(0,11)').LOW
+         AIF   ('&REG' NE '(14,12)').BAD
          AIF   ('&RC' EQ '(15)').KEEP
          AIF   ('&RC' EQ '0').ZERO
          AIF   ('&RC' NE '').BAD
 &N       LM    14,12,12(13)
+         BR    14
+         MEXIT
+.LOW     AIF   ('&RC' EQ '(15)' OR '&RC' EQ '').LOWRET
+         AIF   ('&RC' NE '0').BAD
+&N       SR    15,15
+         AGO   .LOWLM
+.LOWRET ANOP
+&N       DS    0H
+.LOWLM   LM    0,11,20(13)
          BR    14
          MEXIT
 .ZERO    ANOP

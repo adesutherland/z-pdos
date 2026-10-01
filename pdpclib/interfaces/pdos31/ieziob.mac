@@ -20,6 +20,10 @@ IOBDCBPT DS    A
 IOBRESTR DS    A
 IOBINCAM DS    H
          DS    H
+IOBDATCH EQU   128
+IOBCMDCH EQU   64
+IOBRRT2  EQU   16
+IOBUSB7  EQU   1
          MEXIT
 .BAD     MNOTE 8,'unsupported selected IEZIOB mapping'
          MEND

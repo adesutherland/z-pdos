@@ -2,7 +2,7 @@
 * Original selected sequential/partitioned/EXCP templates; public facts.
          MACRO
 &N       DCB &MACRF=,&DSORG=,&DDNAME=,&EODAD=,&EXLST=,                 X
-               &REPOS=,&BLKSIZE=,&DEVD=,&RECFM=
+               &REPOS=,&BLKSIZE=,&DEVD=,&RECFM=,&LRECL=
          LCLA  &REFERENCE,&ORG,&FORMAT,&KIND
          LCLC  &EOF,&EXITS
          AIF   ('&N' EQ '').BAD
@@ -13,6 +13,7 @@
 .MODE    ANOP
          AIF   ('&MACRF' EQ '(R,W)').BPAM
          AIF   ('&MACRF' EQ '(RP,WP)').BSAM
+         AIF   ('&MACRF' EQ '(W)').WRITE
          AIF   ('&MACRF' EQ 'E').EXCP
          AIF   ('&DSORG' NE 'PS').BAD
          AIF   ('&REPOS' NE '' OR '&DEVD' NE '').BAD
@@ -34,6 +35,10 @@
 .BSAM    AIF   ('&DSORG' NE 'PS').BAD
 &REFERENCE SETA 9252
 &KIND    SETA  1
+         AGO   .BASIC
+.WRITE   AIF   ('&DSORG' NE 'PS').BAD
+&REFERENCE SETA 32
+&KIND    SETA  1
 .BASIC   AIF   ('&REPOS' NE '' OR '&DEVD' NE '').BAD
          AGO   .POINTERS
 .EXCP    AIF   ('&DSORG' NE 'PS' OR '&DEVD' NE 'TA').BAD
@@ -47,6 +52,11 @@
 .POINTERS ANOP
 &FORMAT  SETA  0
          AIF   ('&RECFM' EQ '').EOF
+         AIF   ('&RECFM' NE 'VBA').UNDEF
+         AIF   (&KIND EQ 2).BAD
+&FORMAT  SETA 84
+         AGO   .EOF
+.UNDEF   ANOP
          AIF   ('&RECFM' NE 'U').BAD
 &FORMAT  SETA  192
 .EOF     ANOP
@@ -66,11 +76,20 @@
          AGO   .TAIL
 .NOBLOCK DC    20X'00'
 .TAIL    AIF   (&KIND EQ 0).QSAM
-         DC    X'01',15X'00'
+         DC    X'01',9X'00'
+         AIF   ('&LRECL' EQ '').NORECL
+         DC    AL2(&LRECL),4X'00'
          MEXIT
-.QSAM    DC    24X'00'
+.NORECL  DC    6X'00'
          MEXIT
-.EXTEND  DC    20X'00'
+.QSAM    DC    10X'00'
+         AIF   ('&LRECL' EQ '').NOLQS
+         DC    AL2(&LRECL),12X'00'
+         MEXIT
+.NOLQS   DC    14X'00'
+         MEXIT
+.EXTEND  AIF   ('&LRECL' NE '').BAD
+         DC    20X'00'
          MEXIT
 .BAD     MNOTE 8,'unsupported selected DCB template'
          MEND

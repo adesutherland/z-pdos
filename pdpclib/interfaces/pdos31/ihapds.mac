@@ -1,0 +1,10 @@
+* SPDX-License-Identifier: MIT; original selected BLDL directory map.
+         MACRO
+&N       IHAPDS &PDSBLDL=NO
+         AIF   ('&N' NE '' OR '&PDSBLDL' NE 'YES').BAD
+PDS2     DSECT
+         DS    CL11
+PDS2CNCT DS    C
+         MEXIT
+.BAD     MNOTE 8,'selected PDS map requires PDSBLDL=YES'
+         MEND

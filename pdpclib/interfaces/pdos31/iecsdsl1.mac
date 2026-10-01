@@ -1,0 +1,40 @@
+* SPDX-License-Identifier: MIT; original selected inline DSCB maps.
+         MACRO
+&N       IECSDSL1 &FORMAT
+         AIF   ('&N' NE '').BAD
+         AIF   ('&FORMAT' EQ '4').FOUR
+         AIF   ('&FORMAT' NE '1').BAD
+IECSDSL1 DS    0C
+DS1DSNAM DS    CL44
+DS1FMTID DS    C
+         DS    CL15
+DS1NOBDB DS    C
+         DS    CL21
+DS1DSORG DS    CL2
+DS1RECFM DS    C
+         DS    C
+DS1BLKL  DS    CL2
+DS1LRECL DS    CL2
+         DS    CL4
+DS1SCALO DS    CL4
+DS1LSTAR DS    CL3
+         DS    CL39
+DS1END   EQU   *
+DS1DSGPS EQU   64
+DS1DSGPO EQU   2
+DS1DSGU  EQU   1
+DS1ACBM  EQU   8
+DS1IND40 EQU   64
+DS1IND10 EQU   16
+DS1IND04 EQU   4
+         MEXIT
+.FOUR    DS    CL18
+DS4DEVSZ DS    CL4
+         DS    CL8
+DS4DEVDT DS    C
+         DS    CL30
+DS4VTOCE DS    CL10
+         DS    CL25
+         MEXIT
+.BAD     MNOTE 8,'selected DSCB map requires unlabelled format 1 or 4'
+         MEND

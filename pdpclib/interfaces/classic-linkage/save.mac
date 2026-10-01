@@ -3,7 +3,10 @@
          MACRO
 &N       SAVE &REG,&TRACE,&ID
          LCLA &LENGTH,&AFTER
-         AIF   ('&REG' NE '(14,12)' OR '&TRACE' NE '').BAD
+         LCLC &STNAME
+&STNAME  SETC '&N'
+         AIF   ('&TRACE' NE '').BAD
+         AIF   ('&REG' NE '(14,12)' AND '&REG' NE '(0,11)').BAD
          AIF   ('&ID' EQ '*').BAD
          AIF   ('&ID' EQ '').NOID
 &LENGTH  SETA  K'&ID
@@ -13,10 +16,14 @@
          DC    AL1(&LENGTH)
          DC    C'&ID'
          DS    0H
-         STM   14,12,12(13)
-         MEXIT
+&STNAME  SETC ''
+         AGO   .STORE
 .NOID    ANOP
-&N       STM   14,12,12(13)
+.STORE   AIF   ('&REG' EQ '(0,11)').LOW
+&STNAME  STM   14,12,12(13)
+         MEXIT
+.LOW     ANOP
+&STNAME  STM   0,11,20(13)
          MEXIT
 .BAD     MNOTE 8,'unsupported selected SAVE interface'
          MEND

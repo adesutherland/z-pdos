@@ -1,0 +1,5 @@
+* SPDX-License-Identifier: MIT; original selected SVC99 linkage.
+         MACRO
+&N       DYNALLOC
+&N       SVC   99
+         MEND
