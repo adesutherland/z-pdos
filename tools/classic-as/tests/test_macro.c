@@ -211,13 +211,10 @@ static void bad_source(const char *source, enum mf_status wanted)
 static void failures(void)
 {
     static const char *bad[] = {
-        " COPY MEMBER\n", " AIF (1 EQ 1).X\n", " AGO .X\n", " ANOP\n",
-        " LCLA &A\n", " LCLB &A\n", " LCLC &A\n", " GBLA &A\n",
-        " GBLB &A\n", " GBLC &A\n", "&A SETA 1\n", "&A SETB 1\n",
-        "&A SETC 'x'\n", " MEXIT\n", " MNOTE 0,'x'\n",
+        " COPY MEMBER\n",
+        " LCLA &A(2)\n", " MEXIT\n", " MNOTE 0,'x'\n",
         " MACRO\n X\n MACRO\n MEND\n", " MACRO\n X\n COPY Y\n MEND\n",
         " MACRO\n X &A\n DC &A(1)\n MEND\n X (A,B)\n",
-        " MACRO\n X\nY&SYSNDX LR 1,2\n MEND\n X\n",
         " MACRO\n X &A\n DC C'&&'\n MEND\n X Z\n"
     };
     size_t i;
@@ -246,7 +243,6 @@ static void failures(void)
     bad_source(" DC S'NAME\n", MF_UNSUPPORTED);
     bad_source(" DC I'NAME\n", MF_UNSUPPORTED);
     bad_source(" DC O'NAME\n", MF_UNSUPPORTED);
-    bad_source(".SEQ LR 1,2\n", MF_UNSUPPORTED);
 }
 static void limits(void)
 {

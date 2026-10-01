@@ -58,8 +58,11 @@ void mf_macro_destroy(struct mf_macro *);
  * Only declared positional slots are accepted; extra slots are unsupported.
  * A single comma is accepted as the empty operand on MACRO/MEND markers only;
  * comma-separated empty actuals retain their positional slots.
- * COPY without a library or inside definitions, continuation, conditional controls/variables, attributes, SYSNDX,
- * parameter indexing, escaped ampersands and nested definitions are unsupported.
+ * Scalar LCL/GBL and SETA/B/C, macro-local AIF/AGO/ANOP/MEXIT, forward
+ * open-code AIF/AGO, and SYSNDX are supported. Immediate parameter T' can
+ * identify numeric, omitted or unknown text; ordinary-symbol queries remain
+ * unsupported. COPY inside definitions, continuation, parameter indexing,
+ * other attributes, escaped ampersands and nested definitions are unsupported.
  * Definitions cannot be redefined. Names compare case-insensitively; character
  * argument values retain their original octets. ASCII and CP037 records use
  * fixed cards (syntax1..71; continuation72 rejected; sequence73..80 ignored).

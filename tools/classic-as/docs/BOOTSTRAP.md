@@ -56,6 +56,6 @@ The optional traditional provider is a separate C89 library, included by the
 development CMake build and selected only by `--macros`. Use
 `-DMF_TRADITIONAL_MACROS=OFF` for the small CMake configuration; the direct recipe
 above already excludes it. Its public header is `mf_classic_macro.h`. A direct
-capable-host build can add `macro_cards.c` and `macro_provider.c` and define
+capable-host build can add `macro_cards.c`, `macro_expr.c` and `macro_provider.c` and define
 `MF_WITH_TRADITIONAL_MACROS` for the desktop driver. No cREXX runtime, resolver,
 heap API or external macro library becomes a core dependency.

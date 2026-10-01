@@ -62,11 +62,30 @@ and CLI fixtures exercise lookup, nesting, CP037 members, missing/cyclic inputs,
 capacity, I/O failures and changed unused records across replay. COPY inside
 a macro definition still requires definition-time insertion and is rejected.
 
-The first gate explicitly rejects continuation cards, conditional
-controls and variables, argument sublist indexing, SYSNDX and assembler-state
-attributes. Passing an invocation through as an unexplained no-op would hide a
-missing build dependency. Ordinary instructions and directives emitted by the
-provider still pass through the same engine/profile/object checks.
+The conditional increment supports scalar LCLA/B/C and GBLA/B/C, SETA/B/C,
+AIF/AGO/ANOP/MEXIT and SYSNDX. Local state is fresh per macro invocation;
+global state persists after compatible redeclaration, but must be declared in
+each scope that uses it. Parameter/local collisions and repeated local
+declarations fail. SET assignments can implicitly declare a local scalar.
+Arithmetic uses checked signed 32-bit values, decimal terms, parentheses and
++/-/*/division. Logical expressions support NOT, AND, OR and EQ/NE/LT/LE/GT/GE;
+character comparisons use CP037 order and right-space padding. Quoted character
+values preserve case. The expression nesting bound is 32.
+
+Macro sequence branches can go forward or backward in their own definition;
+the step limit bounds loops. Open-code branches currently scan forward within
+the supplying record stream. Missing targets fail; backward open-code branching
+and cross-member lookahead remain unsupported. Skipped records still contribute
+to replay consistency. MEXIT ends the current invocation. SYSNDX uses the
+invocation's decimal index, padded to at least four digits, reset on replay.
+
+The selected T' parameter query distinguishes immediate numeric text (N),
+omitted text (O) and unknown text (U). It does not infer assembler symbol types
+or offer phase-dependent lookahead. General symbol attributes, sublist indexing,
+continuation cards, COPY inside definitions, arrays, created variables and
+cREXX preprocessing remain unsupported. Each scope has at most
+`max_model_statements` scalar variables, names at most 64 bytes and character
+values at most `max_statement_bytes`; their storage is allocated at creation.
 
 ## Storage, replay and provenance
 
@@ -97,8 +116,8 @@ must make that ownership explicit.
 
 ## Subsequent gates
 
-Scalar local/global variables, SETA/SETB/SETC, AIF/AGO/ANOP/MEXIT, argument
-sublists, substrings and SYSNDX belong to the next conditional provider gate.
+Argument sublists, substrings, variable arrays and backward open-code replay
+belong to later conditional provider gates.
 Source-owned shared globals must retain their value when redeclared, while
 locals start afresh on each call. Variable assignments must reuse bounded
 storage. No optional cREXX backend becomes a bootstrap prerequisite.

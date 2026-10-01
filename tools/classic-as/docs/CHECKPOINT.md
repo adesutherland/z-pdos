@@ -120,3 +120,13 @@ coordinates, replay of unused/comment records, and failed-open/close cleanup hav
 original independent unit checks. A CLI fixture checks copied source and a
 library-loaded macro against independently fixed BASR bytes and deck semantics.
 PDPTOP is now reached; its conditional variables remain the next build gap.
+
+## PDOS-driven scalar conditional assembly, 1 October 2026
+
+The provider executes the bounded scalar/branch subset documented in MACROS.md.
+Original fixtures independently check global persistence, fresh locals, scope
+visibility, sequence loops, numeric/character relations, arithmetic overflow,
+division by zero, MEXIT, SYSNDX replay and inactive undefined operands. Existing
+allocation/replay/I/O and deck checks remain. The selected PDPTOP now passes its
+variable setup; the real output reaches the next engine dependency, its leading
+AMODE ANY before the unnamed CSECT. No source/profile rewrite is used.

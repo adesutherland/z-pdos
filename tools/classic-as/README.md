@@ -31,5 +31,5 @@ An existing output path is refused; use a fresh path for each assembly.
 This seed qualifies the documented host component subset. It does not assemble
 all newlib/PDPCLIB/PDOS sources, implement an emulator, qualify
 native z/PDOS hosting, or establish source-to-IPL. The first optional traditional
-macro provider uses the same statement interface; conditional assembly and
-cREXX preprocessing remain later increments.
+macro provider uses the same statement interface; a bounded scalar conditional subset is also implemented. General conditional
+features and cREXX preprocessing remain later increments.

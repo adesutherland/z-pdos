@@ -57,8 +57,8 @@ Symbol references in an ungenerated nominal need not resolve. Character/hex
 nominals still undergo the documented lexical and explicit-length checks.
 This does not yet implement symbol length/type attributes.
 
-Multiplication/division, ORG, conditional assembly and
-cREXX expansion are not implemented. Traditional definitions require the
+Ordinary assembler multiplication/division, ORG and cREXX expansion remain
+unimplemented. The optional provider has its separate scalar conditional subset. Traditional definitions require the
 optional provider selected below. Unsupported
 constructs fail explicitly. The source parser's documented subset is distinct
 from the pure encoder's instruction descriptions.
@@ -161,9 +161,10 @@ The core uses host-supplied record handles and source identities, never paths.
 Library diagnostics name the supplying file. Desktop bounds are 16 directories,
 256 source identities, 16 simultaneous members and 1,024 path bytes.
 
-The provider explicitly rejects continuation, COPY inside macro definitions, conditional controls and
-variables, attributes, SYSNDX, sublist indexing, escaped ampersands and nested
-definitions. The [macro guide](MACROS.md) gives an original example and the
+The provider accepts the scalar variables, conditional branches and SYSNDX
+described in the macro guide. It rejects continuation, COPY inside macro
+definitions, variable arrays, general attributes, sublist indexing, escaped
+ampersands and nested definitions. The [macro guide](MACROS.md) gives an original example and the
 storage/replay/provenance contract. This is a language subset; it supplies no
 IBM service or mapping macros.
 

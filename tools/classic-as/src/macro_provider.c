@@ -13,7 +13,8 @@ struct definition {
     struct mf_origin origin;
     size_t parameters, first, count;
 };
-struct frame { size_t definition, pc; };
+struct frame { size_t definition, pc; unsigned long index; };
+struct variable { mf_octet name[64]; size_t length, used, global; int type; long number; };
 struct member { struct mf_records records; unsigned identity; size_t owner; };
 struct fingerprint { mf_u32 a, b; struct mf_u64 records, bytes; };
 struct mf_macro {
@@ -24,6 +25,10 @@ struct mf_macro {
     struct member *members;
     size_t member_depth;
     int started;
+    struct variable *variables; mf_octet *variable_text;
+    size_t *variable_counts; size_t variable_slots;
+    unsigned long invocation_index;
+    mf_octet skip_name[64]; size_t skip_length;
     struct definition *definitions;
     struct parameter *parameters;
     struct mf_statement *models;
@@ -60,7 +65,7 @@ static int word(struct mf_span s, size_t k)
 static int blocked(struct mf_span s)
 {
     size_t i;
-    for (i = 3; i < 20; ++i) if (word(s, i)) return 1;
+    for (i = 16; i < 20; ++i) if (word(s, i)) return 1;
     return 0;
 }
 static struct mf_span slice(struct mf_span s, size_t at, size_t n)
@@ -232,8 +237,12 @@ static enum mf_status capture(struct mf_macro *m, const struct mf_statement *mar
             if (!empty(s.operand)) return MF_SOURCE;
             ++m->definition_count; return MF_OK;
         }
-        if (word(s.operation, 0) || word(s.operation, 2) || blocked(s.operation) ||
-            (s.label.length && s.label.data[0] == 0x2e)) return MF_UNSUPPORTED;
+        if (word(s.operation, 0) || word(s.operation, 2) || blocked(s.operation)) return MF_UNSUPPORTED;
+        if (s.label.length && s.label.data[0] == 0x2e) {
+            if (!name_valid(slice(s.label, 1, s.label.length - 1))) return MF_SOURCE;
+            for (i = 0; i < d->count; ++i)
+                if (mf_macro_same(s.label, m->models[d->first + i].label)) return MF_DUPLICATE;
+        }
         if (m->model_count == m->config.max_model_statements) return MF_LIMIT;
         st = retain(m, &s, m->models + m->model_count); if (st != MF_OK) return st;
         ++m->model_count; ++d->count;
@@ -277,33 +286,147 @@ static enum mf_status push(struct mf_macro *m, size_t definition, const struct m
         }
         if (st != MF_EOF) return st;
     }
+    if (m->invocation_index == MAX32) return MF_LIMIT;
+    m->frames[m->depth].index = ++m->invocation_index;
+    m->variable_counts[m->depth + 2] = 0;
     m->frames[m->depth].definition = definition; m->frames[m->depth].pc = 0;
     m->trace[m->depth].name = d->name; m->trace[m->depth].invocation = call->origin;
     m->trace[m->depth].definition = d->origin; m->trace[m->depth].model = d->origin;
     ++m->depth; return MF_OK;
 }
+static size_t variable_find(struct mf_macro *m, size_t scope, struct mf_span name)
+{
+    size_t i, first; struct mf_span n;
+    first = scope * m->config.max_model_statements;
+    for (i = 0; i < m->variable_counts[scope]; ++i) {
+        n.data = m->variables[first + i].name; n.length = m->variables[first + i].length;
+        if (mf_macro_same(n, name)) return first + i;
+    }
+    return NONE;
+}
+static struct mf_span decimal(long number, mf_octet *buffer)
+{
+    struct mf_span v; size_t i, j; unsigned long n; mf_octet c;
+    i = 0; n = number < 0 ? (unsigned long)(-(number + 1)) + 1UL : (unsigned long)number;
+    do { buffer[i++] = (mf_octet)(0x30 + n % 10UL); n /= 10UL; } while (n);
+    if (number < 0) buffer[i++] = 0x2d;
+    for (j = 0; j < i / 2; ++j) { c = buffer[j]; buffer[j] = buffer[i - j - 1]; buffer[i - j - 1] = c; }
+    v.data = buffer; v.length = i; return v;
+}
+static enum mf_status resolve(struct mf_macro *m, struct mf_span name,
+    mf_octet *buffer, struct mf_span *value)
+{
+    struct definition *d; struct parameter *p; struct variable *v;
+    size_t j, at;
+    if (word(name, 20)) {
+        unsigned long n;
+        if (!m->depth) return MF_UNSUPPORTED;
+        n = m->frames[m->depth - 1].index;
+        if (n > 2147483647UL) return MF_RANGE;
+        *value = decimal((long)n, buffer);
+        if (value->length < 4) {
+            size_t i, pad; pad = 4 - value->length;
+            for (i = value->length; i; --i) buffer[i - 1 + pad] = buffer[i - 1];
+            for (i = 0; i < pad; ++i) buffer[i] = 0x30;
+            value->length = 4;
+        }
+        return MF_OK;
+    }
+    if (m->depth) {
+        d = m->definitions + m->frames[m->depth - 1].definition;
+        p = m->parameters ? m->parameters + m->frames[m->depth - 1].definition * m->config.max_parameters : NULL;
+        for (j = 0; j < d->parameters; ++j) if (mf_macro_same(name, p[j].name)) break;
+        if (j < d->parameters || (d->label.length && mf_macro_same(name, d->label))) {
+            if (j == d->parameters) j = m->config.max_parameters;
+            *value = m->values[(m->depth - 1) * (m->config.max_parameters + 1) + j]; return MF_OK;
+        }
+    }
+    at = variable_find(m, m->depth + 1, name);
+    if (at == NONE) return MF_UNDEFINED;
+    if (m->variables[at].global) at = m->variables[at].global - 1;
+    v = m->variables + at;
+    if (v->type == 2) { value->data = m->variable_text + at * m->config.max_statement_bytes; value->length = v->used; }
+    else *value = decimal(v->number, buffer);
+    return MF_OK;
+}
+static enum mf_status variable_add(struct mf_macro *m, size_t scope, struct mf_span name, int type, size_t *at)
+{
+    struct variable *v;
+    if (m->variable_counts[scope] == m->config.max_model_statements) return MF_LIMIT;
+    *at = scope * m->config.max_model_statements + m->variable_counts[scope]++;
+    v = m->variables + *at; memset(v, 0, sizeof *v);
+    memcpy(v->name, name.data, name.length); v->length = name.length; v->type = type;
+    return MF_OK;
+}
+static enum mf_status declare(struct mf_macro *m, const struct mf_statement *s, size_t operation)
+{
+    size_t cur, at, scope, global, i; int type;
+    struct mf_span arg, name; enum mf_status st;
+    if (s->label.length && s->label.data[0] != 0x2e) return MF_SOURCE;
+    scope = m->depth + 1; type = (int)((operation - 7) % 3); cur = 0;
+    while ((st = mf_macro_arguments(s->operand, &cur, &arg)) == MF_OK) {
+        name = arg.length && arg.data[0] == 0x26 ? slice(arg, 1, arg.length - 1) : arg;
+        if (!name_valid(name)) return MF_UNSUPPORTED;
+        if (name.length > 64) return MF_LIMIT;
+        if (name.length >= 3 && mf_macro_upper(name.data[0]) == 0x53 &&
+            mf_macro_upper(name.data[1]) == 0x59 && mf_macro_upper(name.data[2]) == 0x53) return MF_UNSUPPORTED;
+        if (m->depth) {
+            struct definition *d; struct parameter *p;
+            d = m->definitions + m->frames[m->depth - 1].definition;
+            p = m->parameters ? m->parameters + m->frames[m->depth - 1].definition * m->config.max_parameters : NULL;
+            if (d->label.length && mf_macro_same(name, d->label)) return MF_DUPLICATE;
+            for (i = 0; i < d->parameters; ++i) if (mf_macro_same(name, p[i].name)) return MF_DUPLICATE;
+        }
+        at = variable_find(m, scope, name);
+        if (operation < 10) {
+            if (at != NONE) return MF_DUPLICATE;
+            st = variable_add(m, scope, name, type, &at); if (st != MF_OK) return st;
+        } else {
+            global = variable_find(m, 0, name);
+            if (global == NONE) { st = variable_add(m, 0, name, type, &global); if (st != MF_OK) return st; }
+            else if (m->variables[global].type != type) return MF_SOURCE;
+            if (at == NONE) { st = variable_add(m, scope, name, type, &at); if (st != MF_OK) return st; }
+            else if (!m->variables[at].global) return MF_DUPLICATE;
+            m->variables[at].global = global + 1;
+        }
+    }
+    return st == MF_EOF ? MF_OK : st;
+}
 static enum mf_status substitute(struct mf_macro *m, struct mf_span s,
     size_t *used, struct mf_span *out)
 {
-    struct definition *d; struct parameter *p; struct mf_span name, value;
+    struct mf_span name, value; mf_octet buffer[32], attribute;
+    struct mf_u64 magnitude; int negative;
     size_t i, start, j; int quoted; enum mf_status st;
     start = *used; i = 0; quoted = 0;
     while (i < s.length) {
+        attribute = 0;
+        if (!quoted && i + 2 < s.length && mf_macro_upper(s.data[i]) == 0x54 &&
+            s.data[i + 1] == 0x27 && s.data[i + 2] == 0x26) { attribute = 0x54; i += 2; }
         if (s.data[i] == 0x26) {
-            if (!m->depth || i + 1 == s.length || s.data[i + 1] == 0x26) return MF_UNSUPPORTED;
+            if (i + 1 == s.length || s.data[i + 1] == 0x26) return MF_UNSUPPORTED;
             j = ++i;
             while (i < s.length && mf_macro_name_rest(s.data[i])) ++i;
             name = slice(s, j, i - j);
-            if (!name_valid(name) || word(name, 20)) return MF_UNSUPPORTED;
+            if (!name_valid(name)) return MF_UNSUPPORTED;
             if (i < s.length && s.data[i] == 0x28) return MF_UNSUPPORTED;
-            d = m->definitions + m->frames[m->depth - 1].definition;
-            p = m->parameters ? m->parameters + m->frames[m->depth - 1].definition * m->config.max_parameters : NULL;
-            for (j = 0; j < d->parameters; ++j) if (mf_macro_same(name, p[j].name)) break;
-            if (j == d->parameters) {
-                if (!d->label.length || !mf_macro_same(name, d->label)) return MF_UNDEFINED;
-                j = m->config.max_parameters;
+            st = resolve(m, name, buffer, &value); if (st != MF_OK) return st;
+            if (attribute) {
+                /* This selected attribute describes immediate argument text.
+                 * Ordinary-symbol attributes still need an engine query. */
+                if (!m->depth) return MF_UNSUPPORTED;
+                {
+                    struct definition *d; struct parameter *p;
+                    d = m->definitions + m->frames[m->depth - 1].definition;
+                    p = m->parameters ? m->parameters + m->frames[m->depth - 1].definition * m->config.max_parameters : NULL;
+                    for (j = 0; j < d->parameters; ++j) if (mf_macro_same(name, p[j].name)) break;
+                    if (j == d->parameters) return MF_UNSUPPORTED;
+                }
+                st = mf_u64_parse(value, &magnitude, &negative);
+                buffer[0] = buffer[2] = 0x27;
+                buffer[1] = !value.length ? 0x4f : st == MF_OK ? 0x4e : 0x55;
+                value.data = buffer; value.length = 3;
             }
-            value = m->values[(m->depth - 1) * (m->config.max_parameters + 1) + j];
             if (value.length > m->config.max_statement_bytes - *used) return MF_LIMIT;
             if (value.length) memcpy(m->output + *used, value.data, value.length);
             *used += value.length;
@@ -318,17 +441,93 @@ static enum mf_status substitute(struct mf_macro *m, struct mf_span s,
         }
     }
     out->data = m->output + start; out->length = *used - start;
-    st = MF_OK; return st;
+    return MF_OK;
 }
 static enum mf_status expand(struct mf_macro *m, const struct mf_statement *s,
     struct mf_statement *out)
 {
     size_t used; enum mf_status st;
     used = 0; out->origin = s->origin;
-    st = substitute(m, s->label, &used, &out->label); if (st != MF_OK) return st;
+    if (s->label.length && s->label.data[0] == 0x2e) {
+        if (!name_valid(slice(s->label, 1, s->label.length - 1))) return MF_SOURCE;
+        out->label.data = m->output; out->label.length = 0;
+    }
+    else { st = substitute(m, s->label, &used, &out->label); if (st != MF_OK) return st; }
     st = substitute(m, s->operation, &used, &out->operation); if (st != MF_OK) return st;
     st = substitute(m, s->operand, &used, &out->operand); if (st != MF_OK) return st;
     if ((out->label.length && !name_valid(out->label)) || !name_valid(out->operation)) return MF_SOURCE;
+    return MF_OK;
+}
+static enum mf_status conditional(struct mf_macro *m, const struct mf_statement *s, size_t op)
+{
+    struct mf_span expression, target, name; struct mf_macro_value value;
+    size_t used, at, i, start, level; enum mf_status st; struct variable *v; int quoted, branch;
+    if (op >= 7 && op <= 12) return declare(m, s, op);
+    if (op >= 13 && op <= 15) {
+        if (!s->label.length || s->label.data[0] != 0x26) return MF_SOURCE;
+        name = slice(s->label, 1, s->label.length - 1);
+        at = variable_find(m, m->depth + 1, name);
+        if (at == NONE) {
+            struct mf_statement declaration; declaration = *s;
+            declaration.label.length = 0; declaration.operand = s->label;
+            st = declare(m, &declaration, op - 6); if (st != MF_OK) return st;
+            at = variable_find(m, m->depth + 1, name);
+        }
+        if (m->variables[at].global) at = m->variables[at].global - 1;
+        v = m->variables + at; if (v->type != (int)(op - 13)) return MF_SOURCE;
+        used = 0; st = substitute(m, s->operand, &used, &expression); if (st != MF_OK) return st;
+        st = mf_macro_eval(expression, 32, &value); if (st != MF_OK) return st;
+        if (v->type == 2) {
+            if (!value.character) return MF_SOURCE;
+            v->used = 0;
+            for (i = 0; i < value.text.length; ++i) {
+                mf_octet c; c = value.text.data[i];
+                if (c == 0x27 && i + 1 < value.text.length && value.text.data[i + 1] == 0x27) ++i;
+                m->variable_text[at * m->config.max_statement_bytes + v->used++] = c;
+            }
+        } else {
+            if (value.character || (v->type == 1 && value.number != 0 && value.number != 1)) return MF_SOURCE;
+            v->number = value.number;
+        }
+        return MF_OK;
+    }
+    if (op == 5) return empty(s->operand) ? MF_OK : MF_SOURCE;
+    if (op == 6) {
+        if (!m->depth) return MF_UNSUPPORTED;
+        if (!empty(s->operand)) return MF_SOURCE;
+        --m->depth; return MF_OK;
+    }
+    branch = 1; target = s->operand;
+    if (op == 3) {
+        if (!target.length || target.data[0] != 0x28) return MF_SOURCE;
+        level = 1; quoted = 0; start = 1;
+        for (i = 1; i < target.length; ++i) {
+            if (!quoted && i + 2 < target.length && mf_macro_upper(target.data[i]) == 0x54 &&
+                target.data[i + 1] == 0x27 && target.data[i + 2] == 0x26) { ++i; continue; }
+            if (target.data[i] == 0x27) quoted = !quoted;
+            else if (!quoted && target.data[i] == 0x28) ++level;
+            else if (!quoted && target.data[i] == 0x29 && --level == 0) break;
+        }
+        if (i == target.length) return MF_SOURCE;
+        expression = slice(target, start, i - start);
+        target = slice(target, i + 1, target.length - i - 1);
+        used = 0; st = substitute(m, expression, &used, &expression); if (st != MF_OK) return st;
+        st = mf_macro_eval(expression, 32, &value); if (st != MF_OK) return st;
+        if (value.character || (value.number != 0 && value.number != 1)) return MF_SOURCE;
+        branch = value.number != 0;
+    }
+    if (!target.length || target.data[0] != 0x2e ||
+        !name_valid(slice(target, 1, target.length - 1))) return MF_SOURCE;
+    if (!branch) return MF_OK;
+    if (m->depth) {
+        struct definition *d; d = m->definitions + m->frames[m->depth - 1].definition;
+        for (i = 0; i < d->count; ++i) if (mf_macro_same(target, m->models[d->first + i].label)) break;
+        if (i == d->count) return MF_UNDEFINED;
+        m->frames[m->depth - 1].pc = i;
+    } else {
+        if (target.length > sizeof m->skip_name) return MF_LIMIT;
+        memcpy(m->skip_name, target.data, target.length); m->skip_length = target.length;
+    }
     return MF_OK;
 }
 static void observe(struct mf_macro *m, enum mf_status status, struct mf_span detail)
@@ -400,6 +599,7 @@ static enum mf_status provider_next(void *cookie, struct mf_statement *out)
         } else {
             st = raw(m, &s);
             if (st == MF_EOF) {
+                if (m->skip_length) { st = MF_UNDEFINED; break; }
                 if (m->member_depth) { st = member_pop(m); if (st != MF_OK) break; continue; }
                 if (m->replaying && !hashes_equal(&m->first, &m->current)) st = MF_REPLAY;
                 else {
@@ -408,12 +608,18 @@ static enum mf_status provider_next(void *cookie, struct mf_statement *out)
                 }
             }
             if (st != MF_OK) break;
+            if (m->skip_length) {
+                struct mf_span target; target.data = m->skip_name; target.length = m->skip_length;
+                if (!mf_macro_same(target, s.label)) continue;
+                m->skip_length = 0;
+            }
             if (word(s.operation, 0)) { st = capture(m, &s); if (st != MF_OK) break; continue; }
         }
-        if (word(s.operation, 0) || word(s.operation, 1) || blocked(s.operation) ||
-            (s.label.length && s.label.data[0] == 0x2e)) {
+        if (word(s.operation, 0) || word(s.operation, 1) || blocked(s.operation)) {
             st = MF_UNSUPPORTED; break;
         }
+        for (k = 3; k <= 15; ++k) if (word(s.operation, k)) break;
+        if (k <= 15) { st = conditional(m, &s, k); if (st != MF_OK) break; continue; }
         st = expand(m, &s, &expanded); if (st != MF_OK) break;
         if (blocked(expanded.operation) || word(expanded.operation, 0) || word(expanded.operation, 1)) {
             st = MF_UNSUPPORTED; break;
@@ -456,6 +662,8 @@ static enum mf_status provider_replay(void *cookie)
     if (!m->complete || m->terminal != MF_EOF) return MF_SOURCE;
     st = m->records.replay(m->records.cookie); if (st != MF_OK) return st;
     m->definition_count = m->model_count = m->definition_used = m->depth = 0;
+    m->invocation_index = 0; m->skip_length = 0;
+    memset(m->variable_counts, 0, (m->config.max_depth + 2) * sizeof(size_t));
     m->steps = 0; m->terminal = MF_OK; m->complete = 0; m->replaying = 1;
     memset(&m->last_origin, 0, sizeof m->last_origin); hash_init(&m->current);
     return MF_OK;
@@ -483,6 +691,8 @@ enum mf_status mf_macro_create(const struct mf_macro_config *c,
     if (c->max_parameters && c->max_macros > (size_t)-1 / c->max_parameters) return MF_LIMIT;
     if (c->max_depth > (size_t)-1 / (c->max_parameters + 1) ||
         c->max_depth > (size_t)-1 / c->max_argument_bytes) return MF_LIMIT;
+    if (c->max_depth > (size_t)-1 - 2 ||
+        c->max_model_statements > (size_t)-1 / (c->max_depth + 2)) return MF_LIMIT;
     slots = c->max_depth * (c->max_parameters + 1);
     params = c->max_macros * c->max_parameters;
     st = allocate(storage, 1, sizeof *m, &p); if (st != MF_OK) return st;
@@ -503,6 +713,13 @@ enum mf_status mf_macro_create(const struct mf_macro_config *c,
     ALLOC(pending, c->max_statement_bytes, mf_octet);
     ALLOC(members, c->max_depth, struct member);
 #undef ALLOC
+    m->variable_slots = c->max_model_statements * (c->max_depth + 2);
+    st = allocate(storage, m->variable_slots, sizeof(struct variable), &p); if (st != MF_OK) return st;
+    m->variables = (struct variable *)p;
+    st = allocate(storage, m->variable_slots, c->max_statement_bytes, &p); if (st != MF_OK) return st;
+    m->variable_text = (mf_octet *)p;
+    st = allocate(storage, c->max_depth + 2, sizeof(size_t), &p); if (st != MF_OK) return st;
+    m->variable_counts = (size_t *)p; memset(p, 0, (c->max_depth + 2) * sizeof(size_t));
     hash_init(&m->current);
     *out = m; statements->cookie = m; statements->next = provider_next;
     statements->replay = provider_replay; return MF_OK;
