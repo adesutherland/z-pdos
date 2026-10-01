@@ -794,6 +794,14 @@ static void channel_words(void)
     init(&f,"S CSECT\n CCW1 1,0,256,0\n END S\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
     init(&f,"S CSECT\n CCW1 1,0,0,65536\n END S\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
     init(&f,"S CSECT\n CCW1 1,ABSENT,0,0\n END S\n"); CHECK(run(&f) == MF_UNDEFINED); clean(&f);
+    init(&f,"S CSECT\n DC X'AA'\nCC CCW 7,16777215,X'40',65535\n CCW0 X'1D',0,X'20',1\n END CC\n");
+    successful(&f); CHECK(f.sections[0].length == 24 && f.data[0][0] == 0xaa &&
+        f.data[0][8] == 7 && f.data[0][9] == 255 && f.data[0][10] == 255 && f.data[0][11] == 255 &&
+        f.data[0][12] == 0x40 && f.data[0][13] == 0 && f.data[0][14] == 255 && f.data[0][15] == 255 &&
+        f.data[0][16] == 0x1d && f.data[0][20] == 0x20 && f.data[0][23] == 1 && !f.fixup_count); clean(&f);
+    init(&f,"S CSECT\n CCW 1,16777216,0,0\n END S\n"); failed(&f,MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n CCW0 1,0,3,0\n END S\n"); failed(&f,MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n CCW 1,S,0,0\n END S\n"); failed(&f,MF_UNSUPPORTED); clean(&f);
 }
 int main(void)
 {

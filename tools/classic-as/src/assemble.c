@@ -1371,7 +1371,7 @@ static enum mf_status end_statement(struct mf_as *as)
     }
     return end_literal_pool(as);
 }
-static enum mf_status ccw1_statement(struct mf_as *as)
+static enum mf_status ccw_statement(struct mf_as *as, int format_one)
 {
     struct mf_span parts[4]; size_t count; struct value address_value;
     struct mf_fixup fixup; enum mf_status status; mf_u32 command, flags, length, padding, offset;
@@ -1388,17 +1388,21 @@ static enum mf_status ccw1_statement(struct mf_as *as)
     status = number(as,parts[0],255,&command); if (status != MF_OK) return status;
     status = number(as,parts[2],255,&flags); if (status != MF_OK) return status;
     status = number(as,parts[3],65535,&length); if (status != MF_OK) return status;
-    bytes[0] = (mf_octet)command; bytes[1] = (mf_octet)flags;
-    bytes[2] = (mf_octet)(length >> 8); bytes[3] = (mf_octet)length;
+    if (!format_one && (flags & 3)) return MF_RANGE;
+    bytes[0] = (mf_octet)command;
+    bytes[format_one ? 1 : 4] = (mf_octet)flags;
+    bytes[format_one ? 2 : 6] = (mf_octet)(length >> 8);
+    bytes[format_one ? 3 : 7] = (mf_octet)length;
     status = evaluate(as,parts[1],&address_value);
     if (status == MF_UNDEFINED && as->pass == 1) return advance(as,8,NULL);
     if (status != MF_OK) return status;
-    if (address_value.negative || address_value.magnitude.hi || address_value.magnitude.lo > 0x7fffffffUL) return MF_RANGE;
+    if (address_value.negative || address_value.magnitude.hi ||
+        address_value.magnitude.lo > (format_one ? 0x7fffffffUL : 0xffffffUL)) return MF_RANGE;
     if (address_value.coefficient < 0 || address_value.coefficient > 1 ||
         (address_value.coefficient && address_value.kind != MF_REF_SECTION)) return MF_UNSUPPORTED;
-    if (address_value.coefficient && as->sections[as->current].dummy) return MF_UNSUPPORTED;
+    if (address_value.coefficient && (!format_one || as->sections[as->current].dummy)) return MF_UNSUPPORTED;
     if (address_value.coefficient && as->fixup_count == as->config.max_fixups) return MF_LIMIT;
-    mf_u64_store(address_value.magnitude,bytes+4,4);
+    mf_u64_store(address_value.magnitude,bytes+(format_one ? 4 : 1),format_one ? 4 : 3);
     status = advance(as,8,bytes); if (status != MF_OK) return status;
     if (address_value.coefficient) {
         ++as->fixup_count;
@@ -1487,6 +1491,7 @@ static enum mf_status process(struct mf_as *as)
     static const mf_octet org[] = {0x4f,0x52,0x47};
     static const mf_octet space[] = {0x53,0x50,0x41,0x43,0x45}, eject[] = {0x45,0x4a,0x45,0x43,0x54};
     static const mf_octet ccw1[] = {0x43,0x43,0x57,0x31};
+    static const mf_octet ccw0[] = {0x43,0x43,0x57,0x30}, ccw[] = {0x43,0x43,0x57};
     struct mf_span op; struct value v; const struct mf_instruction *ins; enum mf_status status;
     unsigned mask; int reg;
     op = as->statement.operation; as->statement_length = 1; as->statement_type = 0;
@@ -1499,7 +1504,8 @@ static enum mf_status process(struct mf_as *as)
     if (word(op, space, sizeof space)) return listing_control(as,1);
     if (word(op, eject, sizeof eject)) return listing_control(as,0);
     if (word(op, org, sizeof org)) return origin_statement(as);
-    if (word(op, ccw1, sizeof ccw1)) return ccw1_statement(as);
+    if (word(op, ccw1, sizeof ccw1)) return ccw_statement(as,1);
+    if (word(op, ccw0, sizeof ccw0) || word(op, ccw, sizeof ccw)) return ccw_statement(as,0);
     if (word(op, csect, sizeof csect)) return select_section(as, 0);
     if (word(op, dsect, sizeof dsect)) return select_section(as, 1);
     if (word(op, equ, sizeof equ)) {

@@ -243,7 +243,13 @@ Command/flags are checked bytes and count is 0..65535. An absolute or
 single-section address is checked to 31 bits at assembly time; relocatable
 addresses receive an ordinary four-byte A fixup at offset four. Alignment
 fill is emitted as zeros. Final relocated channel addresses still require the
-load-image audit. CCW/CCW0 remain unsupported.
+load-image audit.
+
+CCW and CCW0 emit the same aligned eight-byte format-0 word with a checked
+absolute 24-bit address, flags in byte four, zero byte five and count in
+bytes six/seven. Reserved low flag bits must be zero. Relocatable format-0
+addresses are rejected until three-byte object relocation is supported.
+The formats follow IBM's [CCW/CCW0 reference](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=statements-ccw-ccw0-instructions).
 
 With `--macros`, a nonblank column 72 joins the next card from column 16.
 Columns 1–15 on continuation cards must be blank. Comma-terminated padding
