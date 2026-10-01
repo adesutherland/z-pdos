@@ -916,7 +916,7 @@ static enum mf_status branch(struct mf_as *as, unsigned mask, int reg)
     if (!parts[0].length) return MF_SOURCE;
     memset(&op, 0, sizeof op); op.r1 = mask;
     if (reg) {
-        status = number(as, parts[0], 15, &n); if (status != MF_OK) return status;
+        status = instruction_number(as, parts[0], 15, &n); if (status != MF_OK) return status;
         op.r2 = (unsigned)n; name.data = bcr; name.length = sizeof bcr;
     } else {
         status = address(as, parts[0], 1, 0, 0, 0, &op.d2, &op.b2, &op.x2);

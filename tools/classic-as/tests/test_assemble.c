@@ -770,6 +770,18 @@ static void symbol_lengths(void)
     init(&f,"A EQU C''\n END\n"); failed(&f,MF_SOURCE); clean(&f);
     init(&f,"A EQU C'ABCDE'\n END\n"); failed(&f,MF_RANGE); clean(&f);
 }
+static void forward_branch_registers(void)
+{
+    static const mf_octet expected[6] = {7,0xfe,7,0x7e,7,0x0e};
+    struct fixture f;
+    init(&f,"S CSECT\n BR RETURN\n BNER RETURN\n NOPR RETURN\nRETURN EQU 14\n END S\n");
+    successful(&f); CHECK(f.sections[0].length == sizeof expected);
+    CHECK(!memcmp(f.data[0],expected,sizeof expected)); clean(&f);
+    init(&f,"S CSECT\n BR RETURN\nRETURN EQU 16\n END S\n");
+    failed(&f,MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n BR MISSING\n END S\n");
+    failed(&f,MF_UNDEFINED); clean(&f);
+}
 static void channel_words(void)
 {
     static const mf_octet expected[24] = {0xaa,0,0,0,0,0,0,0,7,0x40,0,6,0,0,0,24,0x1d,0,0x7f,0xff,0,0,0,0};
@@ -788,5 +800,6 @@ int main(void)
     no_operand_sections(); symbol_lengths(); channel_words(); character_and_location_literals(); origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); nominal_lists(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
+    forward_branch_registers();
     printf("assemble: %lu checks passed\n", checks); return 0;
 }

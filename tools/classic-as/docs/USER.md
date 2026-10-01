@@ -270,6 +270,10 @@ narrow literals remain unsupported. Their nominal parentheses are distinct
 from an instruction's register/address suffix.
 LTORG accepts no operand or a single comma marking an absent operand.
 
+Register branch aliases, including BR, BNER and NOPR, resolve forward
+absolute register symbols on pass two just like their BCR equivalents.
+Unresolved symbols and values outside 0–15 fail without a successful deck.
+
 The macro-enabled CLI reports failing nested macro model coordinates before
 its primary invocation diagnostic. Borrowed observer frames are printed
 synchronously and are not retained as an expansion history.
