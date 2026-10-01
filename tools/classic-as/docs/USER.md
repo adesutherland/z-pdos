@@ -205,6 +205,9 @@ never produce a successful deck. Other PUSH/POP state classes remain unsupported
 DC/DS duplication factors also accept parenthesized absolute expressions whose
 layout values are already defined. Forward layout dependencies are rejected.
 Repeated address constants reevaluate the location counter for each element.
+Explicit byte lengths also accept parenthesized absolute expressions, including
+ordinary length attributes. Their positive values must be known during layout;
+padding, type width limits and rejection of truncation are unchanged.
 
 For RSY, explicit signed displacements range from -524288 to 524287. The
 encoder receives their checked 20-bit representation. Implicit symbolic

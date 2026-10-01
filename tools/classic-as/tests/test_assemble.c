@@ -596,6 +596,16 @@ static void declaration_expressions(void)
     init(&f," DC A(B'100000000000000000000000000000000')\n END\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
     init(&f,"S CSECT\nBYTES DC 4AL1(*-BYTES)\n END S\n");
     successful(&f); CHECK(f.data[0][0] == 0 && f.data[0][1] == 1 && f.data[0][2] == 2 && f.data[0][3] == 3); clean(&f);
+    init(&f,"S CSECT\nSIZE EQU 5\nITEM DC CL(SIZE)'Ab'\n DC XL(L'ITEM-2)'ABC'\n DS (L'ITEM-4)CL(SIZE)\n END S\n");
+    successful(&f); CHECK(f.sections[0].length == 13);
+    CHECK(f.data[0][0] == 0xc1 && f.data[0][1] == 0x82 && f.data[0][4] == 0x40);
+    CHECK(f.data[0][5] == 0 && f.data[0][6] == 0x0a && f.data[0][7] == 0xbc);
+    CHECK(!f.present[0][8]); clean(&f);
+    init(&f," DC CL(LATER)'A'\nLATER EQU 4\n END\n"); failed(&f,MF_UNDEFINED); clean(&f);
+    init(&f," DC CL(0)'A'\n END\n"); failed(&f,MF_RANGE); clean(&f);
+    init(&f," DC CL(-1)'A'\n END\n"); failed(&f,MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n DC CL(S)'A'\n END\n"); failed(&f,MF_SOURCE); clean(&f);
+    init(&f," DC CL((3)'A'\n END\n"); failed(&f,MF_SOURCE); clean(&f);
 }
 static void source_metadata(void)
 {

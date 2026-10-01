@@ -857,20 +857,26 @@ static int hex_digit(mf_octet c)
     if (c >= 0x41 && c <= 0x46) return c - 0x41 + 10;
     return -1;
 }
+static enum mf_status constant_group(struct mf_span s, size_t *at)
+{
+    size_t depth; int quoted; mf_octet byte;
+    depth = 0; quoted = 0;
+    do {
+        byte = s.data[*at];
+        if (byte == 0x27 && (quoted || !length_quote(s,*at))) quoted = !quoted;
+        else if (!quoted && byte == 0x28) ++depth;
+        else if (!quoted && byte == 0x29) --depth;
+        ++*at;
+    } while (*at < s.length && depth);
+    return depth || quoted ? MF_SOURCE : MF_OK;
+}
 static enum mf_status constant_parse(struct mf_as *as, struct mf_span s, int reserve,
     struct constant *c)
 {
-    size_t at, start, i, depth; mf_u32 n; enum mf_status status; unsigned type; mf_octet byte;
+    size_t at, start, i; mf_u32 n; enum mf_status status; unsigned type; mf_octet byte;
     memset(c, 0, sizeof *c); s = trim(s); at = 0; c->repeat = 1;
     if (s.length && s.data[0] == 0x28) {
-        int quoted; quoted = 0; depth = 0;
-        do {
-            byte = s.data[at++];
-            if (byte == 0x27) quoted = !quoted;
-            else if (!quoted && byte == 0x28) ++depth;
-            else if (!quoted && byte == 0x29) --depth;
-        } while (at < s.length && depth);
-        if (depth || quoted) return MF_SOURCE;
+        status = constant_group(s,&at); if (status != MF_OK) return status;
         status = number(as, subspan(s, 0, at), U32MAX, &c->repeat);
         if (status != MF_OK) return status;
     } else {
@@ -887,7 +893,9 @@ static enum mf_status constant_parse(struct mf_as *as, struct mf_span s, int res
     else return MF_UNSUPPORTED;
     if (at < s.length && upper(s.data[at]) == 0x4c) {
         ++at; start = at;
-        while (at < s.length && s.data[at] >= 0x30 && s.data[at] <= 0x39) ++at;
+        if (at < s.length && s.data[at] == 0x28) {
+            status = constant_group(s,&at); if (status != MF_OK) return status;
+        } else while (at < s.length && s.data[at] >= 0x30 && s.data[at] <= 0x39) ++at;
         if (at == start) return MF_SOURCE;
         status = number(as, subspan(s, start, at - start), UINT_MAX, &n);
         if (status != MF_OK) return status;
