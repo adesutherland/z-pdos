@@ -1,0 +1,45 @@
+* SPDX-License-Identifier: MIT
+* Original selected classic 12-byte track-capacity list and CVT call.
+         MACRO
+&N       TRKCALC &FUNCTN=,&UCB=,&BALANCE=,&RKDD=,&REGSAVE=,&MF=
+         LCLA  &FLAGS
+         AIF   ('&MF' NE 'L').EXEC
+         DS    0F
+&N       DC    3F'0'
+         MEXIT
+.EXEC    AIF   ('&FUNCTN' NE 'TRKCAP' OR '&REGSAVE' NE 'YES').BAD
+         AIF   ('&UCB' EQ '' OR '&RKDD' EQ '').BAD
+         AIF   (N'&MF NE 2).BAD
+         AIF   ('&MF(1)' NE 'E' OR '&MF(2)' EQ '').BAD
+         AIF   ('&MF(2)'(1,1) EQ '(').BAD
+&FLAGS   SETA  132
+&N       STM   14,12,12(13)
+         LA    1,&MF(2)
+         AIF   ('&UCB'(1,1) EQ '(').UREG
+         L     0,&UCB
+         AGO   .USET
+.UREG    MF$REG 0,&UCB
+.USET    ST    0,0(,1)
+         AIF   ('&RKDD'(1,1) EQ '(').RREG
+         MVC   8(4,1),&RKDD
+         AGO   .BAL
+.RREG    MF$REG 0,&RKDD
+         ST    0,8(,1)
+.BAL     AIF   ('&BALANCE' EQ '*' OR '&BALANCE' EQ '').CALL
+&FLAGS   SETA  &FLAGS+16
+         AIF   ('&BALANCE'(1,1) EQ '(').BREG
+         MVC   6(2,1),&BALANCE
+         AGO   .CALL
+.BREG    MF$REG 0,&BALANCE
+         STH   0,6(,1)
+.CALL    MVI   4(1),&FLAGS
+         LR    2,1
+         L     15,16
+         L     15,232(,15)
+         LA    15,12(,15)
+         BALR  14,15
+         LM    1,12,24(13)
+         L     14,12(13)
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected classic TRKCALC form'
+         MEND

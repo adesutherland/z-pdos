@@ -114,6 +114,18 @@ int main(int argc, char **argv)
 
     CHECK(argc == 3);
     if (!strcmp(argv[1],"pdos31-io")) { io_templates(argv[2]); return 0; }
+    if (!strcmp(argv[1],"pdos31-trkcalc")) {
+        static const unsigned char linked[68] = {
+            0,0,0,0,0,0,0,0,0,0,0,0,0x90,0xec,0xd0,0x0c,
+            0x41,0x10,0xc0,0,0x18,3,0x50,0,0x10,0,0x18,4,0x50,0,0x10,8,
+            0x18,5,0x40,0,0x10,6,0x92,0x94,0x10,4,0x18,0x21,0x58,0xf0,0,0x10,
+            0x58,0xf0,0xf0,0xe8,0x41,0xf0,0xf0,0x0c,5,0xef,0x98,0x1c,0xd0,0x18,
+            0x58,0xe0,0xd0,0x0c,7,0xfe};
+        unsigned char actual[69];
+        input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(actual,1,sizeof actual,input);
+        CHECK(got == sizeof linked && !memcmp(actual,linked,sizeof linked));
+        CHECK(!ferror(input) && fclose(input) == 0); puts("TRKCALC: list, register setup and preservation bytes pass"); return 0;
+    }
     if (!strcmp(argv[1],"pdos31-diagnostics")) {
         static const unsigned char linked[120] = {
             0,0x53,0,0,0,0,0x24,0,0,0,0,0,0,0,0,0,0,0,0x10,0x60,0,0,0x10,0x68,

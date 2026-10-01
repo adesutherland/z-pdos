@@ -167,3 +167,25 @@ remain the inherited limited implementation. Large block tokens are excluded.
 All 120 independently expected template, setup, call and literal bytes pass
 after linking, with a rejected SNAP option control. This does not prove dump,
 abnormal termination or positioning service behavior in a guest.
+
+## Selected track-capacity interface
+
+TRKCALC supports the classic empty 12-byte `MF=L` list and
+`FUNCTN=TRKCAP,REGSAVE=YES,MF=(E,list)` execute form. UCB accepts a
+pointer word or register, RKDD accepts a record/key/data word or register,
+and BALANCE accepts a halfword address or register. Empty or `*` BALANCE
+preserves the list value; other BALANCE operands set the caller-balance bit.
+The list requires fullword alignment. Execution saves registers in the
+caller's standard R13 save area, passes the list in R2, calls the entry at
+CVT+232 plus 12, and restores R1–R12/R14 while retaining R0/R15 results.
+This requires the caller's normal save-area convention and an available
+compatible track-calculation service.
+
+The layout and option facts come from IBM's [STAR data area](https://publibz.boulder.ibm.com/epubs/pdf/has2d100.pdf)
+(printed page 156) and [MVS/XA Data Administration](https://ftpmirror.your.org/pub/misc/bitsavers/pdf/ibm/370/MVS_XA/GC26-4149-2_MVS-XA_Data_Administration_Jun87.pdf)
+(printed pages 162–169). The retained PDOS source declares its CVT entry and
+three preceding branches. No IBM macro implementation was used. An original
+consumer checks 68 independently expected bytes, including the empty list,
+UCB/record/balance register setup, flags, call and preservation sequence.
+PDOS's track-calculation routine is still its inherited placeholder; correct
+service results and device capacities are not established by this host check.
