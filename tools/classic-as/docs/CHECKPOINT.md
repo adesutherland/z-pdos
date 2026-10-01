@@ -276,3 +276,9 @@ allocations. Original cases cover comma truncation, quoted column padding, a
 continued logical condition, CP037, changed replay, missing/invalid cards,
 statement capacity and physical-card step limits. Kernel support advances
 from the continued AIF to external mapping declarations.
+
+Ordinary length attributes and implicit SS lengths are independently checked
+with forward fields, duplication, expression addends, explicit bases and
+length overrides, EQU inheritance, instruction labels and L'*. Undefined,
+oversized and forbidden forward layout attributes fail. Kernel startup now
+passes its forward PGMNAME move and reaches CALL.

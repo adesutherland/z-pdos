@@ -63,3 +63,9 @@ The selected continuation reader uses the public [HLASM continuation rules](http
 for columns 72 and 16 and the [macro operand rules](https://www.ibm.com/docs/en/zos/3.2.0?topic=format-rules-continuation-lines)
 for comma-truncated fields. Its bounds and rejected continued remarks are
 explicit implementation limits.
+
+Ordinary length assignment and omitted SS lengths follow the public HLASM
+[symbol length reference](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=terms-symbol-length-attribute-reference),
+[SS lengths](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=entries-lengths)
+and [EQU](https://www.ibm.com/docs/en/hla-and-tf/1.6?topic=statements-equ-instruction)
+facts. Conditional lookahead is a separate unimplemented provider feature.

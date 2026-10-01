@@ -29,6 +29,8 @@ static void ss_lengths(void)
     init(&f, "S CSECT\n MVC 0(0,1),0(2)\n MVC 0(1,1),0(2)\n MVC 0(2,1),0(2)\n CLC 4095(256,3),4095(4)\n ZAP 0(0,1),0(0,2)\n ZAP 0(1,1),0(1,2)\n ZAP 0(16,1),0(16,2)\n MP 0(8,1),0(0,2)\n MP 0(8,1),0(1,2)\n DP 0(8,1),0(0,2)\n DP 0(8,1),0(1,2)\n END S\n");
     pdp_successful(&f); CHECK(f.sections[0].length == sizeof expected);
     CHECK(!memcmp(f.data[0], expected, sizeof expected)); clean(&f);
+    init(&f," MVC 0(,1),0(2)\n END\n"); pdp_successful(&f);
+    CHECK(!memcmp(f.data[0],expected,6)); clean(&f);
     init(&f, "S CSECT\n USING S,12\n XC AREA(0),AREA\n MVC AREA(1),AREA\nAREA DS F\n END S\n");
     pdp_successful(&f); CHECK(f.data[0][1] == 0 && f.data[0][7] == 0);
     CHECK(f.data[0][2] == 0xc0 && f.data[0][3] == 12 && f.data[0][9] == 12); clean(&f);
@@ -112,7 +114,7 @@ static void pdp_failures(void)
         {" MVC 0(257,1),0(2)\n END\n",MF_RANGE},
         {" ZAP 0(17,1),0(1,2)\n END\n",MF_RANGE},
         {" ZAP 0(0,1),0(-1,2)\n END\n",MF_RANGE},
-        {" MVC 0(,1),0(2)\n END\n",MF_SOURCE},
+        {" MVC 0(,16),0(2)\n END\n",MF_RANGE},
         {" DSECT\n END\n",MF_SOURCE},
         {" CSECT BAD\n END\n",MF_SOURCE},
         {"S EQU 1\nS CSECT\n END\n",MF_DUPLICATE},

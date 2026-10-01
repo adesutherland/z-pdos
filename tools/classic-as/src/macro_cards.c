@@ -76,9 +76,9 @@ enum mf_status mf_macro_card(const struct mf_record *r, enum mf_encoding e,
     while (i < n) {
         c = b[i];
         if (!quoted && i + 1 < n && b[i + 1] == 0x27 &&
-            (mf_macro_upper(c) == 0x4c || ((mf_macro_upper(c) == 0x4b ||
+            ((mf_macro_upper(c) == 0x4b ||
              mf_macro_upper(c) == 0x4e || mf_macro_upper(c) == 0x54) &&
-             (i + 2 == n || b[i + 2] != 0x26)))) {
+             (i + 2 == n || b[i + 2] != 0x26))) {
             s->origin.column = (unsigned)i + 1; return MF_UNSUPPORTED;
         }
         /* D/S/I/O can also begin nominal/self-defining syntax. Preserve a
@@ -94,7 +94,7 @@ enum mf_status mf_macro_card(const struct mf_record *r, enum mf_encoding e,
         }
         if (!quoted && (mf_macro_upper(c) == 0x54 || mf_macro_upper(c) == 0x4b || mf_macro_upper(c) == 0x4e) && i + 2 < n &&
             b[i + 1] == 0x27 && b[i + 2] == 0x26) { i += 2; continue; }
-        if (c == 0x27) quoted = !quoted;
+        if (c == 0x27 && (quoted || !i || mf_macro_upper(b[i-1]) != 0x4c)) quoted = !quoted;
         else if (!quoted && c == 0x28) ++level;
         else if (!quoted && c == 0x29) { if (!level) return MF_SOURCE; --level; }
         if (!quoted && !level && c == 0x20) break;
@@ -112,7 +112,7 @@ enum mf_status mf_macro_arguments(struct mf_span s, size_t *cursor,
     if (*cursor == (size_t)-1) return MF_EOF;
     start = i = *cursor; level = 0; quoted = 0;
     while (i < s.length) {
-        if (s.data[i] == 0x27) quoted = !quoted;
+        if (s.data[i] == 0x27 && (quoted || !i || mf_macro_upper(s.data[i-1]) != 0x4c)) quoted = !quoted;
         else if (!quoted && s.data[i] == 0x28) ++level;
         else if (!quoted && s.data[i] == 0x29) { if (!level) return MF_SOURCE; --level; }
         else if (!quoted && !level && s.data[i] == 0x2c) break;

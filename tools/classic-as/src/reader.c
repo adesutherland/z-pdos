@@ -105,7 +105,8 @@ static enum mf_status reader_next_inner(void *cookie, struct mf_statement *out)
         start = i;
         quoted = 0;
         while (i < n) {
-            if (reader->buffer[i] == 0x27) quoted = !quoted;
+            if (reader->buffer[i] == 0x27 && (quoted || i == start ||
+                (reader->buffer[i-1] != 0x4c && reader->buffer[i-1] != 0x6c))) quoted = !quoted;
             if (!quoted && reader->buffer[i] == 0x20) break;
             ++i;
         }

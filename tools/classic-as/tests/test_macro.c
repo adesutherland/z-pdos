@@ -242,7 +242,7 @@ static void failures(void)
     bad_source(" MACRO\n X ,,\n MEND\n", MF_SOURCE);
     bad_source(" MACRO\n X\n MEND\n X ,,\n", MF_UNSUPPORTED);
     bad_source(" MACRO\n X &A\n LR &A,2\n MEND\n X ,\n", MF_UNSUPPORTED);
-    bad_source(" DC AL1(L'LABEL)\n", MF_UNSUPPORTED);
+    bad_source("&V SETA L'LABEL\n", MF_UNSUPPORTED);
     bad_source(" DC N'NAME\n", MF_UNSUPPORTED);
     bad_source(" DC T'NAME\n", MF_UNSUPPORTED);
     bad_source(" DC D'NAME\n", MF_UNSUPPORTED);
@@ -323,6 +323,8 @@ static void continuation_cards(void)
     struct fixture f; unsigned long n; size_t calls; char source[320], changed[320], operand[80];
     memset(source,' ',sizeof source); memcpy(source," LR 1,",6);
     source[71] = '+'; source[72] = '\n'; memcpy(source+88,"2\n",2); source[90] = 0;
+    init(&f," DC AL1(L'LABEL)\n"); CHECK(create(&f) == MF_OK);
+    expected(&f,"","DC","AL1(L'LABEL)",1); CHECK(drain(&f,&n) == MF_EOF); clean(&f);
     init(&f,source); CHECK(create(&f) == MF_OK); calls = f.calls;
     expected(&f,"","LR","1,2",1); CHECK(drain(&f,&n) == MF_EOF && f.calls == calls);
     CHECK(f.statements.replay(f.statements.cookie) == MF_OK);

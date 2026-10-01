@@ -236,3 +236,12 @@ and remarks are discarded; quoted bytes and spaces inside parentheses are
 preserved. The preallocated statement limit bounds joined text. Every card
 is fingerprinted and charged against the provider step limit. Missing cards,
 invalid prefixes and continued remarks outside the selected subset fail.
+
+Ordinary symbols carry a length attribute: machine instruction size, the
+first DC/DS element width (independent of duplication), or an inherited EQU
+first-term length. A second EQU operand overrides it with 0–65,535; its
+value must already be known. `L'SYMBOL` and `L'*` supply absolute terms.
+An omitted SS length uses the first displacement term's attribute, including
+`FIELD+offset` and `FIELD(,base)`. Explicit lengths override it. Forward
+lengths in fixed-size instructions resolve on pass two; layout declarations
+remain strict. Conditional macro lookahead and general attributes remain open.

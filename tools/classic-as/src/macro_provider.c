@@ -185,7 +185,7 @@ static enum mf_status joined(struct mf_macro *m, struct mf_records *records,
             if (used == m->config.max_statement_bytes) return MF_LIMIT;
             m->logical[used++] = c;
             if (!first || i >= operand) {
-                if (c == 0x27) quoted = !quoted;
+                if (c == 0x27 && (quoted || used < 2 || mf_macro_upper(m->logical[used-2]) != 0x4c)) quoted = !quoted;
                 else if (!quoted && c == 0x28) ++level;
                 else if (!quoted && c == 0x29) { if (!level) return MF_SOURCE; --level; }
                 if (c != 0x20) previous = c;
@@ -249,7 +249,7 @@ static size_t equals(struct mf_span s)
     size_t i, level; int quoted;
     level = 0; quoted = 0;
     for (i = 0; i < s.length; ++i) {
-        if (s.data[i] == 0x27) quoted = !quoted;
+        if (s.data[i] == 0x27 && (quoted || !i || mf_macro_upper(s.data[i-1]) != 0x4c)) quoted = !quoted;
         else if (!quoted && s.data[i] == 0x28) ++level;
         else if (!quoted && s.data[i] == 0x29) --level;
         else if (!quoted && !level && s.data[i] == 0x3d) return i;
@@ -537,8 +537,8 @@ static enum mf_status substitute(struct mf_macro *m, struct mf_span s,
         } else {
             mf_octet c; c = mf_macro_upper(s.data[i]);
             if (!quoted && i + 1 < s.length && s.data[i + 1] == 0x27 &&
-                (c == 0x4c || c == 0x4b || c == 0x4e || c == 0x54)) return MF_UNSUPPORTED;
-            if (s.data[i] == 0x27) quoted = !quoted;
+                (c == 0x4b || c == 0x4e || c == 0x54)) return MF_UNSUPPORTED;
+            if (s.data[i] == 0x27 && (quoted || !i || mf_macro_upper(s.data[i-1]) != 0x4c)) quoted = !quoted;
             if (*used == m->config.max_statement_bytes) return MF_LIMIT;
             m->output[(*used)++] = s.data[i++];
         }

@@ -667,6 +667,20 @@ static void character_and_location_literals(void)
     init(&f,"S CSECT\n USING S,12\n L 1,=CL2'ABC'\n END S\n"); f.config.max_literals = 4;
     CHECK(run(&f) == MF_RANGE); clean(&f);
 }
+static void symbol_lengths(void)
+{
+    static const mf_octet expected[18] = {0xd2,7,0xc0,18,0xc0,42,0xd2,6,0xc0,18,0xc0,42,0xd2,7,0xc0,19,0xc0,42};
+    static const mf_octet lengths[6] = {8,7,1,4,6,8};
+    struct fixture f;
+    init(&f,"S CSECT\n USING S,12\n MVC FIELD,OTHER\n MVC FIELD(L'FIELD-1),OTHER\n MVC FIELD+1(,12),OTHER\nFIELD DS 3CL8\nOTHER DS CL8\nALIAS EQU FIELD,7\nINHERIT EQU FIELD+1\nINS L 1,OTHER\nMOVE MVC 0(L'*),0\n DC AL1(L'FIELD),AL1(L'ALIAS),AL1(L'S),AL1(L'INS)\n DC AL1(L'MOVE),AL1(L'INHERIT)\n END S\n");
+    successful(&f); CHECK(!memcmp(f.data[0],expected,sizeof expected));
+    CHECK(!memcmp(f.data[0]+60,lengths,sizeof lengths)); clean(&f);
+    init(&f,"S CSECT\n MVC MISSING,0\n END S\n"); CHECK(run(&f) == MF_UNDEFINED); clean(&f);
+    init(&f,"S CSECT\n MVC FIELD,0\nFIELD DS CL257\n END S\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n DC AL1(L'ABSENT)\n END S\n"); CHECK(run(&f) == MF_UNDEFINED); clean(&f);
+    init(&f,"S CSECT\nA EQU 0,65536\n END S\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
+    init(&f,"S CSECT\nA EQU 0,L'FORWARD\nFORWARD DS CL8\n END S\n"); CHECK(run(&f) == MF_UNDEFINED); clean(&f);
+}
 static void channel_words(void)
 {
     static const mf_octet expected[24] = {0xaa,0,0,0,0,0,0,0,7,0x40,0,6,0,0,0,24,0x1d,0,0x7f,0xff,0,0,0,0};
@@ -682,7 +696,7 @@ static void channel_words(void)
 }
 int main(void)
 {
-    channel_words(); character_and_location_literals(); origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
+    symbol_lengths(); channel_words(); character_and_location_literals(); origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
     printf("assemble: %lu checks passed\n", checks); return 0;
