@@ -1,0 +1,25 @@
+* SPDX-License-Identifier: MIT; original classic buffer-pool release.
+         MACRO
+&N       FREEPOOL &DCB
+         AIF   ('&DCB' EQ '').BAD
+&N       MF$REG 1,&DCB(1)
+         LR    15,1
+         SR    1,1
+         ICM   1,7,21(15)
+         BZ    MF$P&SYSNDX.E
+         TM    23(15),1
+         BNZ   MF$P&SYSNDX.E
+* This selected release accepts doubleword/default buffer alignment.
+         TM    32(15),1
+         BZ    MF$P&SYSNDX.D
+         ABEND 1
+MF$P&SYSNDX.D SR 0,0
+         IC    0,5(,1)
+         MH    0,6(,1)
+         AH    0,=H'8'
+         MVI   23(15),1
+         SVC   10
+MF$P&SYSNDX.E DS 0H
+         MEXIT
+.BAD     MNOTE 8,'FREEPOOL requires one classic DCB address'
+         MEND

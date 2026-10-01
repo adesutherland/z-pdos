@@ -41,15 +41,16 @@ publication semantics.
 | DS | Reservation/alignment for the documented constant types, including `0H`, `0F`, `0D`; no emitted bytes for gaps |
 | CNOP | Executable alignment at an even byte in a 4- or 8-byte boundary, using original repeated BCR 0,0 padding; odd leading byte is explicitly zero |
 
+| Addressability | USING with up to 15 registers at successive 4096-byte bases, register-zero mappings at offset zero, DROP lists or all; symbolic addresses need a matching USING |
+| Visibility and entry | ENTRY, EXTRN, implicit externals for a single-name V constant, and END with an optional section-relative entry |
+| Literals | Selected `=H'number'`, `=F'number'`, `=X'hex'`/`=XLn'hex'`, `=C'text'`/`=CLn'text'`, `=A(expression)` and `=V(name)`, explicit LTORG and implicit END pool |
+| Modes | AMODE 24/31/ANY; RMODE 24/31/ANY; name associates the declaration with its section, including a later section |
+
 CNOP's two operands are previously defined absolute expressions. Its label
 names the first halfword after any leading odd-byte fill, before the no-ops.
 The selected classic section-placement contract supports boundaries 4 and 8;
 larger boundaries and length attributes of CNOP labels fail explicitly.
 The layout follows IBM's [CNOP reference](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=statements-cnop-instruction).
-| Addressability | USING with up to 15 registers at successive 4096-byte bases, register-zero mappings at offset zero, DROP lists or all; symbolic addresses need a matching USING |
-| Visibility and entry | ENTRY, EXTRN, implicit externals for a single-name V constant, and END with an optional section-relative entry |
-| Literals | Selected `=H'number'`, `=F'number'`, `=X'hex'`/`=XLn'hex'`, `=C'text'`/`=CLn'text'`, `=A(expression)` and `=V(name)`, explicit LTORG and implicit END pool |
-| Modes | AMODE 24/31/ANY; RMODE 24/31/ANY; name associates the declaration with its section, including a later section |
 
 Mode declarations do not create a section. A blank name selects the unnamed
 section, which must exist by END; it does not select the current named section.

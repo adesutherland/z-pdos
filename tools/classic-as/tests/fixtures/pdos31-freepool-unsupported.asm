@@ -1,0 +1,3 @@
+BADPOOL  CSECT
+         FREEPOOL
+         END   BADPOOL

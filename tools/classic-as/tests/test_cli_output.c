@@ -62,6 +62,67 @@ static void storage_requests(const char *path)
     CHECK(step < 64 && calls == 4);
     puts("Storage interfaces: four independently expected SVC register requests pass");
 }
+static void pool_release(const char *path)
+{
+    static const unsigned char expected[66] = {
+        0x18,0x1a,0x18,0xf1,0x1b,0x11,0xbf,0x17,0xf0,21,
+        0x47,0x80,0xc0,56,0x91,1,0xf0,23,0x47,0x70,0xc0,56,
+        0x91,1,0xf0,32,0x47,0x80,0xc0,36,0x41,0x10,0,1,0x0a,13,
+        0x1b,0,0x43,0,0x10,5,0x4c,0,0x10,6,0x4a,0,0xc0,64,
+        0x92,1,0xf0,23,0x0a,10,7,0xfe,0,0,0,0,0,0,0,8
+    };
+    unsigned char actual[67], memory[16384]; unsigned long reg[16], address, pool;
+    unsigned mode, step, op, r, second, base, cc, calls, svc, i; size_t pc, got;
+    FILE *input;
+    input = fopen(path,"rb"); CHECK(input != NULL);
+    got = fread(actual,1,sizeof actual,input);
+    CHECK(got == sizeof expected && !memcmp(actual,expected,sizeof expected));
+    CHECK(!ferror(input) && fclose(input) == 0);
+    for (mode = 0; mode < 4; ++mode) {
+        memset(memory,0,sizeof memory); memcpy(memory+4096,actual,got);
+        for (i = 0; i < 16; ++i) reg[i] = 0x8000+i;
+        reg[10] = 0x2000; reg[12] = 4096; pc = 4096; cc = calls = svc = 0;
+        pool = mode == 1 ? 0 : mode == 2 ? 0x2201 : 0x2200;
+        memory[0x2015] = (unsigned char)(pool >> 16);
+        memory[0x2016] = (unsigned char)(pool >> 8); memory[0x2017] = (unsigned char)pool;
+        memory[0x2205] = 3; memory[0x2207] = 24;
+        if (mode == 3) memory[0x2020] = 1;
+        for (step = 0; step < 32; ++step) {
+            CHECK(pc >= 4096 && pc+2 <= 4096+got);
+            op = memory[pc]; r = memory[pc+1] >> 4; second = memory[pc+1] & 15;
+            if (op == 7) { CHECK(r == 15 && second == 14); break; }
+            if (op == 0x18 || op == 0x1b) {
+                reg[r] = op == 0x18 ? reg[second] : (reg[r]-reg[second]) & 0xffffffffUL;
+                if (op == 0x1b) cc = reg[r] ? 2 : 0;
+                pc += 2; continue;
+            }
+            if (op == 0x0a) {
+                ++calls; svc = memory[pc+1];
+                if (mode == 3) { CHECK(svc == 13 && reg[1] == 1); break; }
+                CHECK(mode == 0 && svc == 10 && reg[0] == 80 && reg[1] == 0x2200);
+                CHECK(memory[0x2017] == 1); pc += 2; continue;
+            }
+            CHECK(pc+4 <= 4096+got); base = memory[pc+2] >> 4;
+            address = (base ? reg[base] : 0)+((memory[pc+2]&15)*256UL+memory[pc+3]);
+            if (op == 0x41) reg[r] = address;
+            else if (op == 0x47) {
+                if (r & (8 >> cc)) { pc = (size_t)address; continue; }
+            } else {
+                CHECK(address+3 < sizeof memory);
+                if (op == 0xbf) { CHECK(second == 7); reg[r] = be(memory+address,3); cc = reg[r] ? 2 : 0; }
+                else if (op == 0x91) { i = memory[address] & memory[pc+1]; cc = !i ? 0 : i == memory[pc+1] ? 3 : 1; }
+                else if (op == 0x43) reg[r] = (reg[r]&0xffffff00UL) | memory[address];
+                else if (op == 0x4c) reg[r] *= be(memory+address,2);
+                else if (op == 0x4a) reg[r] += be(memory+address,2);
+                else { CHECK(op == 0x92); memory[address] = memory[pc+1]; }
+            }
+            pc += 4;
+        }
+        CHECK(step < 32 && calls == (mode == 0 || mode == 3 ? 1 : 0));
+        for (i = 2; i < 15; ++i) CHECK(reg[i] == (i == 10 ? 0x2000 : i == 12 ? 4096 : 0x8000+i));
+    }
+    puts("FREEPOOL: independent bytes and pool/null/invalid/alignment request controls pass");
+}
 static void io_templates(const char *path)
 {
     static const unsigned char names[3][8] = {
@@ -226,6 +287,7 @@ int main(int argc, char **argv)
         CHECK(!ferror(input) && fclose(input) == 0); puts("GET: all 20 independent linkage bytes pass"); return 0;
     }
     if (!strcmp(argv[1],"pdos31-storage")) { storage_requests(argv[2]); return 0; }
+    if (!strcmp(argv[1],"pdos31-freepool")) { pool_release(argv[2]); return 0; }
     if (!strcmp(argv[1], "pdos31-maps")) {
         static const unsigned char linked[64] = {0,32,0,64,0,96,0,104,0,112,0,120,1,0,1,128,2,28,2,32,2,36,2,128,0,32,0,16,0,4,0,0,0,8,0,12,0,16,1,8,0,13,0,8,0,8,0,16,0,108,0,20,1,48,0,16,0,0,0,4,0,5,0,6};
         input = fopen(argv[2], "rb"); CHECK(input != NULL);

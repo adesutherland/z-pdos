@@ -235,3 +235,18 @@ R0/R1/R14/R15 are scratch as applicable; addresses and entries must be below
 An original consumer checks all 44 linked bytes, including register setup,
 SVC numbers, entry offsets and address masks; an ECBLIST request is rejected
 without a deck. This does not qualify asynchronous I/O or waiting in a guest.
+
+The original selected FREEPOOL accepts one DCB address (including the retained
+consumer's one-element register sublist), and releases an existing classic
+buffer pool through SVC10 in subpool zero. A zero pointer or its public
+low-bit invalid marker causes no storage request. For doubleword/default
+alignment, it reads the buffer count at pool+5 and buffer length at pool+6,
+computes count times length plus the eight-byte control block, invalidates
+the DCB pointer and supplies R0/R1 to SVC10. Fullword-only alignment is
+explicitly rejected at execution through user ABEND1. R0/R1/R15 are scratch;
+R2–R14 are preserved. The selected layout and extent follow the public
+[GETPOOL description](https://www.bitsavers.org/pdf/ibm/370/OS_VS2/Release_3.8_1978/GC26-3873-0_OS_VS2_MVS_Data_Management_Macro_Instructions_Rel_3.8_Mar79.pdf)
+(printed page 121) and [DCB pool pointer](https://www.ibm.com/docs/en/zos/3.1.0?topic=blocks-data-control-blockbpam-bsam-qsam).
+No access-method implementation was used. All 66 linked bytes and synthetic
+pool/null/invalid/alignment execution controls pass independently; an omitted
+DCB fails without a deck. Actual guest storage release remains unqualified.
