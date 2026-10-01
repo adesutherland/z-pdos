@@ -33,7 +33,7 @@ publication semantics.
 | --- | --- |
 | Sections | Named CSECT, one unnamed CSECT created/restored by an unlabeled CSECT, internal named DSECT layout, implicit unnamed section for ordinary statements; no overlays |
 | Symbols | ASCII names, case-insensitive identifiers, longer internal labels; bounded caller storage |
-| Expressions | Decimal and `X'hex'` integers, symbols, `*`, parentheses, unary signs, addition/subtraction and supported single-target relocation expressions |
+| Expressions | Decimal, `X'hex'` wide integers and signed 32-bit `B'bits'` terms, symbols, `*`, parentheses, unary signs, addition/subtraction and supported single-target relocation expressions |
 | EQU | Values resolvable in the layout pass; forward EQU chains are unsupported |
 | TITLE | One named deck ID up to eight characters; 1..100-character quoted heading. CP037 deck IDs occupy bytes 73..80, space padded, without generated sequence suffixes. Headings/listings are not produced. |
 | PRINT | Validated ON/OFF, GEN/NOGEN, DATA/NODATA controls and null operands; no listing output in this component. Labels and other control forms are rejected. |
@@ -194,3 +194,7 @@ fail explicitly. `DROP` with no operand or a single comma drops every mapping.
 Absolute implicit addresses also use applicable absolute USING mappings.
 Forward USING expressions defer resolution to pass two; unresolved mappings
 never produce a successful deck. Other PUSH/POP state classes remain unsupported.
+
+DC/DS duplication factors also accept parenthesized absolute expressions whose
+layout values are already defined. Forward layout dependencies are rejected.
+Repeated address constants reevaluate the location counter for each element.

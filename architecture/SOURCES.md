@@ -30,3 +30,11 @@ conversion table implements character-code correspondences; it does not use
 the host's locale or translate binary output. Parser and machine names use
 numeric ASCII values so a future EBCDIC C execution environment can preserve
 the same internal representation. That future host remains to be qualified.
+
+- IBM HLASM [duplication factor](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=instruction-subfield-1-duplication-factor)
+  and [address constants](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=constants-address-constantsa-y)
+  define parenthesized absolute factors and advancing location counters. Our
+  selected subset requires layout factors defined in pass one.
+- IBM HLASM Language Reference SC26-4940-09, chapter 2, binary self-defining
+  terms, defines binary digits and the signed 32-bit interpretation. Wider
+  existing hexadecimal expressions remain a separately documented extension.

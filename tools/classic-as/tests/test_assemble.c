@@ -578,6 +578,25 @@ static void address_state(void)
     init(&f,source); CHECK(run(&f) == MF_LIMIT); clean(&f);
     init(&f, "S CSECT\n USING MISSING,0\n L 1,0\n END S\n"); CHECK(run(&f) == MF_UNDEFINED); clean(&f);
 }
+static void declaration_expressions(void)
+{
+    static const mf_octet expected[] = {0xaa,0xaa,0xaa,0xaa,0x58,0x1f,0,0,0,0,0,0};
+    struct fixture f;
+    init(&f,"S CSECT\nSIZE EQU 4\n DC (SIZE)X'AA'\n L 1,0(B'1111',0)\n DS (SIZE-2)H\n END S\n");
+    successful(&f); CHECK(f.sections[0].length == sizeof expected);
+    CHECK(!memcmp(f.data[0],expected,sizeof expected)); CHECK(!f.present[0][8]); clean(&f);
+    init(&f,"S CSECT\nTOP EQU 8\n DC (TOP-*+S)X'00'\n END S\n");
+    successful(&f); CHECK(f.sections[0].length == 8); clean(&f);
+    init(&f," DC (-1)X'00'\n END\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
+    init(&f," DC (MISSING)X'00'\n END\n"); CHECK(run(&f) == MF_UNDEFINED); clean(&f);
+    init(&f," L 1,0(B'12',0)\n END\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
+    init(&f," L 1,0(B'',0)\n END\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
+    init(&f," DC A(B'11111111111111111111111111111111')\n END\n");
+    successful(&f); CHECK(f.data[0][0] == 255 && f.data[0][3] == 255); clean(&f);
+    init(&f," DC A(B'100000000000000000000000000000000')\n END\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
+    init(&f,"S CSECT\nBYTES DC 4AL1(*-BYTES)\n END S\n");
+    successful(&f); CHECK(f.data[0][0] == 0 && f.data[0][1] == 1 && f.data[0][2] == 2 && f.data[0][3] == 3); clean(&f);
+}
 static void source_metadata(void)
 {
     static const mf_octet id[8] = {0xc4,0xc5,0xc3,0xd2,0x40,0x40,0x40,0x40};
@@ -596,7 +615,7 @@ static void source_metadata(void)
 }
 int main(void)
 {
-    address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
+    declaration_expressions(); address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
     printf("assemble: %lu checks passed\n", checks); return 0;

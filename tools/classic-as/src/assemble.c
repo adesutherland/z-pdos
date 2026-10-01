@@ -248,19 +248,27 @@ static enum mf_status atom(struct parser *p, struct value *out)
         while (p->at < p->text.length && p->text.data[p->at] >= 0x30 && p->text.data[p->at] <= 0x39) ++p->at;
         s = subspan(p->text, start, p->at - start);
         status = mf_u64_parse(s, &v.magnitude, &v.negative);
-    } else if (upper(c) == 0x58 && p->at < p->text.length && p->text.data[p->at] == 0x27) {
+    } else if ((upper(c) == 0x58 || upper(c) == 0x42) && p->at < p->text.length && p->text.data[p->at] == 0x27) {
+        unsigned shift; shift = upper(c) == 0x42 ? 1 : 4;
         ++p->at; start = p->at;
         while (p->at < p->text.length && p->text.data[p->at] != 0x27) {
             c = upper(p->text.data[p->at++]);
             if (c >= 0x30 && c <= 0x39) i = (size_t)(c - 0x30);
             else if (c >= 0x41 && c <= 0x46) i = (size_t)(c - 0x41 + 10);
             else { status = MF_SOURCE; break; }
-            if (v.magnitude.hi > 0x0fffffffUL) { status = MF_RANGE; break; }
-            v.magnitude.hi = ((v.magnitude.hi << 4) | (v.magnitude.lo >> 28)) & U32MAX;
-            v.magnitude.lo = ((v.magnitude.lo << 4) | (mf_u32)i) & U32MAX;
+            if (i >= ((size_t)1 << shift)) { status = MF_SOURCE; break; }
+            if (v.magnitude.hi > (U32MAX >> shift)) { status = MF_RANGE; break; }
+            v.magnitude.hi = ((v.magnitude.hi << shift) | (v.magnitude.lo >> (32 - shift))) & U32MAX;
+            v.magnitude.lo = ((v.magnitude.lo << shift) | (mf_u32)i) & U32MAX;
         }
         if (status == MF_OK && (p->at == start || p->at == p->text.length)) status = MF_SOURCE;
         if (status == MF_OK) ++p->at;
+        if (status == MF_OK && shift == 1) {
+            if (v.magnitude.hi) status = MF_RANGE;
+            else if (v.magnitude.lo & 0x80000000UL) {
+                v.magnitude.lo = ((~v.magnitude.lo) + 1) & U32MAX; v.negative = 1;
+            }
+        }
     } else if (name_start(c)) {
         start = p->at - 1;
         while (p->at < p->text.length && name_char(p->text.data[p->at])) ++p->at;
@@ -739,10 +747,23 @@ static int hex_digit(mf_octet c)
 static enum mf_status constant_parse(struct mf_as *as, struct mf_span s, int reserve,
     struct constant *c)
 {
-    size_t at, start, i; mf_u32 n; enum mf_status status; unsigned type; mf_octet byte;
+    size_t at, start, i, depth; mf_u32 n; enum mf_status status; unsigned type; mf_octet byte;
     memset(c, 0, sizeof *c); s = trim(s); at = 0; c->repeat = 1;
-    while (at < s.length && s.data[at] >= 0x30 && s.data[at] <= 0x39) ++at;
-    if (at) { status = number(as, subspan(s, 0, at), U32MAX, &c->repeat); if (status != MF_OK) return status; }
+    if (s.length && s.data[0] == 0x28) {
+        int quoted; quoted = 0; depth = 0;
+        do {
+            byte = s.data[at++];
+            if (byte == 0x27) quoted = !quoted;
+            else if (!quoted && byte == 0x28) ++depth;
+            else if (!quoted && byte == 0x29) --depth;
+        } while (at < s.length && depth);
+        if (depth || quoted) return MF_SOURCE;
+        status = number(as, subspan(s, 0, at), U32MAX, &c->repeat);
+        if (status != MF_OK) return status;
+    } else {
+        while (at < s.length && s.data[at] >= 0x30 && s.data[at] <= 0x39) ++at;
+        if (at) { status = number(as, subspan(s, 0, at), U32MAX, &c->repeat); if (status != MF_OK) return status; }
+    }
     if (at == s.length) return MF_SOURCE;
     type = upper(s.data[at++]); c->type = type;
     if (type == 0x41 && at < s.length && upper(s.data[at]) == 0x44) { ++at; c->type = 0x44; }
@@ -844,6 +865,11 @@ static enum mf_status emit_constant(struct mf_as *as, const struct constant *c)
             return advance(as, c->width * c->repeat, NULL);
         }
         for (repetition = 0; repetition < c->repeat; ++repetition) {
+            if (repetition && c->type != 0x56) {
+                status = evaluate(as, c->value, &v); if (status != MF_OK) return status;
+                status = numeric_bytes(v, c->width, c->type == 0x48 || c->type == 0x46, bytes);
+                if (status != MF_OK) return status;
+            }
             offset = as->section_state[as->current].position;
             status = advance(as, c->width, bytes); if (status != MF_OK) return status;
             if (v.coefficient) {

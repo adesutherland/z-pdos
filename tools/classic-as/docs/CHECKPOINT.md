@@ -213,3 +213,12 @@ selection, DROP-all and restored mappings. Missing forward definitions, stack
 underflow and capacity exhaustion fail. All 84 integrated host tests pass.
 The six raw PDOS modules advance to ISA, duplication, OS service and macro
 prototype gaps; no complete kernel or guest result is claimed.
+
+## Declaration expression checkpoint
+
+Parenthesized absolute DC/DS duplication factors and signed 32-bit binary
+self-defining terms are implemented. PDOS's source-defined PSA reservation
+now advances past its duplication expression. Independent data/instruction
+bytes cover expressions, binary masks, signed boundaries and incrementing
+location-counter address constants. Undefined layout factors, negative sizes
+and malformed binary terms fail. Forward duplication dependencies remain open.
