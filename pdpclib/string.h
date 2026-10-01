@@ -13,9 +13,14 @@
 #ifndef __STRING_INCLUDED
 #define __STRING_INCLUDED
 
-#if defined(__PDPCLIB_DLL) && !defined(__WATCOMC__) \
+#if !defined(__PDPCLIB_HEADFUNC) \
+    && defined(__PDPCLIB_DLL) && !defined(__WATCOMC__) \
     && !defined(__NODECLSPEC__)
+#ifdef __SCC__
+#define __PDPCLIB_HEADFUNC __dllexport
+#else
 #define __PDPCLIB_HEADFUNC __declspec(dllexport)
+#endif
 #endif
 
 #ifndef __PDPCLIB_HEADFUNC
@@ -50,7 +55,9 @@ typedef unsigned int size_t;
 #endif
 #endif
 
+#ifndef NULL
 #define NULL ((void *)0)
+#endif
 __PDPCLIB_HEADFUNC void *memcpy(void *s1, const void *s2, size_t n);
 __PDPCLIB_HEADFUNC void *memmove(void *s1, const void *s2, size_t n);
 __PDPCLIB_HEADFUNC char *strcpy(char *s1, const char *s2);

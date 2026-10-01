@@ -13,7 +13,7 @@
 #include "stddef.h"
 
 #if !defined(__MVS__) && !defined(__CMS__) && !defined(__VSE__) \
-    && !defined(__MF32__)
+    && !defined(__MF32__) && !defined(__EBCDIC__)
 static unsigned short __isbufR[257] = {
     0x0000U, /* EOF */
     0x0004U, /* NUL */
@@ -1575,6 +1575,15 @@ static short __toupR[257] = {
 unsigned short *__isbuf = &__isbufR[1];
 short *__tolow = &__tolowR[1];
 short *__toup = &__toupR[1];
+
+#ifdef __HACK_RELOC
+void __hackrel_ctype(void)
+{
+    __isbuf = &__isbufR[1];
+    __tolow = &__tolowR[1];
+    __toup = &__toupR[1];
+}
+#endif
 
 __PDPCLIB_API__ int isalnum(int c)
 {

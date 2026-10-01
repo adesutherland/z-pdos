@@ -561,6 +561,18 @@ ZZ&SYSNDX.X DS 0H
 * LOC=ANY storage. Fortunately those flags are ignored for S/370.
 *
          CSECT ,
+*
+* Switch temporarily to this other CSECT, so that we can
+* set AMODE/RMODE upfront
+*
+         AIF   ('&ZSYS' EQ 'S370').NOAM  AMODE on z/OS so no warning
+@@PCLST  AMODE ANY
+@@PCLST  RMODE ANY
+.NOAM    ANOP  ,        S/370 doesn't have AMODE/RMODE
+@@PCLST  CSECT ,
+*
+* Back to normal
+         CSECT ,
          PRINT GEN,ON
          SPACE 1
 *-----------------------ASSEMBLY OPTIONS------------------------------*
@@ -3800,6 +3812,7 @@ DYNALDLN EQU   *-DYNALWRK     LENGTH OF DYNAMIC STORAGE
 *                                                                    *
 **********************************************************************
          PUSH  USING
+         DROP  ,
          ENTRY @@GETPFX
 @@GETPFX DS    0H
          SAVE  (14,12),,@@GETPFX
@@ -4158,6 +4171,8 @@ RETURNTS DS    0H
 *  they should really be saying is 24, 31 and user-defined.          *
 *                                                                    *
 **********************************************************************
+         PUSH  USING
+         DROP  ,
          ENTRY @@GETAM
 @@GETAM  DS    0H
          SAVE  (14,12),,@@GETAM
@@ -4180,6 +4195,7 @@ GAIS31   LA    R15,31
 RETURNGA DS    0H
          RETURN (14,12),RC=(15)
          LTORG ,
+         POP   USING
          SPACE 2
 ***********************************************************************
 *                                                                     *
@@ -4563,10 +4579,11 @@ NXT64    DS    0H
 * SVCRL - do a real SVC                                              *
 *                                                                    *
 **********************************************************************
-         DS    0H
-         USING *,R14
+         PUSH  USING
+         DROP  ,
          ENTRY @@SVCRL
 @@SVCRL  DS    0H
+         USING @@SVCRL,R14
          STM   R14,R12,12(R13)
          LR    R14,R15
          L     R12,0(,R1)
@@ -4595,6 +4612,7 @@ SVC2     DS    0H
 *
          LTORG
          DROP  R14
+         POP   USING
 *
 *
 *
@@ -4728,8 +4746,15 @@ COMM3164 DS    0H
          LA    R2,0
          BSM   R2,0
          ST    R2,NEEDBOA this will be suitable for ORing
+*
+*
+         AIF   ('&ZSYS' EQ 'S370').NODSNS3  Only S/380+90 needs a stub
+
          L     R3,=A(DSNCBOA) the DSN check stub needs this too
          ST    R2,0(,R3)
+.NODSNS3 ANOP  ,                  Only S/380 etc needs a stub
+*
+*
          OI    NEEDBF,NEEDBANY  set flag to say we need BSM switching
          B     RETURNSU
 *

@@ -13,7 +13,7 @@ main: procedure = .int
     return 2
   end
   profile = args.1; work = args.2
-  valid = profile = "mvs38-s370-24" | profile = "tso31-lean" | profile = "tso-zos15-24" | profile = "pdos390-esa" | profile = "pdos-zarch-reference"
+  valid = profile = "mvs38-s370-24" | profile = "tso31-lean" | profile = "tso-zos15-24" | profile = "pdos390-esa" | profile = "pdos-zarch"
   call require valid, "known explicit profile"
   call require left(work, 6) = "build/" & length(work) > 6 & pos("..", work) = 0, "new owned directory under build/"
   address system "test ! -e " || shellquote(work)
@@ -23,7 +23,7 @@ main: procedure = .int
   hashfile = work || "/source.sha256"
   address system "shasum -a 256 pdpclib/mvssupa.asm > " || shellquote(hashfile)
   call require rc = 0, "hash maintained native source"
-  call require word(readfile(hashfile), 1) = "f66fa3f287847b45172f8049953ced0429fa1e34e7e842d13b1b7413d5efde45", "reviewed maintained native source"
+  call require word(readfile(hashfile), 1) = "5c8fdd3f7bacf71eb4689c96f8ecdb58bb0e5a0ecef66a395df1d65e6b1b972c", "reviewed maintained native source"
   address system "cmake -E copy_directory pdpclib " || shellquote(work || "/pdpclib")
   call require rc = 0, "copy maintained library"
   if profile = "tso31-lean" then patch = "omit-prefix-parser.patch"

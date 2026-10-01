@@ -13,9 +13,14 @@
 #ifndef __TIME_INCLUDED
 #define __TIME_INCLUDED
 
-#if defined(__PDPCLIB_DLL) && !defined(__WATCOMC__) \
+#if !defined(__PDPCLIB_HEADFUNC) \
+    && defined(__PDPCLIB_DLL) && !defined(__WATCOMC__) \
     && !defined(__NODECLSPEC__)
+#ifdef __SCC__
+#define __PDPCLIB_HEADFUNC __dllexport
+#else
 #define __PDPCLIB_HEADFUNC __declspec(dllexport)
+#endif
 #endif
 
 #ifndef __PDPCLIB_HEADFUNC
@@ -23,7 +28,9 @@
 #endif
 
 #define CLOCKS_PER_SEC 1000
+#ifndef NULL
 #define NULL ((void *)0)
+#endif
 
 typedef unsigned int clock_t;
 
@@ -51,7 +58,9 @@ typedef unsigned int size_t;
 #endif
 #endif
 
+#ifndef _UCRT
 typedef unsigned long time_t;
+#endif
 
 struct tm
 {
@@ -65,6 +74,45 @@ struct tm
     int tm_yday;
     int tm_isdst;
 };
+
+#ifdef _UCRT
+/* 32-bit time_t has too small range
+ * and there is going to be the 2038 problem,
+ * so UCRT moved to 64-bit time_t (internally __time64_t).
+ * _USE_32BIT_TIME_T is allowed as temporary solution
+ * to avoid 64-bit time_t on 32-bit platforms.
+ */
+#ifndef _USE_32BIT_TIME_T
+#ifndef __int64
+#ifndef __NO_LONG_LONG
+#define __int64 long long
+#else
+#define __int64 long
+#endif
+#endif /* __int64 */
+typedef unsigned __int64 __time64_t;
+typedef __time64_t time_t;
+ 
+#define time _time64
+#define difftime _difftime64
+#define mktime _mktime64
+#define ctime _ctime64
+#define gmtime _gmtime64
+#define localtime _localtime64
+#else
+#ifdef __64BIT__
+#error _USE_32BIT_TIME_T is not allowed on 64-bit platforms.
+#endif
+typedef unsigned long time_t;
+
+#define time _time32
+#define difftime _difftime32
+#define mktime _mktime32
+#define ctime _ctime32
+#define gmtime _gmtime32
+#define localtime _localtime32
+#endif /* _USE_32BIT_TIME_T */
+#endif /* _UCRT */
 
 __PDPCLIB_HEADFUNC time_t time(time_t *timer);
 __PDPCLIB_HEADFUNC clock_t clock(void);

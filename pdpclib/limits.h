@@ -62,7 +62,7 @@
 
 #if (defined(__64BIT__) && defined(__gnu_linux__)) || defined(__LONG64__)
 #define LONG_MAX 0x7fffffffffffffffL
-#define ULONG_MAX ((unsigned short)0xffffffffffffffffUL)
+#define ULONG_MAX 0xffffffffffffffffUL
 #else
 #define LONG_MAX 2147483647L
 #define ULONG_MAX 4294967295UL

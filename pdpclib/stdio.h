@@ -16,9 +16,14 @@
 /* Perhaps should copy these definitions in instead */
 #include <stdarg.h>
 
-#if defined(__PDPCLIB_DLL) && !defined(__WATCOMC__) \
+#if !defined(__PDPCLIB_HEADFUNC) \
+    && defined(__PDPCLIB_DLL) && !defined(__WATCOMC__) \
     && !defined(__NODECLSPEC__)
+#ifdef __SCC__
+#define __PDPCLIB_HEADFUNC __dllexport
+#else
 #define __PDPCLIB_HEADFUNC __declspec(dllexport)
+#endif
 #endif
 
 #ifndef __PDPCLIB_HEADFUNC
@@ -171,7 +176,9 @@ typedef struct
 
 typedef unsigned long fpos_t;
 
+#ifndef NULL
 #define NULL ((void *)0)
+#endif
 #define FILENAME_MAX 260
 
 #ifdef __CC64OS__
@@ -274,18 +281,29 @@ typedef struct
 } __DUMMYFILE;
 
 #if !defined(__PDPCLIB_DLL) && !defined(__CC64OS__)
-#if !defined(__SUBC__) && !defined(__NODECLSPEC__) && !defined(__CC64__) \
+#ifdef _UCRT
+
+__PDPCLIB_HEADFUNC __DUMMYFILE *__acrt_iob_func (unsigned index);
+
+#elif !defined(__SUBC__) && !defined(__NODECLSPEC__) && !defined(__CC64__) \
     && !defined(__M68K__) \
+    && !defined(__MF32__) \
     && !defined(__W64SHELL__) && !defined(__W32EMUL__) \
     && !defined(__GENSHELL__) && !defined(__ARM__) \
     && !(defined(__WIN32__) && defined(__64BIT__))
 
+#ifdef __SCC__
+__dllimport __DUMMYFILE _iob[3];
+#else
 __declspec(dllimport) __DUMMYFILE _iob[3];
+#endif
 
 #else
 
 #if defined(__CC64__) || defined(__W64SHELL__) || defined(__ARM__) \
     || defined(__M68K__) \
+    || defined(__MF32__) \
+    || (defined(__GENSHELL__) && defined(__64BIT__)) \
     || (defined(__WIN32__) && defined(__64BIT__))
 extern __DUMMYFILE *__iob_func(void);
 #elif defined(__64BIT__)
@@ -297,11 +315,20 @@ extern __DUMMYFILE *_imp___iob;
 #endif
 #endif
 
-#if !defined(__SUBC__) && !defined(__NODECLSPEC__) && \
+#if defined(_UCRT) && !defined(__PDPCLIB_DLL)
+#define stdin ((FILE *) (__acrt_iob_func (0)))
+#define stdout ((FILE *) (__acrt_iob_func (1)))
+#define stderr ((FILE *) (__acrt_iob_func (2)))
+#elif defined(_UCRT)
+#define stdin ((FILE *) &(_iob[0]))
+#define stdout ((FILE *) &(_iob[1]))
+#define stderr ((FILE *) &(_iob[2]))
+#elif !defined(__SUBC__) && !defined(__NODECLSPEC__) && \
     !(defined(__CC64__) && !defined(__PDPCLIB_DLL)) && \
     !defined(__CC64OS__) && !defined(__W64SHELL__) && \
     !defined(__W32EMUL__) && !defined(__GENSHELL__) && \
     !defined(__M68K__) && \
+    !defined(__MF32__) && \
     !defined(__ARM__) && \
     !(defined(__WIN32__) && defined(__64BIT__))
 #define stdin ((FILE *) &(_iob[0]))
@@ -311,6 +338,8 @@ extern __DUMMYFILE *_imp___iob;
 
 #if defined(__CC64__) || defined(__W64SHELL__) || defined(__ARM__) \
     || defined(__M68K__) \
+    || defined(__MF32__) \
+    || (defined(__GENSHELL__) && defined(__64BIT__)) \
     || (defined(__WIN32__) && defined(__64BIT__))
 #if defined(__CC64OS__) || defined(__W64SHELL__) || defined(__ARM__)
 extern __PDPCLIB_HEADFUNC __DUMMYFILE _iob[3];
@@ -347,7 +376,9 @@ extern __PDPCLIB_HEADFUNC __DUMMYFILE *__iob_func(void);
 extern FILE *__stdpch;
 #endif
 
+#ifndef _UCRT
 __PDPCLIB_HEADFUNC int printf(const char *format, ...);
+#endif
 __PDPCLIB_HEADFUNC FILE *fopen(const char *filename, const char *mode);
 __PDPCLIB_HEADFUNC int fclose(FILE *stream);
 __PDPCLIB_HEADFUNC size_t fread(void *ptr, size_t size, size_t nmemb,
@@ -356,13 +387,17 @@ __PDPCLIB_HEADFUNC size_t fwrite(const void *ptr, size_t size, size_t nmemb,
     FILE *stream);
 __PDPCLIB_HEADFUNC int fputc(int c, FILE *stream);
 __PDPCLIB_HEADFUNC int fputs(const char *s, FILE *stream);
+#ifndef _UCRT
 __PDPCLIB_HEADFUNC int fprintf(FILE *stream, const char *format, ...);
 __PDPCLIB_HEADFUNC int vfprintf(FILE *stream, const char *format, va_list arg);
 __PDPCLIB_HEADFUNC int vprintf(const char *format, va_list arg);
+#endif
 __PDPCLIB_HEADFUNC int remove(const char *filename);
 __PDPCLIB_HEADFUNC int rename(const char *old, const char *newnam);
+#ifndef _UCRT
 __PDPCLIB_HEADFUNC int sprintf(char *s, const char *format, ...);
 __PDPCLIB_HEADFUNC int vsprintf(char *s, const char *format, va_list arg);
+#endif
 __PDPCLIB_HEADFUNC char *fgets(char *s, int n, FILE *stream);
 __PDPCLIB_HEADFUNC int ungetc(int c, FILE *stream);
 __PDPCLIB_HEADFUNC int fgetc(FILE *stream);
@@ -380,11 +415,92 @@ __PDPCLIB_HEADFUNC FILE *freopen(const char *filename, const char *mode,
 __PDPCLIB_HEADFUNC int fflush(FILE *stream);
 __PDPCLIB_HEADFUNC char *tmpnam(char *s);
 __PDPCLIB_HEADFUNC FILE *tmpfile(void);
+#ifndef _UCRT
 __PDPCLIB_HEADFUNC int fscanf(FILE *stream, const char *format, ...);
 __PDPCLIB_HEADFUNC int scanf(const char *format, ...);
 __PDPCLIB_HEADFUNC int sscanf(const char *s, const char *format, ...);
+#endif
 __PDPCLIB_HEADFUNC char *gets(char *s);
 __PDPCLIB_HEADFUNC int puts(const char *s);
+
+#ifdef _UCRT
+#ifndef _locale_t
+#define _locale_t void *
+#endif
+#ifndef __int64
+#ifndef __NO_LONG_LONG
+#define __int64 long long
+#else
+#define __int64 long
+#endif
+#endif
+
+/* With UCRT there are fewer exported functions
+ * and instead wrapper functions are used
+ * to call fewer more versatile functions
+ * to implement the rest.
+ */
+int printf(const char *format, ...);
+int fprintf(FILE *stream, const char *format, ...);
+int vfprintf(FILE *stream, const char *format, va_list arg);
+int vprintf(const char *format, va_list arg);
+
+int sprintf(char *s, const char *format, ...);
+int vsprintf(char *s, const char *format, va_list arg);
+
+int fscanf(FILE *stream, const char *format, ...);
+int scanf(const char *format, ...);
+int sscanf(const char *s, const char *format, ...);
+
+/* Original Public Domain code copied
+ * from public domain parts of mingw-w64
+ * and then modified, still public domain.
+ */
+__PDPCLIB_HEADFUNC int __stdio_common_vfprintf (unsigned __int64 options,
+                                                FILE *stream,
+                                                const char *format,
+                                                _locale_t locale,
+                                                va_list arg);
+__PDPCLIB_HEADFUNC int __stdio_common_vsprintf (unsigned __int64 options,
+                                                char *s,
+                                                size_t len,
+                                                const char *format,
+                                                _locale_t locale,
+                                                va_list arg);
+__PDPCLIB_HEADFUNC int __stdio_common_vfscanf (unsigned __int64 options,
+                                               FILE *stream,
+                                               const char *format,
+                                               _locale_t locale,
+                                               va_list arg);
+__PDPCLIB_HEADFUNC int __stdio_common_vsscanf (unsigned __int64 options,
+                                               const char *s,
+                                               size_t len,
+                                               const char *format,
+                                               _locale_t locale,
+                                               va_list arg);
+
+unsigned __int64 *__local_stdio_printf_options (void);
+unsigned __int64 *__local_stdio_scanf_options (void);
+
+#define _CRT_INTERNAL_PRINTF_LEGACY_VSPRINTF_NULL_TERMINATION  0x0001ULL
+#define _CRT_INTERNAL_PRINTF_STANDARD_SNPRINTF_BEHAVIOR        0x0002ULL
+#define _CRT_INTERNAL_PRINTF_LEGACY_WIDE_SPECIFIERS            0x0004ULL
+#define _CRT_INTERNAL_PRINTF_LEGACY_MSVCRT_COMPATIBILITY       0x0008ULL
+#define _CRT_INTERNAL_PRINTF_LEGACY_THREE_DIGIT_EXPONENTS      0x0010ULL
+#define _CRT_INTERNAL_PRINTF_STANDARD_ROUNDING                 0x0020ULL
+
+#define _CRT_INTERNAL_SCANF_SECURECRT                    0x0001ULL
+#define _CRT_INTERNAL_SCANF_LEGACY_WIDE_SPECIFIERS       0x0002ULL
+#define _CRT_INTERNAL_SCANF_LEGACY_MSVCRT_COMPATIBILITY  0x0004ULL
+
+#ifndef _CRT_INTERNAL_LOCAL_PRINTF_OPTIONS
+#define _CRT_INTERNAL_LOCAL_PRINTF_OPTIONS (*__local_stdio_printf_options ())
+#endif
+
+#ifndef _CRT_INTERNAL_LOCAL_SCANF_OPTIONS
+#define _CRT_INTERNAL_LOCAL_SCANF_OPTIONS (*__local_stdio_scanf_options ())
+#endif
+#endif /* _UCRT */
 
 #ifndef __POWERC
 __PDPCLIB_HEADFUNC int getchar(void);
@@ -462,6 +578,9 @@ __PDPCLIB_HEADFUNC int ferror(FILE *stream);
 #define putchar __os->Xputchar
 #define getchar __os->Xgetchar
 #define tmpfile __os->Xtmpfile
+#define difftime __os->Xdifftime
+#define fsetpos __os->Xfsetpos
+#define fgetpos __os->Xfgetpos
 #endif
 
 #endif /* __STDIO_INCLUDED */

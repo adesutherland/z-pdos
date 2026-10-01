@@ -85,6 +85,12 @@
 extern int __consdn;
 #endif
 
+/* PDOS386 is a misnomer and we need to eliminate it in favor
+   of PDOSGENOS */
+#if defined(__PDOSGENOS__)
+#define __PDOS386__ 1
+#endif
+
 #if defined(__PDOS386__)
 #include <pos.h>
 #endif
@@ -123,6 +129,12 @@ extern int CTYP __remove(const char *filename);
 extern int CTYP __rename(const char *old, const char *newnam);
 extern int CTYP __devginfo(int handle, unsigned int *info);
 extern void CTYP __devsinfo(int handle, unsigned int info);
+#endif
+
+
+#ifdef CONV_CHARSET
+void __fhostchsmem (void *mem, size_t size);
+void __thostchsmem (void *mem, size_t size);
 #endif
 
 
@@ -179,15 +191,25 @@ extern int __rename(const char *old, const char *newnam);
 #define O_RDONLY 0x0
 #define O_WRONLY 0x1
 #define O_RDWR   0x2
+
+#ifdef __MACOS__
+#define O_CREAT 0x200
+#define O_TRUNC 0x400
+#else
 #define O_CREAT  0x40
 #define O_TRUNC  0x200
+#endif
 
 /* reserve 8000 0000 as a flag to indicate extension */
 /* make sure O_TEXT hasn't been set to 0 by undefining */
 /* and next available bit counting down is thus 4000 0000 */
 
 #undef O_TEXT
+#ifdef __MACOS__
+#define O_TEXT 0
+#else
 #define O_TEXT 0x40000000
+#endif
 
 static int open(const char *a, int b, int *c)
 {
@@ -211,6 +233,26 @@ static int open(const char *a, int b, int *c)
     {
         ret = __open(a, O_RDWR /*O_RDONLY*/ | oflag, 0);
     }
+#ifdef __MACOS__
+    /* not sure why 2 is an error */
+/*
+as per:
+https://stackoverflow.com/questions/77399450/trouble-opening-and-reading-file-in-arm64-assembly-on-apple-mac-m1-cpu#77401061
+my open assembler is insufficient, I need to check the
+carry flag for an error, as they do here:
+otool -t -v /usr/lib/system/libsystem_kernel.dylib
+
+Not sure why other *nix targets aren't having an issue.
+
+Now fixed in m64supa.asm
+*/
+#if 0
+    if (ret == 2)
+    {
+        ret = -2;
+    }
+#endif
+#endif
     if (ret < 0)
     {
         *c = 1;
@@ -288,6 +330,10 @@ static int    spareSpot;
 static int    err;
 static int    inreopen = 0;
 
+#define TF_MAX 26
+static int tmp_files[TF_MAX];
+static char upperalpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
 extern int __runnum;
 
 #if defined(__VSE__)
@@ -315,7 +361,20 @@ __PDPCLIB_API__ FILE **__gterr(void)
     || defined(__GENSHELL__) \
     || (defined(__ARM__) && defined(__WIN32__))
 
+#ifdef _UCRT
+__DUMMYFILE _iob[3];
+
+__PDPCLIB_API__ __DUMMYFILE *__acrt_iob_func (unsigned int index)
+{
+    return _iob + index;
+}
+#else /* _UCRT */
+
+#if defined(__NODECLSPEC__)
+__PDPCLIB_API__ __DUMMYFILE _imp___iob[3];
+#else
 __PDPCLIB_API__ __DUMMYFILE _iob[3];
+#endif
 
 /* Note that all compilers should probably be using this
    instead of directly accessing the _iob. cc64 was the
@@ -325,12 +384,14 @@ __PDPCLIB_API__ __DUMMYFILE _iob[3];
    dodged a bullet there */
 #if defined(__64BIT__) \
     || defined(__M68K__) \
+    || defined(__MF32__) \
     || (defined(__ARM__) && (defined(__GENSHELL__) || defined(__WIN32__)))
 __PDPCLIB_API__ __DUMMYFILE *__iob_func(void)
 {
     return (_iob);
 }
 #endif
+#endif /* _UCRT */
 #endif
 
 #if defined(__W32EMUL__) || defined(__W32DLL__) || defined(__W64SHELL__) \
@@ -342,6 +403,17 @@ static __DUMMYFILE _iob[3];
 #endif
 __DUMMYFILE *_imp___iob = _iob;
 #endif
+
+
+#ifdef __HACK_RELOC
+void __hackrel_stdio(void)
+{
+    __stdin_ptr = &permFiles[0];
+    __stdout_ptr = &permFiles[1];
+    __stderr_ptr = &permFiles[2];
+}
+#endif
+
 
 static void dblcvt(double num, int cnvtype, int nwidth,
                    int nprecision, char *result);
@@ -403,7 +475,22 @@ static char *int_strtok(char *s1, const char *s2);
 #define strtok int_strtok
 #endif
 
+#ifdef _UCRT
+__PDPCLIB_API__ int __stdio_common_vfprintf (unsigned __int64 options,
+                                             FILE *stream,
+                                             const char *format,
+                                             _locale_t locale,
+                                             va_list arg)
+{
+    int ret;
 
+    stream = __INTFILE(stream);
+
+    stream->quickText = 0;
+    ret = vvprintf(format, arg, stream, NULL);
+    return (ret);
+}
+#else
 __PDPCLIB_API__ int printf(const char *format, ...)
 {
     va_list arg;
@@ -446,6 +533,7 @@ __PDPCLIB_API__ int vprintf(const char *format, va_list arg)
     ret = vfprintf(stdout, format, arg);
     return (ret);
 }
+#endif /* _UCRT */
 
 __PDPCLIB_API__ FILE *fopen(const char *filename, const char *mode)
 {
@@ -558,6 +646,7 @@ static void fopen2(void)
     const char *p = fnm;
     const char *q;
 
+    newfnm[0] = '\0';
     /* leading : mean go up one level, not that it is
        a device */
     devfile = 0;
@@ -602,6 +691,14 @@ static void fopen2(void)
     if (!err)
     {
         strcpy(myfile->modeStr, modus);
+#ifdef CONV_CHARSET
+        if (newfnm[0] == '\0')
+        {
+            strncpy(newfnm, fnm, sizeof newfnm);
+            newfnm[sizeof newfnm - 1] = '\0';
+        }
+        __thostchsmem(newfnm, strlen(newfnm));
+#endif
         osfopen();
         if (!err)
         {
@@ -677,7 +774,6 @@ static void fopen3(void)
         myfile->eofInd = 0;
         myfile->istemp = 0;
         myfile->ungetCh = -1;
-        myfile->update = 0;
         myfile->isopen = 1;
         myfile->runnum = __runnum;
 #if !defined(__MVS__) && !defined(__CMS__)
@@ -851,6 +947,19 @@ static void checkMode(void)
     else
     {
         myfile->textMode = 1;
+    }
+    if ((modeType == 10)
+        || (modeType == 11)
+        || (modeType == 12)
+        || (modeType == 7)
+        || (modeType == 8)
+        || (modeType == 9))
+    {
+        myfile->update = 1;
+    }
+    else
+    {
+        myfile->update = 0;
     }
     return;
 }
@@ -1252,6 +1361,11 @@ static void osfopen(void)
         errno = 2;
         return;
     }
+#ifdef CONV_CHARSET
+    /* currently we don't need to put the old filename back, so we
+       don't save and restore that. */
+    fnm = newfnm;
+#endif
     if (mode)
     {
 #if defined(__gnu_linux__) || (defined(__ARM__) && !defined(__WIN32__))
@@ -1718,7 +1832,8 @@ static void osfopen(void)
     mode &= 0x03; /* only interested in the simple mode now */
 
 #if !defined(__PDOS390__)
-    if (myfile->update)
+    /* w+b falls back to a write-only native handle, not an update handle. */
+    if (myfile->update && modeType != 11)
     {
         unsigned int data[7];
         unsigned int parm;
@@ -2070,9 +2185,13 @@ __PDPCLIB_API__ int fclose(FILE *stream)
     if (!stream->permfile && !inreopen)
     {
 #if !defined(__MVS__) && !defined(__CMS__)
-        if (stream->istemp)
+        if (stream->istemp != 0)
         {
-            remove("ZZZZZZZA.$$$");
+            static char fnm[] = "YYYYYYYA.$$$";
+
+            fnm[7] = upperalpha[stream->istemp];
+            tmp_files[stream->istemp] = 0;
+            remove(fnm);
         }
 #endif
         __userFiles[stream->intFno] = NULL;
@@ -2764,6 +2883,13 @@ static void iread(FILE *stream, void *ptr, size_t toread, size_t *actualRead)
             /* Linux is returning DEL for backspace instead of ^H so we
                convert to ^H now, otherwise mfemul doesn't receive the
                character */
+            /* The same thing likely happens when using netcat on MacOS with
+               nc -c localhost (port)
+               after having run:
+               ctty com1:
+               on the MSDOS system running in qemu. So maybe change the
+               above to 1 (unconditional). But I need to use telnet to
+               test properly. */
             for (x = 0; x < *actualRead; x++)
             {
                 if (p[x] == 0x7f)
@@ -2776,6 +2902,8 @@ static void iread(FILE *stream, void *ptr, size_t toread, size_t *actualRead)
 #if !defined(__gnu_linux__) && !(defined(__ARM__) && !defined(__WIN32__))
             if ((toread == 1) && (*actualRead == 1))
             {
+                static int flood = 0; /* have we detected a flood of NULs? */
+
                 /* user pressing ESC will always be 1 character on MSDOS,
                    but not PDOS */
                 if (p[0] == 0x1b)
@@ -2788,7 +2916,11 @@ static void iread(FILE *stream, void *ptr, size_t toread, size_t *actualRead)
 #else
                     genuine = 1;
 #endif
-                    if (!genuine)
+                    /* don't double escapes if we have detected a flood
+                       situation as this is a remote terminal and we
+                       can't detect the difference between the user
+                       pressing a key and a genuine escape sequence. */
+                    if (!genuine && !flood)
                     {
                         pending[0] = 0x1b;
                         numpending = 1;
@@ -2801,10 +2933,32 @@ static void iread(FILE *stream, void *ptr, size_t toread, size_t *actualRead)
                 /* if it is an extended character, convert to ANSI escapes */
                 else if (p[0] == 0)
                 {
-                    tempRead = __read(stream->hfile,
+                    /* when we use the command:
+                       ctty com1:
+                       the BIOS routines are odd in that they return a
+                       long series of NULs while waiting for data from
+                       the serial port. MSDOS internally copes with that
+                       for its own commands somehow, but for some reason
+                       decided to pass that on to the application.
+                       The C library can end the oddness right here and now */
+                    do
+                    {
+                        tempRead = __read(stream->hfile,
                                       ptr,
                                       (unsigned int)toread,
                                       &errind);
+                        if (!errind && p[0] == '\0')
+                        {
+                            /* This flood handling isn't technically perfect,
+                               but is likely to work in practice */
+                            /* It needs two NULs to come through before the
+                               user presses any key, otherwise the NULs will
+                               interfere with the rest of the logic */
+                            flood = 1;
+                        }
+                    } while (!errind
+                             && (tempRead == 1)
+                             && (p[0] == '\0'));
                     if (errind)
                     {
                         errno = tempRead;
@@ -2813,8 +2967,25 @@ static void iread(FILE *stream, void *ptr, size_t toread, size_t *actualRead)
                     }
                     else
                     {
+                        if (flood)
+                        {
+                            /* When interacting with a remote terminal, we
+                               cannot distinguish between an ESC as part
+                               of an escape sequence or the user pressing the
+                               escape key. We need to rely on the terminal
+                               program being Properly Written (TM) and doubling
+                               the ESC when it is the user pressing it.
+                               The mainframe is different because we have a
+                               defacto timing hack when we see a TCP/IP packet
+                               with a single ESC in it. We shouldn't be relying
+                               on that to work. We can't do that here unless
+                               MSDOS has a function call to let us know if there
+                               are pending characters. So just return
+                               whatever we have. */
+                            return;
+                        }
                         /* up */
-                        if (p[0] == 0x48)
+                        else if (p[0] == 0x48)
                         {
                             numpending = 2;
                             memcpy(pending, "[A", 2);
@@ -2863,6 +3034,14 @@ static void iread(FILE *stream, void *ptr, size_t toread, size_t *actualRead)
         }
     }
 #endif
+
+#ifdef CONV_CHARSET
+    if (stream->permfile)
+    {
+        __fhostchsmem(ptr, *actualRead);
+    }
+#endif
+
     return;
 }
 
@@ -3664,26 +3843,26 @@ static int tebc(int local)
 #define CONVTMAC tasc
 #endif
 
-#define ftgtchs(c) CONVFMAC(c)
-#define ttgtchs(c) CONVTMAC(c)
+#define fhostchs(c) CONVFMAC(c)
+#define thostchs(c) CONVTMAC(c)
 
 
-static void ftgtchsmem (void *mem, size_t size)
+void __fhostchsmem (void *mem, size_t size)
 {
     unsigned char *p = mem;
 
     while (size--) {
-        *p = ftgtchs(*p);
+        *p = fhostchs(*p);
         p++;
     }
 }
 
-static void ttgtchsmem (void *mem, size_t size)
+void __thostchsmem (void *mem, size_t size)
 {
     unsigned char *p = mem;
 
     while (size--) {
-        *p = ttgtchs(*p);
+        *p = thostchs(*p);
         p++;
     }
 }
@@ -3744,7 +3923,7 @@ static void iwrite(FILE *stream,
 #ifdef CONV_CHARSET
     if (stream->permfile)
     {
-        ttgtchsmem(ptr, towrite);
+        __thostchsmem((void *)ptr, towrite);
     }
 #endif
 
@@ -4870,7 +5049,7 @@ __PDPCLIB_API__ int fputc(int c, FILE *stream)
                 if (stream->bufTech == _IOFBF)
                 {
 #if !defined(__gnu_linux__) && !(defined(__ARM__) && !defined(__WIN32__)) \
-    && !defined(__MF32__)
+    && !defined(__MF32__) && !defined(__EBCDIC__)
                     *stream->upto++ = '\r';
 #endif
                     *stream->upto++ = '\n';
@@ -5130,6 +5309,27 @@ __PDPCLIB_API__ int rename(const char *old, const char *newnam)
     return (ret);
 }
 
+#ifdef _UCRT
+__PDPCLIB_API__ int __stdio_common_vsprintf (unsigned __int64 options,
+                                             char *s,
+                                             size_t len,
+                                             const char *format,
+                                             _locale_t locale,
+                                             va_list arg)
+{
+    /* The len parameter is for vsnprintf but that is C99,
+     * so it is not supported here.
+     */
+    int ret;
+
+    ret = vvprintf(format, arg, NULL, s);
+    if (ret >= 0)
+    {
+        *(s + ret) = '\0';
+    }
+    return (ret);
+}
+#else 
 __PDPCLIB_API__ int sprintf(char *s, const char *format, ...)
 {
     va_list arg;
@@ -5152,6 +5352,7 @@ __PDPCLIB_API__ int vsprintf(char *s, const char *format, va_list arg)
     }
     return (ret);
 }
+#endif /* _UCRT */
 
 /*
 
@@ -6251,18 +6452,58 @@ __PDPCLIB_API__ char *tmpnam(char *s)
 __PDPCLIB_API__ FILE *tmpfile(void)
 {
 #if defined(__MVS__) || defined(__CMS__)
-    return (fopen("dd:ZZZZZZZA", "wb+"));
+    return (fopen("dd:YYYYYYYA", "wb+"));
 #else
     FILE *fu;
-    fu = fopen("ZZZZZZZA.$$$", "wb+");
+    static char fnm[] = "YYYYYYYA.$$$";
+    int x;
+
+    for (x = 1; x < TF_MAX; x++)
+    {
+        if (tmp_files[x] == 0) break;
+    }
+    if (x == TF_MAX) return NULL;
+    tmp_files[x] = 1;
+    fnm[7] = upperalpha[x];
+    fu = fopen(fnm, "wb+");
     if (fu != NULL)
     {
-        fu->istemp = 1;
+        fu->istemp = x;
+    }
+    else
+    {
+        tmp_files[x] = 0;
     }
     return (fu);
 #endif
 }
 
+#ifdef _UCRT
+__PDPCLIB_API__ int __stdio_common_vfscanf (unsigned __int64 options,
+                                            FILE *stream,
+                                            const char *format,
+                                            _locale_t locale,
+                                            va_list arg)
+{
+    int ret;
+
+    ret = vvscanf(format, arg, stream, NULL);
+    return (ret);
+}
+
+__PDPCLIB_API__ int __stdio_common_vsscanf (unsigned __int64 options,
+                                            const char *s,
+                                            size_t len,
+                                            const char *format,
+                                            _locale_t locale,
+                                            va_list arg)
+{
+    int ret;
+
+    ret = vvscanf(format, arg, NULL, s);
+    return (ret);
+}
+#else
 __PDPCLIB_API__ int fscanf(FILE *stream, const char *format, ...)
 {
     va_list arg;
@@ -6297,6 +6538,7 @@ __PDPCLIB_API__ int sscanf(const char *s, const char *format, ...)
     va_end(arg);
     return (ret);
 }
+#endif
 
 /* vvscanf - the guts of the input scanning */
 /* several mods by Dave Edwards */
@@ -6526,7 +6768,11 @@ static int vvscanf(const char *format, va_list arg, FILE *fp, const char *s)
                          || *format == 'i')
                 {
                     int neg = 0;
+#ifdef __64BIT__
+                    ptrdiff_t x = 0;
+#else
                     unsigned long x = 0;
+#endif
                     int undecided = 0;
                     int base = 10;
                     int mcnt = 0;

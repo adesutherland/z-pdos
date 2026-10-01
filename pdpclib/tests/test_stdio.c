@@ -74,6 +74,7 @@ int main(void)
         CHECK(pdpqa_calls.dcb_queries == (i < 2 ? 1 : 0));
         CHECK(pdpqa_calls.points == (i < 2 ? 1 : 0));
         CHECK(pdpqa_calls.unexpected == 0);
+        CHECK(stream->update == 1);
         CHECK(fclose(stream) == 0);
         CHECK(pdpqa_calls.allocations == 2);
 #endif

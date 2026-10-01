@@ -135,6 +135,7 @@ __POSGENOS__ - I give up.
 extern FILE *__userFiles[__NFILE];
 
 extern void (*__userExit[__NATEXIT])(void);
+extern int __usrExitRunnum[__NATEXIT];
 
 #define MAXPARMS 50 /* maximum number of arguments we can handle */
 
@@ -169,6 +170,15 @@ int __G_zero = 0;
 
 #ifdef __gnu_linux__
 
+#ifdef __MACOS__
+struct termios {
+    unsigned long c_iflag;
+    unsigned long c_oflag;
+    unsigned long c_cflag;
+    unsigned long c_lflag;
+    unsigned long whoknows[50];
+};
+#else
 struct termios {
     unsigned int c_iflag;
     unsigned int c_oflag;
@@ -176,27 +186,61 @@ struct termios {
     unsigned int c_lflag;
     unsigned int whoknows[50];
 };
+#endif
+
 
 static struct termios tios_save;
 static struct termios tios_new;
 
-extern int __ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
+/* this is not actually what ioctl really is - the 3rd parameter
+   should be ... - but I don't want variable argument logic to
+   be invoked, and we have a simple use case in reality */
+extern int __ioctl(unsigned int fd, unsigned int cmd, void *arg);
 extern int __open(const char *a, int b, int c);
 extern int __read(int a, void *b, int c);
 extern int __seek(int handle, long offset, int whence);
 extern void __close(int handle);
 extern int __getpid(void);
 
+
+#ifdef __MACOS__
+#define TIOCGETA 0x40487413
+#define TIOCSETA 0x80487414
+#define TCGETS TIOCGETA
+#define TCSETS TIOCSETA
+#else
 #define TCGETS 0x00005401U
 #define TCSETS 0x00005402U
+#endif
 
+#ifdef __MACOS__
+#define ISIG 0x80
+#define ICANON 0x100
+#define ECHO 0x8
+#define ECHONL 0x10
+#define IXON 0x200
+/* On MacOS need to switch this off too */
+#define IEXTEN 0x400
+#else
 #define ISIG 0x1
 #define ICANON 0x2
 #define ECHO 0x8
 #define ECHONL 0x40
-
 #define IXON 0x400
+#endif
 
+#endif
+
+
+#ifdef CONV_CHARSET
+void __fhostchsmem (void *mem, size_t size);
+void __thostchsmem (void *mem, size_t size);
+#endif
+
+
+#ifdef __HACK_RELOC
+void __hackrel_stdio(void);
+void __hackrel_ctype(void);
 #endif
 
 
@@ -210,9 +254,20 @@ extern int __getpid(void);
 #define __MSDOS__
 #endif
 
+#if defined(__PDOSGENOS__)
+#define __PDOS386__ 1
+#endif
+
 #if defined(__PDOS386__)
 /* Used for PDOS itself to avoid API calls when starting. */
 int __minstart = 0;
+#endif
+
+#if defined(__gnu_linux__)
+char *__inptr = NULL; /* provided by pdpent */
+#endif
+#if defined(__MACOS__)
+char *__envptr = NULL;
 #endif
 
 /* will be set by __exit */
@@ -325,6 +380,7 @@ extern void *__lastsup; /* last thing supplied to memmgr */
 char **__eplist;
 char *__plist;
 
+char *__gcmd = NULL;
 
 #ifdef WINNEWMOD
 static int G_argc;
@@ -351,9 +407,110 @@ __PDPCLIB_API__ int __getmainargs(int *_Argc,
 static DWORD stdin_dw;
 static DWORD stdout_dw;
 
-/* Not sure what _startupinfo is. */
-typedef int _startupinfo;
+typedef struct {
+    int newmode;
+} _startupinfo;
 
+#ifdef _UCRT
+typedef enum _crt_argv_mode {
+    _crt_argv_no_arguments,
+    _crt_argv_unexpanded_arguments,
+    _crt_argv_expanded_arguments
+} _crt_argv_mode;
+
+static int argc;
+static char *argv[MAXPARMS + 1];
+static char **p_argv;
+
+/* Internal CRT functions exported by ucrtbase.dll. */
+__PDPCLIB_API__ int _configure_narrow_argv (_crt_argv_mode mode)
+{
+    /* Same logic as __getmainargs() later. */
+    char *p;
+    int x;
+
+    p = GetCommandLine();
+
+    argv[0] = p;
+    p = strchr(p, ' ');
+    if (p == NULL)
+    {
+        p = "";
+    }
+    else
+    {
+        *p = '\0';
+        p++;
+    }
+
+    while (*p == ' ')
+    {
+        p++;
+    }
+    if (*p == '\0')
+    {
+        argv[1] = NULL;
+        argc = 1;
+    }
+    else
+    {
+        for (x = 1; x < MAXPARMS; )
+        {
+            char srch = ' ';
+
+            if (*p == '"')
+            {
+                p++;
+                srch = '"';
+            }
+            argv[x] = p;
+            x++;
+            p = strchr(p, srch);
+            if (p == NULL)
+            {
+                break;
+            }
+            else
+            {
+                *p = '\0';
+                p++;
+                while (*p == ' ') p++;
+                if (*p == '\0') break; /* strip trailing blanks */
+            }
+        }
+        argv[x] = NULL;
+        argc = x;
+    }
+    p_argv = argv;
+
+    return (0);
+}
+     
+__PDPCLIB_API__ int _initialize_narrow_environment (void)
+{
+    /* Not sure what this function should do. */
+    return 0;
+}
+
+__PDPCLIB_API__ char ***__p___argv (void)
+{
+    return &p_argv;
+}
+
+__PDPCLIB_API__ int *__p___argc (void)
+{
+    return &argc;
+}
+
+__PDPCLIB_API__ int _set_new_mode (int _NewMode)
+{
+    /* Used to enable/disable calling C++ new handler
+     * set by _set_new_handler().
+     * (The handler is called by failed malloc().)
+     */
+    return 0;
+}
+#else
 __PDPCLIB_API__ int __getmainargs(int *_Argc,
                                   char ***_Argv,
                                   char ***_Env,
@@ -424,6 +581,7 @@ __PDPCLIB_API__ int __getmainargs(int *_Argc,
     *_Env = env;
     return (0);
 }
+#endif /* _UCRT */
 #endif
 
 #if defined(__CMS__)
@@ -433,7 +591,7 @@ int __start(char *p, char *pgmname, char *ep)
 #elif defined(__MVS__)
 int __start(char *p, char *pgmname, int tso)
 #elif defined(__EFI__) || defined(__MACOS__)
-int __start(int argc, char **argv)
+int __start(int argc, char **argv, char **envp)
 #elif defined(__AMIGA__)
 int __start(unsigned long cmdlen, char *p, void *pdosbase)
 #elif defined(__ATARI__)
@@ -505,6 +663,10 @@ __PDPCLIB_API__ int CTYP __start(char *p)
 
 #if !defined(__MVS__) && !defined(__CMS__) && !defined(__VSE__)
 
+#ifdef __HACK_RELOC
+    __hackrel_stdio();
+    __hackrel_ctype();
+#endif
     __runnum++;
     memcpy(&oldjb, &jb, sizeof oldjb);
 
@@ -552,7 +714,7 @@ __PDPCLIB_API__ int CTYP __start(char *p)
     }
 #endif
 
-#ifdef __WIN32__
+#if defined(__WIN32__)
     if (__runnum == 1)
     {
     __stdin->hfile = GetStdHandle(STD_INPUT_HANDLE);
@@ -613,11 +775,15 @@ __PDPCLIB_API__ int CTYP __start(char *p)
        processor (which needs echo off) launches another
        application, we don't need to put it back to the
        echo state before doing so. */
-    __ioctl(0, TCGETS, (unsigned long)&tios_save);
+    __ioctl(0, TCGETS, &tios_save);
     tios_new = tios_save;
     tios_new.c_iflag &= ~IXON;
-    tios_new.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG);
-    __ioctl(0, TCSETS, (unsigned long)&tios_new);
+    tios_new.c_lflag &= ~(ECHO | ECHONL
+#ifdef __MACOS__
+        | IEXTEN
+#endif
+        | ICANON | ISIG);
+    __ioctl(0, TCSETS, &tios_new);
     }
 #endif
 
@@ -1179,7 +1345,9 @@ __PDPCLIB_API__ int CTYP __start(char *p)
 
     for (x=0; x < __NFILE; x++)
     {
+#ifndef __HACK_RELOC
         __userFiles[x] = NULL;
+#endif
     }
 
 #ifdef __PDPCLIB_DLL
@@ -1217,7 +1385,11 @@ __PDPCLIB_API__ int CTYP __start(char *p)
         int pf;
         int tot;
 
+        __inptr = p;
         sprintf(fnm, "/proc/%d/cmdline", __getpid());
+#ifdef CONV_CHARSET
+        __thostchsmem(fnm, strlen(fnm));
+#endif
         pf = __open(fnm, 0, 0);
         /* note that the open syscall can return numbers other than
            -1, e.g. -2, but most documentation is for open() which
@@ -1242,6 +1414,9 @@ __PDPCLIB_API__ int CTYP __start(char *p)
             tot = __read(pf, parmbuf, sizeof parmbuf - 1);
             __close(pf);
             parmbuf[sizeof parmbuf - 1] = '\0';
+#ifdef CONV_CHARSET
+            __fhostchsmem(parmbuf, tot);
+#endif
             p = parmbuf;
             argc = 1;
             argv[0] = p;
@@ -1272,6 +1447,23 @@ __PDPCLIB_API__ int CTYP __start(char *p)
     }
 #endif
 
+#if defined(__MACOS__)
+/* If the Mach-O executable has LC_MAIN, then argc and
+   argv will already be set. Otherwise, we will have a
+   pointer to the stack and we need to extract it
+   ourselves. */
+   if (argc == 0)
+   {
+       __inptr = (char *)argv;
+       argc = (int)(ptrdiff_t)argv[0];
+       argv++;
+   }
+   else
+   {
+       __envptr = (char *)envp;
+   }
+#endif
+
 #ifdef __WIN32__
     if (__runnum == 1)
     {
@@ -1289,7 +1481,18 @@ __PDPCLIB_API__ int CTYP __start(char *p)
            like this. We can use a global variable or standardize on
            the interface to start */
         argv = int_argv;
-        p = (char *)argc;
+        if (__gcmd != NULL)
+        {
+            p = __gcmd;
+            __gcmd = NULL;
+        }
+        else
+        {
+            /* this code shouldn't ever be hit, but I'm leaving it
+               in for now in case there is a circumstance I have
+               missed */
+            p = (char *)argc;
+        }
         argv[0] = p;
         p = strchr(p, ' ');
         if (p == NULL)
@@ -1510,7 +1713,7 @@ __PDPCLIB_API__ int CTYP __start(char *p)
 #endif
 
 #endif
-#ifdef PDOS_MAIN_ENTRY
+#if defined(PDOS_MAIN_ENTRY)
     *i1 = argc;
     *i2 = (int)argv;
     return (0);
@@ -1735,16 +1938,19 @@ __PDPCLIB_API__ void _c_exit(void)
     /* Quick C library termination. */
     int x;
 
-#if 0
+#if 1
     for (x = __NATEXIT - 1; x >= 0; x--)
     {
-        if (__userExit[x] != 0)
+        if ((__userExit[x] != 0) && (__usrExitRunnum[x] == __runnum))
         {
             (__userExit[x])();
+            __userExit[x] = 0;
+            __usrExitRunnum[x] = 0; /* done for good measure */
         }
     }
 #endif
 
+#ifndef __HACK_RELOC
     for (x = 0; x < __NFILE; x++)
     {
         if ((__userFiles[x] != NULL) && (__userFiles[x]->runnum == __runnum))
@@ -1757,6 +1963,7 @@ __PDPCLIB_API__ void _c_exit(void)
             /* note that fclose itself will set the userfiles[x] to NULL */
         }
     }
+#endif
 
 #if defined(__VSE__)
     if (__stdpch != NULL)
@@ -1801,7 +2008,7 @@ __PDPCLIB_API__ void _c_exit(void)
 #if defined(__gnu_linux__)
     if (__runnum == 1)
     {
-    __ioctl(0, TCSETS, (unsigned long)&tios_save);
+    __ioctl(0, TCSETS, &tios_save);
     }
 #endif
 

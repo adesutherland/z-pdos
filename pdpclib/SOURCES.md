@@ -32,17 +32,27 @@ their material or an external IBM macro library.
 
 The Lab also used the canonical SourceForge PDOS revision
 `a65eddb9ef4b27a6844f2857db0c98696137612b`. Its PDPCLIB subtree has 324 files and
-differs materially from this mirror. The maintained top-level source remains
-the selected mirror lineage. Relevant Lab C fixes were reapplied to
-this selected baseline using exact unique contexts; OS configuration deltas
-became named profiles. Their content hashes and scope are in [CHANGES.md](CHANGES.md).
+differs materially from this mirror. The initial maintained source used the
+mirror lineage. On 1 October we merged the relevant canonical runtime changes
+into that same source tree, preserving our shared MVS repairs. OS configuration
+deltas remain named profiles. Their disposition and scope are in
+[CHANGES.md](CHANGES.md).
 
 The separate PDLD linker uses that canonical revision and its own source
 record. A library notice does not clear an entire upstream repository, a later
 native file or an external macro library for import.
 
-On 1 October, [reference/pdio1/](reference/pdio1/README.md) preserves 44 exact
-canonical runtime/header/macro inputs for the repaired OS baseline. Its
-[OS source record](../os/pdos/SOURCES.md) identifies the source and recovery
-checks. This frozen qualification selection is separate from the maintained
-top-level library; it does not silently replace or combine either lineage.
+The exact original 44-file PDIO1 runtime selection was published in commit
+[`d62b109`](https://github.com/adesutherland/z-pdos/commit/d62b109ed986bd455732484173ff4ebe0533045a).
+Git preserves that qualification input. The duplicate directory was removed
+after reconciliation: all 44 selected build inputs now come from maintained
+PDPCLIB or its explicit `pdos-zarch` configuration. We adopted canonical bytes
+for 18 differing C/header/notice files, combined canonical MVSSUPA with the
+four existing MVS fix hunks, and corrected the newly exposed MVS `w+b`
+write-handle initialization path. The unchanged selected files needed no merge.
+
+The [OS source record](../os/pdos/SOURCES.md) identifies the pinned canonical
+inputs, current manifests and recovery patch. The current build is a new
+candidate: host checks and C compilation do not inherit the earlier complete
+native kernel/runtime or guest qualification. Other historical ports remain
+in the one maintained tree; this reconciliation does not qualify them.

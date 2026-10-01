@@ -1,87 +1,6 @@
-diff --git a/pdpclib/pdptop.mac b/pdpclib/pdptop.mac
-index d317908..34f5806 100644
---- a/pdpclib/pdptop.mac
-+++ b/pdpclib/pdptop.mac
-@@ -88,3 +88,8 @@
-          AMODE ANY
-          RMODE ANY
- *
-+* ESA/390 low-core fields absent from this z/OS IHAPSA mapping.
-+* At B8 IPL leaves the subchannel identification word for SSCH.
-+* CAW at 48 is only used by the older SIO path in these sources.
-+FLCIOA   EQU   X'B8'
-+FLCCAW   EQU   X'48'
-diff --git a/pdpclib/stdio.c b/pdpclib/stdio.c
-index cc649fa..d38e4d7 100644
---- a/pdpclib/stdio.c
-+++ b/pdpclib/stdio.c
-@@ -1424,6 +1424,15 @@ static void osfopen(void)
-     {
-         mode = 1; /* writing */
-     }
-+#if defined(__PDOS390__)
-+    else if ((modeType == 10) || (modeType == 11))
-+    {
-+        /* SAPSUPA explicitly does not support update mode. */
-+        err = 1;
-+        errno = 2;
-+        return;
-+    }
-+#else
-     else if (modeType == 10)
-     {
-         fprintf(stderr, "we don't have the ability to do update, "
-@@ -1437,6 +1446,7 @@ static void osfopen(void)
-                 "but switching to write mode as a kludge\n");
-         mode = 1;
-     }
-+#endif
-     else
-     {
-         mode = 2; /* update */
-@@ -1821,6 +1831,7 @@ static void osfopen(void)
- 
-     mode &= 0x03; /* only interested in the simple mode now */
- 
-+#if !defined(__PDOS390__)
-     if (myfile->update)
-     {
-         unsigned int data[7];
-@@ -1865,6 +1876,7 @@ static void osfopen(void)
-         */
- #endif
-     }
-+#endif
- 
-     /* recfm=f and v are effecively always line-buffered
-        because we currently do not support blocking. as
-@@ -5885,7 +5897,7 @@ __PDPCLIB_API__ int fseek(FILE *stream, long int offset, int whence)
-         }
- #endif
- #if defined(__MVS__) || defined(__CMS__)
--#if defined(__MVS__)
-+#if defined(__MVS__) && !defined(__PDOS390__)
-     if (stream->update)
-     {
-         unsigned int record_num;
-diff --git a/pdpclib/string.h b/pdpclib/string.h
-index b7e8411..97d5794 100644
---- a/pdpclib/string.h
-+++ b/pdpclib/string.h
-@@ -123,7 +123,7 @@ void * _Builtin __memmove(void *s1, const void *s2, size_t n);
- #endif
- 
- #if defined (__GNUC__) && __GNUC__ >= 3 && !defined(__ARM__) \
--    && !defined(__64BIT__)
-+    && !defined(__64BIT__) && !defined(__PDOS390__)
- #define memcpy(s1,s2,n) (__builtin_memcpy((s1),(s2),(n)))
- #define memcmp(s1,s2,n) (__builtin_memcmp((s1),(s2),(n)))
- #endif
-diff --git a/s370/pdos.c b/s370/pdos.c
-index 08311a9..12b31cd 100644
 --- a/s370/pdos.c
 +++ b/s370/pdos.c
-@@ -251,7 +251,18 @@ old virtual memory map:
+@@ -251,7 +251,18 @@
  /* mandate maximum address space for z/Arch */
  #if defined(ZARCH)
  #ifndef ZAM31
@@ -101,7 +20,7 @@ index 08311a9..12b31cd 100644
  #else
  /* #define MAXASIZE 2032 */ /* 16 less than theoretical maximum of 2048 */
  #define MAXASIZE 128
-@@ -453,6 +464,13 @@ typedef struct rb {
+@@ -453,6 +464,13 @@
      char *next_exe; /* next executable's location */
      int savearea[20]; /* needs to be in user space */
      char *pptrs[1];
@@ -115,7 +34,7 @@ index 08311a9..12b31cd 100644
  } RB;
  
  typedef struct {
-@@ -461,7 +479,21 @@ typedef struct {
+@@ -461,7 +479,21 @@
  
  typedef struct {
      char unused[24];
@@ -137,7 +56,7 @@ index 08311a9..12b31cd 100644
  } TIOT;
  
  /* note that the TCB has another 32 bytes in a prefix area */
-@@ -473,10 +505,33 @@ typedef struct {
+@@ -473,9 +505,32 @@
  } TCB;
  
  typedef struct {
@@ -148,7 +67,7 @@ index 08311a9..12b31cd 100644
 +    char unused2[772 - 236];
 +    int system_table; /* V1R5 system-function table at CVT+772 */
  } CVT;
- 
++
 +#ifdef ZARCH
 +/* Single synchronous IARV64 PC. These tables must be real-addressable:
 +   the selected z/PDOS image places its static data below the first 5 MB,
@@ -168,11 +87,10 @@ index 08311a9..12b31cd 100644
 +
 +
 +#endif
-+
+ 
  typedef struct {
      char filler1[108];
-     void *ascbasxb;
-@@ -771,6 +826,10 @@ typedef struct {
+@@ -771,6 +826,10 @@
                                           4-8 GiB gets mapped to 0-4 GiB */
      /* I think this requires 2k alignment, but will be 4k regardless */
      PAGE_ENTRY pagetable[4096 * PAGES_PER_SEGMENT];
@@ -183,7 +101,7 @@ index 08311a9..12b31cd 100644
  #endif
  
      int cregs[NUM_CR];
-@@ -805,6 +864,7 @@ typedef struct {
+@@ -805,6 +864,7 @@
  #define DCBRECBR 0x10
  
  #define INTERRUPT_SVC 1
@@ -191,7 +109,7 @@ index 08311a9..12b31cd 100644
  
  #if 0
  TASK *task;
-@@ -829,6 +889,45 @@ typedef struct {
+@@ -829,6 +889,45 @@
      int curr_aspace; /* current address space */
  } PDOS;
  
@@ -237,7 +155,7 @@ index 08311a9..12b31cd 100644
  /*static PDOS pdos;*/
  
  static DCB *gendcb = NULL; /* +++ need to eliminate this state info */
-@@ -848,8 +947,21 @@ static int we_have_control = 1; /* we have control until we relinquish
+@@ -848,8 +947,21 @@
  
  void gotret(void);
  int adisp(void);
@@ -259,7 +177,7 @@ index 08311a9..12b31cd 100644
  void dcheck(void);
  void dnotpnt(void);
  void dexit(int oneexit, DCB *dcb);
-@@ -956,8 +1068,50 @@ int pdosRun(PDOS *pdos)
+@@ -956,8 +1068,50 @@
          intrupt = pdosDispatchUntilInterrupt(pdos);
          if (intrupt == INTERRUPT_SVC)
          {
@@ -268,6 +186,7 @@ index 08311a9..12b31cd 100644
 +            int g;
 +#endif
              pdosProcessSVC(pdos);
+-        }
 +#ifdef ZARCH
 +            /* Existing service code writes 32-bit ABI results. Preserve
 +               the unmodified high halves of the interrupted LP64 GPRs. */
@@ -280,7 +199,7 @@ index 08311a9..12b31cd 100644
 +                interrupted->psw64[3] = interrupted->psw2;
 +            }
 +#endif
-         }
++        }
 +#ifdef ZARCH
 +        else if (intrupt == INTERRUPT_PROGRAM)
 +        {
@@ -310,10 +229,11 @@ index 08311a9..12b31cd 100644
      }
  
      return (pdos->exitcode);
-@@ -973,6 +1127,627 @@ void pdosDefaults(PDOS *pdos)
+@@ -972,6 +1126,627 @@
+     pdos->psa = PSA_ORIGIN;    
      return;
  }
- 
++
 +#ifdef ZARCH
 +/* Offsets are from IEFTIOT1 and IEFJFCBN in the retained MVUZ1 listing.
 +   The private disk's VTOC, rather than the caller's namespace, decides
@@ -934,11 +854,10 @@ index 08311a9..12b31cd 100644
 +    return 1;
 +}
 +#endif
-+
+ 
  
  /* initialize PDOS */
- /* zero return = error */
-@@ -1146,13 +1921,33 @@ int pdosInit(PDOS *pdos)
+@@ -1146,13 +1921,33 @@
      printf("IPL device is %x\n", pdos->ipldev);
  #endif
      pdos->shutdown = 0;
@@ -972,7 +891,7 @@ index 08311a9..12b31cd 100644
      pdos->aspaces[pdos->curr_aspace].o.tcb.tcbrbp = calloc(sizeof(RB), 1);
      pdos->aspaces[pdos->curr_aspace].o.tcb.tcbrbp->rbcde1
          = calloc(sizeof(CDENTRY), 1);
-@@ -1161,10 +1956,17 @@ int pdosInit(PDOS *pdos)
+@@ -1161,10 +1956,17 @@
      pdos->context =
          pdos->aspaces[pdos->curr_aspace].o.curr_rb =
          &pdos->aspaces[pdos->curr_aspace].o.first_rb;
@@ -990,7 +909,7 @@ index 08311a9..12b31cd 100644
  #if defined(S380)
      lcreg13(pdos->aspaces[pdos->curr_aspace].o.cregs[13]);
  #endif
-@@ -1193,9 +1995,38 @@ void pdosTerm(PDOS *pdos)
+@@ -1193,9 +1995,38 @@
  static int pdosDispatchUntilInterrupt(PDOS *pdos)
  {
      int ret;
@@ -1029,7 +948,7 @@ index 08311a9..12b31cd 100644
          /* store registers and PSW in low memory to be loaded */
          memcpy(pdos->psa->flcgrsav,
                 pdos->context->regs,
-@@ -1212,15 +2043,33 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+@@ -1212,15 +2043,33 @@
                 sizeof pdos->context->regs);
  #ifdef ZARCH
          pdos->context->psw1 = 0x040C0000U;
@@ -1065,7 +984,7 @@ index 08311a9..12b31cd 100644
  
          /* non-zero returns are requests for services */
          /* these "DLLs" don't belong in the operating system proper,
-@@ -1259,6 +2108,24 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+@@ -1259,6 +2108,24 @@
              len = pptr[1] & 0xffff;
              buf = (char *)pptr[3];
              dcb = (DCB *)pptr[2];
@@ -1090,7 +1009,7 @@ index 08311a9..12b31cd 100644
  
  #if 0
              printf("got a request to write block %p, len %d\n", buf, len);
-@@ -1353,6 +2220,7 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+@@ -1353,6 +2220,7 @@
              char *buf;
              char tbuf[MAXBLKSZ];
              int cnt;
@@ -1098,7 +1017,7 @@ index 08311a9..12b31cd 100644
              char *decb;
              DCB *dcb;
              int *pptr;
-@@ -1372,6 +2240,15 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+@@ -1372,6 +2240,15 @@
              len = pptr[1] & 0xffff;
              buf = (char *)pptr[3];
              dcb = (DCB *)pptr[2];
@@ -1114,7 +1033,7 @@ index 08311a9..12b31cd 100644
  #if 0
              printf("dcb read is for lrecl %d\n", dcb->dcblrecl);
  #endif
-@@ -1494,8 +2371,8 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+@@ -1494,8 +2371,8 @@
                         buf,
                         cyl, head, rec);
  #endif
@@ -1125,7 +1044,7 @@ index 08311a9..12b31cd 100644
  #if DSKDEBUG
                  printf("cnt is %d\n", cnt);
  #endif
-@@ -1503,8 +2380,8 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+@@ -1503,8 +2380,8 @@
                  {
                      rec = 1;
                      head++;
@@ -1136,7 +1055,7 @@ index 08311a9..12b31cd 100644
  #if DSKDEBUG
                      printf("cnt is %d\n", cnt);
  #endif
-@@ -1512,8 +2389,8 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+@@ -1512,8 +2389,8 @@
                      {
                          head = 0;
                          cyl++;
@@ -1147,7 +1066,7 @@ index 08311a9..12b31cd 100644
                      }
                  }
  #if DSKDEBUG
-@@ -1535,6 +2412,15 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+@@ -1535,6 +2412,15 @@
                  *(IOB **)(decb + 16) = &geniob;
              }
          }
@@ -1163,7 +1082,7 @@ index 08311a9..12b31cd 100644
      }
      return (INTERRUPT_SVC); /* only doing SVCs at the moment */
  }
-@@ -1941,6 +2827,34 @@ static void pdosInitAspaces(PDOS *pdos)
+@@ -1941,6 +2827,34 @@
                      (s * PAGES_PER_SEGMENT + p) << 12;
              }
          }
@@ -1198,7 +1117,7 @@ index 08311a9..12b31cd 100644
          pdos->aspaces[a].o.region3[0][0] = 0;
          pdos->aspaces[a].o.region3[0][1] =
              (unsigned int)&pdos->aspaces[a].o.segtable[0]
-@@ -1953,12 +2867,20 @@ static void pdosInitAspaces(PDOS *pdos)
+@@ -1953,12 +2867,20 @@
              | 0x03; /* segment table is max size */
          pdos->aspaces[a].o.region3[2][0] = 0;
          pdos->aspaces[a].o.region3[2][1] =
@@ -1219,7 +1138,7 @@ index 08311a9..12b31cd 100644
              | (0x1 << 2) /* region 3 indicator */
              | 0x03; /* segment table is max size */
          /* pad to minimum size */
-@@ -2007,9 +2929,11 @@ static void pdosInitAspaces(PDOS *pdos)
+@@ -2007,9 +2929,11 @@
          {
              /* 1024 MB less memory available because of the
                 ramdisk at the 3 GiB location */
@@ -1231,7 +1150,7 @@ index 08311a9..12b31cd 100644
          }
          else
          {
-@@ -2038,6 +2962,40 @@ static void pdosProcessSVC(PDOS *pdos)
+@@ -2038,6 +2962,40 @@
  #endif
      if (svc == 3)
      {
@@ -1272,7 +1191,7 @@ index 08311a9..12b31cd 100644
          /* if this is a LINKed program, then restore old context
             rather than shutting down */
          if (pdos->context->rblinkb == 
-@@ -2089,6 +3047,14 @@ static void pdosProcessSVC(PDOS *pdos)
+@@ -2089,6 +3047,14 @@
  #endif
          }
      }
@@ -1287,7 +1206,7 @@ index 08311a9..12b31cd 100644
      else if ((svc == 120) || (svc == 10))
      {
          /* if really getmain */
-@@ -2120,14 +3086,15 @@ static void pdosProcessSVC(PDOS *pdos)
+@@ -2120,14 +3086,15 @@
              {
                  len &= 0xffffff;
              }
@@ -1308,7 +1227,7 @@ index 08311a9..12b31cd 100644
  
              if (above)
              {
-@@ -2183,12 +3150,158 @@ static void pdosProcessSVC(PDOS *pdos)
+@@ -2183,12 +3150,158 @@
              }
          }
      }
@@ -1467,7 +1386,7 @@ index 08311a9..12b31cd 100644
          /* hardcoded constants that fell off the back of a truck */
          memcpy((void *)pdos->context->regs[0], 
                 "\x30\x50\x08\x0B" /* 08 = unit record, but note
-@@ -2209,6 +3322,16 @@ static void pdosProcessSVC(PDOS *pdos)
+@@ -2209,6 +3322,16 @@
                 mvssupa.asm, as it probably shouldn't be second-guessing
                 what is allowed - assuming that's what it is doing. */
              ((char *)pdos->context->regs[0])[2] = 0x80; /* tape */
@@ -1484,7 +1403,7 @@ index 08311a9..12b31cd 100644
          }
          pdos->context->regs[15] = 0;
      }
-@@ -2221,6 +3344,11 @@ static void pdosProcessSVC(PDOS *pdos)
+@@ -2221,6 +3344,11 @@
          /* DCB is pointed to by first parameter */
          /* needs validation */
          gendcb = (DCB *)(p[0] & 0xffffff);
@@ -1496,7 +1415,7 @@ index 08311a9..12b31cd 100644
  #if 0
          printf("got rdjfcb for %.8s\n", gendcb->dcbddnam);
  #endif
-@@ -2235,6 +3363,22 @@ static void pdosProcessSVC(PDOS *pdos)
+@@ -2235,6 +3363,22 @@
              int cyl;            
              int head;
              int rec;
@@ -1519,7 +1438,7 @@ index 08311a9..12b31cd 100644
  #if 0
              printf("must be dataset name %s\n", lastds);
  #endif
-@@ -2321,6 +3465,19 @@ static void pdosProcessSVC(PDOS *pdos)
+@@ -2321,6 +3465,19 @@
              gendcb->dcblrecl = 0;
              gendcb->dcbblksi = 18452;
          }
@@ -1539,7 +1458,7 @@ index 08311a9..12b31cd 100644
      }
      else if (svc == 22) /* open */
      {
-@@ -2332,6 +3489,11 @@ static void pdosProcessSVC(PDOS *pdos)
+@@ -2332,6 +3489,11 @@
          /* DCB is pointed to by first parameter */
          /* needs validation */
          gendcb = (DCB *)(p[0] & 0xffffff);
@@ -1551,7 +1470,7 @@ index 08311a9..12b31cd 100644
  #if 0
          printf("in open, DCB is %p\n", gendcb);
  #endif
-@@ -2339,6 +3501,28 @@ static void pdosProcessSVC(PDOS *pdos)
+@@ -2339,6 +3501,28 @@
          ocode = p[0];
          ocode >>= 24;
          pdos->context->regs[15] = 0;
@@ -1580,7 +1499,7 @@ index 08311a9..12b31cd 100644
          gendcb->dcbcheck = (int)dcheck;
          gendcb->dcbnotepoint = (int)dnotpnt;
          oneexit = gendcb->u2.dcbexlsa & 0xffffff;
-@@ -2355,14 +3539,24 @@ static void pdosProcessSVC(PDOS *pdos)
+@@ -2355,14 +3539,24 @@
  #if 0
              printf("opening for input\n");
  #endif
@@ -1607,7 +1526,7 @@ index 08311a9..12b31cd 100644
          }
          else if (ocode == 0x83) /* inout */
          {
-@@ -2370,7 +3564,12 @@ static void pdosProcessSVC(PDOS *pdos)
+@@ -2370,7 +3564,12 @@
  	    /* this needs to be changed (everything should be using a
  	       generic read/write routine), but for now at least allow
  	       the open and first read to succeed */
@@ -1621,7 +1540,7 @@ index 08311a9..12b31cd 100644
          }
          else /* don't understand - refuse to open */
          {
-@@ -2571,6 +3770,24 @@ static void pdosProcessSVC(PDOS *pdos)
+@@ -2571,6 +3770,24 @@
  
          ocode = p[0];
          ocode >>= 24;
@@ -1646,7 +1565,7 @@ index 08311a9..12b31cd 100644
  
          /* if this is a disk file, and, it was open for write, need to 
             write an EOF record */
-@@ -2632,6 +3849,14 @@ static void pdosProcessSVC(PDOS *pdos)
+@@ -2632,6 +3849,14 @@
              join_cchhr(dcb->dcbfdad + 3, cyl, head, rec);
          }
      }
@@ -1661,7 +1580,7 @@ index 08311a9..12b31cd 100644
      return;
  }
  
-@@ -2659,6 +3884,100 @@ typedef struct {
+@@ -2659,6 +3884,100 @@
       not correct in the first place */
  } SVC99TU;
  
@@ -1762,7 +1681,7 @@ index 08311a9..12b31cd 100644
  
  static void pdosSVC99(PDOS *pdos)
  {
-@@ -2672,6 +3991,13 @@ static void pdosSVC99(PDOS *pdos)
+@@ -2672,6 +3991,13 @@
      svc99rb = *(SVC99RB **)pdos->context->regs[1];
      /* the rb can have the high bit set, so it needs to be cleared */
      svc99rb = (SVC99RB *)((unsigned int)svc99rb & 0x7fffffffU);
@@ -1776,7 +1695,7 @@ index 08311a9..12b31cd 100644
      if (svc99rb->verb == 2) /* unallocate */
      {
          /* unconditional success */
-@@ -4266,6 +5592,7 @@ static int pdosRamDisk(PDOS *pdos, char *parm)
+@@ -4266,6 +5592,7 @@
  
  static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
  {
@@ -1784,7 +1703,7 @@ index 08311a9..12b31cd 100644
      char *raw;
      char *initial;
      char *load;
-@@ -4288,6 +5615,11 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
+@@ -4288,6 +5615,11 @@
      int imgsize;
      static int first = 1; /* first executable, ie command.exe */
      int iscom = 0;
@@ -1796,7 +1715,7 @@ index 08311a9..12b31cd 100644
  
      if (!first || (!__istape && !__iscard && !__ismem))
      {
-@@ -4380,13 +5712,13 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
+@@ -4380,13 +5712,13 @@
          return (-1);
      }
  
@@ -1813,7 +1732,7 @@ index 08311a9..12b31cd 100644
  #endif
      if (raw == NULL)
      {
-@@ -4480,6 +5812,16 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
+@@ -4480,6 +5812,16 @@
              continue;
          }
          lastcnt = cnt;
@@ -1830,7 +1749,7 @@ index 08311a9..12b31cd 100644
          memcpy(load, tbuf, cnt);
          load += cnt;
          j++;
-@@ -4497,7 +5839,14 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
+@@ -4497,7 +5839,14 @@
      }
      else if (pe)
      {
@@ -1846,7 +1765,7 @@ index 08311a9..12b31cd 100644
          {
  #if defined(ZARCH)
              memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem, raw);
-@@ -4506,7 +5855,8 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
+@@ -4506,7 +5855,8 @@
  #endif
              return (-1);
          }
@@ -1856,7 +1775,7 @@ index 08311a9..12b31cd 100644
          /* unconditionally reduce the 5 MB to something reasonable */
  #if defined(ZARCH)
          memmgrRealloc(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
-@@ -4564,6 +5914,32 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
+@@ -4564,6 +5914,32 @@
          pdos->context->pptrs[0] = parm;
      
          pdos->context->regs[1] = (int)pdos->context->pptrs;
@@ -1889,7 +1808,7 @@ index 08311a9..12b31cd 100644
  
  #if 0
          printf("finished loading executable\n");
-@@ -4705,15 +6081,22 @@ static void write3270(char *buf, size_t lenbuf, int cr)
+@@ -4705,15 +6081,22 @@
          }
          first = 0;
      }
@@ -1898,12 +1817,13 @@ index 08311a9..12b31cd 100644
 -    __conswr(sizeof intbuf, intbuf, 0);
 -    lineupto++;
 -    if (lineupto == 22)
-+    /* Keep output within the protected rows, before the input field. */
-+    do
-     {
+-    {
 -        lineupto--;
 -        memmove(intbuf + 6, intbuf + 6 + 80, lineupto * 80);
 -    }
++    /* Keep output within the protected rows, before the input field. */
++    do
++    {
 +        size_t part = lenbuf > 80 ? 80 : lenbuf;
 +        memset(intbuf + 6 + lineupto * 80, ' ', 80);
 +        memcpy(intbuf + 6 + lineupto * 80, buf, part);
@@ -1920,11 +1840,9 @@ index 08311a9..12b31cd 100644
  }
  
  static int cprintf(char *format, ...)
-diff --git a/s370/pdossup.asm b/s370/pdossup.asm
-index 720cf16..e049bed 100644
 --- a/s370/pdossup.asm
 +++ b/s370/pdossup.asm
-@@ -46,6 +46,15 @@ AM64BIT  EQU X'00000000'
+@@ -46,6 +46,15 @@
  *
  *
           CSECT
@@ -1940,7 +1858,7 @@ index 720cf16..e049bed 100644
  **********************************************************************
  *                                                                    *
  *  INITSYS - initialize system                                       *
-@@ -78,7 +87,7 @@ INITSYS  DS    0H
+@@ -78,7 +87,7 @@
  .ZSW64   ANOP
           MVC   FLCEINPW(16),WAITER7
           MVC   FLCEMNPW(16),WAITER1
@@ -1949,7 +1867,7 @@ index 720cf16..e049bed 100644
           MVC   FLCESNPW(16),NEWSVC
  .ZSW64B  ANOP
  *
-@@ -138,6 +147,10 @@ NEWSVC   DC    A(X'00040000'+AM64BIT)
+@@ -138,6 +147,10 @@
           DC    A(AMBIT)
           DC    A(0)
           DC    A(GOTSVC)
@@ -1960,7 +1878,7 @@ index 720cf16..e049bed 100644
  .WAIT64B ANOP
  *
  *
-@@ -231,6 +244,11 @@ WRBLOCK  DS    0H
+@@ -231,6 +244,11 @@
           DC    H'0'
  WRCONT   DS    0H           Interrupt will automatically come here
           AIF   ('&XSYS' EQ 'S390' OR '&XSYS' EQ 'ZARCH').WR31H
@@ -1972,7 +1890,7 @@ index 720cf16..e049bed 100644
           SH    R7,FLCCSW+6  Subtract residual count to get bytes written
           LR    R15,R7
  * After a successful CCW chain, CSW should be pointing to end
-@@ -239,11 +257,17 @@ WRCONT   DS    0H           Interrupt will automatically come here
+@@ -239,11 +257,17 @@
           AGO   .WR24H
  .WR31H   ANOP
           TSCH  0(R9)
@@ -1990,16 +1908,17 @@ index 720cf16..e049bed 100644
           L     R15,=F'-1'   error return
  WRALLFIN DS    0H
           RETURN (14,12),RC=(15)
-@@ -349,8 +373,32 @@ ADISPRET DS    0H
+@@ -349,7 +373,31 @@
           LA    R15,0
  ADISPRT2 DS    0H
           RETURN (14,12),RC=(15)
+-         LTORG
 +         AIF ('&XSYS' NE 'ZARCH').P64PGMRET
 +ADISPPGM LA    R15,4
 +         RETURN (14,12),RC=(15)
 +.P64PGMRET ANOP
-          LTORG
- *
++         LTORG
++*
 +* Native AMODE64 member dispatch: full-width GPRs and 16-byte PSW.
 +* The application enters in problem state, key zero, with I/O and
 +* external interrupts masked by the C request block. SVC returns here.
@@ -2019,11 +1938,10 @@ index 720cf16..e049bed 100644
 +         RETURN (14,12),RC=(15)
 +         LTORG
 +.P64DISEND ANOP
-+*
  *
  *
- **********************************************************************
-@@ -362,9 +410,84 @@ ADISPRT2 DS    0H
+ *
+@@ -362,9 +410,84 @@
  **********************************************************************
  *
  GOTSVC   DS    0H
@@ -2109,7 +2027,7 @@ index 720cf16..e049bed 100644
  *
  *
  *
-@@ -424,7 +547,7 @@ DREAD    DS    0H
+@@ -424,7 +547,7 @@
           CALL  @@SETM31
  .MOD24G  ANOP
           LA    R15,3
@@ -2118,7 +2036,7 @@ index 720cf16..e049bed 100644
  *
  *
  *
-@@ -463,7 +586,18 @@ DWRITE   DS    0H
+@@ -463,7 +586,18 @@
           CALL  @@SETM31
  .MOD24D  ANOP
           LA    R15,2
@@ -2138,7 +2056,7 @@ index 720cf16..e049bed 100644
           DROP  ,
  *
  *
-@@ -601,6 +735,35 @@ LCREG1   DS    0H
+@@ -601,6 +735,35 @@
           LA    R15,0
           RETURN (14,12),RC=(15)
           LTORG
@@ -2174,8 +2092,6 @@ index 720cf16..e049bed 100644
  **********************************************************************
  *                                                                    *
  *  LCREG13 - load control register 13                                *
-diff --git a/s370/pdosutil.c b/s370/pdosutil.c
-index c86c1da..edfe586 100644
 --- a/s370/pdosutil.c
 +++ b/s370/pdosutil.c
 @@ -12,6 +12,7 @@
@@ -2186,7 +2102,7 @@ index c86c1da..edfe586 100644
  #include <string.h>
  
  #include "pdosutil.h"
-@@ -158,7 +159,64 @@ int findFile(int ipldev, char *dsn, int *c, int *h, int *r)
+@@ -158,7 +159,64 @@
  
  #define PE_DEBUG 0
  
@@ -2252,7 +2168,7 @@ index c86c1da..edfe586 100644
  {
      char *p;
      char *q;
-@@ -183,9 +241,21 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+@@ -183,9 +241,21 @@
      int lastt = -1;
      char *lasttxt = NULL;
      char *upto = buf;
@@ -2276,7 +2192,7 @@ index c86c1da..edfe586 100644
      {
          printf("Not an MVS PE executable\n");
          return (-1);
-@@ -196,10 +266,11 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+@@ -196,10 +266,11 @@
      p = buf;
      while (1)
      {
@@ -2290,7 +2206,7 @@ index c86c1da..edfe586 100644
          {
              break;
          }
-@@ -225,14 +296,26 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+@@ -225,14 +296,26 @@
                  break;
              }
              q = p + 24;
@@ -2322,7 +2238,7 @@ index c86c1da..edfe586 100644
  #if PE_DEBUG
              printf("module name is %.8s\n", ihapds->pds2name);
              printf("rmode is %s\n", rmode ? "ANY" : "24");
-@@ -272,7 +355,12 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+@@ -272,7 +355,12 @@
              r2 = l - 4 - 10;
              while (1)
              {
@@ -2336,7 +2252,7 @@ index c86c1da..edfe586 100644
                  r2 -= sizeof(short);
                  if (l2 > r2)
                  {
-@@ -289,17 +377,49 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+@@ -289,17 +377,49 @@
                         *q, l2, q - p);
  #endif
  
@@ -2391,7 +2307,7 @@ index c86c1da..edfe586 100644
                      {
                          term = 1;
                          corrupt = 0;
-@@ -308,44 +428,126 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+@@ -308,44 +428,126 @@
                  }
                  else if (t == 0x20)
                  {
@@ -2472,15 +2388,20 @@ index c86c1da..edfe586 100644
                  {
                      /* printf("rectype: RLD\n"); */
 -                    if (processRLD(buf, rlad, q, l2) != 0)
+-                    {
+-                        term = 1;
+-                        break;
+-                    }
+-                }
+-                else if (t == 3)
 +                    if (processRLD(buf, upto - buf, rlad, q, l2,
 +                                   sections, nsections,
 +                                   high ? &highrelocs : NULL) != 0)
-                     {
-                         term = 1;
-                         break;
-                     }
-                 }
--                else if (t == 3)
++                    {
++                        term = 1;
++                        break;
++                    }
++                }
 +                else if (t == 3 || t == 0x0f)
                  {
                      int l3;
@@ -2502,13 +2423,17 @@ index c86c1da..edfe586 100644
                      printf("l3 is %d\n", l3);
  #endif
 -                    if (processRLD(buf, rlad, q, l3) != 0)
+-                    {
+-                        term = 1;
+-                        break;
+-                    }
 +                    if (processRLD(buf, upto - buf, rlad, q, l3,
 +                                   sections, nsections,
 +                                   high ? &highrelocs : NULL) != 0)
-                     {
-                         term = 1;
-                         break;
-                     }
++                    {
++                        term = 1;
++                        break;
++                    }
 +                    if (l2 < 16 || (unsigned char)q[8] != 6)
 +                    {
 +                        term = 1;
@@ -2526,7 +2451,7 @@ index c86c1da..edfe586 100644
                      {
                          term = 1;
                          break;
-@@ -360,7 +562,13 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+@@ -360,7 +562,13 @@
                  }
                  else
                  {
@@ -2541,7 +2466,7 @@ index c86c1da..edfe586 100644
                  }
  #if 0
                  if ((t == 0x20) || (t == 2))
-@@ -405,20 +613,95 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+@@ -405,20 +613,95 @@
              break;
          }
      }
@@ -2612,6 +2537,8 @@ index c86c1da..edfe586 100644
      return (0);
  }
  
+-
+-int processRLD(char *buf, int rlad, char *rld, int len)
 +int fixPEMode(char *buf, int *len, int *entry, int rlad, int capacity,
 +              int *module_amode, int *module_rmode_any)
 +{
@@ -2630,8 +2557,7 @@ index c86c1da..edfe586 100644
 +{
 +    return fixPEMode(buf, len, entry, rlad, capacity, NULL, NULL);
 +}
- 
--int processRLD(char *buf, int rlad, char *rld, int len)
++
 +
 +static int processRLD(char *buf, int textlen, int rlad, char *rld, int len,
 +                      const PESECTION *sections, int nsections,
@@ -2639,7 +2565,7 @@ index c86c1da..edfe586 100644
  {
      int l;
      char *r;
-@@ -427,16 +710,40 @@ int processRLD(char *buf, int rlad, char *rld, int len)
+@@ -427,16 +710,40 @@
      int negative;
      int ll;
      int a;
@@ -2683,7 +2609,7 @@ index c86c1da..edfe586 100644
              if (r >= fin)
              {
                  printf("corrupt1 at position %x\n", r - rld - 4);
-@@ -449,9 +756,11 @@ int processRLD(char *buf, int rlad, char *rld, int len)
+@@ -449,9 +756,11 @@
              printf("got a negative adjustment - unsupported\n");
              return (-1);
          }
@@ -2698,7 +2624,7 @@ index c86c1da..edfe586 100644
          {
              printf("untested and unsupported relocation %d\n", ll);
              return (-1);
-@@ -471,16 +780,35 @@ int processRLD(char *buf, int rlad, char *rld, int len)
+@@ -471,16 +780,35 @@
              printf("corrupt2 at position %x\n", r - rld);
              return (-1);
          }
@@ -2742,8 +2668,6 @@ index c86c1da..edfe586 100644
          r += 3;
      }
      return (0);
-diff --git a/s370/pdosutil.h b/s370/pdosutil.h
-index fa85a33..ea6a75d 100644
 --- a/s370/pdosutil.h
 +++ b/s370/pdosutil.h
 @@ -11,5 +11,9 @@
@@ -2758,11 +2682,9 @@ index fa85a33..ea6a75d 100644
 +              int *module_amode, int *module_rmode_any);
 +int fixPEHigh(char *buf, int *len, int *entry_offset,
 +              unsigned int base_low, int capacity);
-diff --git a/s370/pload.c b/s370/pload.c
-index c628349..19acecb 100644
 --- a/s370/pload.c
 +++ b/s370/pload.c
-@@ -125,7 +125,8 @@ int main(int argc, char **argv)
+@@ -125,7 +125,8 @@
          rec++;
      }
      cnt = load - start;
@@ -2772,3 +2694,119 @@ index c628349..19acecb 100644
      {
          printf("MVS PE module corrupt\n");
      }
+--- a/pdpclib/mvssupa.asm
++++ b/pdpclib/mvssupa.asm
+@@ -902,6 +902,8 @@
+ *  Note that this test may fail for data sets written under DOS
+          TM    FM1SMSFG,FM1STRP+FM1PDSEX+FM1DSAE  Usable
+          BNZ   BADDSORG             No; too bad
++         TM    FM1SMSFG,FM1PDSE  PDSE has no valid DS1LSTAR
++         BNZ   DDCX1DD             Let normal access methods check it
+          LA    R0,ORFBDPDS        Preset - not initialized
+          ICM   R15,7,DS1LSTAR     Any directory blocks?
+          BZ    OPRERR               No; fail
+@@ -3725,7 +3727,8 @@
+ *   PREPARE DYNAMIC ALLOCATION REQUEST LISTS
+ *
+          LA    R0,ALLARB
+-         STCM  R0,7,ALLARBP+1     REQUEST POINTER
++         O     R0,=X'80000000'   TERMINATE FULL 31-BIT RB POINTER
++         ST    R0,ALLARBP         DO NOT RETAIN TEMPLATE HIGH BYTE
+          LA    R0,ALLATXTP
+          ST    R0,ALLARB+8        TEXT UNIT POINTER
+          LA    R0,ALLAXDSN
+@@ -3751,7 +3754,8 @@
+ DYNALDDN SR    R5,R5              SIGNAL NO FEEDBACK
+ *  WHEN USER SUPPLIES A DD NAME, DO AN UNCONDITIONAL UNALLOCATE ON IT
+          LA    R0,ALLURB
+-         STCM  R0,7,ALLURBP+1     REQUEST POINTER
++         O     R0,=X'80000000'   TERMINATE FULL 31-BIT RB POINTER
++         ST    R0,ALLURBP         DO NOT RETAIN TEMPLATE HIGH BYTE
+          LA    R0,ALLUTXTP
+          ST    R0,ALLURB+8        TEXT UNIT POINTER
+          LA    R2,ALLUXDDN
+@@ -4813,7 +4817,7 @@
+ FM1FLAG  EQU   DS1NOBDB+1,1,C'X'  MORE FLAGS
+ FM1COMPR EQU   X'80'           COMPRESSABLE EXTENDED IF DS1STRP
+ FM1CPOIT EQU   X'40'           CHECKPOINTED D S
+-FM1SMSFG EQU   FM1FLAG+1,1,C'X'  SMS FLAG
++FM1SMSFG EQU   FM1FLAG+17,1,C'X' SMS flag at DSCB byte 78
+ FM1SMSDS EQU   X'80'           SMS D S
+ FM1SMSUC EQU   X'40'           NO BCS ENTRY
+ FM1REBLK EQU   X'20'           MAY BE REBLOCKED
+--- a/pdpclib/pdptop.mac
++++ b/pdpclib/pdptop.mac
+@@ -88,3 +88,8 @@
+          AMODE ANY
+          RMODE ANY
+ *
++* ESA/390 low-core fields absent from this z/OS IHAPSA mapping.
++* At B8 IPL leaves the subchannel identification word for SSCH.
++* CAW at 48 is only used by the older SIO path in these sources.
++FLCIOA   EQU   X'B8'
++FLCCAW   EQU   X'48'
+--- a/pdpclib/stdio.c
++++ b/pdpclib/stdio.c
+@@ -1424,6 +1424,15 @@
+     {
+         mode = 1; /* writing */
+     }
++#if defined(__PDOS390__)
++    else if ((modeType == 10) || (modeType == 11))
++    {
++        /* SAPSUPA explicitly does not support update mode. */
++        err = 1;
++        errno = 2;
++        return;
++    }
++#else
+     else if (modeType == 10)
+     {
+         fprintf(stderr, "we don't have the ability to do update, "
+@@ -1437,6 +1446,7 @@
+                 "but switching to write mode as a kludge\n");
+         mode = 1;
+     }
++#endif
+     else
+     {
+         mode = 2; /* update */
+@@ -1821,7 +1831,9 @@
+ 
+     mode &= 0x03; /* only interested in the simple mode now */
+ 
+-    if (myfile->update)
++#if !defined(__PDOS390__)
++    /* w+b falls back to a write-only native handle, not an update handle. */
++    if (myfile->update && modeType != 11)
+     {
+         unsigned int data[7];
+         unsigned int parm;
+@@ -1865,6 +1877,7 @@
+         */
+ #endif
+     }
++#endif
+ 
+     /* recfm=f and v are effecively always line-buffered
+        because we currently do not support blocking. as
+@@ -5885,7 +5898,7 @@
+         }
+ #endif
+ #if defined(__MVS__) || defined(__CMS__)
+-#if defined(__MVS__)
++#if defined(__MVS__) && !defined(__PDOS390__)
+     if (stream->update)
+     {
+         unsigned int record_num;
+--- a/pdpclib/string.h
++++ b/pdpclib/string.h
+@@ -123,7 +123,7 @@
+ #endif
+ 
+ #if defined (__GNUC__) && __GNUC__ >= 3 && !defined(__ARM__) \
+-    && !defined(__64BIT__)
++    && !defined(__64BIT__) && !defined(__PDOS390__)
+ #define memcpy(s1,s2,n) (__builtin_memcpy((s1),(s2),(n)))
+ #define memcmp(s1,s2,n) (__builtin_memcmp((s1),(s2),(n)))
+ #endif

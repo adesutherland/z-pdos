@@ -23,7 +23,7 @@ and first PDPCLIB language delivery, and selected MVS 3.8 / real System/370 /
 I then selected this repository as the maintained home of PDPCLIB and our
 library fixes. The [library source record](../../../pdpclib/SOURCES.md)
 identifies the complete import; its [change ledger](../../../pdpclib/CHANGES.md)
-consolidates the six Lab/SDK deltas without mixing source lineages or target
+consolidates the Lab/SDK deltas and relevant canonical upstream fixes with explicit target
 profiles. The selected MVS 3.8 configuration member is now present; full
 assembly and native service qualification remain open.
 
@@ -140,7 +140,8 @@ Use [the source guide](../../../architecture/SOURCES.md), [consumer inventory](C
 ## Repaired PDIO1 OS consumer — 1 October
 
 The [repaired PDIO1 OS import](../../../os/pdos/README.md) preserves the actual
-qualified source and runtime selection, with all 17 C units compiling to text
+qualified input in Git history. Its working build uses the single maintained
+PDPCLIB with merged fixes, with all 17 C units compiling to text
 under Classic C. Its [build plan](../../../os/pdos/BUILD-PLAN.md) now owns the
 concrete OS consumer sequence and first source-language failures. The existing
 MVS 3.8/System/370 library target retains its separate scope.

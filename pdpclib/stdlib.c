@@ -96,6 +96,17 @@ int __mmgid = 0; /* memmgr id to use - normally 0 */
 void *__lastsup = NULL; /* last thing supplied to memmgr */
 #endif
 
+/* kludge to get consistent memory address on MacOS */
+/* when switching on USE_MEMMGR */
+#if KLUDGE_MAC
+#undef MAX_CHUNK
+#undef REQ_CHUNK
+/* don't exceed 4 GiB because the code doesn't
+   do that properly yet. So request 2 GiB instead */
+#define MAX_CHUNK 0x80000000UL /* maximum size we will store in memmgr */
+#define REQ_CHUNK 0x80000000UL /* size that we request from OS */
+#endif
+
 #ifdef __MSDOS__
 #if defined(__WATCOMC__) && !defined(__32BIT__)
 #define CTYP __cdecl
@@ -123,6 +134,12 @@ typedef struct {
     int flags;
     int fd;
     long offset;
+    /* note that I don't think this offset2 is really a
+       parameter - I think the file offset is allowed to
+       be 64-bit, and if I am using a compiler with 32-bit
+       long, I set this to 0 as well to avoid needing to
+       support "long long".
+    */
     long offset2;
 } mmstruc;
 
@@ -171,6 +188,9 @@ void __exita(int a);
    back to using MEMMGR and have an internal buffer in BSS,
    where the load address can be controlled */
 /* #define MAP_32BIT 0x8000 */
+/* We probably want the flag set even for 32-bit z/Linux, since
+   we may be running it as 64-bit and need the memory to be
+   allocated below 4 GiB to be addressable */
 #define MAP_32BIT 0x0
 #else
 #define MAP_32BIT 0x40
@@ -182,6 +202,8 @@ void __exita(int a);
 #endif
 
 void (*__userExit[__NATEXIT])(void);
+int __usrExitRunnum[__NATEXIT];
+extern int __runnum;
 
 /* we should migrate everyone to use these internal routines */
 #if defined(__OS2__)
@@ -254,7 +276,10 @@ static void *imalloc(size_t size)
     return ((void *)BaseAddress);
 #endif
 }
+#endif
 
+
+#ifdef __OS2__
 /* in case the low-level routine needs the original size,
    we pass that as a parameter */
 static int ifree(void *ptr, size_t size)
@@ -270,6 +295,91 @@ static int ifree(void *ptr, size_t size)
 }
 #endif
 
+
+
+#if defined(__gnu_linux__) \
+    || (defined(__ARM__) \
+        && !(defined(__WIN32__) || defined(__EFI__)))
+static void *imalloc(size_t size)
+{
+    void *ptr;
+
+    {
+        mmstruc mms;
+
+        mms.addr = NULL;
+        mms.length = size + sizeof(size_t);
+#if defined(__MACOS__) && defined(__ARM__)
+        /* MacOS has a restriction that you can't create rwx memory,
+           so we need to drop execute permission. Instead you will
+           need to run a virtual machine of some sort, which is still
+           near native speed, and the Silicon M1 or whatever extensions
+           are disabled. That's how things like Linux manage to run
+           on an M1 */
+        mms.prot = PROT_READ | PROT_WRITE;
+#else
+        mms.prot = PROT_READ | PROT_WRITE | PROT_EXEC;
+#endif
+        mms.flags = MAP_ANONYMOUS | MAP_PRIVATE | MAP_32BIT;
+        mms.fd = -1;
+        mms.offset = 0;
+        mms.offset2 = 0;
+#if (defined(__ARM__) && !defined(__WIN32__)) || defined(__64BIT__) \
+    || defined(__BIGFOOT__)
+        ptr = __mmap(mms.addr, mms.length, mms.prot,
+                     mms.flags, mms.fd, mms.offset, mms.offset2);
+#else
+        ptr = __mmap(&mms);
+#endif
+
+        /* errors are high pointers - not sure how high - which
+           seem to be a negative errno */
+        /* for MacOS they are low positive numbers */
+#ifdef __MACOS__
+        if (ptr < (void *)256)
+#else
+        if (ptr > (void *)-256)
+#endif
+        {
+            ptr = NULL;
+        }
+        if (ptr != NULL)
+        {
+#if KLUDGE_MAC
+            /* kludge to get consistent addresses on MacOS */
+            /* We increment by 1 GiB, expecting 2 GiB available */
+            ptrdiff_t x;
+
+            x = (ptrdiff_t)ptr;
+            x +=  0x40000000UL;
+            x &= ~0x3fffffffUL;
+            ptr = (void *)x;
+#endif
+            *(size_t *)ptr = size;
+            ptr = (char *)ptr + sizeof(size_t);
+        }
+    }
+    return (ptr);
+}
+#endif
+
+
+#if defined(__gnu_linux__) \
+    || (defined(__ARM__) \
+        && !(defined(__WIN32__) || defined(__EFI__)))
+/* in case the low-level routine needs the original size,
+   we pass that as a parameter */
+static int ifree(void *ptr, size_t size)
+{
+    if (ptr != NULL)
+    {
+        ptr = (char *)ptr - sizeof(size_t);
+        /* this returns 0 on success */
+        __munmap(ptr, *(size_t *)ptr + sizeof(size_t));
+    }
+    return (0);
+}
+#endif
 
 
 /* note that Win64 (probably officially Win32 too) requires
@@ -432,8 +542,9 @@ __PDPCLIB_API__ void *malloc(size_t size)
             *(size_t *)ptr = size;
             ptr = (char *)ptr + sizeof(size_t);
         }
+/* should combine this with the OS/2 version */
 #elif defined(__gnu_linux__) || (defined(__ARM__) && !defined(__WIN32__))
-        ptr = __allocmem(size + sizeof(size_t));
+        ptr = imalloc(size + sizeof(size_t));
         if (ptr != NULL)
         {
             *(size_t *)ptr = size;
@@ -481,10 +592,13 @@ __PDPCLIB_API__ void *malloc(size_t size)
                 *(size_t *)ptr2 = size;
                 ptr2 = (char *)ptr2 + sizeof(size_t);
             }
+/* should combine this with the OS/2 version */
+/* but this uses multiple requests so more complicated */
+/* merge should be the other way around */
 #elif defined(__gnu_linux__) || (defined(__ARM__) && !defined(__WIN32__))
             if (__memmgr.start == NULL)
             {
-                ptr2 = __allocmem(REQ_CHUNK);
+                ptr2 = imalloc(REQ_CHUNK);
             }
             else
             {
@@ -512,7 +626,10 @@ __PDPCLIB_API__ void *malloc(size_t size)
 #if defined(__MVS__) || defined(__CMS__)
     return (__getm(size));
 
-#elif defined(__OS2__)
+#elif defined(__OS2__) || \
+ (defined(__gnu_linux__) || \
+  (defined(__ARM__) && \
+   !(defined(__WIN32__) || defined(__EFI__))))
     size_t *baseaddress;
 
     baseaddress = imalloc(size + sizeof(size_t));
@@ -539,67 +656,6 @@ __PDPCLIB_API__ void *malloc(size_t size)
     }
     return (ptr);
 
-#elif defined(__gnu_linux__) || (defined(__ARM__) && !defined(__WIN32__))
-    void *ptr;
-
-#if 0
-    {
-        int fd;
-        /* may need this on old systems */
-        fd = __open("/dev/zero", O_RDWR);
-        ptr = __mmap(NULL, size + sizeof(size_t),
-                     PROT_READ | PROT_WRITE | PROT_EXEC,
-                     MAP_PRIVATE, fd, 0);
-        close(fd); /* I think this can be done immediately */
-    }
-#else
-    {
-        mmstruc mms;
-
-        mms.addr = NULL;
-        mms.length = size + sizeof(size_t);
-#ifdef __MACOS__
-        /* MacOS has a restriction that you can't create rwx memory,
-           so we need to drop execute permission. Instead you will
-           need to run a virtual machine of some sort, which is still
-           near native speed, and the Silicon M1 or whatever extensions
-           are disabled. That's how things like Linux manage to run
-           on an M1 */
-        mms.prot = PROT_READ | PROT_WRITE;
-#else
-        mms.prot = PROT_READ | PROT_WRITE | PROT_EXEC;
-#endif
-        mms.flags = MAP_ANONYMOUS | MAP_PRIVATE | MAP_32BIT;
-        mms.fd = -1;
-        mms.offset = 0;
-        mms.offset2 = 0;
-#if (defined(__ARM__) && !defined(__WIN32__)) || defined(__64BIT__) \
-    || defined(__BIGFOOT__)
-        ptr = __mmap(mms.addr, mms.length, mms.prot,
-                     mms.flags, mms.fd, mms.offset, mms.offset2);
-#else
-        ptr = __mmap(&mms);
-#endif
-
-        /* errors are high pointers - not sure how high - which
-           seem to be a negative errno */
-        /* for MacOS they are low positive numbers */
-#ifdef __MACOS__
-        if (ptr < (void *)256)
-#else
-        if (ptr > (void *)-256)
-#endif
-        {
-            ptr = NULL;
-        }
-        if (ptr != NULL)
-        {
-            *(size_t *)ptr = size;
-            ptr = (char *)ptr + sizeof(size_t);
-        }
-    }
-#endif
-    return (ptr);
 #endif
 
 #endif /* not MEMMGR */
@@ -746,6 +802,11 @@ __PDPCLIB_API__ void free(void *ptr)
             ptr = (char *)ptr - sizeof(size_t);
             ifree(ptr, *(size_t *)ptr);
 
+/* should combine this with OS/2 version */
+#elif defined(__gnu_linux__) || (defined(__ARM__) && !defined(__WIN32__))
+            ptr = (char *)ptr - sizeof(size_t);
+            ifree(ptr, *(size_t *)ptr);
+
 #elif defined(__WIN32__)
             GlobalFree(((size_t *)ptr) - 1);
 #endif
@@ -764,7 +825,7 @@ __PDPCLIB_API__ void free(void *ptr)
     }
 #endif
 
-#ifdef __OS2__
+#if defined(__OS2__) || defined(__gnu_linux__)
     if (ptr != NULL)
     {
         ptr = (char *)ptr - sizeof(size_t);
@@ -782,15 +843,6 @@ __PDPCLIB_API__ void free(void *ptr)
     }
 #endif
 
-#ifdef __gnu_linux__
-    if (ptr != NULL)
-    {
-        ptr = (char *)ptr - sizeof(size_t);
-        /* this returns 0 on success */
-        __munmap(ptr, *(size_t *)ptr + sizeof(size_t));
-    }
-#endif
-
 #endif /* not USE_MEMMGR */
     return;
 }
@@ -805,14 +857,21 @@ __PDPCLIB_API__ void abort(void)
 #endif
 }
 
+/* hopefully we can unconditionally do this, which is useful
+   for when setjmp/longjmp have not been implemented yet */
 #if !defined(__EMX__) && !defined(__GNUC__) && !defined(__gnu_linux__) \
     && !(defined(__ARM__) && !defined(__WIN32__)) \
     || defined(WATLIN) \
     || (defined(__ARM__) && defined(__64BIT__)) \
-    || defined(__MSC__)
+    || defined(__MSC__) \
+    || defined(__EFI__)
 void __exit(int status);
 #else
-void __exit(int status) __attribute__((noreturn));
+/* this noreturn was added to avoid a warning from gcc 3.2.3
+   but I have since stopped the warning by disabling builtins.
+   And I commented out the noreturn when I was compiling with xcc
+   for Windows and it gave an error */
+void __exit(int status) /* __attribute__((noreturn)) */ ;
 #endif
 
 __PDPCLIB_API__ void exit(int status)
@@ -1264,6 +1323,7 @@ __PDPCLIB_API__ int atexit(void (*func)(void))
         if (__userExit[x] == 0)
         {
             __userExit[x] = func;
+            __usrExitRunnum[x] = __runnum;
             return (0);
         }
     }
@@ -1339,6 +1399,15 @@ __PDPCLIB_API__ char *getenv(const char *name)
 #endif
     return (NULL);
 }
+
+
+#if defined(__gnu_linux__) || defined(__MACOS__)
+extern char *__inptr;
+#endif
+
+#ifdef __MACOS__
+extern char *__envptr;
+#endif
 
 /* The following code was taken from Paul Markham's "EXEC" program,
    and adapted to create a system() function.  The code is all
@@ -1486,7 +1555,7 @@ __PDPCLIB_API__ int system(const char *string)
     return (__getrc());
 #endif
 
-#if defined(__gnu_linux__)
+#if defined(__gnu_linux__) || defined(__MACOS__)
     int rc;
     long pid;
     static int argc = 4;
@@ -1494,6 +1563,25 @@ __PDPCLIB_API__ int system(const char *string)
                             "-c",
                             NULL, /* will be filled in */
                             NULL };
+    char *envptr = __inptr;
+
+#ifdef __MACOS__
+    if (__envptr != NULL)
+    {
+        envptr = __envptr;
+    }
+    else
+    {
+#endif
+    envptr += sizeof(void *); /* skip argc */
+    while (*(char **)envptr != NULL)
+    {
+        envptr += sizeof(char *);
+    }
+    envptr += sizeof(char *); /* skip last argv, and now on environment */
+#ifdef __MACOS__
+    }
+#endif
 
     /* printf("in system\n"); */
     argv[2] = (char *)string;
@@ -1510,10 +1598,19 @@ __PDPCLIB_API__ int system(const char *string)
 #endif
     if (pid != 0)
     {
+        int siginfo[64]; /* bigger than needed, for now */
+
         /* printf("in parent\n"); */
         /* first parm is 0 for P_ALL or 1 for P_PID */
-        /* 4 in 4th parm = W_EXITED */
-        rc = __waitid(0, pid, NULL, 4, NULL);
+        /* 4 in 4th parm = WEXITED */
+        /* MacOS requires a non-NULL siginfo struct */
+#ifdef __MACOS__
+        __waitid(0, pid, siginfo, 4, NULL);
+        rc = siginfo[5];
+#else
+        __waitid(0, pid, siginfo, 4, NULL);
+        rc = siginfo[6];
+#endif
         /* printf("finished waiting\n"); */
     }
     else
@@ -1527,7 +1624,7 @@ __PDPCLIB_API__ int system(const char *string)
            within the rules of vfork where we are supposed to
            immediately execute execve. Just in case that is
            needed. */
-        rc = __execve("/bin/sh", argv, NULL);
+        rc = __execve("/bin/sh", argv, envptr);
         if ((rc == -1) && (errno != 0))
         {
             /* failure to execute on Linux - exit with -1 */

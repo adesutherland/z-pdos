@@ -32,8 +32,9 @@ void *pdpqa_malloc(size_t size)
 {
     void *result;
     if (pdpqa_calls.fail_malloc) return NULL;
-    /* Upstream osfopen reads FILE flags before fopen3 initializes them. */
+    /* Supply a stale flag so checkMode must initialize it before osfopen. */
     result = calloc(1, size);
+    if (result != NULL && size == sizeof(FILE)) ((FILE *)result)->update = 1;
     if (result != NULL) ++pdpqa_calls.allocations;
     return result;
 }

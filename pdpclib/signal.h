@@ -13,9 +13,14 @@
 #ifndef __SIGNAL_INCLUDED
 #define __SIGNAL_INCLUDED
 
-#if defined(__PDPCLIB_DLL) && !defined(__WATCOMC__) \
+#if !defined(__PDPCLIB_HEADFUNC) \
+    && defined(__PDPCLIB_DLL) && !defined(__WATCOMC__) \
     && !defined(__NODECLSPEC__)
+#ifdef __SCC__
+#define __PDPCLIB_HEADFUNC __dllexport
+#else
 #define __PDPCLIB_HEADFUNC __declspec(dllexport)
+#endif
 #endif
 
 #ifndef __PDPCLIB_HEADFUNC

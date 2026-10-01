@@ -13,9 +13,14 @@
 #ifndef __STDLIB_INCLUDED
 #define __STDLIB_INCLUDED
 
-#if defined(__PDPCLIB_DLL) && !defined(__WATCOMC__) \
+#if !defined(__PDPCLIB_HEADFUNC) \
+    && defined(__PDPCLIB_DLL) && !defined(__WATCOMC__) \
     && !defined(__NODECLSPEC__)
+#ifdef __SCC__
+#define __PDPCLIB_HEADFUNC __dllexport
+#else
 #define __PDPCLIB_HEADFUNC __declspec(dllexport)
+#endif
 #endif
 
 #ifndef __PDPCLIB_HEADFUNC
@@ -55,7 +60,9 @@ typedef char wchar_t;
 typedef struct { int quot; int rem; } div_t;
 typedef struct { long quot; long rem; } ldiv_t;
 
+#ifndef NULL
 #define NULL ((void *)0)
+#endif
 #define EXIT_SUCCESS 0
 #if defined(__MVS__) || defined(__CMS__) || defined(__VSE__)
 #define EXIT_FAILURE 12

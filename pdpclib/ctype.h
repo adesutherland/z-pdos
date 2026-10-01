@@ -38,6 +38,7 @@ int toupper(int c);
 #define isalnum __os->isalnum
 #define isxdigit __os->isxdigit
 #define isdigit __os->isdigit
+#define isgraph __os->isgraph
 #define isalpha __os->isalpha
 #define isprint __os->isprint
 #define isspace __os->isspace
@@ -53,6 +54,7 @@ extern unsigned short *__isbuf;
 extern short *__tolow;
 extern short *__toup;
 
+#ifndef __HACK_RELOC
 #define isalnum(c) (__isbuf[(c)] & 0x0001U)
 #define isalpha(c) (__isbuf[(c)] & 0x0002U)
 #define iscntrl(c) (__isbuf[(c)] & 0x0004U)
@@ -66,6 +68,7 @@ extern short *__toup;
 #define isxdigit(c) (__isbuf[(c)] & 0x0400U)
 #define tolower(c) (__tolow[(c)])
 #define toupper(c) (__toup[(c)])
+#endif /* __HACK_RELOC */
 #endif
 
 #endif

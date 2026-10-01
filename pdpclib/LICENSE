@@ -6,6 +6,12 @@ source files retain their notices and contributor history. Original z-pdos
 changes and integration files follow the repository MIT grant; that grant
 does not alter these upstream terms.
 
+The canonical upstream runtime changes merged on 1 October retain their
+individual notices. The current pdpclib.txt also includes upstream's caution
+about a later vsesupa.asm copyright question. That later VSE implementation
+was not imported by this runtime merge; inspect each native file's notices
+before a future port or source replacement.
+
 Written by Paul Edwards.
 Released to the public domain.
 You may use this entire package for any purpose whatsoever without

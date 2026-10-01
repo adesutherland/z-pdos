@@ -12,10 +12,10 @@ repairs belong to their own components.
 | PDPCLIB 0003: DYNAL pointer words | Shared `mvssupa.asm` correction: write both complete request-list pointers with their terminating high bit; do not retain a relocated template's high byte. |
 | PDPCLIB 0002: prefix-parser omission | Optional `tso31-lean/omit-prefix-parser.patch`; full maintained source retains `@@GETEPF` and `@@PCLST`. |
 | PDOS390 0002: native-build compatibility | Guarded C fixes in `string.h` and `stdio.c`; ESA configuration changes in `pdos390-esa/pdptop.mac`. |
-| PDOS64 0001: restore OS switches | Explicit `pdos-zarch-reference/pdptop.mac`, preserving the original switch meaning separately from ESA and MVS profiles. |
+| PDOS64 0001: restore OS switches | Explicit `pdos-zarch/pdptop.mac`, preserving the original switch meaning separately from ESA and MVS profiles. |
 | SDK PDPCLIB 0004 / Lab TSO15 compatibility | Optional `tso-zos15-24/swareq.patch`; temporary SAM31/SAM24 and z/OS SWAREQ remain restricted to that later-machine variant. |
 
-## Exact retained deltas
+## Original delta identities
 
 | Delta | Original SHA-256 |
 | --- | --- |
@@ -35,8 +35,8 @@ README cleanup changed documentation references only, not library code.
 
 The earlier lean TSO31 source identity was
 `b8389b2b39bc945a5480311dc274a84d47f7c04db98b1a66fa82f6cdde20753d`.
-Preparation from the consolidated main source plus the lean omission must
-reproduce that exact native file. The five-service closure and high-placement
+The initial consolidated main source plus the lean omission reproduced that
+exact native file. The five-service closure and high-placement
 checks for that source are retained; no passing guest run is repeated here.
 
 The earlier PDSE-only plus TSO24 SWAREQ source identity was
@@ -51,8 +51,38 @@ assembly/service execution, later profile execution and native library/tool
 hosting remain open. The independent PDLD nonzero-origin regression is a
 linker repair, not a change to the parser source or a reason to omit it.
 
-On 1 October the repaired OS import adds the frozen
-[PDIO1 runtime selection](reference/pdio1/README.md). It preserves the exact
-canonical inputs for the accepted kernel and does not change maintained
-top-level library code. Replacing that OS dependency with a consolidated
-maintained profile needs a separate source comparison and qualification.
+## One maintained runtime — 1 October
+
+The repaired OS import first preserved the exact canonical runtime input in
+commit `d62b109ed986bd455732484173ff4ebe0533045a`. I then selected one maintained
+PDPCLIB for all consumers. Git retains that original qualification checkpoint;
+the duplicate source directory is removed.
+
+We compared all 44 selected files and merged 19 differing shared files:
+`assert.h`, `ctype.c/.h`, `limits.h`, `locale.h`, `math.h`, `mvssupa.asm`,
+`pdpclib.txt`, `setjmp.h`, `signal.h`, `start.c`, `stdarg.h`, `stddef.h`,
+`stdio.c/.h`, `stdlib.c/.h`, `string.h` and `time.h`. The low-core configuration
+already existed as a profile; it is now named `pdos-zarch` and is selected by
+the OS recipe. Other selected inputs were already identical.
+
+The canonical updates include initialized FILE update state before native
+open, run-specific exit handlers, the full-width LP64 unsigned-long limit,
+64-bit argument alignment, EBCDIC table selection, additional header guards
+and conditional upstream port support. These upstream fixes are adopted
+once; previously fixed PDOS/390 builtin and update-service guards remain.
+MVSSUPA keeps the shared DSCB/PDSE and complete DYNAL-pointer repairs while
+adopting upstream CSECT mode metadata and USING-scope corrections. The three
+source-owned macro definitions used by the assembler consumer are unchanged.
+
+Earlier update initialization exposes an MVS regression: `w+b` uses the
+existing write-only fallback, so native open must not prime it through the
+read/update block. The shared source excludes that mode from the block. Host
+tests check stale allocation flags, ordinary opens, both update spellings,
+the unchanged native write mode and absence of read/point calls for that
+fallback. Removing initialization or the fallback guard fails the controls.
+
+The optional lean patch is rebased to omit the new empty `@@PCLST` declaration
+and its conditional DSN-stub references as well as the unchanged parser. The
+SWAREQ profile remains an explicit later-system adapter. Both now produce new
+whole-source identities; old variant hashes are historical guest inputs.
+There is no automatic transfer of their previous whole-source qualification.

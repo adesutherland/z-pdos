@@ -13,9 +13,14 @@
 #ifndef __LOCALE_INCLUDED
 #define __LOCALE_INCLUDED
 
-#if defined(__PDPCLIB_DLL) && !defined(__WATCOMC__) \
+#if !defined(__PDPCLIB_HEADFUNC) \
+    && defined(__PDPCLIB_DLL) && !defined(__WATCOMC__) \
     && !defined(__NODECLSPEC__)
+#ifdef __SCC__
+#define __PDPCLIB_HEADFUNC __dllexport
+#else
 #define __PDPCLIB_HEADFUNC __declspec(dllexport)
+#endif
 #endif
 
 #ifndef __PDPCLIB_HEADFUNC
@@ -43,7 +48,9 @@ struct lconv {
     char n_sign_posn;
 };
 
+#ifndef NULL
 #define NULL ((void *)0)
+#endif
 #define LC_ALL 1
 #define LC_COLLATE 2
 #define LC_CTYPE 3

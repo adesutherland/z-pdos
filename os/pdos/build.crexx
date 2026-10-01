@@ -6,7 +6,7 @@ options levelb
 import rxfnsb
 main: procedure = .int
   arg args = .string[]
-  i = .int; output = .string
+  i = .int; output = .string; file = .string
   if args.0 < 1 | args.0 > 2 then return usage()
   action = args.1
   if action <> "check" & action <> "compile" then return usage()
@@ -23,7 +23,7 @@ main: procedure = .int
   address crexx "run cmake -E make_directory :out :temporary"
   call require rc = 0, "create output"
   address system "shasum -a 256 -c os/pdos/source.sha256 > " || shellquote(out || "/source-check.log")
-  call require rc = 0, "all retained qualified source hashes"
+  call require rc = 0, "all maintained source hashes"
   patchdir = root || "/os/pdos/patches"
   address crexx "cd :patchdir"
   address system "shasum -a 256 -c original.sha256 > " || shellquote(out || "/patch-check.log")
@@ -31,12 +31,22 @@ main: procedure = .int
   address crexx "cd :root"
   address crexx "run cmake -E copy_directory os/pdos/source :source"
   call require rc = 0, "prepare OS source"
-  address crexx "run cmake -E copy_directory pdpclib/reference/pdio1/source :runtime"
-  call require rc = 0, "prepare exact reference runtime"
+  address crexx "run cmake -E make_directory :runtime"
+  call require rc = 0, "create selected runtime directory"
+  runtime_inputs = readlines(root || "/os/pdos/runtime-inputs.txt")
+  do i = 1 to runtime_inputs.0
+    file = strip(runtime_inputs[i])
+    call require words(file) = 1 & pos("/",file) = 0 & pos("..",file) = 0, "runtime input filename"
+    from = root || "/pdpclib/" || file
+    if file = "pdptop.mac" then from = root || "/pdpclib/profiles/pdos-zarch/pdptop.mac"
+    target = runtime || "/" || file
+    address crexx "run cmake -E copy :from :target"
+    call require rc = 0, "prepare maintained runtime " || file
+  end
   address crexx "cd :source"
-  manifest = root || "/os/pdos/qualified.sha256"
+  manifest = root || "/os/pdos/prepared.sha256"
   address system "shasum -a 256 -c " || shellquote(manifest) || " > " || shellquote(out || "/prepared-check.log")
-  call require rc = 0, "prepared source matches qualified manifest"
+  call require rc = 0, "prepared source matches maintained selection"
   address crexx "cd :root"
   if action = "check" then do
     negative = out || "/before-0005"
@@ -63,7 +73,7 @@ main: procedure = .int
         else call require rc = 0, "repaired " || check || " passes ASAN/UBSAN"
       end
     end
-    say "PDIO1 retained and prepared source hashes pass; old fault controls fail; repaired functions pass ASAN/UBSAN."
+    say "Maintained OS/runtime source hashes pass; old fault controls fail; repaired functions pass ASAN/UBSAN."
     return 0
   end
   compiler = root || "/build/classic-cc/mvs/gcc/mf-classic-cc"

@@ -25,6 +25,8 @@ are references or consumers, not places to make new library fixes.
   and generated objects stay outside source control. Read-only Lab/SDK input
   must not be changed during consolidation.
 
-- `reference/pdio1/` freezes a selected canonical source input for reproducing
-  the repaired OS. It is not another maintained library. Preserve that baseline
-  and qualify a deliberate lineage/profile transition before replacing it.
+- OS and application builds consume this one maintained library. Merge fixes
+  here, including relevant upstream changes from a different source lineage.
+  Keep justified configuration/service differences in explicit profiles and
+  earlier whole-source versions in Git history. A merged candidate does not
+  inherit a previous binary or whole-source guest qualification.

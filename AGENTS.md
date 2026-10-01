@@ -15,8 +15,9 @@ Read its component guide and source record. Its GCC-derived implementation
 retains GPL terms and is separate from the original assembler. The current
 native host build emits assembly text; complete toolchain qualification is open.
 The repaired PDIO1 OS source lives in `os/pdos/`. Read its guide and source
-record. Its exact canonical qualification runtime selection is frozen in
-`pdpclib/reference/pdio1/`; it is distinct from the maintained mirror lineage.
+record. It consumes the maintained `pdpclib/` source with an explicit profile.
+Each product has one maintained source version. Git commits preserve earlier
+checkpoints; separate source trees require a specific, documented divergence.
 
 - Read the component guide and inspect Git status before editing. Preserve
   unrelated changes. Do not commit, push or publish without session authority.

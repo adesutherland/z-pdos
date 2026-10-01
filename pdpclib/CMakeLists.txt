@@ -18,6 +18,12 @@ endif()
 
 # The fixture depends on GCC-compatible native varargs and symbol labels.
 if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+  include(CheckTypeSize)
+  check_type_size("unsigned long" PDPCLIB_HOST_ULONG_BYTES LANGUAGE C)
+  if(PDPCLIB_HOST_ULONG_BYTES EQUAL 8)
+    add_executable(test_pdpclib_limits tests/test_limits.c)
+    add_test(NAME pdpclib_limits_long64 COMMAND test_pdpclib_limits)
+  endif()
   add_library(pdpclib_qa_report OBJECT tests/report_failure.c)
   # Inherited stdio was written for historical compilers, not modern host
   # warning policy. Keep strict warnings on our harness and native stubs.

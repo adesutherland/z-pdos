@@ -4,11 +4,13 @@
 target. We preserve its accepted behavior and drive the Classic Tools work
 from its actual compiler, runtime and support inputs. Source preservation,
 C compilation, assembly, linking, source-built boot and application execution
-have separate acceptance results.
+have separate acceptance results. There is one maintained PDPCLIB source;
+the exact original qualified runtime is preserved in Git. The active merged
+runtime is a new candidate for the later link, boot and application gates.
 
 | Gate | Acceptance | State |
 | --- | --- | --- |
-| PD-01: preserve source | Exact selected OS/runtime bytes, original patches, notices, manifests and clean recovery; real-function old/new failure controls | Complete locally; see CHECKPOINT.md |
+| PD-01: preserve source | Original qualified input preserved by commit; one maintained OS/runtime selection, notices, manifests and clean recovery; real-function old/new failure controls | Complete locally; see CHECKPOINT.md |
 | PD-02: new C producer | All 17 selected units compile with pinned Classic C and explicit source/runtime configuration | Complete for assembly-text generation; symbol/helper closure and target execution open |
 | PD-03: first Classic object | A small C function uses the retained PDPMAC convention, assembles independently and passes separately expected object/relocation checks | Open; generated output stops at COPY |
 | PD-04: source assembly | The selected runtime, loader and kernel source assemble under an explicit z/Architecture kernel contract, with required macro/service and instruction coverage | Open; support source first stops at TITLE |

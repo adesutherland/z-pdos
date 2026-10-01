@@ -6,9 +6,11 @@ home of z/PDOS and **Mainframe Classic Tools**, which use traditional mainframe
 assembly and object conventions.
 
 The [repaired PDIO1 OS source](os/pdos/README.md) now preserves the kernel
-used for the 1 October cREXX beta 3 HIGH qualification, with exact source,
-runtime selection, repair history and recovery checks. Its 17 C build units
-compile with Mainframe Classic C. Independent whole-source assembly, linking,
+used for the 1 October cREXX beta 3 HIGH qualification, with repair history
+and recovery checks. It uses our one maintained PDPCLIB, with the relevant
+canonical upstream and Lab fixes merged into that library. Its 17 C build units
+compile with Mainframe Classic C. The earlier exact qualified input is kept
+in Git history. Independent whole-source assembly, linking,
 source-built boot and application qualification remain open under the
 [OS build plan](os/pdos/BUILD-PLAN.md).
 

@@ -56,12 +56,18 @@ typedef unsigned int size_t;
 typedef char wchar_t;
 #endif
 
+#ifndef NULL
 #define NULL ((void *)0)
+#endif
 #define offsetof(x, y) (size_t)&(((x *)0)->y)
 
 #if defined(__PDPCLIB_DLL) && !defined(__WATCOMC__) \
     && !defined(__NODECLSPEC__)
+#ifdef __SCC__
+#define __PDPCLIB_API__ __dllexport
+#else
 #define __PDPCLIB_API__ __declspec(dllexport)
+#endif
 #elif defined(__CC64OS__)
 #define __PDPCLIB_API__ $callback
 #else

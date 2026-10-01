@@ -66,10 +66,17 @@ void __va_start(va_list *x, ...);
 #define va_start(ap, parmN) \
     __va_start(&ap, &parmN, 8 /* size */, 8 /* alignment */, &parmN);
 #else
+#ifdef __64BIT__
+#define va_start(ap, parmN) ap = (char *)&parmN + \
+    ((sizeof(parmN) < 8) ? 8 : sizeof(parmN))
+#else
 #define va_start(ap, parmN) ap = (char *)&parmN + sizeof(parmN)
 #endif
+#endif
 
-#ifdef __64BIT__
+#if defined(__SCC__)
+#define va_arg(ap, type) __scc_builtin_va_arg(ap, type)
+#elif defined(__64BIT__)
 #define va_arg(ap, type) *(type *)(ap += (sizeof(type) < 8) ? 8 : sizeof(type),\
     ap - ((sizeof(type) < 8) ? 8 : sizeof(type)))
 #elif defined(__ARM__)

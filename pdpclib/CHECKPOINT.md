@@ -7,6 +7,11 @@ and publishing this independently reviewed delivery on 1 October 2026.
 The preceding published entry/language checkpoint is
 `ff7e282808194a33e4d6a2da49e52018fb2775f3`.
 
+This records the original consolidation delivery. The current single-source
+runtime merge is recorded in [CHANGES.md](CHANGES.md) and the
+[OS checkpoint](../os/pdos/CHECKPOINT.md). Whole-source hashes below identify
+the earlier delivery, which remains in Git history.
+
 ## Source ownership
 
 The complete 288-file PDPCLIB mirror subtree was verified byte for byte before

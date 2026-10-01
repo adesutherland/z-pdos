@@ -6,8 +6,11 @@ Released: xxxx-xx-xx
 
 Written by Paul Edwards.
 Released to the public domain.
-You may use this entire package for any purpose whatsoever without
+You may use this entire package (*) for any purpose whatsoever without
 restriction.
+
+(*) Search for "copyright" in vsesupa.asm and read the comments
+for a currently open question.
 
 Here is a more formal wording governing the software:
 

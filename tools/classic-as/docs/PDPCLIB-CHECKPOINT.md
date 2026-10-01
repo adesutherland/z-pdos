@@ -9,7 +9,7 @@ qualify whole MVSSUPA, its external services or a booted OS.
 The subsequent [PDPCLIB consolidation](../../../pdpclib/README.md) brings
 the maintained library and six Lab/SDK deltas into this repository. The macro
 consumer now binds the maintained MVSSUPA identity
-`f66fa3f287847b45172f8049953ced0429fa1e34e7e842d13b1b7413d5efde45`;
+`5c8fdd3f7bacf71eb4689c96f8ecdb58bb0e5a0ecef66a395df1d65e6b1b972c`;
 the three selected definitions and their fixed object bytes are unchanged.
 The pristine identity below remains the origin of the earlier reference check.
 

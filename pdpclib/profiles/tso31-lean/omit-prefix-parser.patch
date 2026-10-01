@@ -1,10 +1,28 @@
 --- a/pdpclib/mvssupa.asm
 +++ b/pdpclib/mvssupa.asm
-@@ -3826,279 +3826,10 @@
+@@ -561,18 +561,6 @@
+ * LOC=ANY storage. Fortunately those flags are ignored for S/370.
+ *
+          CSECT ,
+-*
+-* Switch temporarily to this other CSECT, so that we can
+-* set AMODE/RMODE upfront
+-*
+-         AIF   ('&ZSYS' EQ 'S370').NOAM  AMODE on z/OS so no warning
+-@@PCLST  AMODE ANY
+-@@PCLST  RMODE ANY
+-.NOAM    ANOP  ,        S/370 doesn't have AMODE/RMODE
+-@@PCLST  CSECT ,
+-*
+-* Back to normal
+-         CSECT ,
+          PRINT GEN,ON
+          SPACE 1
+ *-----------------------ASSEMBLY OPTIONS------------------------------*
+@@ -3842,278 +3830,9 @@
  *
  *
- *
--***********************************************************************
+ ***********************************************************************
 -*-                                                                   -*
 -*- TITLE - @@GETEPF                                                  -*
 -*-                                                                   -*
@@ -27,7 +45,7 @@
 -*-     >>>>> J. REGINATO-NOV/2020 - BRAZIL <<<<<                     -*
 -*-     >>>>> RELEASED TO THE PUBLIC DOMAIN <<<<<                     -*
 -*-                                                                   -*
- ***********************************************************************
+-***********************************************************************
 -         ENTRY @@GETEPF            ENTRY POINT
 -@@GETEPF SAVE  (14,12),,@@GETEPF-NOV/2020-J.REGINATO
 -*                                  SAVE CALLER'S REGISTERS
@@ -259,9 +277,7 @@
 -         IKJPPL                    PARSE PARAMETER LIST
 -LENPPL   EQU   *-PPL               LENGTH OF PPL
 -         CSECT
-+* TSO31 lean service deck omits unused @@GETEPF and IKJPARM table.   *
-+* The five retained FILESVC entry points do not call this parser.    *
- ***********************************************************************
+-***********************************************************************
 -*-       DECLARES THE STATIC WORK AREA                               -*
 -***********************************************************************
 -WKPDE    DS    F                   ADDRESS OF THE PDE FROM PARSE
@@ -279,15 +295,25 @@
 -*
 -*
 -*
++* TSO31 lean service deck omits unused @@GETEPF and IKJPARM table.   *
++* The five retained FILESVC entry points do not call this parser.    *
++***********************************************************************
  **********************************************************************
  *                                                                    *
  *  TEST31 - see if we are running in AMODE 31                        *
-@@ -4726,8 +4457,6 @@
+@@ -4746,15 +4465,6 @@
           LA    R2,0
           BSM   R2,0
           ST    R2,NEEDBOA this will be suitable for ORing
+-*
+-*
+-         AIF   ('&ZSYS' EQ 'S370').NODSNS3  Only S/380+90 needs a stub
+-
 -         L     R3,=A(DSNCBOA) the DSN check stub needs this too
 -         ST    R2,0(,R3)
+-.NODSNS3 ANOP  ,                  Only S/380 etc needs a stub
+-*
+-*
           OI    NEEDBF,NEEDBANY  set flag to say we need BSM switching
           B     RETURNSU
  *

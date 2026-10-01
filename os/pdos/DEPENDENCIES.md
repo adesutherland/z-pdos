@@ -7,7 +7,7 @@ image dependencies.
 | Stage | Selected input or interface | Current state |
 | --- | --- | --- |
 | OS C source | `pdos.c`, `pdosutil.c/.h`, `pload.c`, `pcomm.c` | Exact retained PDIO1 selection; all four C units compile with Classic C |
-| Runtime C | START, STDIO, STDLIB, CTYPE, STRING, TIME, ERRNO, ASSERT, LOCALE, MATH, SETJMP, SIGNAL, MEMMGR | Exact canonical runtime selection; all 13 units compile with Classic C |
+| Runtime C | START, STDIO, STDLIB, CTYPE, STRING, TIME, ERRNO, ASSERT, LOCALE, MATH, SETJMP, SIGNAL, MEMMGR | One maintained PDPCLIB with merged canonical/Lab fixes and `pdos-zarch` configuration; all 13 units compile with Classic C |
 | Source macros | PDPTOP, PDPMAIN, PDPPRLG, PDPEPIL | Retained source-owned bytes; COPY, macro lookup and conditional state remain open |
 | Kernel startup and support | SAPSTART, SAPSUPA, PDOSSUP | Retained source; whole assembly and z/Architecture encoding remain open |
 | Loader support | PLOADSUP plus PLOAD and PDOSUTIL | Retained source; IPL placement and independent whole-module reconstruction remain open |
