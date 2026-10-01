@@ -137,3 +137,18 @@ section, without access-method prefixes or extensions. In the public
 names the low seven CSW bytes at offset 9; offset 8 is IOBFLAG3.
 An independent linked fixture checks 20 offsets and lengths against literal
 expected values. Neither mapping claims a complete IBM macro interface.
+
+## Selected operator message interface
+
+The original WTO supports one quoted message of 1–126 characters, one route
+code (1–16), one descriptor (1–12), and standard or MF=L form. Its public
+[SVC35 contract](https://www.ibm.com/docs/en/zos/3.2.0?topic=descriptions-svc-35-0a23)
+uses R1 for the four-byte header and R0 zero. The appended
+[WPL fields](https://www.ibm.com/docs/en/zos/2.5.0?topic=xtl-wpl-information)
+are the descriptor halfword followed by the routing halfword. BAS supplies
+the parameter address while skipping inline data; SR clears R0 before SVC35.
+The generated continuation name starts MF$W and is reserved. Text starts
+eight bytes after a named standard invocation; a halfword pad can follow
+the appended fields. No multiple-line, reply, token, execute, or extended
+options are provided. Independent linking checks all 49 bytes of two standard
+calls and one list, including the source's text-patching alias convention.

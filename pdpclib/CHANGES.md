@@ -89,6 +89,12 @@ There is no automatic transfer of their previous whole-source qualification.
 
 ## Original selected linkage interfaces — 1 October 2026
 
+The original selected WTO uses the published SVC35 header, descriptor/routing
+fields and register contract. MVSSUPA's two text-tail EQU aliases now allow
+for its explicit R0 clearing instruction; named message text still starts
+eight bytes after the invocation. Independent message/alias byte checks pass.
+This is a new producer layout, not inherited IBM macro code or guest proof.
+
 Original selected JFCB and standard-section IOB maps now pass 20 independent
 field/length checks. SAPSUPA's IEZIOB call receives a comma before its remark,
 as required when the operand is omitted. This source correction does not

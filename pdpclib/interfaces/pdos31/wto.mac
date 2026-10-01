@@ -1,0 +1,45 @@
+* SPDX-License-Identifier: MIT
+* Original single inline-message WTO with selected scalar route/descriptor.
+         MACRO
+&N       WTO &MESSAGE,&ROUTCDE=11,&DESC=7,&MF=
+         LCLA  &SIZE,&ROUTE,&DESCR,&BIT,&I
+         LCLC  &TEXT
+         AIF   (K'&MESSAGE EQ 0).BAD
+&TEXT    SETC  &MESSAGE
+&SIZE    SETA  K'&TEXT
+         AIF   (&SIZE LT 1 OR &SIZE GT 126).BAD
+&ROUTE   SETA  &ROUTCDE
+&DESCR   SETA  &DESC
+         AIF   (&ROUTE LT 1 OR &ROUTE GT 16).BAD
+         AIF   (&DESCR LT 1 OR &DESCR GT 12).BAD
+&I       SETA  1
+&BIT     SETA  32768
+.RLOOP   AIF   (&I EQ &ROUTE).ROK
+&I       SETA  &I+1
+&BIT     SETA  &BIT/2
+         AGO   .RLOOP
+.ROK     ANOP
+&ROUTE   SETA  &BIT
+&I       SETA  1
+&BIT     SETA  32768
+.DLOOP   AIF   (&I EQ &DESCR).DOK
+&I       SETA  &I+1
+&BIT     SETA  &BIT/2
+         AGO   .DLOOP
+.DOK     ANOP
+&DESCR   SETA  &BIT
+         AIF   ('&MF' EQ 'L').LIST
+         AIF   ('&MF' NE '').BAD
+&N       BAS   1,MF$W&SYSNDX.C
+         DC    AL1(0,&SIZE+4),X'8000',C&MESSAGE
+         DC    AL2(&DESCR,&ROUTE)
+         DS    0H
+MF$W&SYSNDX.C SR 0,0
+         SVC   35
+         MEXIT
+.LIST    DS    0H
+&N       DC    AL1(0,&SIZE+4),X'8000',C&MESSAGE
+         DC    AL2(&DESCR,&ROUTE)
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected single-line WTO form'
+         MEND

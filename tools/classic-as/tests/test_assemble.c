@@ -214,7 +214,7 @@ static void clean(struct fixture *f)
 static void successful(struct fixture *f)
 {
     enum mf_status status; status = run(f);
-    if (status != MF_OK) fprintf(stderr,"got %d for %s\n",(int)status,f->first);
+    if (status != MF_OK) fprintf(stderr,"got %d at line %lu for %s\n",(int)status,f->diagnostic.origin.line,f->first);
     CHECK(status == MF_OK); CHECK(f->result.status == MF_OK);
     CHECK(f->result.valid_output && f->valid); CHECK(f->reports == 0);
     CHECK(f->begins == 1 && f->finishes == 1 && f->invalids == 0);
@@ -760,6 +760,15 @@ static void symbol_lengths(void)
     init(&f,"S CSECT\n DC AL1(L'ABSENT)\n END S\n"); CHECK(run(&f) == MF_UNDEFINED); clean(&f);
     init(&f,"S CSECT\nA EQU 0,65536\n END S\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
     init(&f,"S CSECT\nA EQU 0,L'FORWARD\nFORWARD DS CL8\n END S\n"); CHECK(run(&f) == MF_UNDEFINED); clean(&f);
+    init(&f,"S CSECT\n USING S,12\nA EQU B+1,3,C'C'\n MVC A,B\nB DC CL4'ABCD'\n DC AL1(L'A)\n END S\n"); failed(&f,MF_UNDEFINED); clean(&f);
+    init(&f,"S CSECT\nB DC CL4'ABCD'\nA EQU B+1,3,C'C'\n USING S,12\n MVC A,B\n DC AL1(L'A)\n END S\n"); successful(&f);
+    CHECK(f.sections[0].length == 11 && f.data[0][5] == 2 && f.data[0][10] == 3); clean(&f);
+    init(&f,"S CSECT\nA EQU 0,1,256\n END S\n"); failed(&f,MF_RANGE); clean(&f);
+    init(&f,"S CSECT\nA EQU 0,1,S\n END S\n"); failed(&f,MF_SOURCE); clean(&f);
+    init(&f," DC AL4(C'ABCD'),AL1(C''''),AL1(C'&&')\n END\n"); successful(&f);
+    CHECK(f.sections[0].length == 6 && f.data[0][0] == 0xc1 && f.data[0][3] == 0xc4 && f.data[0][4] == 0x7d && f.data[0][5] == 0x50); clean(&f);
+    init(&f,"A EQU C''\n END\n"); failed(&f,MF_SOURCE); clean(&f);
+    init(&f,"A EQU C'ABCDE'\n END\n"); failed(&f,MF_RANGE); clean(&f);
 }
 static void channel_words(void)
 {

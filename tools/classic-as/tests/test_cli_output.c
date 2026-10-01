@@ -114,6 +114,17 @@ int main(int argc, char **argv)
 
     CHECK(argc == 3);
     if (!strcmp(argv[1],"pdos31-io")) { io_templates(argv[2]); return 0; }
+    if (!strcmp(argv[1],"pdos31-wto")) {
+        static const unsigned char linked[39] = {
+            0x4d,0x10,0xc0,0x0e,0,6,0x80,0,0xc1,0xc2,2,0,0,0x20,0x1b,0,0x0a,0x23,
+            0x4d,0x10,0xc0,0x20,0,5,0x80,0,0xc3,0,0x10,0x80,0,0,
+            0x1b,0,0x0a,0x23,0,5,0x80};
+        static const unsigned char tail[10] = {0,0xc4,0x80,0,0,1,0,8,0,2};
+        unsigned char actual[50];
+        input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(actual,1,sizeof actual,input);
+        CHECK(got == 49 && !memcmp(actual,linked,39) && !memcmp(actual+39,tail,10));
+        CHECK(!ferror(input) && fclose(input) == 0); puts("WTO: inline/list bytes and patched-text aliases pass"); return 0;
+    }
     if (!strcmp(argv[1],"pdos31-directory")) {
         static const unsigned char linked[40] = {0x18,0x1a,0x41,0,0xc0,0x14,0x0a,0x12,
             0x18,0x1a,0x13,0x11,0x41,0,0xc0,0x20,0x0a,0x12,7,0xfe,

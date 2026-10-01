@@ -1387,7 +1387,7 @@ OSNDONE  L     R15,=A(@@SNAP)
          BALR  R14,R15            CALL SNAPPER
          MVC   OPBADDD,DWDDNAM    SHOW WHAT
          WTO   'MVSSUPA - OPEN FAILED FOR nnnnnnnn',ROUTCDE=11
-OPBADDD  EQU   *-6-8,8,C'C'       Insert bad DD
+OPBADDD  EQU   *-8-8,8,C'C'       Text tail before flags and R0/SVC
 FREEOSTO LTR   R10,R10            Should never happen
          BZ    FREEDSTO             but it did during testing
          FREEMAIN R,LV=ZDCBLEN,A=(R10),SP=SUBPOOL  Free DCB area
@@ -1431,7 +1431,7 @@ WNOMEM   TM    JFCBIND1,JFCPDS    See if a member name in JCL
          MVC   BADMEMDD,ZDDN      Identify bad DD
          WTO   'MVSSUPA - Output PDS missing member name for DD nnnnnnn*
                n',ROUTCDE=11
-BADMEMDD EQU   *-6-8,8,C'C'       Insert bad DD
+BADMEMDD EQU   *-8-8,8,C'C'       Text tail before flags and R0/SVC
          WTO   'MVSSUPA - Refuses to write over PDS directory',        C
                ROUTCDE=11
          ABEND 123                Abend without a dump

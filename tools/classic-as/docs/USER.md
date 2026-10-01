@@ -256,6 +256,10 @@ Ordinary symbols carry a length attribute: machine instruction size, the
 first DC/DS element width (independent of duplication), or an inherited EQU
 first-term length. A second EQU operand overrides it with 0–65,535; its
 value must already be known. `L'SYMBOL` and `L'*` supply absolute terms.
+An optional third EQU operand sets a checked 0–255 type byte, retained for
+pass replay; ordinary T' attribute queries remain unsupported. Character
+self-defining terms C'...' supply one to four CP037 bytes as a signed
+32-bit value. Paired apostrophes and ampersands count as one character.
 An omitted SS length uses the first displacement term's attribute, including
 `FIELD+offset` and `FIELD(,base)`. Explicit lengths override it. Forward
 lengths in fixed-size instructions resolve on pass two; layout declarations

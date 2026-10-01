@@ -8,10 +8,10 @@ main: procedure = .int
   if work = "" | work = "." | work = "/" then return 2
   address crexx "run cmake -E make_directory :work"
   if rc <> 0 then return rc
-  do i = 1 to 5
-    source = word("pdos31-io-templates pdos31-get pdos31-io-maps pdos31-io-services pdos31-directory",i)
-    entry = word("IOTEST GETTEST IOMAPS IOSVCS DIRTEST",i)
-    mode = word("pdos31-io pdos31-get pdos31-io-maps pdos31-io-services pdos31-directory",i)
+  do i = 1 to 6
+    source = word("pdos31-io-templates pdos31-get pdos31-io-maps pdos31-io-services pdos31-directory pdos31-wto",i)
+    entry = word("IOTEST GETTEST IOMAPS IOSVCS DIRTEST WTOTEST",i)
+    mode = word("pdos31-io pdos31-get pdos31-io-maps pdos31-io-services pdos31-directory pdos31-wto",i)
     deck = work || "/" || source || ".obj"
     binary = work || "/" || source || ".bin"
     source = "tools/classic-as/tests/fixtures/" || source || ".asm"
@@ -24,8 +24,8 @@ main: procedure = .int
     address crexx "run :checker :mode :binary"
     if rc <> 0 then return rc
   end
-  do i = 1 to 3
-    source = "tools/classic-as/tests/fixtures/" || word("pdos31-io-unsupported pdos31-directory-unsupported pdos31-camlst-unsupported",i) || ".asm"
+  do i = 1 to 4
+    source = "tools/classic-as/tests/fixtures/" || word("pdos31-io-unsupported pdos31-directory-unsupported pdos31-camlst-unsupported pdos31-wto-unsupported",i) || ".asm"
     failed = work || "/io-failed.obj"
     address crexx "run cmake -E rm -f :failed"
     if rc <> 0 then return rc

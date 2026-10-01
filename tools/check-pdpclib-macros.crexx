@@ -21,7 +21,7 @@ main: procedure = .int
   address system "shasum -a 256 " || shellquote(original) || " > " || shellquote(hashfile)
   call require rc = 0, "hash supplied source"
   hash = word(readfile(hashfile), 1)
-  call require hash = "5c8fdd3f7bacf71eb4689c96f8ecdb58bb0e5a0ecef66a395df1d65e6b1b972c", "reviewed maintained source identity"
+  call require hash = "9bb9430d7cb4c93bc8e1b443a3bc32856365c311cf419c3afdbe3808e725aa5b", "reviewed maintained source identity"
   source = readfile(original)
   subset = extract_lines(source, 2, 59) || extract_lines(source, 298, 302) || extract_lines(source, 306, 309) || extract_lines(source, 455, 459)
   subset = subset || "MACREF   CSECT" || '0A'x || "R14      EQU   14" || '0A'x
