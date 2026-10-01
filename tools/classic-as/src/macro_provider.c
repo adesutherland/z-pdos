@@ -9,7 +9,7 @@
 #define NONE ((size_t)-1)
 struct parameter { struct mf_span name, initial; int keyword; };
 struct definition {
-    struct mf_span name, label;
+    struct mf_span name, label, end_label;
     struct mf_origin origin;
     size_t parameters, first, count;
 };
@@ -306,6 +306,15 @@ static enum mf_status capture(struct mf_macro *m, const struct mf_statement *mar
         st = raw(m, &s); if (st == MF_EOF) return MF_SOURCE; if (st != MF_OK) return st;
         if (word(s.operation, 1)) {
             if (!empty(s.operand)) return MF_SOURCE;
+            if (s.label.length) {
+                struct mf_statement end;
+                if (s.label.data[0] != 0x2e ||
+                    !name_valid(slice(s.label, 1, s.label.length - 1))) return MF_SOURCE;
+                for (i = 0; i < d->count; ++i)
+                    if (mf_macro_same(s.label, m->models[d->first + i].label)) return MF_DUPLICATE;
+                st = retain(m, &s, &end); if (st != MF_OK) return st;
+                d->end_label = end.label;
+            }
             ++m->definition_count; return MF_OK;
         }
         if (word(s.operation, 0) || word(s.operation, 2) || blocked(s.operation)) return MF_UNSUPPORTED;
@@ -643,7 +652,7 @@ static enum mf_status conditional(struct mf_macro *m, const struct mf_statement 
     if (m->depth) {
         struct definition *d; d = m->definitions + m->frames[m->depth - 1].definition;
         for (i = 0; i < d->count; ++i) if (mf_macro_same(target, m->models[d->first + i].label)) break;
-        if (i == d->count) return MF_UNDEFINED;
+        if (i == d->count && !mf_macro_same(target, d->end_label)) return MF_UNDEFINED;
         m->frames[m->depth - 1].pc = i;
     } else {
         if (target.length > sizeof m->skip_name) return MF_LIMIT;

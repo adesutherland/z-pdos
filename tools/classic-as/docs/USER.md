@@ -183,6 +183,8 @@ two empty positional arguments and is checked against the prototype. For a
 prototype with only keyword parameters, a single comma instead means no
 operands and preserves all defaults, just as for a zero-parameter prototype.
 Nonempty positional actuals and additional commas still fail in that case.
+An AIF/AGO target may name the sequence label on MEND; taking that branch
+ends the current expansion, including a nested call, without emitting MEND.
 
 With `--macros`, repeat `-I directory` to select ordered library directories.
 The host searches lower-case and original-case member names with `.mac`, `.asm`,

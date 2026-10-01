@@ -128,7 +128,26 @@ static void inactive_source(void)
     bad_source(" AGO .DONE\n.DONE DC C'unclosed\n",MF_SOURCE);
     bad_source(" AGO .DONE\n MACRO\n UNUSED\n.DONE ANOP\n MEND\n",MF_UNDEFINED);
 }
+static void end_targets(void)
+{
+    struct fixture f; unsigned pass; unsigned long n;
+    init(&f," MACRO\n EARLY &STOP=YES\n AIF ('&STOP' EQ 'YES').EXIT\n LR 3,4\n.EXIT MEND\n EARLY\n EARLY STOP=NO\n LR 1,2\n");
+    CHECK(create(&f) == MF_OK);
+    for (pass = 0; pass < 2; ++pass) {
+        expected(&f,"","LR","3,4",7);
+        expected(&f,"","LR","1,2",8);
+        CHECK(drain(&f,&n) == MF_EOF);
+        if (!pass) CHECK(f.statements.replay(f.statements.cookie) == MF_OK);
+    }
+    clean(&f);
+    init(&f," MACRO\n INNER\n AGO .END\n.END MEND\n MACRO\n OUTER\n INNER\n LR 5,6\n.END MEND\n OUTER\n");
+    CHECK(create(&f) == MF_OK);
+    expected(&f,"","LR","5,6",10);
+    CHECK(drain(&f,&n) == MF_EOF); clean(&f);
+    bad_source(" MACRO\n BADEND\n.X ANOP\n.X MEND\n BADEND\n",MF_DUPLICATE);
+    bad_source(" MACRO\n BADEND\n AGO .MISSING\n.END MEND\n BADEND\n",MF_UNDEFINED);
+}
 int main(void)
 {
-    inactive_source(); scoped(); expressions(); argument_attributes(); label_attributes(); variable_counts(); substrings(); printf("conditional macros: %lu checks passed\n", checks); return 0;
+    end_targets(); inactive_source(); scoped(); expressions(); argument_attributes(); label_attributes(); variable_counts(); substrings(); printf("conditional macros: %lu checks passed\n", checks); return 0;
 }
