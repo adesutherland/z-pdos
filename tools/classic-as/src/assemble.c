@@ -1424,7 +1424,8 @@ static enum mf_status process(struct mf_as *as)
     if (word(op, drop, sizeof drop)) return using_statement(as, 1);
     if (word(op, end, sizeof end)) return end_statement(as);
     if (word(op, ltorg, sizeof ltorg)) {
-        if (as->statement.operand.length) return MF_SOURCE;
+        struct mf_span operand; operand = trim(as->statement.operand);
+        if (operand.length && !(operand.length == 1 && operand.data[0] == 0x2c)) return MF_SOURCE;
         return literal_pool(as, 1);
     }
     if (branch_alias(op, &mask, &reg)) return branch(as, mask, reg);

@@ -256,6 +256,7 @@ An SS first operand that is a supported literal uses that literal's width.
 Narrow AL1/AL2/AL3 address literals accept absolute expressions; relocatable
 narrow literals remain unsupported. Their nominal parentheses are distinct
 from an instruction's register/address suffix.
+LTORG accepts no operand or a single comma marking an absent operand.
 
 The macro-enabled CLI reports failing nested macro model coordinates before
 its primary invocation diagnostic. Borrowed observer frames are printed

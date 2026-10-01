@@ -699,11 +699,12 @@ static void character_and_location_literals(void)
     };
     static const mf_octet addresses[16] = {0x58,0x10,0xc0,8,0x58,0x20,0xc0,12,0,0,0,0,0,0,0,4};
     struct fixture f;
-    init(&f,"S CSECT\n USING S,12\n CLC =CL5'Ab',0(2)\n MVC 0(2,1),=AL2(44+96)\n END S\n"); f.config.max_literals = 4;
+    init(&f,"S CSECT\n USING S,12\n CLC =CL5'Ab',0(2)\n MVC 0(2,1),=AL2(44+96)\n LTORG ,\n END S\n"); f.config.max_literals = 4;
     successful(&f); CHECK(f.sections[0].length == sizeof ss_literals);
     CHECK(!memcmp(f.data[0],ss_literals,sizeof ss_literals)); clean(&f);
     init(&f,"S CSECT\n USING S,12\n L 1,=AL2(S)\n END S\n"); f.config.max_literals = 4;
     failed(&f,MF_UNSUPPORTED); clean(&f);
+    init(&f," LTORG ,,\n END\n"); failed(&f,MF_SOURCE); clean(&f);
     init(&f,"S CSECT\n USING S,12\n L 1,=C'abc'\n L 2,=C'ABC'\n L 3,=CL8'abc'\n END S\n"); f.config.max_literals = 4;
     successful(&f); CHECK(f.sections[0].length == sizeof characters && !memcmp(f.data[0],characters,sizeof characters)); clean(&f);
     init(&f,"S CSECT\n USING S,12\n L 1,=A(*)\n L 2,=A(*)\n END S\n"); f.config.max_literals = 4;
