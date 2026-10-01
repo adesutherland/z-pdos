@@ -252,6 +252,10 @@ An omitted SS length uses the first displacement term's attribute, including
 `FIELD+offset` and `FIELD(,base)`. Explicit lengths override it. Forward
 lengths in fixed-size instructions resolve on pass two; layout declarations
 remain strict. Conditional macro lookahead and general attributes remain open.
+An SS first operand that is a supported literal uses that literal's width.
+Narrow AL1/AL2/AL3 address literals accept absolute expressions; relocatable
+narrow literals remain unsupported. Their nominal parentheses are distinct
+from an instruction's register/address suffix.
 
 The macro-enabled CLI reports failing nested macro model coordinates before
 its primary invocation diagnostic. Borrowed observer frames are printed

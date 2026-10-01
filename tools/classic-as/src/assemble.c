@@ -382,11 +382,13 @@ static int length_quote(struct mf_span s, size_t at)
     return at && upper(s.data[at-1]) == 0x4c && (at == 1 || !name_char(s.data[at-2]));
 }
 /* The first expression term supplies an omitted SS or EQU length. */
+static enum mf_status literal_length(struct mf_as *, struct mf_span, mf_u32 *);
 static enum mf_status expression_length(struct mf_as *as, struct mf_span s, mf_u32 *length)
 {
     size_t i, at; s = trim(s); at = 0; *length = 1;
     while (at < s.length && (s.data[at] == 0x2b || s.data[at] == 0x2d || s.data[at] == 0x28 || s.data[at] == 0x20)) ++at;
     if (at == s.length) return MF_SOURCE;
+    if (s.data[at] == 0x3d) return literal_length(as,subspan(s,at,s.length-at),length);
     if (s.data[at] == 0x2a) { *length = as->statement_length; return MF_OK; }
     if (name_start(s.data[at])) {
         size_t first; first = at++;
@@ -698,8 +700,12 @@ static enum mf_status address(struct mf_as *as, struct mf_span s, int indexed,
         else if (s.data[i] == 0x2c && depth == 1) group_comma = 1;
     }
     if (depth || quoted) return MF_SOURCE;
-    if (open != NIL && open && s.data[0] == 0x3d &&
-        upper(s.data[open - 1]) >= 0x41 && upper(s.data[open - 1]) <= 0x5a) open = NIL;
+    if (open != NIL && open && s.data[0] == 0x3d) {
+        /* An alphanumeric literal type/length prefix precedes its nominal,
+         * not an address suffix: =A(...), =AL2(...), for example. */
+        for (i = 1; i < open && name_char(s.data[i]); ++i) {}
+        if (i == open) open = NIL;
+    }
     /* A suffix follows a complete displacement expression. An initial group,
      * or one following an arithmetic sign, belongs to that expression. */
     if (open != NIL && ((!open && !group_comma) || s.data[s.length - 1] != 0x29 ||
@@ -1106,7 +1112,7 @@ static enum mf_status literal_constant(struct mf_as *as, struct mf_span text,
     if (!text.length || text.data[0] != 0x3d) return MF_SOURCE;
     status = constant_parse(as, subspan(text, 1, text.length - 1), 0, c);
     if (status != MF_OK) return status;
-    if (c->repeat != 1 || (c->explicit_length && c->type != 0x58 && c->type != 0x43) ||
+    if (c->repeat != 1 || (c->explicit_length && c->type != 0x58 && c->type != 0x43 && c->type != 0x41) ||
         (c->type != 0x48 && c->type != 0x46 && c->type != 0x58 && c->type != 0x43 && c->type != 0x56 && c->type != 0x41)) return MF_UNSUPPORTED;
     if (c->type == 0x48 || c->type == 0x46) {
         v = zero_value();
@@ -1120,6 +1126,13 @@ static enum mf_status literal_constant(struct mf_as *as, struct mf_span text,
             c->width % 4 == 0 ? 4 : c->width % 2 == 0 ? 2 : 1;
     }
     return MF_OK;
+}
+static enum mf_status literal_length(struct mf_as *as, struct mf_span text, mf_u32 *length)
+{
+    struct constant c; enum mf_status status;
+    status = literal_constant(as,text,&c);
+    if (status == MF_OK) *length = c.width;
+    return status;
 }
 static enum mf_status literal_value(struct mf_as *as, struct mf_span text, struct value *v)
 {
