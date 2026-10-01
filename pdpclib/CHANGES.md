@@ -94,3 +94,8 @@ definitions from documented public register-save contracts. It is an explicit
 assembler library input, not an inherited IBM macro library. The small Classic C
 object gate checks identifier layout and RC=(15) register restoration with
 independently expected bytes. Full runtime assembly and execution remain open.
+
+The explicit original classic-linkage library adds the reached symbolic,
+no-parameter CALL form. It follows public register linkage facts and supplies
+no control-program service or imported macro implementation. Independent
+link bytes and rejected-operand output checks qualify the host interface.

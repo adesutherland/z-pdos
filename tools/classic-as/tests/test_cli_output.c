@@ -52,6 +52,14 @@ int main(int argc, char **argv)
     FILE *input;
 
     CHECK(argc == 3);
+    if (!strcmp(argv[1], "call")) {
+        static const unsigned char linked[12] = {0x58,0xf0,0xc0,8,5,0xef,7,0xfe,0,0,0x10,6};
+        input = fopen(argv[2], "rb"); CHECK(input != NULL);
+        got = fread(card,1,sizeof card,input);
+        CHECK(got == sizeof linked && !memcmp(card,linked,sizeof linked));
+        CHECK(!ferror(input) && fclose(input) == 0);
+        puts("CALL: all 12 linked bytes and V target pass"); return 0;
+    }
     if (!strcmp(argv[1], "channel-word")) {
         static const unsigned char linked[30] = {0xaa,0,0,0,0,0,0,0,7,0x40,0,6,0,0,0x10,0x18,0x1d,0,0x7f,0xff,0,0,0,0,0,0,0,0,0,0};
         input = fopen(argv[2], "rb"); CHECK(input != NULL);

@@ -1,0 +1,11 @@
+* SPDX-License-Identifier: MIT
+* Original no-parameter CALL interface from public linkage facts.
+         MACRO
+&N       CALL &TARGET,&ARGS,&VL,&LINKINST=BALR
+         AIF   ('&TARGET' EQ '' OR '&ARGS' NE '' OR '&VL' NE '').BAD
+         AIF   ('&LINKINST' NE 'BALR').BAD
+&N       L     15,=V(&TARGET)
+         BALR  14,15
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected CALL interface'
+         MEND

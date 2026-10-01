@@ -31,3 +31,11 @@ original numeric register-name definitions from the documented hardware
 register numbers and public YREGS usage. Other operand forms and floating
 register aliases remain unsupported. An independent CLI fixture checks the
 resulting BASR R14,R15 bytes; this supplies no OS control block or service.
+
+CALL accepts a symbolic entry with no parameter list and the default
+`LINKINST=BALR`. It loads the entry address into R15 through a V literal and
+links through R14, preserving R1. Register entries, parameter lists, VL and
+other link instructions are rejected. This is original code based on the
+public [CALL interface](https://www.ibm.com/docs/en/zos/3.1.0?topic=section-call-description).
+An independent assemble/link fixture checks all 12 bytes at a nonzero image
+base, local V resolution and rejection without publishing a deck.
