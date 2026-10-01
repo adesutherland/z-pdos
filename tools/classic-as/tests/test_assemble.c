@@ -284,6 +284,16 @@ static void nominal_lists(void)
     CHECK(f.sections[0].length == 0 && f.fixup_count == 0 && f.symbol_count == 0); clean(&f);
     init(&f," DC X'A B, C'\n END\n"); successful(&f);
     CHECK(f.sections[0].length == 2 && f.data[0][0] == 0xab && f.data[0][1] == 0x0c); clean(&f);
+    init(&f,"S CSECT\nA DS Y(1,12+2)\nB DS CL8' ',XL3'00'\nC DS D'0,1'\nD DS F'MISSING,1/0'\nE DC AL1(L'A,L'B,L'C,L'D)\n END E\n");
+    successful(&f); CHECK(f.sections[0].length == 44 && f.entry.offset == 40 && f.fixup_count == 0);
+    CHECK(f.symbols[symbol_index(&f,"B")].offset == 4 && f.symbols[symbol_index(&f,"C")].offset == 16);
+    CHECK(f.data[0][40] == 2 && f.data[0][41] == 8 && f.data[0][42] == 8 && f.data[0][43] == 4);
+    { size_t i; for (i = 0; i < 40; ++i) CHECK(!f.present[0][i]); } clean(&f);
+    init(&f," DS Y(1,,2)\n END\n"); failed(&f,MF_SOURCE); clean(&f);
+    init(&f,"D DSECT\nFIELD DC A(D,FIELD),AL2(4),C'AB'\nLEN EQU *-D\nS CSECT\n DC AL1(LEN,L'FIELD)\n END S\n");
+    successful(&f); CHECK(f.sections[0].dummy && f.sections[0].length == 12 && f.fixup_count == 0);
+    CHECK(f.sections[1].length == 2 && f.data[1][0] == 12 && f.data[1][1] == 4); clean(&f);
+    init(&f,"D DSECT\n DC A(MISSING)\nS CSECT\n LR 1,2\n END S\n"); failed(&f,MF_UNDEFINED); clean(&f);
 }
 static void forms(void)
 {
@@ -379,7 +389,6 @@ static void bad_sources(void)
         {" EXTRN EXT\nEXT EQU 1\n LR 1,2\n END\n", MF_DUPLICATE},
         {"D DSECT\n L 1,0\n END\n", MF_SOURCE},
         {"D DSECT\n ENTRY FIELD\nFIELD DS F\nC CSECT\n LR 1,2\n END C\n", MF_SOURCE},
-        {"D DSECT\nFIELD DC A(D)\nC CSECT\n LR 1,2\n END C\n", MF_SOURCE},
         {"S CSECT\n SVC 256\n END\n", MF_RANGE},
         {" LR 16,0\n END\n", MF_RANGE},
         {" LR -1,0\n END\n", MF_RANGE},
@@ -745,12 +754,26 @@ static void character_and_location_literals(void)
     init(&f,"S CSECT\n USING S,12\n L 1,=CL2'ABC'\n END S\n"); f.config.max_literals = 4;
     CHECK(run(&f) == MF_RANGE); clean(&f);
 }
+static void implicit_index_addresses(void)
+{
+    static const mf_octet expected[20] = {
+        0x41,0xf5,0xd0,4,0x58,0x26,0xd0,4,
+        0x58,0x37,0xc0,16,0,0,0,0,0,0,0,9};
+    struct fixture f;
+    init(&f,"S CSECT\n USING S,12\n USING D,13\n LA 15,FIELD(5)\n L 2,FIELD(6,13)\n L 3,=F'9'(7)\nD DSECT\n DS F\nFIELD DS F\nS CSECT\n END ,\n");
+    f.config.max_literals = 2; successful(&f);
+    CHECK(f.sections[0].length == sizeof expected && !memcmp(f.data[0],expected,sizeof expected));
+    CHECK(!f.entry.present); clean(&f);
+    init(&f,"S CSECT\n LA 15,FIELD(5)\nD DSECT\nFIELD DS F\n END\n"); failed(&f,MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n USING S,12\n LA 15,S(16)\n END\n"); failed(&f,MF_RANGE); clean(&f);
+}
 static void no_operand_sections(void)
 {
     struct fixture f;
     init(&f,"S CSECT ,\n LR 1,2\nD DSECT ,\nFIELD DS F\nS CSECT ,\n LR 3,4\n END S\n");
     successful(&f); CHECK(f.section_count == 2 && f.sections[0].length == 4 && f.sections[1].dummy);
     CHECK(f.data[0][0] == 0x18 && f.data[0][1] == 0x12 && f.data[0][2] == 0x18 && f.data[0][3] == 0x34); clean(&f);
+    init(&f,"S CSECT\n END ,,\n"); failed(&f,MF_SOURCE); clean(&f);
     init(&f,"S CSECT ,,\n END S\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
 }
 static void symbol_lengths(void)
@@ -836,7 +859,7 @@ static void halfword_addresses(void)
 }
 int main(void)
 {
-    no_operand_sections(); symbol_lengths(); channel_words(); character_and_location_literals(); origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); nominal_lists(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
+    implicit_index_addresses(); no_operand_sections(); symbol_lengths(); channel_words(); character_and_location_literals(); origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); nominal_lists(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
     forward_branch_registers(); executable_alignment(); halfword_addresses();

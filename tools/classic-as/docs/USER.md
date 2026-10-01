@@ -38,7 +38,7 @@ publication semantics.
 | TITLE | One named deck ID up to eight characters; 1..100-character quoted heading. CP037 deck IDs occupy bytes 73..80, space padded, without generated sequence suffixes. Headings/listings are not produced. |
 | PRINT | Validated ON/OFF, GEN/NOGEN, DATA/NODATA controls and null operands; no listing output in this component. Labels and other control forms are rejected. |
 | DC | H/F integers, AL1/AL2/AL3 absolute and A addresses, absolute halfword Y and eight-byte AD, external V, hexadecimal X and CP037 C/CL character constants; checked duplication and target length |
-| DS | Reservation/alignment for the documented constant types, including `0H`, `0F`, `0D`; no emitted bytes for gaps |
+| DS | Reservation/alignment for the documented constant types, including `0H`, `0F`, `0D`; nominal lists determine extent but do not initialize storage or evaluate their values; no emitted bytes for gaps. DC in a DSECT checks values and determines layout without emitting text or fixups. |
 | CNOP | Executable alignment at an even byte in a 4- or 8-byte boundary, using original repeated BCR 0,0 padding; odd leading byte is explicitly zero |
 
 | Addressability | USING with up to 15 registers at successive 4096-byte bases, register-zero mappings at offset zero, DROP lists or all; symbolic addresses need a matching USING |
@@ -144,13 +144,20 @@ An explicit source length of zero is normalized to one: both encode a zero
 length field. This supports EX templates without wrapping zero to 255.
 Register-pair restrictions are checked. Values are rejected before narrowing.
 The core encoder takes resolved fields; the engine owns expressions and USING.
-Write `0(12)` for zero displacement with base register 12. A parenthesized
+Write `0(12)` for zero displacement with base register 12. For an RX
+relocatable address, `FIELD(5)` specifies index 5 and infers the base from
+USING; `FIELD(5,12)` supplies both index and base. A parenthesized
 displacement expression such as `(4+1)` is an expression, and can precede an
 explicit suffix as in `(TARGET+4)(,12)`.
 For an SS length operand, `AREA(20)` supplies the length and infers a matching
 base from USING; `AREA(20,12)` selects base 12 explicitly. The second character
 SS operand may also infer its base, as in `XC AREA(20),AREA`. Implied lengths
 from symbol attributes remain unsupported.
+
+SETC character expressions may concatenate quoted strings or substrings with
+a period outside quotes, as in `'MAP'.'ZP'`. Embedded periods remain data.
+Empty segments and numeric segments fail; the configured statement limit
+bounds the complete unescaped result.
 
 ## Object and failure contract
 
@@ -181,7 +188,10 @@ own explicit limits; this does not qualify a 24-bit native host's memory fit.
 ## Optional traditional macros
 
 The ordinary CLI uses the identity reader. A CMake build includes the optional
-traditional provider by default; `--macros` selects it for that input. Configure
+traditional provider by default; `--macros` selects it for that input. Its
+default capacities are 64 definitions and 1024 model statements. Explicit
+`--macro-limit 1..1024` and `--macro-model-limit 1..65536` select capacities
+within the existing host budget; nondefault values require `--macros`. Configure
 with `-DMF_TRADITIONAL_MACROS=OFF` to omit its source and library entirely. The
 direct bootstrap recipe also omits it. Such builds reject `--macros` with return
 code 2; neither build silently expands macros without the option.

@@ -46,6 +46,30 @@ main: procedure = .int
   call run_case cli, "--literal-limit 1 " || shellquote(limits_source) || " " || shellquote(limits_deck), 1, stdout_path, stderr_path, "literal capacity enforced"
   call absent limits_deck
   call run_case cli, "--literal-limit 2 " || shellquote(limits_source) || " " || shellquote(limits_deck), 0, stdout_path, stderr_path, "explicit sufficient literal capacity"
+  /* A two-definition/two-model consumer distinguishes both capacity knobs. */
+  call run_case cli, "--help", 0, stdout_path, stderr_path, "capacity help"
+  if pos("--macro-limit", readfile(stdout_path)) > 0 then do
+    do i = 1 to 2
+      option = word("--macro-limit --macro-model-limit",i)
+      maximum_bad = word("1025 65537",i)
+      call run_case cli, option, 2, stdout_path, stderr_path, "missing macro capacity"
+      call run_case cli, option || " 0", 2, stdout_path, stderr_path, "zero macro capacity"
+      call run_case cli, option || " -1", 2, stdout_path, stderr_path, "negative macro capacity"
+      call run_case cli, option || " " || maximum_bad, 2, stdout_path, stderr_path, "excessive macro capacity"
+      call run_case cli, option || " 9999999999999999999999", 2, stdout_path, stderr_path, "overflowing macro capacity"
+      output = work || "/no-provider.obj"; call erase output
+      call run_case cli, option || " 2 " || shellquote(forms) || " " || shellquote(output), 2, stdout_path, stderr_path, "capacity requires selected provider"
+      call absent output
+    end
+    macros_source = work || "/macro-limits.asm"; macros_deck = work || "/macro-limits.obj"
+    call writefile macros_source, changestr("|", " MACRO| ONE| LR 1,2| MEND| MACRO| TWO| LR 3,4| MEND|S CSECT| ONE| TWO| END S|", '0a'x)
+    call erase macros_deck
+    call run_case cli, "--macros --macro-limit 1 " || shellquote(macros_source) || " " || shellquote(macros_deck), 1, stdout_path, stderr_path, "macro definition capacity enforced"
+    call absent macros_deck
+    call run_case cli, "--macros --macro-model-limit 1 " || shellquote(macros_source) || " " || shellquote(macros_deck), 1, stdout_path, stderr_path, "macro model capacity enforced"
+    call absent macros_deck
+    call run_case cli, "--macros --macro-limit 2 --macro-model-limit 2 " || shellquote(macros_source) || " " || shellquote(macros_deck), 0, stdout_path, stderr_path, "sufficient explicit macro capacities"
+  end
   output = work || "/extra.obj"; call erase output
   call run_case cli, shellquote(forms) || " " || shellquote(output) || " extra", 2, stdout_path, stderr_path, "extra argument"
   call absent output

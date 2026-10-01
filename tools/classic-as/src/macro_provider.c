@@ -578,6 +578,35 @@ static enum mf_status expand(struct mf_macro *m, const struct mf_statement *s,
     if ((out->label.length && !name_valid(out->label)) || !name_valid(out->operation)) return MF_SOURCE;
     return MF_OK;
 }
+static enum mf_status set_character(struct mf_macro *m, size_t at, struct mf_span expression)
+{
+    struct mf_macro_value value; struct variable *v; size_t i, first, j, depth; int quoted;
+    enum mf_status st; mf_octet c;
+    v = m->variables + at; v->used = 0; first = depth = 0; quoted = 0;
+    for (i = 0; i <= expression.length; ++i) {
+        if (i < expression.length) {
+            c = expression.data[i];
+            if (c == 0x27) {
+                if (quoted && i + 1 < expression.length && expression.data[i + 1] == 0x27) { ++i; continue; }
+                quoted = !quoted;
+            } else if (!quoted && c == 0x28) ++depth;
+            else if (!quoted && c == 0x29) { if (!depth) return MF_SOURCE; --depth; }
+        }
+        if (i == expression.length || (!quoted && !depth && expression.data[i] == 0x2e)) {
+            if (quoted || depth || i == first) return MF_SOURCE;
+            st = mf_macro_eval(slice(expression,first,i-first),32,&value); if (st != MF_OK) return st;
+            if (!value.character) return MF_SOURCE;
+            for (j = 0; j < value.text.length; ++j) {
+                c = value.text.data[j];
+                if (c == 0x27 && j + 1 < value.text.length && value.text.data[j + 1] == 0x27) ++j;
+                if (v->used == m->config.max_statement_bytes) return MF_LIMIT;
+                m->variable_text[at * m->config.max_statement_bytes + v->used++] = c;
+            }
+            first = i + 1;
+        }
+    }
+    return MF_OK;
+}
 static enum mf_status conditional(struct mf_macro *m, const struct mf_statement *s, size_t op)
 {
     struct mf_span expression, target, name; struct mf_macro_value value;
@@ -605,19 +634,10 @@ static enum mf_status conditional(struct mf_macro *m, const struct mf_statement 
         if (m->variables[at].global) at = m->variables[at].global - 1;
         v = m->variables + at; if (v->type != (int)(op - 13)) return MF_SOURCE;
         used = 0; st = substitute(m, s->operand, &used, &expression); if (st != MF_OK) return st;
+        if (v->type == 2) return set_character(m,at,expression);
         st = mf_macro_eval(expression, 32, &value); if (st != MF_OK) return st;
-        if (v->type == 2) {
-            if (!value.character) return MF_SOURCE;
-            v->used = 0;
-            for (i = 0; i < value.text.length; ++i) {
-                mf_octet c; c = value.text.data[i];
-                if (c == 0x27 && i + 1 < value.text.length && value.text.data[i + 1] == 0x27) ++i;
-                m->variable_text[at * m->config.max_statement_bytes + v->used++] = c;
-            }
-        } else {
-            if (value.character || (v->type == 1 && value.number != 0 && value.number != 1)) return MF_SOURCE;
-            v->number = value.number;
-        }
+        if (value.character || (v->type == 1 && value.number != 0 && value.number != 1)) return MF_SOURCE;
+        v->number = value.number;
         return MF_OK;
     }
     if (op == 5) return empty(s->operand) ? MF_OK : MF_SOURCE;

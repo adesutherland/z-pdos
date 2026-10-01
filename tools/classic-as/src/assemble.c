@@ -795,6 +795,11 @@ static enum mf_status address(struct mf_as *as, struct mf_span s, int indexed,
         if (status == MF_UNDEFINED && as->pass == 1) { *disp = 0; if (!explicit_base) *base = 0; return MF_OK; }
         if (status != MF_OK) return status;
     }
+    /* RX implicit addresses retain their USING-selected base when a single
+     * index subfield is supplied. The absolute d(b) shorthand is explicit. */
+    if (indexed && open != NIL && count == 1 && v.coefficient) {
+        *index_or_length = (unsigned)n; explicit_base = 0;
+    }
     if (v.magnitude.hi || v.coefficient < 0 || v.coefficient > 1 ||
         (v.coefficient && (v.kind != MF_REF_SECTION || v.negative))) return MF_SOURCE;
     if (!v.coefficient && v.negative) {
@@ -1051,7 +1056,7 @@ static enum mf_status constant_parse(struct mf_as *as, struct mf_span s, int res
         if (type == 0x41 && c->type != 0x44) { if (c->width > 4) return MF_UNSUPPORTED; }
         else if (type != 0x43 && type != 0x58 && type != 0x59) return MF_UNSUPPORTED;
     }
-    if (reserve) { c->extent = c->width; return at == s.length ? MF_OK : MF_UNSUPPORTED; }
+    if (reserve && at == s.length) { c->extent = c->width; return MF_OK; }
     if (at == s.length) {
         if (c->repeat) return MF_SOURCE;
         if ((type == 0x43 || type == 0x58) && !c->explicit_length) return MF_UNSUPPORTED;
@@ -1119,7 +1124,11 @@ static enum mf_status emit_constant_single(struct mf_as *as, const struct consta
         if (c->type == 0x56 && (v.coefficient != 1 || v.kind != MF_REF_EXTERNAL ||
             !zero(v.magnitude) || v.negative)) return MF_SOURCE;
         if (v.coefficient && c->width != 4) return MF_UNSUPPORTED;
-        if (v.coefficient && as->sections[as->current].dummy) return MF_SOURCE;
+        if (as->sections[as->current].dummy) {
+            status = numeric_bytes(v, c->width, c->type == 0x48 || c->type == 0x46, bytes);
+            if (status != MF_OK) return status;
+            return advance(as, c->width * c->repeat, NULL);
+        }
         if (v.coefficient && (as->fixup_count > as->config.max_fixups ||
             c->repeat > as->config.max_fixups - as->fixup_count)) return MF_LIMIT;
         status = numeric_bytes(v, c->width, c->type == 0x48 || c->type == 0x46, bytes);
@@ -1374,7 +1383,7 @@ static enum mf_status end_statement(struct mf_as *as)
     struct value v; enum mf_status status;
     if (as->statement.label.length) return MF_SOURCE;
     as->ended = 1;
-    if (!as->statement.operand.length) return end_literal_pool(as);
+    if (!as->statement.operand.length || (as->statement.operand.length == 1 && as->statement.operand.data[0] == 0x2c)) return end_literal_pool(as);
     status = evaluate(as, as->statement.operand, &v);
     if (status == MF_UNDEFINED && as->pass == 1) return end_literal_pool(as);
     if (status != MF_OK) return status;

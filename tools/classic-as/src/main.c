@@ -223,7 +223,7 @@ int main(int argc, char **argv)
     struct mf_diagnostics diagnostics; struct mf_as_config config;
     struct mf_as_result result; struct mf_as *as; struct mf_obj *obj;
     mf_octet reader_buffer[CARD_CAPACITY]; enum mf_status status;
-    enum mf_profile profile; const char *input_path, *output_path; int arg, rc, use_macros; size_t literal_limit;
+    enum mf_profile profile; const char *input_path, *output_path; int arg, rc, use_macros; size_t literal_limit, macro_model_limit, macro_limit;
 #ifdef MF_WITH_TRADITIONAL_MACROS
     struct mf_macro_config macro_config; struct mf_macro *macros; struct mf_macro_observer macro_observer;
     struct host_library library; struct mf_macro_library resolver;
@@ -231,13 +231,13 @@ int main(int argc, char **argv)
     macros = NULL;
 #endif
     profile = MF_S360; arg = 1; as = NULL; obj = NULL;
-    use_macros = 0; literal_limit = 256;
+    use_macros = 0; literal_limit = 256; macro_model_limit = 1024; macro_limit = 64;
     if (argc == 2 && strcmp(argv[1], "--version") == 0) {
         puts("mf-classic-as 0.1.0-bootstrap"); return 0;
     }
     if (argc == 2 && strcmp(argv[1], "--help") == 0) {
 #ifdef MF_WITH_TRADITIONAL_MACROS
-        puts("usage: mf-classic-as [--profile s360|s370|esa390|z900] [--literal-limit 0..65536] [--macros] [-I directory] input.asm output.obj"); return 0;
+        puts("usage: mf-classic-as [--profile s360|s370|esa390|z900] [--literal-limit 0..65536] [--macros] [--macro-model-limit 1..65536] [--macro-limit 1..1024] [-I directory] input.asm output.obj"); return 0;
 #else
         puts("usage: mf-classic-as [--profile s360|s370|esa390|z900] [--literal-limit 0..65536] input.asm output.obj"); return 0;
 #endif
@@ -254,18 +254,24 @@ int main(int argc, char **argv)
             else if (strcmp(argv[arg + 1], "z900") == 0) profile = MF_Z900;
             else { fprintf(stderr, "unsupported profile: %s\n", argv[arg + 1]); return 2; }
             arg += 2;
-        } else if (strcmp(argv[arg], "--literal-limit") == 0) {
-            const char *p; unsigned long n;
-            if (argc <= arg + 1) { fprintf(stderr, "missing --literal-limit value\n"); return 2; }
+        } else if (strcmp(argv[arg], "--literal-limit") == 0 || strcmp(argv[arg], "--macro-model-limit") == 0 || strcmp(argv[arg], "--macro-limit") == 0) {
+            const char *p; unsigned long n, maximum;
+            int models, definitions; models = strcmp(argv[arg], "--macro-model-limit") == 0;
+            definitions = strcmp(argv[arg], "--macro-limit") == 0; maximum = definitions ? 1024UL : 65536UL;
+            if (argc <= arg + 1) { fprintf(stderr, "missing %s value\n",argv[arg]); return 2; }
             p = argv[arg + 1]; n = 0;
-            if (!*p) { fprintf(stderr, "empty --literal-limit value\n"); return 2; }
+            if (!*p) { fprintf(stderr, "empty %s value\n",argv[arg]); return 2; }
             while (*p) {
-                if (*p < '0' || *p > '9' || n > (65536UL - (unsigned long)(*p - '0')) / 10UL) {
-                    fprintf(stderr, "--literal-limit must be decimal 0..65536\n"); return 2;
+                if (*p < '0' || *p > '9' || n > (maximum - (unsigned long)(*p - '0')) / 10UL) {
+                    fprintf(stderr, "%s must be decimal %u..%lu\n",argv[arg],models || definitions ? 1U : 0U,maximum); return 2;
                 }
                 n = n * 10UL + (unsigned long)(*p++ - '0');
             }
-            literal_limit = (size_t)n; arg += 2;
+            if (models || definitions) {
+                if (!n) { fprintf(stderr,"%s must be positive\n",argv[arg]); return 2; }
+                if (models) macro_model_limit = (size_t)n; else macro_limit = (size_t)n;
+            } else literal_limit = (size_t)n;
+            arg += 2;
         } else if (strcmp(argv[arg], "--macros") == 0) {
 #ifdef MF_WITH_TRADITIONAL_MACROS
             use_macros = 1; ++arg;
@@ -285,11 +291,12 @@ int main(int argc, char **argv)
     }
     if (argc != arg + 2) {
 #ifdef MF_WITH_TRADITIONAL_MACROS
-        fprintf(stderr, "usage: mf-classic-as [--profile s360|s370|esa390|z900] [--literal-limit 0..65536] [--macros] [-I directory] input.asm output.obj\n"); return 2;
+        fprintf(stderr, "usage: mf-classic-as [--profile s360|s370|esa390|z900] [--literal-limit 0..65536] [--macros] [--macro-model-limit 1..65536] [--macro-limit 1..1024] [-I directory] input.asm output.obj\n"); return 2;
 #else
         fprintf(stderr, "usage: mf-classic-as [--profile s360|s370|esa390|z900] [--literal-limit 0..65536] input.asm output.obj\n"); return 2;
 #endif
     }
+    if (!use_macros && (macro_model_limit != 1024 || macro_limit != 64)) { fprintf(stderr,"macro limits require --macros\n"); return 2; }
     input_path = argv[arg]; output_path = argv[arg + 1];
     if (strcmp(input_path, output_path) == 0 || !target_absent(output_path)) {
         fprintf(stderr, "output target already exists or cannot be checked: %s\n", output_path); return 2;
@@ -322,8 +329,8 @@ int main(int argc, char **argv)
     config.max_fixups = (size_t)65536UL; config.max_statement = 256; config.max_expression_depth = 32;
 #ifdef MF_WITH_TRADITIONAL_MACROS
     if (use_macros) {
-        macro_config.max_macros = 64; macro_config.max_parameters = 16;
-        macro_config.max_model_statements = 1024; macro_config.max_definition_bytes = 262144UL;
+        macro_config.max_macros = macro_limit; macro_config.max_parameters = 16;
+        macro_config.max_model_statements = macro_model_limit; macro_config.max_definition_bytes = 262144UL;
         macro_config.max_depth = 16; macro_config.max_argument_bytes = 4096;
         macro_config.max_statement_bytes = CARD_CAPACITY; macro_config.max_steps = 1000000UL;
         macro_observer.cookie = &library; macro_observer.notify = macro_report;

@@ -111,6 +111,26 @@ static void substrings(void)
     bad_source(" LCLC &C\n&C SETC 'ABC'(3,2)\n",MF_RANGE);
     bad_source(" AIF ('ABC'('x',1) EQ 'A').YES\n.YES ANOP\n",MF_SOURCE);
 }
+static void character_concatenation(void)
+{
+    struct fixture f; unsigned pass; unsigned long n; size_t allocated;
+    init(&f," LCLC &C\n&C SETC 'MAP'.'ZP'\n DC C'&C'\n&C SETC 'A.B'.'XYZ'(2,*)\n DC C'&C'\n&C SETC 'A''B'.''.'C'\n DC AL1(K'&C)\n");
+    CHECK(create(&f) == MF_OK); allocated = f.calls;
+    for (pass = 0; pass < 2; ++pass) {
+        expected(&f,"","DC","C'MAPZP'",3);
+        expected(&f,"","DC","C'A.BYZ'",5);
+        expected(&f,"","DC","AL1(4)",7);
+        CHECK(drain(&f,&n) == MF_EOF && f.calls == allocated);
+        if (!pass) CHECK(f.statements.replay(f.statements.cookie) == MF_OK);
+    }
+    clean(&f);
+    bad_source(" LCLC &C\n&C SETC 'A'..'B'\n",MF_SOURCE);
+    bad_source(" LCLC &C\n&C SETC 'A'.\n",MF_SOURCE);
+    bad_source(" LCLC &C\n&C SETC 'A'.1\n",MF_SOURCE);
+    bad_source(" LCLC &C\n&C SETC 'A'.'B\n",MF_SOURCE);
+    init(&f," LCLC &C\n&C SETC 'AB'.'CD'\n"); f.config.max_statement_bytes = 3;
+    CHECK(create(&f) == MF_OK); CHECK(drain(&f,&n) == MF_LIMIT); clean(&f);
+}
 static void inactive_source(void)
 {
     struct fixture f; unsigned pass; unsigned long n;
@@ -149,5 +169,5 @@ static void end_targets(void)
 }
 int main(void)
 {
-    end_targets(); inactive_source(); scoped(); expressions(); argument_attributes(); label_attributes(); variable_counts(); substrings(); printf("conditional macros: %lu checks passed\n", checks); return 0;
+    character_concatenation(); end_targets(); inactive_source(); scoped(); expressions(); argument_attributes(); label_attributes(); variable_counts(); substrings(); printf("conditional macros: %lu checks passed\n", checks); return 0;
 }
