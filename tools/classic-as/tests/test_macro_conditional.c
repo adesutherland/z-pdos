@@ -67,6 +67,22 @@ static void argument_attributes(void)
     bad_source(" MNOTE 8,'unsupported form'\n", MF_SOURCE);
     bad_source(" MNOTE 4,'warning'\n", MF_UNSUPPORTED);
 }
+static void label_attributes(void)
+{
+    struct fixture f; unsigned pass; unsigned long n; size_t allocated;
+    init(&f," MACRO\n&LABEL DESCRIBE\n LCLA &SIZE\n&SIZE SETA K'&LABEL\n"
+        " DC AL1(&SIZE),AL1(N'&LABEL)\n AIF (T'&LABEL EQ 'O').EMPTY\n"
+        " DC C'&LABEL'\n.EMPTY ANOP\n MEND\nFIVE5 DESCRIBE\n DESCRIBE\n");
+    CHECK(create(&f) == MF_OK); allocated = f.calls;
+    for (pass = 0; pass < 2; ++pass) {
+        expected(&f,"","DC","AL1(5),AL1(1)",10);
+        expected(&f,"","DC","C'FIVE5'",10);
+        expected(&f,"","DC","AL1(0),AL1(0)",11);
+        CHECK(drain(&f,&n) == MF_EOF && f.calls == allocated);
+        if (!pass) CHECK(f.statements.replay(f.statements.cookie) == MF_OK);
+    }
+    clean(&f);
+}
 static void inactive_source(void)
 {
     struct fixture f; unsigned pass; unsigned long n;
@@ -86,5 +102,5 @@ static void inactive_source(void)
 }
 int main(void)
 {
-    inactive_source(); scoped(); expressions(); argument_attributes(); printf("conditional macros: %lu checks passed\n", checks); return 0;
+    inactive_source(); scoped(); expressions(); argument_attributes(); label_attributes(); printf("conditional macros: %lu checks passed\n", checks); return 0;
 }

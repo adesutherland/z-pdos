@@ -468,6 +468,7 @@ static int formal_parameter(struct mf_macro *m, struct mf_span name)
     struct definition *d; struct parameter *p; size_t j;
     if (!m->depth) return 0;
     d = m->definitions + m->frames[m->depth - 1].definition;
+    if (d->label.length && mf_macro_same(name, d->label)) return 1;
     p = m->parameters ? m->parameters + m->frames[m->depth - 1].definition * m->config.max_parameters : NULL;
     for (j = 0; j < d->parameters; ++j) if (mf_macro_same(name, p[j].name)) return 1;
     return 0;

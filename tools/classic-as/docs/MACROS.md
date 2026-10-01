@@ -80,6 +80,8 @@ to replay consistency. MEXIT ends the current invocation. SYSNDX uses the
 invocation's decimal index, padded to at least four digits, reset on replay.
 
 K' reports immediate parameter text length and N' its top-level sublist count.
+The invocation label is also a formal parameter when the prototype declares it;
+these immediate attributes include its supplied or omitted text.
 Literal positive decimal indices select parameter sublist elements; an absent
 element is empty. Scalar variable indexing and dynamic or nested indices remain
 unsupported. The selected T' parameter query distinguishes immediate numeric text (N),
