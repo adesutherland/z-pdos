@@ -1,0 +1,62 @@
+* SPDX-License-Identifier: MIT
+* Original selected SVC10/120 register release; public ABI in README.md.
+         MACRO
+&N       FREEMAIN &REQUEST,&LV=,&A=,&SP=0
+         LCLA  &OPTION,&REGNO
+         LCLC  &TEXT,&LABEL,&POOL
+&LABEL   SETC  '&N'
+&POOL    SETC  '&SP'
+         AIF   ('&POOL' NE '').POOL
+&POOL    SETC  '0'
+.POOL    AIF   ('&REQUEST' EQ 'RC').COND
+         AIF   ('&REQUEST' EQ 'R').ADDRESS
+         AIF   ('&REQUEST' NE 'RU').BAD
+&OPTION  SETA  3
+         AGO   .ADDRESS
+.COND    ANOP
+&OPTION  SETA  1
+.ADDRESS AIF   ('&A' EQ '' OR '&LV' EQ '').BAD
+         AIF   ('&A'(1,1) EQ '(').AREG
+&LABEL   LA    1,&A
+         AGO   .VALUE
+.AREG    AIF   (K'&A LT 3).BAD
+         AIF   ('&A'(K'&A,1) NE ')').BAD
+&TEXT    SETC  '&A'(2,K'&A-2)
+         AIF   ('&TEXT'(1,1) NE 'R').ANUMBER
+&TEXT    SETC  '&TEXT'(2,*)
+.ANUMBER ANOP
+&REGNO   SETA  &TEXT
+         AIF   (&REGNO LT 1 OR &REGNO GT 12).BAD
+&LABEL   LR    1,&REGNO
+.VALUE   ANOP
+&LABEL   SETC  ''
+         AIF   ('&LV'(1,1) EQ '(').REG
+         L     0,=A(&LV)
+         AGO   .CONTROL
+.REG     AIF   (K'&LV LT 3).BAD
+         AIF   ('&LV'(K'&LV,1) NE ')').BAD
+&TEXT    SETC  '&LV'(2,K'&LV-2)
+         AIF   ('&TEXT'(1,1) NE 'R').NUMBER
+&TEXT    SETC  '&TEXT'(2,*)
+.NUMBER  ANOP
+&REGNO   SETA  &TEXT
+         AIF   (&REGNO LT 0 OR &REGNO EQ 1 OR &REGNO GT 12).BAD
+         LR    0,&REGNO
+.CONTROL AIF   ('&REQUEST' EQ 'R').LEGACY
+         L     15,MF$F&SYSNDX.C
+         SVC   120
+         B     MF$F&SYSNDX.E
+         DS    0F
+MF$F&SYSNDX.C DC AL2(0),AL1(&POOL),AL1(&OPTION)
+         AGO   .END
+.LEGACY  N     0,=X'00FFFFFF'
+         O     0,MF$F&SYSNDX.C
+         SVC   10
+         B     MF$F&SYSNDX.E
+         DS    0F
+MF$F&SYSNDX.C DC AL1(&POOL),XL3'000000'
+.END     ANOP
+MF$F&SYSNDX.E DS 0H
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected FREEMAIN request'
+         MEND

@@ -1,0 +1,46 @@
+* SPDX-License-Identifier: MIT
+* Original selected SVC120 register request; public ABI in README.md.
+         MACRO
+&N       GETMAIN &REQUEST,&LV=,&SP=0,&LOC=RES
+         LCLA  &OPTION,&REGNO
+         LCLC  &TEXT,&LABEL,&POOL
+&LABEL   SETC  '&N'
+&POOL    SETC  '&SP'
+         AIF   ('&POOL' NE '').POOL
+&POOL    SETC  '0'
+.POOL    AIF   ('&REQUEST' EQ 'RC').COND
+         AIF   ('&REQUEST' NE 'RU').BAD
+&OPTION  SETA  2
+         AGO   .LOC
+.COND    ANOP
+&OPTION  SETA  0
+.LOC     AIF   ('&LOC' EQ 'RES').VALUE
+         AIF   ('&LOC' EQ 'BELOW' OR '&LOC' EQ '24').BELOW
+         AIF   ('&LOC' NE 'ANY' AND '&LOC' NE '31').BAD
+&OPTION  SETA  &OPTION+48
+         AGO   .VALUE
+.BELOW   ANOP
+&OPTION  SETA  &OPTION+16
+.VALUE   AIF   ('&LV' EQ '').BAD
+         AIF   ('&LV'(1,1) EQ '(').REG
+&LABEL   L     0,=A(&LV)
+         AGO   .CONTROL
+.REG     AIF   (K'&LV LT 3).BAD
+         AIF   ('&LV'(K'&LV,1) NE ')').BAD
+&TEXT    SETC  '&LV'(2,K'&LV-2)
+         AIF   ('&TEXT'(1,1) NE 'R').NUMBER
+&TEXT    SETC  '&TEXT'(2,*)
+.NUMBER  ANOP
+&REGNO   SETA  &TEXT
+         AIF   (&REGNO LT 0 OR &REGNO EQ 1 OR &REGNO GT 12).BAD
+&LABEL   LR    0,&REGNO
+.CONTROL L     15,MF$G&SYSNDX.C
+         SR    1,1
+         SVC   120
+         B     MF$G&SYSNDX.E
+         DS    0F
+MF$G&SYSNDX.C DC AL2(0),AL1(&POOL),AL1(&OPTION)
+MF$G&SYSNDX.E DS 0H
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected GETMAIN request'
+         MEND

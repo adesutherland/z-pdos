@@ -46,3 +46,32 @@ An original consumer checks 32 separate relative field/length values against
 literal expected binary bytes after independent linking. Complete-module
 assembly is a separate result; it does not establish correct services, a
 linked OS image or guest execution.
+
+## Register storage requests
+
+The original GETMAIN/FREEMAIN definitions use public
+[SVC 120](https://www.ibm.com/docs/en/zos/3.1.0?topic=descriptions-svc-120-0a78)
+and [SVC 10](https://www.ibm.com/docs/en/zos/3.1.0?topic=descriptions-svc-10-0a0a)
+register contracts. GETMAIN selects RU/RC with a required LV, constant SP
+(default/empty zero), and LOC=RES/BELOW/24/ANY/31. FREEMAIN selects RU/RC or
+legacy R, with required LV/A and constant SP. Register notation accepts decimal
+or R-prefixed numbers: LV uses 0 or 2–12, A uses 1–12. Other LV expressions
+are loaded as a fullword value; other A operands use LA. Forward absolute
+length/subpool symbols are supported by the assembler passes. Subpool bytes
+are checked without truncation.
+
+RU/RC use SVC120: R0 is the length, R1 is zero for obtain or the release
+address, and R15 contains the subpool and request options. FREEMAIN R uses
+the 24-bit SVC10 format with subpool in R0's high byte and length in its low
+three bytes. It must not free storage above 16 MiB. The retained PDOS handler
+implements these entry contracts; its allocation/error behavior is a separate
+OS qualification. These macros do not implement branch entry, list/variable
+requests, storage keys, owner, boundary, whole-subpool release or AR modes.
+Their inline control words are skipped after the SVC; generated local names
+begin MF$G/MF$F and must be reserved by consumers. R0/R1/R15 are work registers;
+the macro setup preserves other registers.
+
+An independent consumer interprets only the small instruction subset emitted
+by four original calls and checks their SVC number, R0/R1/R15 and preserved
+registers after linking. It supplies synthetic SVC returns, so this proves
+register setup rather than actual allocation or guest execution.

@@ -106,3 +106,10 @@ declarations. It preserves source-owned lowcore constants and supplies no OS
 service. Independent field/length bytes and rejected-variant output checks
 pass; PDOSSUP, PLOADSUP and SAPSTART assemble in normal and sanitizer builds.
 Runtime service closure, whole-image linking and guest execution remain open.
+
+The selected library also supplies original GETMAIN RU/RC and FREEMAIN
+RU/RC/R register interfaces from public SVC120/SVC10 contracts. Four calls
+pass independent linked register-setup checks and failure controls under
+normal and sanitizer builds. Complete MVSSTART assembly now passes with
+identical decks from both builds. Allocation, I/O, image and guest evidence
+remain separate; no native macro source or expansion was used.

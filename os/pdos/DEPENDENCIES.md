@@ -9,9 +9,9 @@ image dependencies.
 | OS C source | `pdos.c`, `pdosutil.c/.h`, `pload.c`, `pcomm.c` | Exact retained PDIO1 selection; all four C units compile and independently assemble with Classic C/Assembler |
 | Runtime C | START, STDIO, STDLIB, CTYPE, STRING, TIME, ERRNO, ASSERT, LOCALE, MATH, SETJMP, SIGNAL, MEMMGR | One maintained PDPCLIB with merged canonical/Lab fixes and `pdos-zarch` configuration; all 13 units compile and independently assemble with Classic C/Assembler |
 | Source macros | PDPTOP, PDPMAIN, PDPPRLG, PDPEPIL | Retained source-owned bytes; selected COPY, library lookup and conditional state pass the C consumers; raw-source forms remain open |
-| Kernel startup and support | SAPSTART, SAPSUPA, PDOSSUP | Retained source; whole assembly and z/Architecture encoding remain open |
+| Kernel startup and support | SAPSTART, SAPSUPA, PDOSSUP | Retained source; SAPSTART/PDOSSUP assemble completely with the selected mappings; SAPSUPA I/O service closure remains open |
 | Loader support | PLOADSUP plus PLOAD and PDOSUTIL | Retained source; IPL placement and independent whole-module reconstruction remain open |
-| Command processor | MVSSTART, MVSSUPA, PCOMM and the selected common runtime | Retained source; native services and whole assembly remain open |
+| Command processor | MVSSTART, MVSSUPA, PCOMM and the selected common runtime | MVSSTART assembles with independently checked storage-request interfaces; MVSSUPA I/O services and whole assembly remain open |
 | External native macros | YREGS, SAVE, RETURN, CVT, IEZJSCB, IHAPSA, IHARB, IHACDE, IEFJFCBN, IEZIOB, IHASVC; OPEN/CLOSE/DCB and other reached service forms | Calls exist in retained source. Original build supplied IBM MACLIB/MODGEN. Selected sparse PSA/TCB/JSCB/RB/CDE/ASCB/ASXB/CVT/SVC-entry mappings pass independent field checks; broader mappings and service forms remain open |
 | Qualified C producer | Repaired GCCMVS 3.2.3 v90, binary SHA-256 `f85eb831865c7de8eb12f74d26b5607414cf7a9204a4609fcd9f1826c3fa7bec` | Historical native kernel build input; the local Classic C checkpoint is a different GCC 3.4.6 producer |
 | Qualified assembler/binder | ASMA90 and IEWL | Historical qualification route; replacing these requires independent object, relocation and load-image checks |

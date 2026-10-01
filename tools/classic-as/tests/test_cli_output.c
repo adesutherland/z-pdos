@@ -21,6 +21,47 @@ static unsigned long be(const unsigned char *p, unsigned n)
     while (n--) result = result * 256UL + *p++;
     return result;
 }
+static void storage_requests(const char *path)
+{
+    static const unsigned long expected[4][4] = {
+        {120,128,0,0x512}, {120,513,0,0x30},
+        {120,513,0x8000,0x503}, {10,0x03000040,0x123450,0}
+    };
+    unsigned char bytes[512]; unsigned long reg[16], address, value;
+    size_t size, pc; unsigned step, calls, op, r, second, base; FILE *input;
+    input = fopen(path,"rb"); CHECK(input != NULL);
+    size = fread(bytes,1,sizeof bytes,input); CHECK(size && size < sizeof bytes);
+    CHECK(!ferror(input) && fclose(input) == 0);
+    memset(reg,0,sizeof reg); reg[6] = 513; reg[10] = 0x123450;
+    reg[12] = 4096; reg[14] = 0x445566; pc = calls = 0;
+    for (step = 0; step < 64; ++step) {
+        CHECK(pc+2 <= size); op = bytes[pc]; r = bytes[pc+1] >> 4; second = bytes[pc+1] & 15;
+        if (op == 0x07) { CHECK(r == 15 && second == 14); break; }
+        if (op == 0x18 || op == 0x1b) {
+            reg[r] = op == 0x18 ? reg[second] : (reg[r]-reg[second]) & 0xffffffffUL;
+            pc += 2; continue;
+        }
+        if (op == 0x0a) {
+            CHECK(calls < 4 && bytes[pc+1] == expected[calls][0]);
+            CHECK(reg[0] == expected[calls][1] && reg[1] == expected[calls][2] && reg[15] == expected[calls][3]);
+            CHECK(reg[6] == 513 && reg[10] == 0x123450 && reg[12] == 4096 && reg[14] == 0x445566);
+            if (calls < 2) reg[1] = 0x8000;
+            reg[15] = 0; ++calls; pc += 2; continue;
+        }
+        CHECK(pc+4 <= size && second == 0);
+        base = bytes[pc+2] >> 4;
+        address = (base ? reg[base] : 0) + ((bytes[pc+2] & 15)*256UL+bytes[pc+3]);
+        CHECK(address >= 4096 && address-4096 < size);
+        if (op == 0x47) { CHECK(r == 15); pc = (size_t)(address-4096); continue; }
+        CHECK(address-4096+4 <= size); value = be(bytes+address-4096,4);
+        if (op == 0x58) reg[r] = value;
+        else if (op == 0x54) reg[r] &= value;
+        else { CHECK(op == 0x56); reg[r] |= value; }
+        pc += 4;
+    }
+    CHECK(step < 64 && calls == 4);
+    puts("Storage interfaces: four independently expected SVC register requests pass");
+}
 
 int main(int argc, char **argv)
 {
@@ -52,6 +93,7 @@ int main(int argc, char **argv)
     FILE *input;
 
     CHECK(argc == 3);
+    if (!strcmp(argv[1],"pdos31-storage")) { storage_requests(argv[2]); return 0; }
     if (!strcmp(argv[1], "pdos31-maps")) {
         static const unsigned char linked[64] = {0,32,0,64,0,96,0,104,0,112,0,120,1,0,1,128,2,28,2,32,2,36,2,128,0,32,0,16,0,4,0,0,0,8,0,12,0,16,1,8,0,13,0,8,0,8,0,16,0,108,0,20,1,48,0,16,0,0,0,4,0,5,0,6};
         input = fopen(argv[2], "rb"); CHECK(input != NULL);
