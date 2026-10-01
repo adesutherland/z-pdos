@@ -103,3 +103,14 @@ shasum -a 256 -c source.sha256
 The build works from the retained source and requires no attachment download.
 The patch is a recovery record; edit the maintained source rather than layering
 private patches onto generated build copies.
+
+## Numeric escape preservation — 2 October 2026
+
+The retained newline fix maps host LF to EBCDIC NEL (0x15). Its inverse
+already mapped target 0x25 to host NEL, but the forward table still mapped
+host NEL to 0x15. Consequently both hex `\x25` and octal `\045` string
+escapes emitted 0x15. This defect survived the earlier newline tests.
+The forward NEL entry now maps to 0x25, completing the existing newline/NEL
+exchange and preserving all 256 numeric byte values. Printable CP037 mappings
+and the selected newline value remain unchanged. Comments now describe this
+contract accurately. The consolidated recovery patch and manifest are refreshed.

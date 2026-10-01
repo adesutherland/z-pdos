@@ -220,7 +220,7 @@ extern void i370_override_options (void);
    on modern hosts, so it is removed.  EBCDIC translation is handled
    elsewhere.  */
 
-/* Host (ASCII/ISO-8859-1) <-> target (EBCDIC CP037) mapping.  Tables in
+/* Host (ASCII/ISO-8859-1) <-> target (EBCDIC CP037 with newline/NEL exchange) mapping.  Tables in
    i370.c.  Three users, all so that a character has ONE value whether it is a
    character constant or sits inside a string literal:
 
@@ -229,7 +229,7 @@ extern void i370_override_options (void);
      - MAP_OUTCHAR (= ASCTOEBC) maps the control / variant / '&' string bytes
        that ASM_OUTPUT_ASCII emits as X'..' hex (printable bytes go out as
        C'...' text and are converted by the whole-file ASCII->EBCDIC transfer).
-       So a string '\n' (0x0A) becomes 0x25, matching the '\n' constant.
+       So a string '\n' (0x0A) becomes 0x15, matching the '\n' constant.
      - MAP_INCHAR (= EBCTOASC) pre-images hex/octal string escapes in
        cppcharset.c, so MAP_OUTCHAR round-trips them back to the literal byte
        ("\x04" stays 0x04 rather than being translated).  This is what keeps

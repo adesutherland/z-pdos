@@ -132,8 +132,8 @@ d5b29f4ab7cd7ead3a9c6bf06bb8dfd2159748289a3babab5d81d11b9d5ebe05  source/gcc/con
 bdad2b0425dd1cfee427170bdce48673c1d7756c2be8e3ac20ea95812ec7db6b  source/gcc/config/i370/i370-c.c
 b310dac70d73da294e4e28b9ea46470a8087c50712a604285e9bf394fb7d112c  source/gcc/config/i370/i370-modes.def
 81b50ff8532d3f1b16de94dd8d04cd5b670c724272ff4ecb29c45512a90d52e6  source/gcc/config/i370/i370-protos.h
-8e5cb39fcab51a8dd7b142dc7a570dc7849f15e4b7313af97c5841b9919f44fe  source/gcc/config/i370/i370.c
-f791e75f9f7259249ff66ab027fa300bccffe916be677bd02298af7a090dbcf3  source/gcc/config/i370/i370.h
+15ca88e32f9442f44458754a7fb04dba739ee73be8f03843b10ed72ba570d7d2  source/gcc/config/i370/i370.c
+a671234d7b9c1d6b02e10dd4bcf3fc2245c1a7af906b8a7bfd2d27f090fb14cc  source/gcc/config/i370/i370.h
 ca639a47c63b0faad8aa4a36a10a09e8e82b5f971d3939b8b374d69d416862b8  source/gcc/config/i370/i370.md
 9e1577ca02d734bdce1f0c588b39df0dc9d500f9e4adb517970e45d914b590f0  source/gcc/config/i370/mvspdp.h
 8f285ede55caeecc28ef9c388a0a5f92fa8bc8d1d59f2a1e8bc6774546065ced  source/gcc/config/i370/t-i370

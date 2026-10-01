@@ -217,16 +217,15 @@ index 3bef79e..c3de9d0 100644
  extern void mvs_add_alias (const char *, const char *, int);
  extern int mvs_need_alias (const char *);
 diff --git a/gcc/config/i370/i370.c b/gcc/config/i370/i370.c
-index 7c7cbef..0e85dd4 100644
 --- a/gcc/config/i370/i370.c
 +++ b/gcc/config/i370/i370.c
 @@ -1,3 +1,5 @@
-+/* Reconciled with Mike Beer's repairs for Mainframe Classic C on 2026-10-01.
++/* Reconciled with Mike Beer's repairs for Mainframe Classic C on 2026-10-01; numeric escape repair 2026-10-02.
 +   See component SOURCES.md for upstream and local integration changes. */
  /* Subroutines for insn-output.c for System/370.
     Copyright (C) 1989, 1993, 1995, 1997, 1998, 1999, 2000, 2002
     Free Software Foundation, Inc.
-@@ -28,6 +30,7 @@ Boston, MA 02111-1307, USA.  */
+@@ -28,6 +30,7 @@
  #include "tm.h"
  #include "rtl.h"
  #include "tree.h"
@@ -234,7 +233,49 @@ index 7c7cbef..0e85dd4 100644
  #include "regs.h"
  #include "hard-reg-set.h"
  #include "real.h"
-@@ -405,6 +408,14 @@ struct gcc_target targetm = TARGET_INITIALIZER;
+@@ -49,18 +52,15 @@
+ 
+ 
+ #ifdef TARGET_EBCDIC
+-/* Host (ASCII/ISO-8859-1) -> target (EBCDIC CP037) translation table for
++/* Host (ASCII/ISO-8859-1) -> target (EBCDIC CP037 with newline/NEL exchange) translation table for
+    character *constants*.  Their value lands in a numeric operand (e.g.
+    "LA r,193"; see lex_charconst), which the whole-file ASCII->EBCDIC transfer
+    of the .s file does not reach, so it must already be the EBCDIC code point.
+ 
+-   This is pure CP037 -- the code page MVS data sets use on this system.  An
+-   earlier attempt used the gccmvs 3.2.3 (c2asm370) _sch_ascebc table, which is
+-   a CP037/CP1047 blend (LF 0x15, brackets 0xAD/0xBD); built that way, rexx370
+-   character constants no longer matched the CP037 runtime data and every test
+-   came back RC=12.  Pure CP037 (LF 0x25, '[' 0xBA, ']' 0xBB) matches the data
+-   and is the intended long-term encoding.  Generated from CP037; do not edit
+-   by hand.  */
++   The retained cc370 newline convention maps host LF to EBCDIC NEL (0x15).
++   Exchange the host NEL mapping too, so that all 256 values remain bijective
++   and hex/octal string escapes survive MAP_INCHAR followed by MAP_OUTCHAR.
++   Printable mappings use CP037, including '[' 0xBA and ']' 0xBB. */
+ const unsigned char i370_ascii_to_ebcdic[256] = {
+   0x00, 0x01, 0x02, 0x03, 0x37, 0x2D, 0x2E, 0x2F,
+   0x16, 0x05, 0x15, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+@@ -78,7 +78,7 @@
+   0x88, 0x89, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96,
+   0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6,
+   0xA7, 0xA8, 0xA9, 0xC0, 0x4F, 0xD0, 0xA1, 0x07,
+-  0x20, 0x21, 0x22, 0x23, 0x24, 0x15, 0x06, 0x17,
++  0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x06, 0x17,
+   0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x09, 0x0A, 0x1B,
+   0x30, 0x31, 0x1A, 0x33, 0x34, 0x35, 0x36, 0x08,
+   0x38, 0x39, 0x3A, 0x3B, 0x04, 0x14, 0x3E, 0xFF,
+@@ -96,7 +96,7 @@
+   0x70, 0xDD, 0xDE, 0xDB, 0xDC, 0x8D, 0x8E, 0xDF,
+ };
+ 
+-/* Inverse of the above: EBCDIC CP037 -> host (ASCII/ISO-8859-1).  Used by
++/* Inverse of the above: target EBCDIC -> host (ASCII/ISO-8859-1).  Used by
+    MAP_INCHAR to pre-image hex/octal string escapes in cppcharset.c, so that
+    when MAP_OUTCHAR (ASCTOEBC) runs over them in ASM_OUTPUT_ASCII the value
+    round-trips back to the literal byte the programmer wrote (e.g. "\x04"
+@@ -406,6 +406,14 @@
  static void
  i370_init_libfuncs (void)
  {
@@ -249,7 +290,7 @@ index 7c7cbef..0e85dd4 100644
    set_conv_libfunc (ufix_optab, DImode, SFmode, "__fxunsf");
    set_conv_libfunc (ufix_optab, DImode, DFmode, "__fxundf");
    set_conv_libfunc (sfloat_optab, SFmode, DImode, "__fltdsf");
-@@ -465,6 +476,25 @@ i370_override_options (void)
+@@ -467,6 +475,25 @@
  
  #ifdef TARGET_HLASM
  static int statfunc = 0;
@@ -275,7 +316,7 @@ index 7c7cbef..0e85dd4 100644
  static int statvar = 0;
  
  /* Encode symbol attributes (local vs. global, tls model) of a SYMBOL_REF
-@@ -491,6 +521,7 @@ i370_encode_section_info (tree decl, rtx rtl, int first)
+@@ -493,6 +520,7 @@
      strcpy(str, XSTR(sym_ref, 0));
      strcat(str, buf);
      XSTR (sym_ref, 0) = ggc_alloc_string (str, strlen(str) + 1);
@@ -283,7 +324,7 @@ index 7c7cbef..0e85dd4 100644
    }
    else if (first
        && TREE_STATIC (decl)
-@@ -521,6 +552,7 @@ i370_encode_section_info (tree decl, rtx rtl, int first)
+@@ -523,6 +551,7 @@
      strcat(str, buf);
  #endif
      XSTR (sym_ref, 0) = ggc_alloc_string (str, strlen(str) + 1);
@@ -291,10 +332,12 @@ index 7c7cbef..0e85dd4 100644
    }
  }
  
-@@ -578,6 +610,25 @@ mvs_make_float (REAL_VALUE_TYPE r)
+@@ -578,6 +607,25 @@
+       memmove (p, t, strlen (t) + 1);
+    }
     return (buf);
- }
- 
++}
++
 +/* Classic C dialect decision, 2026-10-01: publish the backend's already
 +   rounded IBM hexadecimal representation instead of asking the assembler to
 +   parse/round decimal E/D literals. Explicit widths preserve pool grouping. */
@@ -312,12 +355,10 @@ index 7c7cbef..0e85dd4 100644
 +    fprintf (file, "=XL8'%08lX%08lX'",
 +             (unsigned long) words[0] & 0xffffffffUL,
 +             (unsigned long) words[1] & 0xffffffffUL);
-+}
-+
+ }
+ 
  /* ===================================================== */
- /* The following three routines are used to determine whether
-    a branch target is on this page, or is a far jump.  We use
-@@ -1079,6 +1130,24 @@ mvs_add_label (int id)
+@@ -1081,6 +1129,24 @@
    lp = mvs_get_label (id);
    lp->label_page = mvs_page_num;
  
@@ -342,7 +383,7 @@ index 7c7cbef..0e85dd4 100644
  #if 0
    /* Worst-case assumption. Should not be needed. Here for debugging. */
    if (mvs_page_num != function_base_page)
-@@ -1229,28 +1298,34 @@ mvs_check_page (FILE *file, int code, int lit)
+@@ -1231,28 +1297,34 @@
           The mvs_case_code holds the size of the jump table.  */
        if (mvs_case_code == 0)
          {
@@ -386,7 +427,7 @@ index 7c7cbef..0e85dd4 100644
                                       mvs_page_num, BASE_REGISTER);
          }
        mvs_page_code = code;
-@@ -1638,6 +1713,23 @@ mvs_get_alias (const char *realname, char *aliasname)
+@@ -1640,6 +1712,23 @@
        return 1;
      }
  #else
@@ -410,7 +451,7 @@ index 7c7cbef..0e85dd4 100644
    p = strchr(realname, MVS_NAMESEP);
    if (p != NULL)
      {
-@@ -1647,7 +1739,33 @@ mvs_get_alias (const char *realname, char *aliasname)
+@@ -1649,7 +1738,33 @@
      }
    else if (strlen (realname) > MAX_MVS_LABEL_SIZE)
      {
@@ -445,7 +486,7 @@ index 7c7cbef..0e85dd4 100644
        aliasname[MAX_MVS_LABEL_SIZE] = '\0';
        return 1;
      }
-@@ -2028,18 +2146,14 @@ i370_print_operand (FILE *fh, rtx XV, int CODE)
+@@ -2030,18 +2145,14 @@
  	  {
  	    if (GET_MODE (XV) == SFmode)
  	      {
@@ -466,7 +507,7 @@ index 7c7cbef..0e85dd4 100644
  	      }
  	    else
  	      {
-@@ -2304,18 +2418,14 @@ i370_print_operand (FILE *fh, rtx XV, int CODE)
+@@ -2306,18 +2417,14 @@
  	  {
  	    if (GET_MODE (XV) == SFmode)
  	      {
@@ -487,7 +528,7 @@ index 7c7cbef..0e85dd4 100644
  	      }
  	    else /* VOIDmode !?!? strange but true ...  */
  	      {
-@@ -2485,9 +2595,14 @@ i370_hlasm_assemble_integer (rtx x, unsigned int size, int aligned_p)
+@@ -2487,9 +2594,14 @@
        case 4:
          if (GET_CODE (x) == CONST_INT)
          {
@@ -505,7 +546,7 @@ index 7c7cbef..0e85dd4 100644
          }
          else
          {
-@@ -2553,6 +2668,35 @@ i370_hlasm_assemble_integer (rtx x, unsigned int size, int aligned_p)
+@@ -2555,6 +2667,35 @@
     used in the function.  This function is responsible for knowing
     which registers should not be saved even if used.  */
  
@@ -541,7 +582,7 @@ index 7c7cbef..0e85dd4 100644
  static void
  i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
  {
-@@ -2568,11 +2712,11 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2570,11 +2711,11 @@
    /* Don't print stack and args in PDPMAC as it makes the
       comment too long */
  #ifdef TARGET_PDPMAC
@@ -555,7 +596,7 @@ index 7c7cbef..0e85dd4 100644
             nlen, mvs_function_name,
  	   l,
  	   current_function_outgoing_args_size);
-@@ -2604,7 +2748,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2606,7 +2747,7 @@
  	   STACK_FRAME_BASE + l + current_function_outgoing_args_size,
  	   BASE_REGISTER,
  	   mvs_need_entry ? "YES" : "NO");
@@ -564,7 +605,7 @@ index 7c7cbef..0e85dd4 100644
  #ifdef TARGET_DIGNUS
    fprintf (f, "@FRAMESIZE_%d DC F'%d'\n",
  	   mvs_page_num,
-@@ -2613,7 +2757,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2615,7 +2756,7 @@
  #ifdef TARGET_PDPMAC
    fprintf (f, "\tLTORG\n");
  #endif
@@ -573,7 +614,7 @@ index 7c7cbef..0e85dd4 100644
    fprintf (f, "\tDROP\t%d\n", BASE_REGISTER);
    fprintf (f, "\tBALR\t%d,0\n", BASE_REGISTER);
    fprintf (f, "\tUSING\t*,%d\n", BASE_REGISTER);
-@@ -2647,7 +2791,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2649,7 +2790,7 @@
        function_minute = function_time->tm_min;
        function_second = function_time->tm_sec;
      }
@@ -582,7 +623,7 @@ index 7c7cbef..0e85dd4 100644
    fprintf (f, "FDSE%03d\tDSECT\n", function_label_index);
    fprintf (f, "\tDS\tD\n");
    fprintf (f, "\tDS\tCL(" HOST_WIDE_INT_PRINT_DEC ")\n",
-@@ -2732,7 +2876,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2734,7 +2875,7 @@
                  function_hour, function_minute, function_second);
        fprintf (f, "\tDC\tCL2'01',CL4'0100'\n");
      }
@@ -591,7 +632,7 @@ index 7c7cbef..0e85dd4 100644
    fprintf (f, "FDSD%03d\tDSECT\n", function_label_index);
    fprintf (f, "\tDS\tD\n");
    fprintf (f, "\tDS\tCL(%d)\n", STACK_POINTER_OFFSET + l
-@@ -2780,10 +2924,10 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2782,10 +2923,10 @@
  
  #endif /* TARGET_MACROS */
  
@@ -605,7 +646,7 @@ index 7c7cbef..0e85dd4 100644
  
    mvs_free_label_list ();
    mvs_page_code = 6;
-@@ -2799,7 +2943,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2801,7 +2942,7 @@
  static void
  i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
  {
@@ -614,7 +655,7 @@ index 7c7cbef..0e85dd4 100644
             mvs_need_entry ? 'X' : 'S',
             CURRFUNC);
  
-@@ -2843,7 +2987,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2845,7 +2986,7 @@
    fprintf (f, "\tST\tr15,76(r13)\n");
  
    fprintf (f, "\tL\tr%d,=A(.LPGT%d)\n", PAGE_REGISTER, mvs_page_num);
@@ -623,7 +664,7 @@ index 7c7cbef..0e85dd4 100644
  
    mvs_free_label_list ();
    mvs_page_code = 6;
-@@ -2990,7 +3134,7 @@ i370_globalize_label (FILE *stream, const char *name)
+@@ -2992,7 +3133,7 @@
      }
    if (mvs_need_to_globalize)
      {
@@ -632,7 +673,7 @@ index 7c7cbef..0e85dd4 100644
        fputs ("\tENTRY\t", stream);
        assemble_name (stream, name);
        fputs ("\n", stream);
-@@ -3068,7 +3212,7 @@ i370_globalize_label (FILE *stream, const char *name)
+@@ -3070,7 +3211,7 @@
      }
    if (mvs_need_to_globalize)
      {
@@ -641,7 +682,7 @@ index 7c7cbef..0e85dd4 100644
        fputs ("\tENTRY\t", stream);
        assemble_name (stream, name);
        fputs ("\n", stream);
-@@ -3102,7 +3246,7 @@ i370_output_function_epilogue (FILE *file, HOST_WIDE_INT l ATTRIBUTE_UNUSED)
+@@ -3104,7 +3245,7 @@
  
    check_label_emit ();
    mvs_check_page (file, 14, 0);
@@ -650,7 +691,7 @@ index 7c7cbef..0e85dd4 100644
    mvs_page_num++;
  
  #ifdef TARGET_MACROS
-@@ -3133,16 +3277,16 @@ i370_output_function_epilogue (FILE *file, HOST_WIDE_INT l ATTRIBUTE_UNUSED)
+@@ -3135,16 +3276,16 @@
  
  #endif /* TARGET_MACROS */
  
@@ -671,7 +712,7 @@ index 7c7cbef..0e85dd4 100644
    mvs_need_entry = 0;
  }
  
-@@ -3154,10 +3298,10 @@ i370_output_function_epilogue (FILE *file, HOST_WIDE_INT l ATTRIBUTE_UNUSED)
+@@ -3156,10 +3297,10 @@
    fprintf (file, "\tL\tr14,12(r13,r0)\n");
    fprintf (file, "\tLM\t0,12,20(r13)\n");
    fprintf (file, "\tBR\tr14\n");
@@ -685,7 +726,6 @@ index 7c7cbef..0e85dd4 100644
    fprintf (file, ".LPGT%d:\n", function_base_page);
  
 diff --git a/gcc/config/i370/i370.h b/gcc/config/i370/i370.h
-index 3b772b0..b0b5d3e 100644
 --- a/gcc/config/i370/i370.h
 +++ b/gcc/config/i370/i370.h
 @@ -1,3 +1,4 @@
@@ -693,7 +733,25 @@ index 3b772b0..b0b5d3e 100644
  /* Definitions of target machine for GNU compiler.  System/370 version.
     Copyright (C) 1989, 1993, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
     2003 Free Software Foundation, Inc.
-@@ -1631,7 +1632,7 @@ enum reg_class
+@@ -219,7 +220,7 @@
+    on modern hosts, so it is removed.  EBCDIC translation is handled
+    elsewhere.  */
+ 
+-/* Host (ASCII/ISO-8859-1) <-> target (EBCDIC CP037) mapping.  Tables in
++/* Host (ASCII/ISO-8859-1) <-> target (EBCDIC CP037 with newline/NEL exchange) mapping.  Tables in
+    i370.c.  Three users, all so that a character has ONE value whether it is a
+    character constant or sits inside a string literal:
+ 
+@@ -228,7 +229,7 @@
+      - MAP_OUTCHAR (= ASCTOEBC) maps the control / variant / '&' string bytes
+        that ASM_OUTPUT_ASCII emits as X'..' hex (printable bytes go out as
+        C'...' text and are converted by the whole-file ASCII->EBCDIC transfer).
+-       So a string '\n' (0x0A) becomes 0x25, matching the '\n' constant.
++       So a string '\n' (0x0A) becomes 0x15, matching the '\n' constant.
+      - MAP_INCHAR (= EBCTOASC) pre-images hex/octal string escapes in
+        cppcharset.c, so MAP_OUTCHAR round-trips them back to the literal byte
+        ("\x04" stays 0x04 rather than being translated).  This is what keeps
+@@ -1631,7 +1632,7 @@
      {									\
        fprintf (FILE, "%s\tALIAS\tC'%s'\n", temp, NAME);			\
      }									\
@@ -702,7 +760,7 @@ index 3b772b0..b0b5d3e 100644
    fputs ("\tENTRY\t", FILE);						\
    assemble_name (FILE, NAME);						\
    fputs ("\n", FILE);							\
-@@ -1889,4 +1890,8 @@ enum reg_class
+@@ -1889,4 +1890,8 @@
    fprintf ((FILE), ","HOST_WIDE_INT_PRINT_UNSIGNED"\n", (ROUNDED)))
  
  #endif /* TARGET_ELF_ABI */

@@ -1,4 +1,4 @@
-/* Reconciled with Mike Beer's repairs for Mainframe Classic C on 2026-10-01.
+/* Reconciled with Mike Beer's repairs for Mainframe Classic C on 2026-10-01; numeric escape repair 2026-10-02.
    See component SOURCES.md for upstream and local integration changes. */
 /* Subroutines for insn-output.c for System/370.
    Copyright (C) 1989, 1993, 1995, 1997, 1998, 1999, 2000, 2002
@@ -52,18 +52,15 @@ Boston, MA 02111-1307, USA.  */
 
 
 #ifdef TARGET_EBCDIC
-/* Host (ASCII/ISO-8859-1) -> target (EBCDIC CP037) translation table for
+/* Host (ASCII/ISO-8859-1) -> target (EBCDIC CP037 with newline/NEL exchange) translation table for
    character *constants*.  Their value lands in a numeric operand (e.g.
    "LA r,193"; see lex_charconst), which the whole-file ASCII->EBCDIC transfer
    of the .s file does not reach, so it must already be the EBCDIC code point.
 
-   This is pure CP037 -- the code page MVS data sets use on this system.  An
-   earlier attempt used the gccmvs 3.2.3 (c2asm370) _sch_ascebc table, which is
-   a CP037/CP1047 blend (LF 0x15, brackets 0xAD/0xBD); built that way, rexx370
-   character constants no longer matched the CP037 runtime data and every test
-   came back RC=12.  Pure CP037 (LF 0x25, '[' 0xBA, ']' 0xBB) matches the data
-   and is the intended long-term encoding.  Generated from CP037; do not edit
-   by hand.  */
+   The retained cc370 newline convention maps host LF to EBCDIC NEL (0x15).
+   Exchange the host NEL mapping too, so that all 256 values remain bijective
+   and hex/octal string escapes survive MAP_INCHAR followed by MAP_OUTCHAR.
+   Printable mappings use CP037, including '[' 0xBA and ']' 0xBB. */
 const unsigned char i370_ascii_to_ebcdic[256] = {
   0x00, 0x01, 0x02, 0x03, 0x37, 0x2D, 0x2E, 0x2F,
   0x16, 0x05, 0x15, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
@@ -81,7 +78,7 @@ const unsigned char i370_ascii_to_ebcdic[256] = {
   0x88, 0x89, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96,
   0x97, 0x98, 0x99, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6,
   0xA7, 0xA8, 0xA9, 0xC0, 0x4F, 0xD0, 0xA1, 0x07,
-  0x20, 0x21, 0x22, 0x23, 0x24, 0x15, 0x06, 0x17,
+  0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x06, 0x17,
   0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x09, 0x0A, 0x1B,
   0x30, 0x31, 0x1A, 0x33, 0x34, 0x35, 0x36, 0x08,
   0x38, 0x39, 0x3A, 0x3B, 0x04, 0x14, 0x3E, 0xFF,
@@ -99,7 +96,7 @@ const unsigned char i370_ascii_to_ebcdic[256] = {
   0x70, 0xDD, 0xDE, 0xDB, 0xDC, 0x8D, 0x8E, 0xDF,
 };
 
-/* Inverse of the above: EBCDIC CP037 -> host (ASCII/ISO-8859-1).  Used by
+/* Inverse of the above: target EBCDIC -> host (ASCII/ISO-8859-1).  Used by
    MAP_INCHAR to pre-image hex/octal string escapes in cppcharset.c, so that
    when MAP_OUTCHAR (ASCTOEBC) runs over them in ASM_OUTPUT_ASCII the value
    round-trips back to the literal byte the programmer wrote (e.g. "\x04"

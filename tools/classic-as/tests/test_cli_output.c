@@ -332,6 +332,14 @@ int main(int argc, char **argv)
         CHECK(got == sizeof linked && !memcmp(card,linked,sizeof linked));
         CHECK(!ferror(input) && fclose(input) == 0); puts("partial save: all 34 independent bytes pass"); return 0;
     }
+    if (!strcmp(argv[1],"encoded-bytes")) {
+        unsigned char actual[258];
+        input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(actual,1,sizeof actual,input);
+        CHECK(got == 257);
+        for (i = 0; i < 256; ++i) CHECK(actual[i] == i);
+        CHECK(actual[256] == 0 && !ferror(input) && fclose(input) == 0);
+        puts("compiler numeric escapes: all 256 byte values and terminator pass"); return 0;
+    }
     if (!strcmp(argv[1],"pdos31-runtime-maps")) { runtime_maps(argv[2]); return 0; }
     if (!strcmp(argv[1],"pdos31-get")) {
         static const unsigned char linked[20] = {0x18,0x12,0x58,0xf0,0x10,0x30,0x54,0xf0,0xc0,0x10,5,0xef,7,0xfe,0,0,0,0xff,0xff,0xff};

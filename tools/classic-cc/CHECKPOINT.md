@@ -16,9 +16,9 @@ copy of that private source series.
 - Reproduced surviving comment-emission defects and checked later descriptions
   as recorded in [MANUAL-RECONCILIATION.md](MANUAL-RECONCILIATION.md).
 - Maintained 819-file source manifest SHA-256:
-  `05b5ed2f4cc7ed67650d60d26cb31521d2942fda12be517af87107396f2a7b8a`.
+  `9158c6337d091cee9f547ee2c69ebad5688c724f05e2c93231afc4f0aad5217b`.
 - Consolidated recovery patch SHA-256:
-  `8df5b340a74993485745d35347dc3872a4e35a7402bb2bf4686003e44a1dde40`.
+  `95b0488325bdd50ea249760665978b00ea25834c58514602e2be4c676f818e04`.
 - Native host: macOS 26.6.2, build 25G83, Apple Silicon;
   Apple Clang 21.0.0 (`clang-2100.1.1.101`), GNU89 host compiler mode.
 - Targets: `i370-ibm-mvspdp` and `i370-ibm-cms`, inherited PDPCLIB macro ABI,
@@ -111,3 +111,20 @@ all 23 inherited regression groups still pass for each producer. Clean source
 recovery reproduces all 819 files. The Classic Assembler's selected HFP subset
 now accepts all 17 compiled PDOS C units; handwritten support, named kernel
 profile, linking/loading and guest execution remain open.
+
+## Complete numeric-byte consumer — 2 October 2026
+
+A reproduced pre-repair compiler output emitted 0x15 for both `\x25` and
+`\045`. An original array containing all 256 numeric escapes then failed
+independent assembler/link byte checking. After completing the newline/NEL
+exchange, every byte 00–FF plus the string terminator passes at O0/O1/O2/Os
+for both MVS and CMS producers, using normal and sanitizer Classic tools.
+Existing inherited code-generation and consolidation checks pass for both
+compiler builds. Zero-fuzz clean recovery reproduces all 819 source files.
+These are code-generation/object tests; no target execution is claimed.
+
+Repeat the byte consumer after building compiler and Classic tools:
+
+```sh
+crexx tools/classic-cc/check-bytes.crexx --args mvs build/classic-as/tools/classic-as/mf-classic-as build/classic-as/tools/classic-ld/mf-classic-ld build/classic-as/tools/classic-as/test_cli_output
+```
