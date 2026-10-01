@@ -1,0 +1,15 @@
+* SPDX-License-Identifier: MIT
+* Original selected PDOS31 mapping; coordinates and limits in README.md.
+         MACRO
+&N       CVT &DSECT=YES
+         AIF   ('&N' NE '' OR '&DSECT' NE 'YES').BAD
+CVT      DSECT
+         ORG   CVT+0
+CVTMAP   DS    0C
+         ORG   CVT+304
+CVTTZ    DS    F
+         ORG   CVT+308
+CVTPTR   EQU   16
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected CVT mapping'
+         MEND

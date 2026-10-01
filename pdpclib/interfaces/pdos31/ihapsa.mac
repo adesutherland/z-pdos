@@ -1,0 +1,38 @@
+* SPDX-License-Identifier: MIT
+* Original selected PDOS31 mapping; coordinates and limits in README.md.
+         MACRO
+&N       IHAPSA 
+         AIF   ('&N' NE '').BAD
+PSA      DSECT
+         ORG   PSA+16
+FLCCVT   DS    A
+         ORG   PSA+32
+FLCSOPSW DS    CL8
+         ORG   PSA+64
+FLCCSW   DS    CL8
+         ORG   PSA+96
+FLCSNPSW DS    CL8
+         ORG   PSA+104
+FLCPNPSW DS    CL8
+         ORG   PSA+112
+FLCMNPSW DS    CL8
+         ORG   PSA+120
+FLCINPSW DS    CL8
+         ORG   PSA+256
+FLCFLA   DS    CL16
+         ORG   PSA+384
+FLCGRSAV DS    16F
+         ORG   PSA+540
+PSATOLD  DS    A
+         ORG   PSA+544
+PSAANEW  DS    A
+         ORG   PSA+548
+PSAAOLD  DS    A
+         ORG   PSA+640
+PSACLHT  DS    CL116
+         ORG   PSA+4096
+SVCOPSW  EQU   FLCSOPSW,8
+SVCNPSW  EQU   FLCSNPSW,8
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IHAPSA mapping'
+         MEND

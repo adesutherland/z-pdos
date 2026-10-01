@@ -56,6 +56,11 @@ if(CREXX_EXECUTABLE)
         --args $<TARGET_FILE:mf-classic-as> $<TARGET_FILE:mf-classic-ld>
         $<TARGET_FILE:test_cli_output> ${PROJECT_BINARY_DIR}/call-interface-link)
     set_tests_properties(classic_call_interface_link PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    add_test(NAME classic_pdos31_maps_link
+      COMMAND ${CREXX_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check-pdos31-maps.crexx
+        --args $<TARGET_FILE:mf-classic-as> $<TARGET_FILE:mf-classic-ld>
+        $<TARGET_FILE:test_cli_output> ${PROJECT_BINARY_DIR}/pdos31-maps-link)
+    set_tests_properties(classic_pdos31_maps_link PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
   endif()
   add_test(NAME pdpclib_profile_sources
     COMMAND ${CREXX_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check-pdpclib-profiles.crexx

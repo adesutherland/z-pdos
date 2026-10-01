@@ -1,0 +1,18 @@
+* SPDX-License-Identifier: MIT
+* Original selected PDOS31 mapping; coordinates and limits in README.md.
+         MACRO
+&N       IHASVC 
+         AIF   ('&N' NE '').BAD
+SVCENTRY DSECT
+         ORG   SVCENTRY+0
+SVCEP    DS    A
+         ORG   SVCENTRY+4
+SVCTP    DS    C
+         ORG   SVCENTRY+5
+SVCATTR3 DS    C
+         ORG   SVCENTRY+6
+SVCLOCKS DS    H
+         ORG   SVCENTRY+8
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IHASVC mapping'
+         MEND

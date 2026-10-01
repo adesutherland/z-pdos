@@ -1,0 +1,18 @@
+* SPDX-License-Identifier: MIT
+* Original selected PDOS31 mapping; coordinates and limits in README.md.
+         MACRO
+&N       IKJTCB 
+         AIF   ('&N' NE '').BAD
+TCB      DSECT
+         ORG   TCB+0
+TCBRBP   DS    A
+         ORG   TCB+8
+TCBDEB   DS    A
+         ORG   TCB+12
+TCBTIO   DS    A
+         ORG   TCB+16
+TCBCMP   DS    F
+         ORG   TCB+20
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IKJTCB mapping'
+         MEND

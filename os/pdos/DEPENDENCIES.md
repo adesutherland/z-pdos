@@ -12,7 +12,7 @@ image dependencies.
 | Kernel startup and support | SAPSTART, SAPSUPA, PDOSSUP | Retained source; whole assembly and z/Architecture encoding remain open |
 | Loader support | PLOADSUP plus PLOAD and PDOSUTIL | Retained source; IPL placement and independent whole-module reconstruction remain open |
 | Command processor | MVSSTART, MVSSUPA, PCOMM and the selected common runtime | Retained source; native services and whole assembly remain open |
-| External native macros | YREGS, SAVE, RETURN, CVT, IEZJSCB, IHAPSA, IHARB, IHACDE, IEFJFCBN, IEZIOB, IHASVC; OPEN/CLOSE/DCB and other reached service forms | Calls exist in retained source. Original build supplied IBM MACLIB/MODGEN. Selected active forms need public interface/layout evidence and independently authored definitions |
+| External native macros | YREGS, SAVE, RETURN, CVT, IEZJSCB, IHAPSA, IHARB, IHACDE, IEFJFCBN, IEZIOB, IHASVC; OPEN/CLOSE/DCB and other reached service forms | Calls exist in retained source. Original build supplied IBM MACLIB/MODGEN. Selected sparse PSA/TCB/JSCB/RB/CDE/ASCB/ASXB/CVT/SVC-entry mappings pass independent field checks; broader mappings and service forms remain open |
 | Qualified C producer | Repaired GCCMVS 3.2.3 v90, binary SHA-256 `f85eb831865c7de8eb12f74d26b5607414cf7a9204a4609fcd9f1826c3fa7bec` | Historical native kernel build input; the local Classic C checkpoint is a different GCC 3.4.6 producer |
 | Qualified assembler/binder | ASMA90 and IEWL | Historical qualification route; replacing these requires independent object, relocation and load-image checks |
 | Independent tools | `mf-classic-cc`, `mf-classic-as`, `mf-classic-ld` | all C objects pass; raw support, named kernel ISA and runtime/name closure and MVS load-image construction remain open |

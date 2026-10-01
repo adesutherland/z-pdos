@@ -1,0 +1,12 @@
+* SPDX-License-Identifier: MIT
+* Original selected PDOS31 mapping; coordinates and limits in README.md.
+         MACRO
+&N       IEZJSCB 
+         AIF   ('&N' NE '').BAD
+IEZJSCB  DSECT
+         ORG   IEZJSCB+264
+JSCBPSCB DS    A
+         ORG   IEZJSCB+268
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IEZJSCB mapping'
+         MEND

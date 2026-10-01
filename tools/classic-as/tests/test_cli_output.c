@@ -52,6 +52,14 @@ int main(int argc, char **argv)
     FILE *input;
 
     CHECK(argc == 3);
+    if (!strcmp(argv[1], "pdos31-maps")) {
+        static const unsigned char linked[64] = {0,32,0,64,0,96,0,104,0,112,0,120,1,0,1,128,2,28,2,32,2,36,2,128,0,32,0,16,0,4,0,0,0,8,0,12,0,16,1,8,0,13,0,8,0,8,0,16,0,108,0,20,1,48,0,16,0,0,0,4,0,5,0,6};
+        input = fopen(argv[2], "rb"); CHECK(input != NULL);
+        got = fread(card,1,sizeof card,input);
+        CHECK(got == sizeof linked && !memcmp(card,linked,sizeof linked));
+        CHECK(!ferror(input) && fclose(input) == 0);
+        puts("PDOS31 mappings: 32 independent field/length values pass"); return 0;
+    }
     if (!strcmp(argv[1], "call")) {
         static const unsigned char linked[12] = {0x58,0xf0,0xc0,8,5,0xef,7,0xfe,0,0,0x10,6};
         input = fopen(argv[2], "rb"); CHECK(input != NULL);

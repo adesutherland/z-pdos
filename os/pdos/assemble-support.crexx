@@ -1,0 +1,27 @@
+/* SPDX-License-Identifier: MIT; fresh handwritten PDIO1 module assembly. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 > 2 then return 2
+  work = "build/pdos/support"
+  if args.0 >= 1 then work = args.1
+  if left(work,11) <> "build/pdos/" | length(work) <= 11 | pos("..",work) > 0 then return 2
+  cli = "build/classic-as/tools/classic-as/mf-classic-as"
+  if args.0 = 2 then cli = args.2
+  address crexx "run cmake -E make_directory :work"
+  if rc <> 0 then return rc
+  inputs = readlines("os/pdos/assembly-inputs.txt")
+  do i = 1 to 6
+    source = word(inputs[i],2)
+    if left(source,5) = "s370/" then source = "os/pdos/source/" || source
+    member = word("PDOSSUP PLOADSUP SAPSTART SAPSUPA MVSSTART MVSSUPA",i)
+    deck = work || "/" || member || ".obj"
+    address crexx "run cmake -E rm -f :deck"
+    if rc <> 0 then return rc
+    address crexx "run :cli --profile z900 --literal-limit 4096 --macros -I pdpclib/profiles/pdos-zarch -I pdpclib -I pdpclib/interfaces/classic-linkage -I pdpclib/interfaces/pdos31 :source :deck"
+    if rc <> 0 then return rc
+    say member "handwritten object passes"
+  end
+  say "Six handwritten modules assemble; independent link/image and guest gates remain separate."
+  return 0

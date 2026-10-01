@@ -1,0 +1,14 @@
+* SPDX-License-Identifier: MIT
+* Original selected PDOS31 mapping; coordinates and limits in README.md.
+         MACRO
+&N       IHACDE 
+         AIF   ('&N' NE '').BAD
+CDENTRY  DSECT
+         ORG   CDENTRY+8
+CDNAME   DS    CL8
+         ORG   CDENTRY+16
+CDENTPT  DS    A
+         ORG   CDENTRY+20
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IHACDE mapping'
+         MEND

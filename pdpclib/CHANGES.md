@@ -99,3 +99,10 @@ The explicit original classic-linkage library adds the reached symbolic,
 no-parameter CALL form. It follows public register linkage facts and supplies
 no control-program service or imported macro implementation. Independent
 link bytes and rejected-operand output checks qualify the host interface.
+
+The explicit `interfaces/pdos31` library adds original sparse control-block
+mappings from public layout facts and the retained PDOS compatibility
+declarations. It preserves source-owned lowcore constants and supplies no OS
+service. Independent field/length bytes and rejected-variant output checks
+pass; PDOSSUP, PLOADSUP and SAPSTART assemble in normal and sanitizer builds.
+Runtime service closure, whole-image linking and guest execution remain open.

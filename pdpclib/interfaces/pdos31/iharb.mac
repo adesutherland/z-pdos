@@ -1,0 +1,14 @@
+* SPDX-License-Identifier: MIT
+* Original selected PDOS31 mapping; coordinates and limits in README.md.
+         MACRO
+&N       IHARB 
+         AIF   ('&N' NE '').BAD
+RBBASIC  DSECT
+         ORG   RBBASIC+12
+RBCDE    DS    0CL4
+         ORG   RBBASIC+13
+RBCDE1   DS    CL3
+         ORG   RBBASIC+16
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IHARB mapping'
+         MEND

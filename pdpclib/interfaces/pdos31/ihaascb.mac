@@ -1,0 +1,12 @@
+* SPDX-License-Identifier: MIT
+* Original selected PDOS31 mapping; coordinates and limits in README.md.
+         MACRO
+&N       IHAASCB 
+         AIF   ('&N' NE '').BAD
+ASCB     DSECT
+         ORG   ASCB+108
+ASCBASXB DS    A
+         ORG   ASCB+112
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IHAASCB mapping'
+         MEND
