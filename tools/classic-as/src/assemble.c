@@ -20,7 +20,7 @@ struct section_state { mf_u32 position, high_water, relocation_end; unsigned mod
 struct mode_declaration { struct mf_span name; unsigned mask, amode, rmode; };
 struct literal {
     struct mf_span text; unsigned section, alignment; size_t pool;
-    mf_u32 offset; int placed, seen;
+    mf_u32 offset, reference_offset; unsigned reference_section; int placed, seen;
 };
 struct base_state { int active, pending; unsigned section; mf_u32 offset; };
 struct fingerprint { mf_u32 a, b; struct mf_u64 bytes; unsigned long count; int complete; };
@@ -33,7 +33,7 @@ struct mf_as {
     struct mode_declaration *modes; size_t mode_count;
     struct mf_symbol *symbols;
     struct symbol_state *symbol_state;
-    struct literal *literals; size_t literal_count, pool;
+    struct literal *literals, *evaluating_literal; size_t literal_count, pool;
     struct base_state bases[16], base_stack[16][16]; size_t base_depth;
     struct mf_statement statement;
     const struct mf_object_writer *writer;
@@ -192,7 +192,11 @@ static struct value current_value(struct mf_as *as)
 {
     struct value v;
     v = zero_value();
-    if (as->current != NIL) {
+    if (as->evaluating_literal) {
+        v.magnitude.lo = as->evaluating_literal->reference_offset;
+        v.coefficient = 1; v.kind = MF_REF_SECTION;
+        v.target = as->evaluating_literal->reference_section;
+    } else if (as->current != NIL) {
         v.magnitude.lo = as->section_state[as->current].position;
         v.coefficient = 1; v.kind = MF_REF_SECTION;
         v.target = as->sections[as->current].id;
@@ -977,8 +981,8 @@ static enum mf_status literal_constant(struct mf_as *as, struct mf_span text,
     if (!text.length || text.data[0] != 0x3d) return MF_SOURCE;
     status = constant_parse(as, subspan(text, 1, text.length - 1), 0, c);
     if (status != MF_OK) return status;
-    if (c->repeat != 1 || (c->explicit_length && c->type != 0x58) ||
-        (c->type != 0x48 && c->type != 0x46 && c->type != 0x58 && c->type != 0x56 && c->type != 0x41)) return MF_UNSUPPORTED;
+    if (c->repeat != 1 || (c->explicit_length && c->type != 0x58 && c->type != 0x43) ||
+        (c->type != 0x48 && c->type != 0x46 && c->type != 0x58 && c->type != 0x43 && c->type != 0x56 && c->type != 0x41)) return MF_UNSUPPORTED;
     if (c->type == 0x48 || c->type == 0x46) {
         v = zero_value();
         status = mf_u64_parse(c->value, &v.magnitude, &v.negative);
@@ -995,20 +999,40 @@ static enum mf_status literal_constant(struct mf_as *as, struct mf_span text,
 static enum mf_status literal_value(struct mf_as *as, struct mf_span text, struct value *v)
 {
     struct literal *literal; struct constant c; size_t i, j; enum mf_status status; mf_octet *copy;
+    int sensitive, quoted, equal;
     if (!as->config.max_literals) return MF_UNSUPPORTED;
     status = literal_constant(as, text, &c); if (status != MF_OK) return status;
+    sensitive = quoted = 0;
+    if (c.type == 0x41) for (j = 0; j < c.value.length; ++j) {
+        if (c.value.data[j] == 0x27) quoted = !quoted;
+        else if (!quoted && c.value.data[j] == 0x2a) sensitive = 1;
+    }
     for (i = 0; i < as->literal_count; ++i) {
         literal = &as->literals[i];
-        if (literal->pool == as->pool && same_name(literal->text, text)) break;
+        if (literal->pool != as->pool || literal->text.length != text.length) continue;
+        quoted = 0; equal = 1;
+        for (j = 0; j < text.length; ++j) {
+            mf_octet byte; byte = quoted && c.type != 0x58 ? text.data[j] : upper(text.data[j]);
+            if (byte != literal->text.data[j]) { equal = 0; break; }
+            if (text.data[j] == 0x27) quoted = !quoted;
+        }
+        if (equal && (!sensitive || (literal->reference_section == as->sections[as->current].id &&
+            literal->reference_offset == as->section_state[as->current].position))) break;
     }
     if (i == as->literal_count) {
         if (as->pass == 2) return MF_REPLAY;
         if (i == as->config.max_literals) return MF_LIMIT;
         copy = (mf_octet *)acquire(as, text.length); if (!copy) return MF_LIMIT;
-        for (j = 0; j < text.length; ++j) copy[j] = upper(text.data[j]);
+        quoted = 0;
+        for (j = 0; j < text.length; ++j) {
+            copy[j] = quoted && c.type != 0x58 ? text.data[j] : upper(text.data[j]);
+            if (text.data[j] == 0x27) quoted = !quoted;
+        }
         literal = &as->literals[i]; memset(literal, 0, sizeof *literal);
         literal->text.data = copy; literal->text.length = text.length;
         literal->pool = as->pool; literal->alignment = c.alignment;
+        literal->reference_section = as->sections[as->current].id;
+        literal->reference_offset = as->section_state[as->current].position;
         ++as->literal_count;
     }
     literal = &as->literals[i]; literal->seen = 1;
@@ -1039,7 +1063,8 @@ static enum mf_status literal_pool(struct mf_as *as, int labeled)
                 literal->section = as->sections[as->current].id; literal->placed = 1;
             } else if (literal->section != as->sections[as->current].id ||
                 literal->offset != as->section_state[as->current].position) return MF_REPLAY;
-            status = emit_constant(as, &c); if (status != MF_OK) return status;
+            as->evaluating_literal = literal; status = emit_constant(as, &c); as->evaluating_literal = NULL;
+            if (status != MF_OK) return status;
         }
     }
     if (as->pool == (size_t)-1) return MF_LIMIT;

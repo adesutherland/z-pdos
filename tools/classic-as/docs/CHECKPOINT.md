@@ -253,3 +253,11 @@ check ten final bytes, three TXT records, label/layout semantics, DSECT
 redefinitions, default restoration, missing callbacks and invalid origins.
 Both engine and writer reject origins below prior relocation fields. This
 bounded suffix policy deliberately leaves arbitrary relocation overlays open.
+
+## Character and location-counter literals
+
+Selected C/CL literals preserve case, CP037 encoding and explicit blank padding.
+Original pool tests distinguish lower/upper text and reject truncation. A(*)
+literals capture the referencing instruction's section and offset; independently
+expected bytes and fixups prove that two references have different values.
+SAPSTART now passes its SAPLOAD character literal and advances to CCW1.

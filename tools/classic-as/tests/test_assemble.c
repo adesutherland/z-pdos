@@ -651,9 +651,25 @@ static void origin_layout(void)
     init(&f,"S CSECT\n ORG S-1\n END S\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
     init(&f,"S CSECT\n ORG MISSING\n END S\n"); CHECK(run(&f) == MF_UNDEFINED); clean(&f);
 }
+static void character_and_location_literals(void)
+{
+    static const mf_octet characters[30] = {
+        0x58,0x10,0xc0,24,0x58,0x20,0xc0,27,0x58,0x30,0xc0,16,0,0,0,0,
+        0x81,0x82,0x83,0x40,0x40,0x40,0x40,0x40,0x81,0x82,0x83,0xc1,0xc2,0xc3
+    };
+    static const mf_octet addresses[16] = {0x58,0x10,0xc0,8,0x58,0x20,0xc0,12,0,0,0,0,0,0,0,4};
+    struct fixture f;
+    init(&f,"S CSECT\n USING S,12\n L 1,=C'abc'\n L 2,=C'ABC'\n L 3,=CL8'abc'\n END S\n"); f.config.max_literals = 4;
+    successful(&f); CHECK(f.sections[0].length == sizeof characters && !memcmp(f.data[0],characters,sizeof characters)); clean(&f);
+    init(&f,"S CSECT\n USING S,12\n L 1,=A(*)\n L 2,=A(*)\n END S\n"); f.config.max_literals = 4;
+    successful(&f); CHECK(f.sections[0].length == sizeof addresses && !memcmp(f.data[0],addresses,sizeof addresses));
+    CHECK(f.fixup_count == 2 && f.fixups[0].offset == 8 && f.fixups[1].offset == 12); clean(&f);
+    init(&f,"S CSECT\n USING S,12\n L 1,=CL2'ABC'\n END S\n"); f.config.max_literals = 4;
+    CHECK(run(&f) == MF_RANGE); clean(&f);
+}
 int main(void)
 {
-    origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
+    character_and_location_literals(); origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
     printf("assemble: %lu checks passed\n", checks); return 0;

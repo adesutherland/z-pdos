@@ -41,7 +41,7 @@ publication semantics.
 | DS | Reservation/alignment for the documented constant types, including `0H`, `0F`, `0D`; no emitted bytes for gaps |
 | Addressability | USING with up to 15 registers at successive 4096-byte bases, register-zero mappings at offset zero, DROP lists or all; symbolic addresses need a matching USING |
 | Visibility and entry | ENTRY, EXTRN, implicit externals for a single-name V constant, and END with an optional section-relative entry |
-| Literals | Selected `=H'number'`, `=F'number'`, `=X'hex'`/`=XLn'hex'`, `=A(expression)` and `=V(name)`, explicit LTORG and implicit END pool |
+| Literals | Selected `=H'number'`, `=F'number'`, `=X'hex'`/`=XLn'hex'`, `=C'text'`/`=CLn'text'`, `=A(expression)` and `=V(name)`, explicit LTORG and implicit END pool |
 | Modes | AMODE 24/31/ANY; RMODE 24/31/ANY; name associates the declaration with its section, including a later section |
 
 Mode declarations do not create a section. A blank name selects the unnamed
@@ -64,17 +64,19 @@ Symbol references in an ungenerated nominal need not resolve. Character/hex
 nominals still undergo the documented lexical and explicit-length checks.
 This does not yet implement symbol length/type attributes.
 
-Ordinary assembler multiplication/division, ORG and cREXX expansion remain
+Ordinary assembler multiplication/division and cREXX expansion remain
 unimplemented. The optional provider has its separate scalar conditional subset. Traditional definitions require the
 optional provider selected below. Unsupported
 constructs fail explicitly. The source parser's documented subset is distinct
 from the pure encoder's instruction descriptions.
 
-The selected literals have no duplication or nested nominal list. Only X
+The selected literals have no duplication or nested nominal list. X and C
 literals accept explicit length, with checked padding and no truncation. A literals accept the ordinary checked address expression and addend. H/F literals are signed decimal; X literals contain a
 nonzero number of hexadecimal digits with left zero padding; V takes one external name. Identity
-is case-insensitive source spelling within one pool: differently spelled
-numeric values are not automatically merged. Pending literals collect globally
+folds operation/identifier and hexadecimal spelling and preserves character bytes: differently spelled
+numeric values are not automatically merged. Character literals preserve case
+and CP037 bytes. Location-counter A literals retain the referencing instruction
+section and offset and are distinct at different instruction locations. Pending literals collect globally
 across sections. LTORG emits them in the current real section; END emits the
 remaining pool at the end of the first real section. The pool starts on an
 eight-byte boundary and groups lengths divisible by 16, then 8, 4, 2, then odd,
