@@ -213,7 +213,9 @@ static void clean(struct fixture *f)
 }
 static void successful(struct fixture *f)
 {
-    CHECK(run(f) == MF_OK); CHECK(f->result.status == MF_OK);
+    enum mf_status status; status = run(f);
+    if (status != MF_OK) fprintf(stderr,"got %d for %s\n",(int)status,f->first);
+    CHECK(status == MF_OK); CHECK(f->result.status == MF_OK);
     CHECK(f->result.valid_output && f->valid); CHECK(f->reports == 0);
     CHECK(f->begins == 1 && f->finishes == 1 && f->invalids == 0);
     CHECK(f->result.storage_requested == f->used);
@@ -258,6 +260,30 @@ static void constants(void)
     CHECK(f.symbols[symbol_index(&f, "FMIN")].offset == 8);
     CHECK(f.symbols[symbol_index(&f, "ADPOS")].offset == 16);
     CHECK(f.fixup_count == 0); clean(&f);
+}
+static void nominal_lists(void)
+{
+    struct fixture f;
+    static const mf_octet data[] = {0x0a,0x0a,0xbc,0x0a,0x0a,0xbc,0,1,0,0xfe,0,0,
+        0,3,0,5,0,3,0,5,0xff,0xff,0x7f,0xff,0,0,0,0,0,0,0,4,0,2,0,1};
+    static const mf_octet code[] = {0xd2,3,0x10,0,0xc0,0x18,0xd5,7,0x10,0,0xc0,0x10};
+    static const mf_octet pool[] = {0x80,0x8f,0x84,0x8e,0x83,0x86,0,0,1,1,0,2};
+    init(&f,"S CSECT\nHEX DC 2X'A,ABC',XL2'1,FE'\n DS 0F\nADD DC 2AL2(3,(7-2))\n DC H'-1,32767'\nREL DC A(S,S+4)\n DC AL2(L'ADD),AL2(L'HEX)\n END S\n");
+    successful(&f); CHECK(f.sections[0].length == sizeof data && !memcmp(f.data[0],data,sizeof data));
+    CHECK(f.fixup_count == 2 && f.fixups[0].offset == 24 && f.fixups[1].offset == 28);
+    CHECK(f.fixups[0].width == 4 && f.fixups[1].target == 1); clean(&f);
+    init(&f,"S CSECT\n USING S,12\n MVC 0(4,1),=AL1(1,1,0,2)\n CLC 0(8,1),=X'80,8F,84,8E,83,86,0,0'\n END S\n"); f.config.max_literals = 4;
+    successful(&f); CHECK(f.sections[0].length == 28);
+    CHECK(!memcmp(f.data[0],code,sizeof code) && !memcmp(f.data[0]+16,pool,sizeof pool)); clean(&f);
+    init(&f," DC X'01,,02'\n END\n"); failed(&f,MF_SOURCE); clean(&f);
+    init(&f," DC X'01,'\n END\n"); failed(&f,MF_SOURCE); clean(&f);
+    init(&f," DC XL1'0010,100'\n END\n"); failed(&f,MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n DC AL2(1,S)\n END\n"); failed(&f,MF_UNSUPPORTED); clean(&f);
+    init(&f," DC A(1,(2,3))\n END\n"); failed(&f,MF_SOURCE); clean(&f);
+    init(&f," DC 0A(MISSING,2/0),0H'1,32768'\n END\n"); successful(&f);
+    CHECK(f.sections[0].length == 0 && f.fixup_count == 0 && f.symbol_count == 0); clean(&f);
+    init(&f," DC X'A B, C'\n END\n"); successful(&f);
+    CHECK(f.sections[0].length == 2 && f.data[0][0] == 0xab && f.data[0][1] == 0x0c); clean(&f);
 }
 static void forms(void)
 {
@@ -750,7 +776,7 @@ static void channel_words(void)
 }
 int main(void)
 {
-    no_operand_sections(); symbol_lengths(); channel_words(); character_and_location_literals(); origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
+    no_operand_sections(); symbol_lengths(); channel_words(); character_and_location_literals(); origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); nominal_lists(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
     printf("assemble: %lu checks passed\n", checks); return 0;

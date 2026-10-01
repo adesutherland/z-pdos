@@ -912,7 +912,7 @@ static enum mf_status branch(struct mf_as *as, unsigned mask, int reg)
 
 struct constant {
     unsigned type, width, alignment;
-    mf_u32 repeat;
+    mf_u32 repeat, extent;
     struct mf_span value;
     int explicit_length;
 };
@@ -922,6 +922,54 @@ static int hex_digit(mf_octet c)
     if (c >= 0x30 && c <= 0x39) return c - 0x30;
     if (c >= 0x41 && c <= 0x46) return c - 0x41 + 10;
     return -1;
+}
+static enum mf_status nominal_next(struct mf_span values, size_t *at, struct mf_span *value)
+{
+    size_t start, depth; int quoted; mf_octet byte;
+    start = *at; depth = 0; quoted = 0;
+    while (*at < values.length) {
+        byte = values.data[*at];
+        if (byte == 0x27 && (quoted || !length_quote(values,*at))) quoted = !quoted;
+        else if (!quoted && byte == 0x28) ++depth;
+        else if (!quoted && byte == 0x29) { if (!depth) return MF_SOURCE; --depth; }
+        else if (!quoted && !depth && byte == 0x2c) break;
+        ++*at;
+    }
+    if (depth || quoted) return MF_SOURCE;
+    *value = trim(subspan(values,start,*at-start));
+    if (!value->length) return MF_SOURCE;
+    ++*at; return MF_OK;
+}
+static enum mf_status hex_width(struct mf_span value, unsigned *width)
+{
+    size_t i, digits;
+    digits = 0;
+    for (i = 0; i < value.length; ++i) {
+        if (value.data[i] == 0x20) continue;
+        if (hex_digit(value.data[i]) < 0) return MF_SOURCE;
+        ++digits;
+    }
+    if (!digits) return MF_SOURCE;
+    if (digits / 2 + digits % 2 > UINT_MAX) return MF_RANGE;
+    *width = (unsigned)(digits / 2 + digits % 2); return MF_OK;
+}
+static enum mf_status constant_extent(struct constant *c)
+{
+    size_t at; struct mf_span value; unsigned width; enum mf_status status;
+    c->extent = 0; at = 0;
+    if (c->type == 0x43 || !c->value.length) { c->extent = c->width; return MF_OK; }
+    while (at <= c->value.length) {
+        status = nominal_next(c->value,&at,&value); if (status != MF_OK) return status;
+        width = c->width;
+        if (c->type == 0x58) {
+            status = hex_width(value,&width); if (status != MF_OK) return status;
+            if (c->explicit_length) { if (width > c->width) return MF_RANGE; width = c->width; }
+            else if (!c->extent) c->width = width;
+        }
+        if (width > U32MAX - c->extent) return MF_RANGE;
+        c->extent += width;
+    }
+    return MF_OK;
 }
 static enum mf_status constant_group(struct mf_span s, size_t *at)
 {
@@ -970,27 +1018,23 @@ static enum mf_status constant_parse(struct mf_as *as, struct mf_span s, int res
         if (type == 0x41 && c->type != 0x44) { if (c->width > 4) return MF_UNSUPPORTED; }
         else if (type != 0x43 && type != 0x58) return MF_UNSUPPORTED;
     }
-    if (reserve) return at == s.length ? MF_OK : MF_UNSUPPORTED;
+    if (reserve) { c->extent = c->width; return at == s.length ? MF_OK : MF_UNSUPPORTED; }
     if (at == s.length) {
         if (c->repeat) return MF_SOURCE;
         if ((type == 0x43 || type == 0x58) && !c->explicit_length) return MF_UNSUPPORTED;
-        return MF_OK;
+        c->extent = c->width; return MF_OK;
     }
     if (type == 0x41 || type == 0x56) {
         if (s.data[at] != 0x28 || s.data[s.length - 1] != 0x29) return MF_SOURCE;
         c->value = trim(subspan(s, at + 1, s.length - at - 2));
-        return c->value.length ? MF_OK : MF_SOURCE;
+        return c->value.length ? constant_extent(c) : MF_SOURCE;
     }
     if (s.data[at] != 0x27 || s.data[s.length - 1] != 0x27 || s.length - at < 2) return MF_SOURCE;
     c->value = subspan(s, at + 1, s.length - at - 2);
     if ((type == 0x48 || type == 0x46) && !c->value.length) return MF_SOURCE;
     if (type == 0x58) {
         if (!c->value.length) return MF_SOURCE;
-        for (i = 0; i < c->value.length; ++i) if (hex_digit(c->value.data[i]) < 0) return MF_SOURCE;
-        if (c->value.length / 2 + c->value.length % 2 > UINT_MAX) return MF_RANGE;
-        n = (mf_u32)(c->value.length / 2 + c->value.length % 2);
-        if (!c->explicit_length) c->width = (unsigned)n;
-        else if (n > c->width) return MF_RANGE;
+        return constant_extent(c);
     } else if (type == 0x43) {
         n = 0;
         for (i = 0; i < c->value.length; ++i) {
@@ -1006,7 +1050,7 @@ static enum mf_status constant_parse(struct mf_as *as, struct mf_span s, int res
         else if (n > c->width) return MF_RANGE;
         if (!c->width) return MF_RANGE;
     }
-    return MF_OK;
+    return constant_extent(c);
 }
 static enum mf_status numeric_bytes(struct value v, unsigned width, int signed_only,
     mf_octet *bytes)
@@ -1026,11 +1070,11 @@ static enum mf_status numeric_bytes(struct value v, unsigned width, int signed_o
     if (v.negative) mf_u64_negate(bits, &bits);
     mf_u64_store(bits, bytes, width); return MF_OK;
 }
-static enum mf_status emit_constant(struct mf_as *as, const struct constant *c)
+static enum mf_status emit_constant_single(struct mf_as *as, const struct constant *c)
 {
     enum mf_status status; struct value v; struct mf_fixup fixup;
     mf_octet bytes[256]; mf_u32 repetition, offset; size_t i, written, chunk, input;
-    unsigned width; int nibble;
+    unsigned width; int nibble; size_t digits, j;
     if (!c->repeat) return MF_OK;
     v = zero_value();
     if (c->type == 0x48 || c->type == 0x46 || c->type == 0x41 || c->type == 0x44 || c->type == 0x56) {
@@ -1076,6 +1120,10 @@ static enum mf_status emit_constant(struct mf_as *as, const struct constant *c)
     }
     if (as->pass == 1) return advance(as, c->width * c->repeat, NULL);
     /* Character/hex data stream in small chunks, independent of repeat count. */
+    digits = 0;
+    if (c->type == 0x58)
+        for (j = 0; j < c->value.length; ++j) if (c->value.data[j] != 0x20) ++digits;
+    width = (unsigned)(digits / 2 + digits % 2);
     for (repetition = 0; repetition < c->repeat; ++repetition) {
         written = input = 0;
         while (written < c->width) {
@@ -1088,11 +1136,14 @@ static enum mf_status emit_constant(struct mf_as *as, const struct constant *c)
                         status = mf_ascii_to_ebcdic(bytes[i], &bytes[i]); if (status != MF_OK) return status;
                     } else bytes[i] = 0x40;
                 } else {
-                    width = (unsigned)(c->value.length / 2 + c->value.length % 2);
                     if (written + i < c->width - width) bytes[i] = 0;
                     else {
                         nibble = 0;
-                        if (input || !(c->value.length % 2)) nibble = hex_digit(c->value.data[input++]);
+                        if (input || !(digits % 2)) {
+                            while (input < c->value.length && c->value.data[input] == 0x20) ++input;
+                            nibble = hex_digit(c->value.data[input++]);
+                        }
+                        while (input < c->value.length && c->value.data[input] == 0x20) ++input;
                         bytes[i] = (mf_octet)((nibble << 4) | hex_digit(c->value.data[input++]));
                     }
                 }
@@ -1103,12 +1154,32 @@ static enum mf_status emit_constant(struct mf_as *as, const struct constant *c)
     }
     return MF_OK;
 }
+static enum mf_status emit_constant(struct mf_as *as, const struct constant *c)
+{
+    struct constant part; size_t at; mf_u32 repetition; enum mf_status status;
+    if (!c->repeat) return MF_OK;
+    if (c->type == 0x43) return emit_constant_single(as,c);
+    part = *c; part.repeat = 1;
+    if (as->pass == 1) part.repeat = c->repeat;
+    for (repetition = 0; repetition < c->repeat; ++repetition) {
+        at = 0;
+        while (at <= c->value.length) {
+            status = nominal_next(c->value,&at,&part.value); if (status != MF_OK) return status;
+            if (c->type == 0x58 && !c->explicit_length) {
+                status = hex_width(part.value,&part.width); if (status != MF_OK) return status;
+            }
+            status = emit_constant_single(as,&part); if (status != MF_OK) return status;
+        }
+        if (as->pass == 1) return MF_OK;
+    }
+    return MF_OK;
+}
 /* Selected H/F signed decimal, X/XL octets, A and V(single-name) literals.
  * The table owns identities, not source statements or complete pool images. */
 static enum mf_status literal_constant(struct mf_as *as, struct mf_span text,
     struct constant *c)
 {
-    struct value v; enum mf_status status; mf_octet bytes[4];
+    struct value v; enum mf_status status; mf_octet bytes[4]; size_t at; struct mf_span value;
     if (!text.length || text.data[0] != 0x3d) return MF_SOURCE;
     status = constant_parse(as, subspan(text, 1, text.length - 1), 0, c);
     if (status != MF_OK) return status;
@@ -1116,14 +1187,18 @@ static enum mf_status literal_constant(struct mf_as *as, struct mf_span text,
         (c->type != 0x48 && c->type != 0x46 && c->type != 0x58 && c->type != 0x43 && c->type != 0x56 && c->type != 0x41)) return MF_UNSUPPORTED;
     if (c->type == 0x48 || c->type == 0x46) {
         v = zero_value();
-        status = mf_u64_parse(c->value, &v.magnitude, &v.negative);
-        if (status != MF_OK) return status;
-        status = numeric_bytes(v, c->width, 1, bytes); if (status != MF_OK) return status;
+        at = 0;
+        while (at <= c->value.length) {
+            status = nominal_next(c->value,&at,&value); if (status != MF_OK) return status;
+            status = mf_u64_parse(value, &v.magnitude, &v.negative);
+            if (status != MF_OK) return status;
+            status = numeric_bytes(v, c->width, 1, bytes); if (status != MF_OK) return status;
+        }
     } else if (c->type == 0x56) {
         status = implicit_external(as, c->value, NULL); if (status != MF_OK) return status;
     } else {
-        c->alignment = c->width % 16 == 0 ? 16 : c->width % 8 == 0 ? 8 :
-            c->width % 4 == 0 ? 4 : c->width % 2 == 0 ? 2 : 1;
+        c->alignment = c->extent % 16 == 0 ? 16 : c->extent % 8 == 0 ? 8 :
+            c->extent % 4 == 0 ? 4 : c->extent % 2 == 0 ? 2 : 1;
     }
     return MF_OK;
 }
@@ -1222,7 +1297,7 @@ static enum mf_status end_literal_pool(struct mf_as *as)
 static enum mf_status data_statement(struct mf_as *as, int reserve)
 {
     struct mf_span s, item; struct constant c; enum mf_status status;
-    size_t at, first, depth; int quoted, first_item; mf_u32 total; struct value ignored;
+    size_t at, first, depth, nominal_at; int quoted, first_item; mf_u32 total; struct value ignored; struct mf_span nominal;
     status = ensure_section(as); if (status != MF_OK) return status;
     s = as->statement.operand; at = first = depth = 0; quoted = 0; first_item = 1;
     while (at <= s.length) {
@@ -1238,10 +1313,14 @@ static enum mf_status data_statement(struct mf_as *as, int reserve)
             status = constant_parse(as, item, reserve, &c); if (status != MF_OK) return status;
             if (!reserve && !c.repeat && c.value.length &&
                 (c.type == 0x48 || c.type == 0x46 || c.type == 0x41 || c.type == 0x44 || c.type == 0x56)) {
-                status = evaluate_mode(as, c.value, &ignored, 1); if (status != MF_OK) return status;
+                nominal_at = 0;
+                while (nominal_at <= c.value.length) {
+                    status = nominal_next(c.value,&nominal_at,&nominal); if (status != MF_OK) return status;
+                    status = evaluate_mode(as,nominal,&ignored,1); if (status != MF_OK) return status;
+                }
             }
-            if (c.repeat && c.width > U32MAX / c.repeat) return MF_RANGE;
-            total = c.repeat * c.width;
+            if (c.repeat && c.extent > U32MAX / c.repeat) return MF_RANGE;
+            total = c.repeat * c.extent;
             status = align_position(as, c.alignment); if (status != MF_OK) return status;
             if (first_item) {
                 as->statement_length = c.width;

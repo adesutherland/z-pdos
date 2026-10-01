@@ -72,7 +72,11 @@ optional provider selected below. Unsupported
 constructs fail explicitly. The source parser's documented subset is distinct
 from the pure encoder's instruction descriptions.
 
-The selected literals have no duplication or nested nominal list. X and C
+Selected DC H/F/A/AD/V/X forms accept comma-separated nominal values, with
+duplication applied to the complete list. X values have separate left padding;
+explicit XL lengths apply to each value. Labels retain the first value's length.
+Selected literals also accept nominal lists, except V remains one external name.
+Literal duplication is still unsupported. X and C
 literals accept explicit length, with checked padding and no truncation. A literals accept the ordinary checked address expression and addend. H/F literals are signed decimal; X literals contain a
 nonzero number of hexadecimal digits with left zero padding; V takes one external name. Identity
 folds operation/identifier and hexadecimal spelling and preserves character bytes: differently spelled
