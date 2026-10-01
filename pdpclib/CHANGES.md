@@ -86,3 +86,11 @@ and its conditional DSN-stub references as well as the unchanged parser. The
 SWAREQ profile remains an explicit later-system adapter. Both now produce new
 whole-source identities; old variant hashes are historical guest inputs.
 There is no automatic transfer of their previous whole-source qualification.
+
+## Original selected linkage interfaces — 1 October 2026
+
+`interfaces/classic-linkage` supplies newly authored bounded SAVE/RETURN macro
+definitions from documented public register-save contracts. It is an explicit
+assembler library input, not an inherited IBM macro library. The small Classic C
+object gate checks identifier layout and RC=(15) register restoration with
+independently expected bytes. Full runtime assembly and execution remain open.

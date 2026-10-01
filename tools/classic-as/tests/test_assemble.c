@@ -288,6 +288,14 @@ static void expressions_and_bases(void)
     CHECK(f.entry.present && f.entry.section == 1 && f.entry.offset == 4);
     CHECK(f.fixup_count == 0); clean(&f);
 }
+static void narrow_addresses(void)
+{
+    static const mf_octet expected[] = {255,0x12,0x34,0xab,0xcd,0xef};
+    struct fixture f;
+    init(&f, "S CSECT\n DC AL1(255),AL2(X'1234'),AL3(X'ABCDEF')\n END S\n");
+    successful(&f); CHECK(f.sections[0].length == sizeof expected);
+    CHECK(!memcmp(f.data[0], expected, sizeof expected) && !f.fixup_count); clean(&f);
+}
 static void deferred_modes(void)
 {
     struct fixture f;
@@ -556,7 +564,7 @@ static void boundary_and_regression_cases(void)
 }
 int main(void)
 {
-    constants(); forms(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
+    constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
     printf("assemble: %lu checks passed\n", checks); return 0;

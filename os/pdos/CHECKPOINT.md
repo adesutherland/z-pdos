@@ -64,3 +64,21 @@ The accepted image and leases were not changed.
 application gates. [DEPENDENCIES.md](DEPENDENCIES.md) records the source and
 service interfaces. Generated outputs and detailed receipts remain ignored;
 Git preserves sources, recipes and these compact results.
+
+## First Classic object — 1 October 2026
+
+The retained `tests/classic-call.c` function compiles at `-Os` with the current
+Classic C MVS producer. The assembler reads unchanged PDPTOP/PDPPRLG/PDPEPIL
+through explicit maintained library inputs plus original selected SAVE/RETURN
+definitions in `pdpclib/interfaces/classic-linkage`. No native object is reused.
+`tools/check-classic-call.crexx` repeats this PD-03 gate and independently checks
+the entire 92-byte layout, CP037 entry identifier, register save/restore, result
+path, section/export metadata and two A relocations with expected values 88
+and 46. The probe uses only the existing S/370 instruction subset; it does not
+qualify a named z/Architecture kernel profile or guest execution.
+
+Affected normal and sanitizer suites pass 38/38; macros-disabled bootstrap
+checks pass 21/21. The full source assembly gate remains open. Its reached
+gaps include local V references, CLM/explicit-length literals, compiler fixed
+constants and support-source directives. Accepted PDIO1 guest evidence remains
+separate from this new object proof.

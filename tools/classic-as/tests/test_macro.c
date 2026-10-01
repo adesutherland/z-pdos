@@ -214,7 +214,6 @@ static void failures(void)
         " COPY MEMBER\n",
         " LCLA &A(2)\n", " MEXIT\n", " MNOTE 0,'x'\n",
         " MACRO\n X\n MACRO\n MEND\n", " MACRO\n X\n COPY Y\n MEND\n",
-        " MACRO\n X &A\n DC &A(1)\n MEND\n X (A,B)\n",
         " MACRO\n X &A\n DC C'&&'\n MEND\n X Z\n"
     };
     size_t i;
@@ -236,7 +235,6 @@ static void failures(void)
     bad_source(" MACRO\n X\n MEND\n X ,\n", MF_UNSUPPORTED);
     bad_source(" MACRO\n X &A\n LR &A,2\n MEND\n X ,\n", MF_UNSUPPORTED);
     bad_source(" DC AL1(L'LABEL)\n", MF_UNSUPPORTED);
-    bad_source(" MACRO\n X &A\n DC K'&A\n MEND\n", MF_UNSUPPORTED);
     bad_source(" DC N'NAME\n", MF_UNSUPPORTED);
     bad_source(" DC T'NAME\n", MF_UNSUPPORTED);
     bad_source(" DC D'NAME\n", MF_UNSUPPORTED);
@@ -247,7 +245,7 @@ static void failures(void)
 static void limits(void)
 {
     struct fixture f; unsigned long n; size_t i, calls;
-    for (i = 1; i <= 11; ++i) {
+    for (i = 1; i <= 16; ++i) {
         init(&f, simple); f.fail_allocate = i; CHECK(create(&f) == MF_LIMIT);
         CHECK(f.macro == NULL && f.statements.next == NULL); clean(&f);
     }

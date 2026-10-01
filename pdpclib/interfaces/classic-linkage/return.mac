@@ -1,0 +1,23 @@
+* SPDX-License-Identifier: MIT
+* Original selected 72-byte save-area interface. See README.md.
+         MACRO
+&N       RETURN &REG,&TRACE,&RC=
+         AIF   ('&REG' NE '(14,12)' OR '&TRACE' NE '').BAD
+         AIF   ('&RC' EQ '(15)').KEEP
+         AIF   ('&RC' EQ '0').ZERO
+         AIF   ('&RC' NE '').BAD
+&N       LM    14,12,12(13)
+         BR    14
+         MEXIT
+.ZERO    ANOP
+&N       SR    15,15
+         AGO   .RESTORE
+.KEEP    ANOP
+&N       L     14,12(13)
+         AGO   .OTHERS
+.RESTORE L     14,12(13)
+.OTHERS  LM    0,12,20(13)
+         BR    14
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected RETURN interface'
+         MEND

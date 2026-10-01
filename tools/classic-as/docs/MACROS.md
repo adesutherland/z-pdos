@@ -79,13 +79,20 @@ and cross-member lookahead remain unsupported. Skipped records still contribute
 to replay consistency. MEXIT ends the current invocation. SYSNDX uses the
 invocation's decimal index, padded to at least four digits, reset on replay.
 
-The selected T' parameter query distinguishes immediate numeric text (N),
+K' reports immediate parameter text length and N' its top-level sublist count.
+Literal positive decimal indices select parameter sublist elements; an absent
+element is empty. Scalar variable indexing and dynamic or nested indices remain
+unsupported. The selected T' parameter query distinguishes immediate numeric text (N),
 omitted text (O) and unknown text (U). It does not infer assembler symbol types
-or offer phase-dependent lookahead. General symbol attributes, sublist indexing,
+or offer phase-dependent lookahead. General symbol attributes,
 continuation cards, COPY inside definitions, arrays, created variables and
 cREXX preprocessing remain unsupported. Each scope has at most
 `max_model_statements` scalar variables, names at most 64 bytes and character
 values at most `max_statement_bytes`; their storage is allocated at creation.
+
+MNOTE with severity 8 through 255 ends expansion with a source error. Lower
+severity reporting still needs an explicit diagnostic interface and is rejected;
+messages never silently disappear.
 
 ## Storage, replay and provenance
 
@@ -116,13 +123,13 @@ must make that ownership explicit.
 
 ## Subsequent gates
 
-Argument sublists, substrings, variable arrays and backward open-code replay
+Substrings, dynamic or nested sublist indices, variable arrays and backward open-code replay
 belong to later conditional provider gates.
 Source-owned shared globals must retain their value when redeclared, while
 locals start afresh on each call. Variable assignments must reuse bounded
 storage. No optional cREXX backend becomes a bootstrap prerequisite.
 
-N' and K' can describe argument structure and substituted text. A selected T'
+The supported N' and K' describe argument structure and substituted text. T'
 omission test can also be local to arguments, but general T' and ordinary-symbol
 L' require assembler metadata and explicit phase/visibility rules. The query
 contract must distinguish known, not yet available and undefined; pass-two

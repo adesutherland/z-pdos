@@ -52,7 +52,22 @@ static void expressions(void)
     bad_source(" GBLA &V\n GBLB &V\n", MF_SOURCE);
     bad_source(" MACRO\n LOOP\n.X AGO .X\n MEND\n LOOP\n", MF_LIMIT);
 }
+static void argument_attributes(void)
+{
+    struct fixture f; unsigned long n;
+    init(&f, " MACRO\n PARTS &R,&ID\n LCLA &N\n&N SETA K'&ID\n"
+        " AIF (N'&R NE 2).BAD\n STM &R(1),&R(2),12(13)\n DC AL1(&N)\n"
+        " MEXIT\n.BAD BAD &UNDEFINED\n MEND\n PARTS (14,12),HELLO\n");
+    CHECK(create(&f) == MF_OK);
+    expected(&f, "", "STM", "14,12,12(13)", 11);
+    expected(&f, "", "DC", "AL1(5)", 11);
+    CHECK(drain(&f, &n) == MF_EOF); clean(&f);
+    bad_source(" LCLC &A\n&A SETC '(1,2)'\n DC F'&A(1)'\n", MF_UNSUPPORTED);
+    bad_source(" MACRO\n INDEX &A\n DC F'&A(0)'\n MEND\n INDEX (1,2)\n", MF_RANGE);
+    bad_source(" MNOTE 8,'unsupported form'\n", MF_SOURCE);
+    bad_source(" MNOTE 4,'warning'\n", MF_UNSUPPORTED);
+}
 int main(void)
 {
-    scoped(); expressions(); printf("conditional macros: %lu checks passed\n", checks); return 0;
+    scoped(); expressions(); argument_attributes(); printf("conditional macros: %lu checks passed\n", checks); return 0;
 }

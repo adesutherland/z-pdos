@@ -1,0 +1,23 @@
+/* SPDX-License-Identifier: MIT
+ * Compile retained C through unchanged source-owned macros to a checked deck.
+ */
+options levelb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 4 then do
+    say "usage: crexx tools/check-classic-call.crexx --args compiler assembler checker owned-build-directory"
+    return 2
+  end
+  compiler = args.1; cli = args.2; checker = args.3; work = args.4
+  if work = "" | work = "." | work = "/" then return 2
+  address crexx "run cmake -E make_directory :work"
+  if rc <> 0 then return rc
+  source = work || "/classic-call.asm"; output = work || "/classic-call.obj"
+  address crexx "run cmake -E rm -f :output"
+  if rc <> 0 then return rc
+  address crexx "run :compiler -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S os/pdos/tests/classic-call.c -o :source"
+  if rc <> 0 then return rc
+  address crexx "run :cli --profile s370 --macros -I pdpclib/profiles/pdos-zarch -I pdpclib -I pdpclib/interfaces/classic-linkage :source :output"
+  if rc <> 0 then return rc
+  address crexx "run :checker :output"
+  return rc

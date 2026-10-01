@@ -26,6 +26,7 @@ endforeach()
 
 add_executable(test_deck tests/test_deck.c)
 add_executable(test_cli_output tests/test_cli_output.c)
+add_executable(test_classic_call_deck tests/test_classic_call_deck.c)
 add_test(NAME classic_cli_prepare
   COMMAND ${CMAKE_COMMAND} -E rm -f ${CMAKE_CURRENT_BINARY_DIR}/bootstrap.obj)
 set_tests_properties(classic_cli_prepare PROPERTIES FIXTURES_SETUP bootstrap_path)
@@ -87,6 +88,14 @@ endif()
 # Pure C unit tests and independent positive deck checks do not depend on it.
 find_program(CREXX_EXECUTABLE crexx)
 if(CREXX_EXECUTABLE)
+  set(classic_compiler ${PROJECT_SOURCE_DIR}/build/classic-cc/mvs/gcc/mf-classic-cc)
+  if(MF_TRADITIONAL_MACROS AND EXISTS ${classic_compiler})
+    add_test(NAME classic_compiler_object
+      COMMAND ${CREXX_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check-classic-call.crexx
+        --args ${classic_compiler} $<TARGET_FILE:mf-classic-as>
+        $<TARGET_FILE:test_classic_call_deck> ${CMAKE_CURRENT_BINARY_DIR}/classic-call)
+    set_tests_properties(classic_compiler_object PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+  endif()
   add_test(NAME classic_cli_contracts
     COMMAND ${CREXX_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cli.crexx
       --args $<TARGET_FILE:mf-classic-as> $<TARGET_FILE:test_cli_output>

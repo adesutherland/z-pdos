@@ -65,7 +65,7 @@ static int word(struct mf_span s, size_t k)
 static int blocked(struct mf_span s)
 {
     size_t i;
-    for (i = 16; i < 20; ++i) if (word(s, i)) return 1;
+    for (i = 17; i < 20; ++i) if (word(s, i)) return 1;
     return 0;
 }
 static struct mf_span slice(struct mf_span s, size_t at, size_t n)
@@ -392,6 +392,15 @@ static enum mf_status declare(struct mf_macro *m, const struct mf_statement *s, 
     }
     return st == MF_EOF ? MF_OK : st;
 }
+static int formal_parameter(struct mf_macro *m, struct mf_span name)
+{
+    struct definition *d; struct parameter *p; size_t j;
+    if (!m->depth) return 0;
+    d = m->definitions + m->frames[m->depth - 1].definition;
+    p = m->parameters ? m->parameters + m->frames[m->depth - 1].definition * m->config.max_parameters : NULL;
+    for (j = 0; j < d->parameters; ++j) if (mf_macro_same(name, p[j].name)) return 1;
+    return 0;
+}
 static enum mf_status substitute(struct mf_macro *m, struct mf_span s,
     size_t *used, struct mf_span *out)
 {
@@ -401,31 +410,60 @@ static enum mf_status substitute(struct mf_macro *m, struct mf_span s,
     start = *used; i = 0; quoted = 0;
     while (i < s.length) {
         attribute = 0;
-        if (!quoted && i + 2 < s.length && mf_macro_upper(s.data[i]) == 0x54 &&
-            s.data[i + 1] == 0x27 && s.data[i + 2] == 0x26) { attribute = 0x54; i += 2; }
+        if (!quoted && i + 2 < s.length && (mf_macro_upper(s.data[i]) == 0x54 ||
+            mf_macro_upper(s.data[i]) == 0x4b || mf_macro_upper(s.data[i]) == 0x4e) &&
+            s.data[i + 1] == 0x27 && s.data[i + 2] == 0x26) { attribute = mf_macro_upper(s.data[i]); i += 2; }
         if (s.data[i] == 0x26) {
             if (i + 1 == s.length || s.data[i + 1] == 0x26) return MF_UNSUPPORTED;
             j = ++i;
             while (i < s.length && mf_macro_name_rest(s.data[i])) ++i;
             name = slice(s, j, i - j);
             if (!name_valid(name)) return MF_UNSUPPORTED;
-            if (i < s.length && s.data[i] == 0x28) return MF_UNSUPPORTED;
             st = resolve(m, name, buffer, &value); if (st != MF_OK) return st;
+            if (i < s.length && s.data[i] == 0x28) {
+                size_t wanted, cursor, index; struct mf_span item; int sublist;
+                if (!formal_parameter(m, name)) return MF_UNSUPPORTED;
+                wanted = 0; ++i;
+                if (i == s.length || s.data[i] < 0x30 || s.data[i] > 0x39) return MF_UNSUPPORTED;
+                while (i < s.length && s.data[i] >= 0x30 && s.data[i] <= 0x39) {
+                    if (wanted > ((size_t)-1 - (size_t)(s.data[i] - 0x30)) / 10) return MF_RANGE;
+                    wanted = wanted * 10 + (size_t)(s.data[i++] - 0x30);
+                }
+                if (!wanted) return MF_RANGE;
+                if (i == s.length || s.data[i++] != 0x29) return MF_UNSUPPORTED;
+                sublist = value.length >= 2 && value.data[0] == 0x28 && value.data[value.length - 1] == 0x29;
+                if (sublist) value = slice(value, 1, value.length - 2);
+                if (!sublist && wanted != 1) value.length = 0;
+                else if (sublist) {
+                    cursor = 0; index = 0; item = value;
+                    while ((st = mf_macro_arguments(value, &cursor, &item)) == MF_OK) if (++index == wanted) break;
+                    if (st != MF_OK && st != MF_EOF) return st;
+                    value = item; if (st == MF_EOF) value.length = 0;
+                }
+            }
             if (attribute) {
                 /* This selected attribute describes immediate argument text.
                  * Ordinary-symbol attributes still need an engine query. */
-                if (!m->depth) return MF_UNSUPPORTED;
-                {
-                    struct definition *d; struct parameter *p;
-                    d = m->definitions + m->frames[m->depth - 1].definition;
-                    p = m->parameters ? m->parameters + m->frames[m->depth - 1].definition * m->config.max_parameters : NULL;
-                    for (j = 0; j < d->parameters; ++j) if (mf_macro_same(name, p[j].name)) break;
-                    if (j == d->parameters) return MF_UNSUPPORTED;
+                if (!formal_parameter(m, name)) return MF_UNSUPPORTED;
+                if (attribute == 0x54) {
+                    st = mf_u64_parse(value, &magnitude, &negative);
+                    buffer[0] = buffer[2] = 0x27;
+                    buffer[1] = !value.length ? 0x4f : st == MF_OK ? 0x4e : 0x55;
+                    value.data = buffer; value.length = 3;
+                } else {
+                    size_t number, cursor; struct mf_span item;
+                    number = value.length;
+                    if (attribute == 0x4e) {
+                        number = value.length ? 1 : 0;
+                        if (value.length >= 2 && value.data[0] == 0x28 && value.data[value.length - 1] == 0x29) {
+                            value = slice(value, 1, value.length - 2); cursor = number = 0;
+                            while ((st = mf_macro_arguments(value, &cursor, &item)) == MF_OK) ++number;
+                            if (st != MF_EOF) return st;
+                        }
+                    }
+                    if (number > 2147483647UL) return MF_RANGE;
+                    value = decimal((long)number, buffer);
                 }
-                st = mf_u64_parse(value, &magnitude, &negative);
-                buffer[0] = buffer[2] = 0x27;
-                buffer[1] = !value.length ? 0x4f : st == MF_OK ? 0x4e : 0x55;
-                value.data = buffer; value.length = 3;
             }
             if (value.length > m->config.max_statement_bytes - *used) return MF_LIMIT;
             if (value.length) memcpy(m->output + *used, value.data, value.length);
@@ -462,6 +500,15 @@ static enum mf_status conditional(struct mf_macro *m, const struct mf_statement 
 {
     struct mf_span expression, target, name; struct mf_macro_value value;
     size_t used, at, i, start, level; enum mf_status st; struct variable *v; int quoted, branch;
+    if (op == 16) {
+        size_t cursor; struct mf_span severity, message; struct mf_macro_value code;
+        cursor = 0;
+        st = mf_macro_arguments(s->operand, &cursor, &severity); if (st != MF_OK) return st;
+        st = mf_macro_eval(severity, 32, &code); if (st != MF_OK) return st;
+        st = mf_macro_arguments(s->operand, &cursor, &message);
+        if (st != MF_OK || code.character || cursor != NONE) return MF_SOURCE;
+        return code.number >= 8 && code.number <= 255 ? MF_SOURCE : MF_UNSUPPORTED;
+    }
     if (op >= 7 && op <= 12) return declare(m, s, op);
     if (op >= 13 && op <= 15) {
         if (!s->label.length || s->label.data[0] != 0x26) return MF_SOURCE;
@@ -502,7 +549,8 @@ static enum mf_status conditional(struct mf_macro *m, const struct mf_statement 
         if (!target.length || target.data[0] != 0x28) return MF_SOURCE;
         level = 1; quoted = 0; start = 1;
         for (i = 1; i < target.length; ++i) {
-            if (!quoted && i + 2 < target.length && mf_macro_upper(target.data[i]) == 0x54 &&
+            if (!quoted && i + 2 < target.length && (mf_macro_upper(target.data[i]) == 0x54 || mf_macro_upper(target.data[i]) == 0x4b ||
+                mf_macro_upper(target.data[i]) == 0x4e) &&
                 target.data[i + 1] == 0x27 && target.data[i + 2] == 0x26) { ++i; continue; }
             if (target.data[i] == 0x27) quoted = !quoted;
             else if (!quoted && target.data[i] == 0x28) ++level;
@@ -618,8 +666,8 @@ static enum mf_status provider_next(void *cookie, struct mf_statement *out)
         if (word(s.operation, 0) || word(s.operation, 1) || blocked(s.operation)) {
             st = MF_UNSUPPORTED; break;
         }
-        for (k = 3; k <= 15; ++k) if (word(s.operation, k)) break;
-        if (k <= 15) { st = conditional(m, &s, k); if (st != MF_OK) break; continue; }
+        for (k = 3; k <= 16; ++k) if (word(s.operation, k)) break;
+        if (k <= 16) { st = conditional(m, &s, k); if (st != MF_OK) break; continue; }
         st = expand(m, &s, &expanded); if (st != MF_OK) break;
         if (blocked(expanded.operation) || word(expanded.operation, 0) || word(expanded.operation, 1)) {
             st = MF_UNSUPPORTED; break;

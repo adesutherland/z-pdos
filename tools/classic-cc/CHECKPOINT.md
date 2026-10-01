@@ -80,3 +80,10 @@ The [roadmap](ROADMAP.md) owns the compiler/assembler tradeoffs and those
 acceptance gates. Named machine profiles remain unqualified; their
 [shared direction](../../architecture/MACHINE-PROFILES.md) does not imply
 Classic/ELF ABI compatibility or wider addressing support.
+
+The later PD-03 consumer now compiles `os/pdos/tests/classic-call.c` and
+assembles its unchanged text through maintained macros. An independent checker
+verifies its complete object bytes and relocations; see the
+[OS checkpoint](../../os/pdos/CHECKPOINT.md). This supersedes the earlier COPY
+probe for that bounded language path. Link/load, whole-source and guest gates
+remain open.

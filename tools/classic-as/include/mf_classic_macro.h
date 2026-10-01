@@ -61,7 +61,9 @@ void mf_macro_destroy(struct mf_macro *);
  * Scalar LCL/GBL and SETA/B/C, macro-local AIF/AGO/ANOP/MEXIT, forward
  * open-code AIF/AGO, and SYSNDX are supported. Immediate parameter T' can
  * identify numeric, omitted or unknown text; ordinary-symbol queries remain
- * unsupported. COPY inside definitions, continuation, parameter indexing,
+ * unsupported. Parameter K'/N' and literal decimal sublist indices are supported.
+ * Severity 8..255 MNOTE fails explicitly; lower severities are unsupported.
+ * COPY inside definitions, continuation, variable/dynamic/nested indexing,
  * other attributes, escaped ampersands and nested definitions are unsupported.
  * Definitions cannot be redefined. Names compare case-insensitively; character
  * argument values retain their original octets. ASCII and CP037 records use

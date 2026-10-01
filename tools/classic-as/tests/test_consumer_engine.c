@@ -54,6 +54,17 @@ static void literal_bytes(void)
     CHECK(f.fixups[0].target_kind == MF_REF_EXTERNAL && f.fixups[0].target == f.symbols[external].id);
     CHECK(f.fixups[0].address_kind == MF_ADDRESS_V && f.fixups[0].width == 4); clean(&f);
 }
+static void address_literal(void)
+{
+    static const mf_octet expected[] = {0x58,0x10,0xc0,8,0,0,0,0,0,0,0,8};
+    struct fixture f;
+    consumer_init(&f, "S CSECT\n USING S,12\n L 1,=A(FORWARD+4)\nFORWARD DC F'0'\n END S\n");
+    successful(&f); CHECK(f.sections[0].length == sizeof expected);
+    CHECK(!memcmp(f.data[0], expected, sizeof expected));
+    CHECK(f.fixup_count == 1 && f.fixups[0].offset == 8 && f.fixups[0].width == 4);
+    CHECK(f.fixups[0].target_kind == MF_REF_SECTION && f.fixups[0].target == 1 && f.fixups[0].address_kind == MF_ADDRESS_A);
+    clean(&f);
+}
 static void pool_grouping(void)
 {
     struct fixture f;
@@ -121,7 +132,6 @@ static void consumer_failures(void)
 {
     static const struct bad_case cases[] = {
         {"S CSECT\n USING S,12\n L 1,=H'1'\n END\n",MF_UNSUPPORTED},
-        {"S CSECT\n USING S,12\n L 1,=A(S)\n END\n",MF_UNSUPPORTED},
         {"S CSECT\n USING S,12\n L 1,=2F'1'\n END\n",MF_UNSUPPORTED},
         {"S CSECT\n USING S,12\n L 1,=XL4'01'\n END\n",MF_UNSUPPORTED},
         {"S CSECT\n USING S,12\n L 1,=F'2147483648'\n END\n",MF_RANGE},
@@ -226,7 +236,7 @@ static void repeated_literal_storage(void)
 }
 int main(void)
 {
-    aliases(); literal_bytes(); pool_grouping(); multiple_pools_and_sections();
+    aliases(); address_literal(); literal_bytes(); pool_grouping(); multiple_pools_and_sections();
     implicit_externals(); symbolic_ss(); consumer_failures();
     literal_replay_and_writer_errors(); literal_sink_contract(); repeated_literal_storage();
     printf("consumer engine: %lu checks passed\n", checks); return 0;

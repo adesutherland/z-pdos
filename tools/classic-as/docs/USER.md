@@ -35,11 +35,11 @@ publication semantics.
 | Symbols | ASCII names, case-insensitive identifiers, longer internal labels; bounded caller storage |
 | Expressions | Decimal and `X'hex'` integers, symbols, `*`, parentheses, unary signs, addition/subtraction and supported single-target relocation expressions |
 | EQU | Values resolvable in the layout pass; forward EQU chains are unsupported |
-| DC | H/F integers, A addresses, absolute eight-byte AD, external V, hexadecimal X and CP037 C/CL character constants; checked duplication and target length |
+| DC | H/F integers, AL1/AL2/AL3 absolute and A addresses, absolute eight-byte AD, external V, hexadecimal X and CP037 C/CL character constants; checked duplication and target length |
 | DS | Reservation/alignment for the documented constant types, including `0H`, `0F`, `0D`; no emitted bytes for gaps |
 | Addressability | One base per USING statement, DROP, explicit base/index fields; same-section symbolic addresses need a matching USING |
 | Visibility and entry | ENTRY, EXTRN, implicit externals for a single-name V constant, and END with an optional section-relative entry |
-| Literals | Selected `=F'number'`, `=X'hex'` and `=V(name)`, explicit LTORG and implicit END pool |
+| Literals | Selected `=F'number'`, `=X'hex'`, `=A(expression)` and `=V(name)`, explicit LTORG and implicit END pool |
 | Modes | AMODE 24/31/ANY; RMODE 24/31/ANY; name associates the declaration with its section, including a later section |
 
 Mode declarations do not create a section. A blank name selects the unnamed
@@ -68,8 +68,8 @@ optional provider selected below. Unsupported
 constructs fail explicitly. The source parser's documented subset is distinct
 from the pure encoder's instruction descriptions.
 
-The selected literals have no duplication, explicit length, expression addend
-or nested nominal list. F literals are signed decimal; X literals contain an
+The selected literals have no duplication, explicit length or nested nominal
+list. A literals accept the ordinary checked address expression and addend. F literals are signed decimal; X literals contain an
 even, nonzero number of hexadecimal digits; V takes one external name. Identity
 is case-insensitive source spelling within one pool: differently spelled
 numeric values are not automatically merged. Pending literals collect globally
@@ -168,7 +168,7 @@ Library diagnostics name the supplying file. Desktop bounds are 16 directories,
 
 The provider accepts the scalar variables, conditional branches and SYSNDX
 described in the macro guide. It rejects continuation, COPY inside macro
-definitions, variable arrays, general attributes, sublist indexing, escaped
+definitions, variable arrays, general symbol attributes, dynamic or nested sublist indexing, escaped
 ampersands and nested definitions. The [macro guide](MACROS.md) gives an original example and the
 storage/replay/provenance contract. This is a language subset; it supplies no
 IBM service or mapping macros.

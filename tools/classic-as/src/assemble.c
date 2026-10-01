@@ -713,7 +713,8 @@ static enum mf_status constant_parse(struct mf_as *as, struct mf_span s, int res
         if (status != MF_OK) return status;
         if (!n) return MF_RANGE;
         c->explicit_length = 1; c->width = (unsigned)n; c->alignment = 1;
-        if (type != 0x43 && type != 0x58) return MF_UNSUPPORTED;
+        if (type == 0x41 && c->type != 0x44) { if (c->width > 4) return MF_UNSUPPORTED; }
+        else if (type != 0x43 && type != 0x58) return MF_UNSUPPORTED;
     }
     if (reserve) return at == s.length ? MF_OK : MF_UNSUPPORTED;
     if (at == s.length) {
@@ -758,7 +759,10 @@ static enum mf_status numeric_bytes(struct value v, unsigned width, int signed_o
 {
     struct mf_u64 limit, bits;
     limit.hi = 0; limit.lo = U32MAX;
-    if (width == 2) limit.lo = v.negative ? 32768UL : 32767UL;
+    if (width == 1 || width == 2 || width == 3) {
+        mf_u32 maximum; maximum = width == 1 ? 255UL : width == 2 ? 65535UL : 16777215UL;
+        limit.lo = v.negative ? maximum / 2 + 1 : signed_only ? maximum / 2 : maximum;
+    }
     else if (width == 4 && !v.coefficient)
         limit.lo = v.negative ? 0x80000000UL : (signed_only ? 0x7fffffffUL : U32MAX);
     else if (width == 8) { limit.hi = v.negative ? 0x80000000UL : U32MAX; limit.lo = v.negative ? 0 : U32MAX; }
@@ -785,6 +789,7 @@ static enum mf_status emit_constant(struct mf_as *as, const struct constant *c)
         if ((c->type == 0x48 || c->type == 0x46 || c->type == 0x44) && v.coefficient) return MF_UNSUPPORTED;
         if (c->type == 0x56 && (v.coefficient != 1 || v.kind != MF_REF_EXTERNAL ||
             !zero(v.magnitude) || v.negative)) return MF_SOURCE;
+        if (v.coefficient && c->width != 4) return MF_UNSUPPORTED;
         if (v.coefficient && as->sections[as->current].dummy) return MF_SOURCE;
         if (v.coefficient && (as->fixup_count > as->config.max_fixups ||
             c->repeat > as->config.max_fixups - as->fixup_count)) return MF_LIMIT;
@@ -849,7 +854,7 @@ static enum mf_status literal_constant(struct mf_as *as, struct mf_span text,
     status = constant_parse(as, subspan(text, 1, text.length - 1), 0, c);
     if (status != MF_OK) return status;
     if (c->repeat != 1 || c->explicit_length ||
-        (c->type != 0x46 && c->type != 0x58 && c->type != 0x56)) return MF_UNSUPPORTED;
+        (c->type != 0x46 && c->type != 0x58 && c->type != 0x56 && c->type != 0x41)) return MF_UNSUPPORTED;
     if (c->type == 0x46) {
         v = zero_value();
         status = mf_u64_parse(c->value, &v.magnitude, &v.negative);

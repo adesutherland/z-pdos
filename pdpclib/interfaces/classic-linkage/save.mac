@@ -1,0 +1,22 @@
+* SPDX-License-Identifier: MIT
+* Original selected 72-byte save-area interface. See README.md.
+         MACRO
+&N       SAVE &REG,&TRACE,&ID
+         LCLA &LENGTH,&AFTER
+         AIF   ('&REG' NE '(14,12)' OR '&TRACE' NE '').BAD
+         AIF   ('&ID' EQ '*').BAD
+         AIF   ('&ID' EQ '').NOID
+&LENGTH  SETA  K'&ID
+         AIF   (&LENGTH GT 70).BAD
+&AFTER   SETA  (5+&LENGTH+1)/2*2
+&N       B     &AFTER.(,15)
+         DC    AL1(&LENGTH)
+         DC    C'&ID'
+         DS    0H
+         STM   14,12,12(13)
+         MEXIT
+.NOID    ANOP
+&N       STM   14,12,12(13)
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected SAVE interface'
+         MEND

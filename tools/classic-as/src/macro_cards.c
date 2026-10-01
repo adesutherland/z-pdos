@@ -75,8 +75,8 @@ enum mf_status mf_macro_card(const struct mf_record *r, enum mf_encoding e,
     while (i < n) {
         c = b[i];
         if (!quoted && i + 1 < n && b[i + 1] == 0x27 &&
-            (mf_macro_upper(c) == 0x4c || mf_macro_upper(c) == 0x4b ||
-             mf_macro_upper(c) == 0x4e || (mf_macro_upper(c) == 0x54 &&
+            (mf_macro_upper(c) == 0x4c || ((mf_macro_upper(c) == 0x4b ||
+             mf_macro_upper(c) == 0x4e || mf_macro_upper(c) == 0x54) &&
              (i + 2 == n || b[i + 2] != 0x26)))) {
             s->origin.column = (unsigned)i + 1; return MF_UNSUPPORTED;
         }
@@ -91,7 +91,7 @@ enum mf_status mf_macro_card(const struct mf_record *r, enum mf_encoding e,
                 s->origin.column = (unsigned)i + 1; return MF_UNSUPPORTED;
             }
         }
-        if (!quoted && mf_macro_upper(c) == 0x54 && i + 2 < n &&
+        if (!quoted && (mf_macro_upper(c) == 0x54 || mf_macro_upper(c) == 0x4b || mf_macro_upper(c) == 0x4e) && i + 2 < n &&
             b[i + 1] == 0x27 && b[i + 2] == 0x26) { i += 2; continue; }
         if (c == 0x27) quoted = !quoted;
         else if (!quoted && c == 0x28) ++level;
