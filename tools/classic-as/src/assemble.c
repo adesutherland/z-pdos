@@ -40,6 +40,7 @@ struct mf_as {
     const struct mf_diagnostics *diagnostics;
     int pass, ended, used;
     struct mf_entry entry;
+    mf_octet deck_id[8]; size_t deck_id_length; unsigned title_names;
 };
 struct parser { struct mf_as *as; struct mf_span text; size_t at, depth; int syntax_only; };
 
@@ -995,8 +996,57 @@ static enum mf_status end_statement(struct mf_as *as)
     }
     return end_literal_pool(as);
 }
+/* Validated listing controls have no code effect; TITLE also has a concrete
+ * classic-record identity. The writer receives it before any record is emitted. */
+static enum mf_status title_statement(struct mf_as *as)
+{
+    struct mf_span s, id; size_t i, n;
+    s = as->statement.operand; id = as->statement.label;
+    if (s.length < 3 || s.data[0] != 0x27 || s.data[s.length - 1] != 0x27) return MF_SOURCE;
+    n = 0;
+    for (i = 1; i < s.length - 1; ++i) {
+        if (s.data[i] < 0x20 || s.data[i] > 0x7e) return MF_SOURCE;
+        if (s.data[i] == 0x27 && (++i == s.length - 1 || s.data[i] != 0x27)) return MF_SOURCE;
+        if (++n > 100) return MF_RANGE;
+    }
+    if (!n) return MF_SOURCE;
+    if (id.length) {
+        if (!valid_name(id)) return MF_SOURCE;
+        if (id.length > 8) return MF_LIMIT;
+        if (as->title_names++) return MF_DUPLICATE;
+        if (as->pass == 1) { memcpy(as->deck_id, id.data, id.length); as->deck_id_length = id.length; }
+        else if (as->deck_id_length != id.length || memcmp(as->deck_id, id.data, id.length)) return MF_REPLAY;
+    }
+    return MF_OK;
+}
+static enum mf_status print_statement(struct mf_as *as)
+{
+    static const mf_octet choices[][7] = {
+        {0x4f,0x4e,0}, {0x4f,0x46,0x46,0}, {0x47,0x45,0x4e,0},
+        {0x4e,0x4f,0x47,0x45,0x4e,0}, {0x44,0x41,0x54,0x41,0},
+        {0x4e,0x4f,0x44,0x41,0x54,0x41,0}
+    };
+    struct mf_span s, item; size_t at, start, i, n;
+    if (as->statement.label.length) return MF_SOURCE;
+    s = as->statement.operand; at = 0;
+    do {
+        start = at;
+        while (at < s.length && s.data[at] != 0x2c) ++at;
+        item = trim(subspan(s, start, at - start));
+        if (item.length) {
+            for (i = 0; i < sizeof choices / sizeof choices[0]; ++i) {
+                for (n = 0; choices[i][n]; ++n) { }
+                if (word(item, choices[i], n)) break;
+            }
+            if (i == sizeof choices / sizeof choices[0]) return MF_UNSUPPORTED;
+        }
+    } while (at++ < s.length);
+    return MF_OK;
+}
 static enum mf_status process(struct mf_as *as)
 {
+    static const mf_octet title[] = {0x54,0x49,0x54,0x4c,0x45};
+    static const mf_octet print[] = {0x50,0x52,0x49,0x4e,0x54};
     static const mf_octet csect[] = {0x43,0x53,0x45,0x43,0x54};
     static const mf_octet dsect[] = {0x44,0x53,0x45,0x43,0x54};
     static const mf_octet equ[] = {0x45,0x51,0x55};
@@ -1014,6 +1064,8 @@ static enum mf_status process(struct mf_as *as)
     op = as->statement.operation;
     if (!op.length) return as->statement.label.length || as->statement.operand.length ? MF_SOURCE : MF_OK;
     if (as->ended) return MF_SOURCE;
+    if (word(op, title, sizeof title)) return title_statement(as);
+    if (word(op, print, sizeof print)) return print_statement(as);
     if (word(op, csect, sizeof csect)) return select_section(as, 0);
     if (word(op, dsect, sizeof dsect)) return select_section(as, 1);
     if (word(op, equ, sizeof equ)) {
@@ -1087,7 +1139,7 @@ static enum mf_status run_pass(struct mf_as *as, const struct mf_statements *sou
     for (i = 0; i < as->section_count; ++i) {
         as->section_state[i].position = 0;
     }
-    as->pool = 0;
+    as->pool = 0; as->title_names = 0;
     if (as->pass == 2) for (i = 0; i < as->literal_count; ++i) as->literals[i].seen = 0;
     memset(as->bases, 0, sizeof as->bases); as->current = NIL; as->ended = 0; as->fixup_count = 0;
     fingerprint_init(fingerprint);
@@ -1189,7 +1241,7 @@ enum mf_status mf_as_assemble(struct mf_as *as, const struct mf_statements *sour
     const struct mf_object_writer *writer, const struct mf_diagnostics *diagnostics,
     struct mf_as_result *result)
 {
-    enum mf_status status, finish_status; struct fingerprint first, second;
+    enum mf_status status, finish_status; struct fingerprint first, second; struct mf_span id;
     struct mf_diagnostic diagnostic; size_t i; int begun;
     if (result) { memset(result, 0, sizeof *result); result->status = MF_SOURCE; }
     if (!as || !source || !source->next || !source->replay || !writer ||
@@ -1206,6 +1258,10 @@ enum mf_status mf_as_assemble(struct mf_as *as, const struct mf_statements *sour
             if (as->symbols[i].kind == MF_EXPORT &&
                 (!as->symbols[i].section || as->sections[as->symbols[i].section - 1].dummy)) { status = MF_SOURCE; break; }
         }
+    }
+    if (status == MF_OK && as->deck_id_length) {
+        id.data = as->deck_id; id.length = as->deck_id_length;
+        status = writer->deck_id ? writer->deck_id(writer->cookie, id) : MF_UNSUPPORTED;
     }
     if (status == MF_OK) status = source->replay(source->cookie);
     if (status == MF_OK) {

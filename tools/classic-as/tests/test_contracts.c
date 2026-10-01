@@ -146,7 +146,7 @@ static enum mf_status run(struct source *s, struct observer *o,
     storage.cookie = &arena; storage.acquire = allocate;
     source.cookie = s; source.next = next; source.replay = replay;
     writer.cookie = o; writer.begin = begin; writer.text = text;
-    writer.gap = gap; writer.fixup = fixup; writer.entry = entry; writer.finish = finish;
+    writer.gap = gap; writer.fixup = fixup; writer.entry = entry; writer.finish = finish; writer.deck_id = NULL;
     diagnostics.cookie = o; diagnostics.report = diagnostic;
     status = mf_as_create(c, &storage, &as);
     if (status == MF_OK) status = mf_as_assemble(as, &source, &writer, &diagnostics, result);

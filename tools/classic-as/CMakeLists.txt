@@ -60,6 +60,8 @@ classic_cli_fixture(forms forms.asm)
 classic_cli_fixture(profile cli-profile.asm --profile s370)
 
 if(MF_TRADITIONAL_MACROS)
+  classic_cli_fixture(registers registers.asm --profile s370 --macros
+    -I ${PROJECT_SOURCE_DIR}/pdpclib/interfaces/classic-linkage)
   set(library_deck ${CMAKE_CURRENT_BINARY_DIR}/library.obj)
   add_test(NAME classic_library_cli_prepare
     COMMAND ${CMAKE_COMMAND} -E rm -f ${library_deck})

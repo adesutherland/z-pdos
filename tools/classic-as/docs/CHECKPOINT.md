@@ -187,3 +187,18 @@ units assemble through maintained macros. Raw support, the named kernel
 profile and whole-toolchain guest evidence remain separate gates.
 Affected normal/sanitizer suites pass 42/42; all 17 C objects also pass
 through the sanitizer assembler using the retained recipe.
+
+## Deck identification and register interface — 1 October 2026
+
+TITLE now validates headings and sends a bounded named ID through an explicit
+optional writer callback before record output. IDs do not enter the ordinary
+symbol namespace; all record trailers carry the independently checked CP037
+ID. Names above eight characters and duplicate named TITLEs fail, and writers
+without metadata support reject named TITLEs. PRINT accepts only the documented
+validated listing-control subset; no source listing is claimed.
+
+The original no-operand YREGS interface supplies R0..R15 and passes an independent
+CLI instruction-byte check. The six raw inputs now reach concrete next gaps:
+forward PSA mapping/USING, source-dependent duplication, PUSH USING, GETMAIN
+and the empty FIXWRITE prototype. No missing service was treated as a no-op.
+Affected normal and sanitizer suites pass 45/45.

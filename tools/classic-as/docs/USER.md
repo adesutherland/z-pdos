@@ -35,6 +35,8 @@ publication semantics.
 | Symbols | ASCII names, case-insensitive identifiers, longer internal labels; bounded caller storage |
 | Expressions | Decimal and `X'hex'` integers, symbols, `*`, parentheses, unary signs, addition/subtraction and supported single-target relocation expressions |
 | EQU | Values resolvable in the layout pass; forward EQU chains are unsupported |
+| TITLE | One named deck ID up to eight characters; 1..100-character quoted heading. CP037 deck IDs occupy bytes 73..80, space padded, without generated sequence suffixes. Headings/listings are not produced. |
+| PRINT | Validated ON/OFF, GEN/NOGEN, DATA/NODATA controls and null operands; no listing output in this component. Labels and other control forms are rejected. |
 | DC | H/F integers, AL1/AL2/AL3 absolute and A addresses, absolute eight-byte AD, external V, hexadecimal X and CP037 C/CL character constants; checked duplication and target length |
 | DS | Reservation/alignment for the documented constant types, including `0H`, `0F`, `0D`; no emitted bytes for gaps |
 | Addressability | One base per USING statement, DROP, explicit base/index fields; same-section symbolic addresses need a matching USING |

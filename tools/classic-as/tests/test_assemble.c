@@ -562,9 +562,25 @@ static void boundary_and_regression_cases(void)
     CHECK(mf_as_assemble(f.as, &f.wrapped, &f.writer, NULL, &result) == MF_SOURCE);
     CHECK(result.status == MF_SOURCE && !result.valid_output); clean(&f);
 }
+static void source_metadata(void)
+{
+    static const mf_octet id[8] = {0xc4,0xc5,0xc3,0xd2,0x40,0x40,0x40,0x40};
+    struct fixture f; size_t i;
+    init(&f, "DECK TITLE 'first title'\n PRINT GEN,,ON\nDECK EQU 1\nS CSECT\n TITLE 'second title'\n PRINT NOGEN,OFF,DATA,NODATA\n LR 1,2\n END S\n");
+    real_writer(&f); CHECK(run(&f) == MF_OK && f.sink_valid);
+    CHECK(f.deck_length == 240 && f.deck[96] == 0x18 && f.deck[97] == 0x12);
+    for (i = 0; i < f.deck_length; i += 80) CHECK(!memcmp(f.deck+i+72,id,8));
+    clean(&f);
+    init(&f, " TITLE ''\n LR 1,2\n END\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
+    init(&f, "X TITLE 'hello'\nX TITLE 'again'\n LR 1,2\n END\n"); CHECK(run(&f) == MF_DUPLICATE); clean(&f);
+    init(&f, "LONGTITLE TITLE 'hello'\n LR 1,2\n END\n"); CHECK(run(&f) == MF_LIMIT); clean(&f);
+    init(&f, "X TITLE 'hello'\n LR 1,2\n END\n"); CHECK(run(&f) == MF_UNSUPPORTED); clean(&f);
+    init(&f, " PRINT UNKNOWN\n LR 1,2\n END\n"); CHECK(run(&f) == MF_UNSUPPORTED); clean(&f);
+    init(&f, "X PRINT GEN\n LR 1,2\n END\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
+}
 int main(void)
 {
-    constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
+    source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
     printf("assemble: %lu checks passed\n", checks); return 0;

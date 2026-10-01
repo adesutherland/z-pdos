@@ -29,6 +29,7 @@ struct mf_obj {
     enum mf_status error;
     int begun, closed;
     struct mf_entry entry;
+    mf_octet deck_id[8]; int have_deck_id;
     mf_octet text[56];
     size_t text_count;
     unsigned text_section;
@@ -48,10 +49,11 @@ static void card(mf_octet *p, unsigned a, unsigned b, unsigned c)
     memset(p, 0x40, 80); p[0] = 2;
     p[1] = (mf_octet)a; p[2] = (mf_octet)b; p[3] = (mf_octet)c;
 }
-static enum mf_status emit(struct mf_obj *o, const mf_octet *p)
+static enum mf_status emit(struct mf_obj *o, mf_octet *p)
 {
     enum mf_status s;
     if (o->error != MF_OK) return o->error;
+    if (o->have_deck_id) memcpy(p + 72, o->deck_id, 8);
     s = o->sink.write(o->sink.cookie, p, 80);
     return s == MF_OK ? MF_OK : fail(o, s);
 }
@@ -68,6 +70,16 @@ static enum mf_status name(struct mf_span n, mf_octet *out, int empty)
         if (s != MF_OK) return s;
     }
     return MF_OK;
+}
+static enum mf_status deck_id(void *cookie, struct mf_span id)
+{
+    struct mf_obj *o; enum mf_status st;
+    o = (struct mf_obj *)cookie;
+    if (o->error != MF_OK) return o->error;
+    if (o->begun || o->closed || o->have_deck_id) return fail(o, MF_OBJECT);
+    st = name(id, o->deck_id, 0);
+    if (st != MF_OK) return fail(o, st);
+    o->have_deck_id = 1; return MF_OK;
 }
 static struct obj_section *section(struct mf_obj *o, unsigned id)
 {
@@ -344,7 +356,7 @@ enum mf_status mf_obj_create(const struct mf_storage *storage,
     }
     *result = o; writer->cookie = o; writer->begin = begin; writer->text = text;
     writer->gap = gap; writer->fixup = fixup; writer->entry = entry;
-    writer->finish = finish; return MF_OK;
+    writer->finish = finish; writer->deck_id = deck_id; return MF_OK;
 }
 void mf_obj_destroy(struct mf_obj *o)
 {

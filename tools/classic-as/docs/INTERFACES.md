@@ -50,6 +50,13 @@ Explicit EXTRN binds the ordinary namespace and still excludes local definition.
 Writer name uniqueness is per exported/external identity class; A and V keep
 their distinct relocation kinds when referring to the same eventual address.
 
+An optional `deck_id` callback precedes `begin` for a named TITLE. Initialize
+that field to NULL when unsupported; a named TITLE then fails explicitly.
+The metadata span is borrowed during the synchronous call. The classic writer
+copies and CP037-encodes the ID, bounds it to eight bytes, and space pads the
+remaining identification bytes. It emits the same ID on ESD/TXT/RLD/END cards,
+without generating a sequence suffix. TITLE names do not define ordinary symbols.
+
 Writer operations are `begin`, `text`, `gap`, `fixup`, `entry`, `finish`. Begin
 receives final sections/symbols; later events do not mutate their identities.
 Gaps preserve reserved storage without inventing bytes. Ordered events cannot

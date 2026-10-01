@@ -25,3 +25,9 @@ RC=(15) path: identifier bytes, save offsets, restored registers, branch
 behavior and return-code preservation. The remaining accepted forms are
 implementation coverage, not separately qualified guest paths. Host assembly does not qualify
 the runtime or guest ABI.
+
+YREGS supplies only the reached no-operand R0 through R15 equates. These are
+original numeric register-name definitions from the documented hardware
+register numbers and public YREGS usage. Other operand forms and floating
+register aliases remain unsupported. An independent CLI fixture checks the
+resulting BASR R14,R15 bytes; this supplies no OS control block or service.

@@ -92,7 +92,7 @@ int main(int argc, char **argv)
     } else if (!strcmp(argv[1], "forms")) {
         fixture = 1; expected = forms; length = sizeof forms;
     } else {
-        CHECK(!strcmp(argv[1], "profile"));
+        CHECK(!strcmp(argv[1], "profile") || !strcmp(argv[1], "registers"));
         fixture = 2; expected = profile; length = sizeof profile;
     }
     input = fopen(argv[2], "rb"); CHECK(input != NULL);

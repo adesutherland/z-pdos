@@ -139,6 +139,9 @@ struct mf_object_writer {
     enum mf_status (*fixup)(void *, const struct mf_fixup *);
     enum mf_status (*entry)(void *, const struct mf_entry *);
     enum mf_status (*finish)(void *, int valid);
+    /* Optional, before begin. Initialize to NULL when unsupported. A named
+     * TITLE requires this callback; the span is borrowed only for the call. */
+    enum mf_status (*deck_id)(void *, struct mf_span);
 };
 /* Writer owns bounded caller-supplied session storage, never host devices.
  * Events are ordered within each section. Overlays are unsupported initially.
