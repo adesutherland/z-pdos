@@ -816,11 +816,23 @@ static void executable_alignment(void)
     init(&f,"S CSECT\n CNOP 0,16\n END S\n"); failed(&f,MF_UNSUPPORTED); clean(&f);
     init(&f,"S CSECT\nHERE CNOP 0,4\n DC AL1(L'HERE)\n END S\n"); failed(&f,MF_UNSUPPORTED); clean(&f);
 }
+static void halfword_addresses(void)
+{
+    static const mf_octet values[6] = {255,255,128,0,0,12}; struct fixture f;
+    init(&f,"S CSECT\n DC X'AA'\n DS 0Y\nA DC Y(65535,-32768,4*3)\n DS 2Y\n DC YL1(255),AL1(L'A)\n BR 14\n END A\n");
+    successful(&f); CHECK(f.sections[0].length == 16 && f.entry.offset == 2);
+    CHECK(!memcmp(f.data[0]+2,values,sizeof values) && !f.present[0][1] && !f.present[0][8]);
+    CHECK(f.data[0][12] == 255 && f.data[0][13] == 2 && f.data[0][14] == 7 && f.data[0][15] == 0xfe); clean(&f);
+    init(&f,"S CSECT\n DC Y(65536)\n END S\n"); failed(&f,MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n DC Y(-32769)\n END S\n"); failed(&f,MF_RANGE); clean(&f);
+    init(&f,"S CSECT\n DC Y(S)\n END S\n"); failed(&f,MF_UNSUPPORTED); clean(&f);
+    init(&f,"S CSECT\n DS YL3\n END S\n"); failed(&f,MF_RANGE); clean(&f);
+}
 int main(void)
 {
     no_operand_sections(); symbol_lengths(); channel_words(); character_and_location_literals(); origin_layout(); system_instructions(); declaration_expressions(); address_state(); source_metadata(); constants(); nominal_lists(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
-    forward_branch_registers(); executable_alignment();
+    forward_branch_registers(); executable_alignment(); halfword_addresses();
     printf("assemble: %lu checks passed\n", checks); return 0;
 }

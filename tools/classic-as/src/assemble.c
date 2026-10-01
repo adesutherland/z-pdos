@@ -1024,7 +1024,7 @@ static enum mf_status constant_parse(struct mf_as *as, struct mf_span s, int res
     if (at == s.length) return MF_SOURCE;
     type = upper(s.data[at++]); c->type = type;
     if (type == 0x41 && at < s.length && upper(s.data[at]) == 0x44) { ++at; c->type = 0x44; }
-    if (type == 0x48) c->width = c->alignment = 2;
+    if (type == 0x48 || type == 0x59) c->width = c->alignment = 2;
     else if (type == 0x46 || type == 0x41 || type == 0x56) c->width = c->alignment = c->type == 0x44 ? 8 : 4;
     else if (type == 0x44 && reserve) c->width = c->alignment = 8;
     else if (type == 0x43 || type == 0x58) c->width = c->alignment = 1;
@@ -1039,8 +1039,9 @@ static enum mf_status constant_parse(struct mf_as *as, struct mf_span s, int res
         if (status != MF_OK) return status;
         if (!n) return MF_RANGE;
         c->explicit_length = 1; c->width = (unsigned)n; c->alignment = 1;
+        if (type == 0x59 && c->width > 2) return MF_RANGE;
         if (type == 0x41 && c->type != 0x44) { if (c->width > 4) return MF_UNSUPPORTED; }
-        else if (type != 0x43 && type != 0x58) return MF_UNSUPPORTED;
+        else if (type != 0x43 && type != 0x58 && type != 0x59) return MF_UNSUPPORTED;
     }
     if (reserve) { c->extent = c->width; return at == s.length ? MF_OK : MF_UNSUPPORTED; }
     if (at == s.length) {
@@ -1048,7 +1049,7 @@ static enum mf_status constant_parse(struct mf_as *as, struct mf_span s, int res
         if ((type == 0x43 || type == 0x58) && !c->explicit_length) return MF_UNSUPPORTED;
         c->extent = c->width; return MF_OK;
     }
-    if (type == 0x41 || type == 0x56) {
+    if (type == 0x41 || type == 0x56 || type == 0x59) {
         if (s.data[at] != 0x28 || s.data[s.length - 1] != 0x29) return MF_SOURCE;
         c->value = trim(subspan(s, at + 1, s.length - at - 2));
         return c->value.length ? constant_extent(c) : MF_SOURCE;
@@ -1101,7 +1102,7 @@ static enum mf_status emit_constant_single(struct mf_as *as, const struct consta
     unsigned width; int nibble; size_t digits, j;
     if (!c->repeat) return MF_OK;
     v = zero_value();
-    if (c->type == 0x48 || c->type == 0x46 || c->type == 0x41 || c->type == 0x44 || c->type == 0x56) {
+    if (c->type == 0x48 || c->type == 0x46 || c->type == 0x41 || c->type == 0x44 || c->type == 0x56 || c->type == 0x59) {
         if (c->type == 0x56) status = implicit_external(as, c->value, &v);
         else status = evaluate(as, c->value, &v);
         if (status == MF_UNDEFINED && as->pass == 1) return advance(as, c->width * c->repeat, NULL);

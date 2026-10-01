@@ -37,7 +37,7 @@ publication semantics.
 | EQU | Values resolvable in the layout pass; forward EQU chains are unsupported |
 | TITLE | One named deck ID up to eight characters; 1..100-character quoted heading. CP037 deck IDs occupy bytes 73..80, space padded, without generated sequence suffixes. Headings/listings are not produced. |
 | PRINT | Validated ON/OFF, GEN/NOGEN, DATA/NODATA controls and null operands; no listing output in this component. Labels and other control forms are rejected. |
-| DC | H/F integers, AL1/AL2/AL3 absolute and A addresses, absolute eight-byte AD, external V, hexadecimal X and CP037 C/CL character constants; checked duplication and target length |
+| DC | H/F integers, AL1/AL2/AL3 absolute and A addresses, absolute halfword Y and eight-byte AD, external V, hexadecimal X and CP037 C/CL character constants; checked duplication and target length |
 | DS | Reservation/alignment for the documented constant types, including `0H`, `0F`, `0D`; no emitted bytes for gaps |
 | CNOP | Executable alignment at an even byte in a 4- or 8-byte boundary, using original repeated BCR 0,0 padding; odd leading byte is explicitly zero |
 
@@ -51,6 +51,13 @@ names the first halfword after any leading odd-byte fill, before the no-ops.
 The selected classic section-placement contract supports boundaries 4 and 8;
 larger boundaries and length attributes of CNOP labels fail explicitly.
 The layout follows IBM's [CNOP reference](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=statements-cnop-instruction).
+
+Y reserves or defines two-byte, halfword-aligned address constants. Its nominal
+values are parenthesized absolute expressions; multiple values and duplication
+work as for A. Explicit YL1/YL2 suppress alignment. Values must fit their
+selected width without truncation; relocatable Y values remain unsupported by
+the classic four-byte relocation writer. The selected form follows the
+[A/Y reference](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=constants-address-constantsa-y).
 
 Mode declarations do not create a section. A blank name selects the unnamed
 section, which must exist by END; it does not select the current named section.
