@@ -221,3 +221,17 @@ and [original DECB data area](https://ftpmirror.your.org/pub/misc/bitsavers/pdf/
 identify the request fields. An original consumer checks 100 independent
 linked bytes; an SF64 request must fail without a deck. SF64, backward I/O,
 standard inline forms and VSAM requests remain separate interfaces.
+
+EXCP supplies an IOB address in R1 and issues SVC0. WAIT accepts one ECB
+address, supplies R0=1 and a positive R1 address, then issues SVC1. EOV
+supplies the DCB in R1, clears R0 and issues SVC55. These selected register
+contracts follow IBM's [Diagnosis: Reference](https://publibfp.boulder.ibm.com/epubs/pdf/iea2v2c0.pdf)
+and [SVC55 description](https://www.ibm.com/docs/en/zos/3.1.0?topic=descriptions-svc-55-0a37).
+CHECK accepts a classic DECB, passes its address in R1 and calls the opened
+DCB's low-three-byte check entry at offset 53, using the
+[public DCB layout](https://www.ibm.com/docs/en/zos/3.1.0?topic=aids-dcb-excp-sam-bpam).
+R0/R1/R14/R15 are scratch as applicable; addresses and entries must be below
+16 MiB. ECB lists, extended wait options and VSAM CHECK remain unsupported.
+An original consumer checks all 44 linked bytes, including register setup,
+SVC numbers, entry offsets and address masks; an ECBLIST request is rejected
+without a deck. This does not qualify asynchronous I/O or waiting in a guest.

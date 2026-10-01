@@ -1,0 +1,13 @@
+* SPDX-License-Identifier: MIT; original BSAM DECB/check entry linkage.
+         MACRO
+&N       CHECK &EVENT
+         AIF   ('&EVENT' EQ '').BAD
+&N       MF$REG 1,&EVENT
+         L     15,8(,1)
+         N     15,=X'00FFFFFF'
+         L     15,52(,15)
+         N     15,=X'00FFFFFF'
+         BALR  14,15
+         MEXIT
+.BAD     MNOTE 8,'CHECK requires one classic DECB address'
+         MEND

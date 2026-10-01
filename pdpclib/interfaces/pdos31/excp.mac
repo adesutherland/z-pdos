@@ -1,0 +1,9 @@
+* SPDX-License-Identifier: MIT; original classic IOB/SVC0 linkage.
+         MACRO
+&N       EXCP &IOB
+         AIF   ('&IOB' EQ '').BAD
+&N       MF$REG 1,&IOB
+         SVC   0
+         MEXIT
+.BAD     MNOTE 8,'EXCP requires one classic IOB address'
+         MEND

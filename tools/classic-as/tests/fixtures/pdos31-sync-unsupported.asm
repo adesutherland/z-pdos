@@ -1,0 +1,3 @@
+BADWAIT  CSECT
+         WAIT  ECBLIST=(2)
+         END   BADWAIT

@@ -1,0 +1,10 @@
+* SPDX-License-Identifier: MIT; original single ECB/SVC1 linkage.
+         MACRO
+&N       WAIT &ECB=
+         AIF   ('&ECB' EQ '').BAD
+&N       MF$REG 1,&ECB
+         LA    0,1
+         SVC   1
+         MEXIT
+.BAD     MNOTE 8,'WAIT requires one ECB address'
+         MEND

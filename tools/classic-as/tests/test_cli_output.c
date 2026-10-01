@@ -114,6 +114,16 @@ int main(int argc, char **argv)
 
     CHECK(argc == 3);
     if (!strcmp(argv[1],"pdos31-io")) { io_templates(argv[2]); return 0; }
+    if (!strcmp(argv[1],"pdos31-sync")) {
+        static const unsigned char linked[44] = {
+            0x18,0x15,0x0a,0,0x18,0x12,0x41,0,0,1,0x0a,1,0x18,0x1a,0x1b,0,0x0a,0x37,
+            0x18,0x18,0x58,0xf0,0x10,8,0x54,0xf0,0xc0,0x28,0x58,0xf0,0xf0,0x34,
+            0x54,0xf0,0xc0,0x28,5,0xef,7,0xfe,0,0xff,0xff,0xff};
+        unsigned char actual[45];
+        input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(actual,1,sizeof actual,input);
+        CHECK(got == sizeof linked && !memcmp(actual,linked,sizeof linked));
+        CHECK(!ferror(input) && fclose(input) == 0); puts("classic synchronization: register and entry bytes pass"); return 0;
+    }
     if (!strcmp(argv[1],"pdos31-basic-dcb")) {
         static const unsigned char names[24] = {
             0xc2,0xe2,0xc1,0xd4,0x40,0x40,0x40,0x40,

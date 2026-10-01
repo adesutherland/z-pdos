@@ -1,0 +1,10 @@
+* SPDX-License-Identifier: MIT; original classic DCB/SVC55 linkage.
+         MACRO
+&N       EOV &DCB
+         AIF   ('&DCB' EQ '').BAD
+&N       MF$REG 1,&DCB
+         SR    0,0
+         SVC   55
+         MEXIT
+.BAD     MNOTE 8,'EOV requires one classic DCB address'
+         MEND

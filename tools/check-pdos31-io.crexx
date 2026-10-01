@@ -8,10 +8,10 @@ main: procedure = .int
   if work = "" | work = "." | work = "/" then return 2
   address crexx "run cmake -E make_directory :work"
   if rc <> 0 then return rc
-  do i = 1 to 10
-    source = word("pdos31-io-templates pdos31-get pdos31-io-maps pdos31-io-services pdos31-directory pdos31-wto pdos31-diagnostics pdos31-trkcalc pdos31-basic-dcb pdos31-bsam",i)
-    entry = word("IOTEST GETTEST IOMAPS IOSVCS DIRTEST WTOTEST DIAGTEST TRKTEST BASICTST BSAMTEST",i)
-    mode = word("pdos31-io pdos31-get pdos31-io-maps pdos31-io-services pdos31-directory pdos31-wto pdos31-diagnostics pdos31-trkcalc pdos31-basic-dcb pdos31-bsam",i)
+  do i = 1 to 11
+    source = word("pdos31-io-templates pdos31-get pdos31-io-maps pdos31-io-services pdos31-directory pdos31-wto pdos31-diagnostics pdos31-trkcalc pdos31-basic-dcb pdos31-bsam pdos31-sync",i)
+    entry = word("IOTEST GETTEST IOMAPS IOSVCS DIRTEST WTOTEST DIAGTEST TRKTEST BASICTST BSAMTEST SYNCTEST",i)
+    mode = word("pdos31-io pdos31-get pdos31-io-maps pdos31-io-services pdos31-directory pdos31-wto pdos31-diagnostics pdos31-trkcalc pdos31-basic-dcb pdos31-bsam pdos31-sync",i)
     deck = work || "/" || source || ".obj"
     binary = work || "/" || source || ".bin"
     source = "tools/classic-as/tests/fixtures/" || source || ".asm"
@@ -24,8 +24,8 @@ main: procedure = .int
     address crexx "run :checker :mode :binary"
     if rc <> 0 then return rc
   end
-  do i = 1 to 7
-    source = "tools/classic-as/tests/fixtures/" || word("pdos31-io-unsupported pdos31-directory-unsupported pdos31-camlst-unsupported pdos31-wto-unsupported pdos31-snap-unsupported pdos31-trkcalc-unsupported pdos31-bsam-unsupported",i) || ".asm"
+  do i = 1 to 8
+    source = "tools/classic-as/tests/fixtures/" || word("pdos31-io-unsupported pdos31-directory-unsupported pdos31-camlst-unsupported pdos31-wto-unsupported pdos31-snap-unsupported pdos31-trkcalc-unsupported pdos31-bsam-unsupported pdos31-sync-unsupported",i) || ".asm"
     failed = work || "/io-failed.obj"
     address crexx "run cmake -E rm -f :failed"
     if rc <> 0 then return rc
