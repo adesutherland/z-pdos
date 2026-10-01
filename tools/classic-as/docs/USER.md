@@ -249,3 +249,8 @@ remain strict. Conditional macro lookahead and general attributes remain open.
 The macro-enabled CLI reports failing nested macro model coordinates before
 its primary invocation diagnostic. Borrowed observer frames are printed
 synchronously and are not retained as an expansion history.
+
+`SPACE` accepts omitted/single-comma operands or a nonnegative 32-bit
+absolute expression; `EJECT` accepts omitted/single-comma operands. They
+validate listing requests and emit no object events. This driver has no
+listing output. Ordinary labels and invalid operands fail.

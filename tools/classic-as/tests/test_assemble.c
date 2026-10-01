@@ -606,6 +606,12 @@ static void source_metadata(void)
     CHECK(f.deck_length == 240 && f.deck[96] == 0x18 && f.deck[97] == 0x12);
     for (i = 0; i < f.deck_length; i += 80) CHECK(!memcmp(f.deck+i+72,id,8));
     clean(&f);
+    init(&f," SPACE\n SPACE ,\n SPACE 256\n SPACE X'FFFFFFFF'\n EJECT\n EJECT ,\n LR 1,2\n END\n");
+    successful(&f); CHECK(f.sections[0].length == 2 && f.data[0][0] == 0x18 && f.data[0][1] == 0x12); clean(&f);
+    init(&f," SPACE -1\n LR 1,2\n END\n"); CHECK(run(&f) == MF_RANGE); clean(&f);
+    init(&f," SPACE UNDEFINED\n LR 1,2\n END\n"); CHECK(run(&f) == MF_UNDEFINED); clean(&f);
+    init(&f," EJECT 1\n LR 1,2\n END\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
+    init(&f,"X SPACE 1\n LR 1,2\n END\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
     init(&f, " TITLE ''\n LR 1,2\n END\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
     init(&f, "X TITLE 'hello'\nX TITLE 'again'\n LR 1,2\n END\n"); CHECK(run(&f) == MF_DUPLICATE); clean(&f);
     init(&f, "LONGTITLE TITLE 'hello'\n LR 1,2\n END\n"); CHECK(run(&f) == MF_LIMIT); clean(&f);

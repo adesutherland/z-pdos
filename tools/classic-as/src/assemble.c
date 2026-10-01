@@ -1280,6 +1280,14 @@ static enum mf_status print_statement(struct mf_as *as)
     } while (at++ < s.length);
     return MF_OK;
 }
+static enum mf_status listing_control(struct mf_as *as, int space)
+{
+    struct mf_span operand; mf_u32 lines;
+    if (as->statement.label.length) return MF_SOURCE;
+    operand = trim(as->statement.operand);
+    if (!operand.length || (operand.length == 1 && operand.data[0] == 0x2c)) return MF_OK;
+    return space ? number(as,operand,U32MAX,&lines) : MF_SOURCE;
+}
 static enum mf_status process(struct mf_as *as)
 {
     static const mf_octet push[] = {0x50,0x55,0x53,0x48}, pop[] = {0x50,0x4f,0x50};
@@ -1298,6 +1306,7 @@ static enum mf_status process(struct mf_as *as)
     static const mf_octet drop[] = {0x44,0x52,0x4f,0x50};
     static const mf_octet ltorg[] = {0x4c,0x54,0x4f,0x52,0x47};
     static const mf_octet org[] = {0x4f,0x52,0x47};
+    static const mf_octet space[] = {0x53,0x50,0x41,0x43,0x45}, eject[] = {0x45,0x4a,0x45,0x43,0x54};
     static const mf_octet ccw1[] = {0x43,0x43,0x57,0x31};
     struct mf_span op; struct value v; const struct mf_instruction *ins; enum mf_status status;
     unsigned mask; int reg;
@@ -1308,6 +1317,8 @@ static enum mf_status process(struct mf_as *as)
     if (word(op, pop, sizeof pop)) return using_stack(as, 1);
     if (word(op, title, sizeof title)) return title_statement(as);
     if (word(op, print, sizeof print)) return print_statement(as);
+    if (word(op, space, sizeof space)) return listing_control(as,1);
+    if (word(op, eject, sizeof eject)) return listing_control(as,0);
     if (word(op, org, sizeof org)) return origin_statement(as);
     if (word(op, ccw1, sizeof ccw1)) return ccw1_statement(as);
     if (word(op, csect, sizeof csect)) return select_section(as, 0);

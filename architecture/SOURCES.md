@@ -69,3 +69,7 @@ Ordinary length assignment and omitted SS lengths follow the public HLASM
 [SS lengths](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=entries-lengths)
 and [EQU](https://www.ibm.com/docs/en/hla-and-tf/1.6?topic=statements-equ-instruction)
 facts. Conditional lookahead is a separate unimplemented provider feature.
+
+Public HLASM [SPACE](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=statements-space-instruction)
+and [EJECT](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=statements-eject-instruction)
+define listing effects only; the selected SPACE count is bounded to unsigned 32 bits.

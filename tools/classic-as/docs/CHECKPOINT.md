@@ -282,3 +282,7 @@ with forward fields, duplication, expression addends, explicit bases and
 length overrides, EQU inheritance, instruction labels and L'*. Undefined,
 oversized and forbidden forward layout attributes fail. Kernel startup now
 passes its forward PGMNAME move and reaches CALL.
+
+SPACE/EJECT listing controls have independently checked unchanged code bytes
+and invalid/undefined operands. They advance the handwritten command runtime
+without substituting no-op OS service interfaces.
