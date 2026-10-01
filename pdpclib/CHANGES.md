@@ -50,3 +50,9 @@ qualification from the different canonical PDPCLIB source. Complete MVS 3.8
 assembly/service execution, later profile execution and native library/tool
 hosting remain open. The independent PDLD nonzero-origin regression is a
 linker repair, not a change to the parser source or a reason to omit it.
+
+On 1 October the repaired OS import adds the frozen
+[PDIO1 runtime selection](reference/pdio1/README.md). It preserves the exact
+canonical inputs for the accepted kernel and does not change maintained
+top-level library code. Replacing that OS dependency with a consolidated
+maintained profile needs a separate source comparison and qualification.

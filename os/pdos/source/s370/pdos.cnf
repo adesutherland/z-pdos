@@ -1,0 +1,51 @@
+MAINSIZE             4096
+
+ARCHMODE             z/Arch
+
+CPUSERIAL            000611
+CPUMODEL             4381
+
+DIAG8CMD             ENABLE
+NUMCPU               1 
+OSTAILOR             QUIET
+PANRATE              MEDIUM
+PGMPRDOS             RESTRICTED
+CODEPAGE             819/1047
+CNSLPORT             3270
+
+# Note that on Hercules you can specify an iplparm by going:
+# ipl 1b9 parm 9Z3270
+
+# Ideally put the console first. It can be either an integrated
+# console (3215-C) or a "normal" telnet console (3215). Or a 3270
+# terminal. Or an EBCDIC ANSI terminal (1052 repurposed for this).
+# The address can be anything.
+
+#0009      3215-C     / noprompt
+#0009      3215       noprompt
+0009      3270
+
+
+# 1052 is ebcdic ansi with Hercules doing the translation to ascii
+#0009      1052       noprompt
+
+# 1052 + ebcdic creates what mfterm calls a 1057
+#0009      1052       ebcdic noprompt
+
+# This allows PDOS to display text, but currently isn't
+# supporting proper input
+#0009      1052-C      / noprompt
+
+
+# This is the IPL disk and can be any address
+
+01b1      3390       scratch.cckd
+#01b1      3390       scratch.ckd
+#01b1      3350       sc3350.ckd
+01b9      3390       pdos00.ckd
+#01b9      3390       pdos00.cckd
+01c1      3420       tapes/pctomf_bin.tdf
+01c2      3420       tapes/out.aws
+01c3      3420       tapes/ipltap.aws
+# card reader
+01d1   3505 tapes/iplcrd.dat

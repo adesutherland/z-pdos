@@ -1,0 +1,91 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Adrian Sutherland
+ * Count spelled operations in source-owned and compiler-emitted records.
+ * This is an inventory, not expansion, encoding or an instruction audit.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 1 then return 2
+  work = args.1
+  call require left(work,11) = "build/pdos/" & length(work) > 11 & pos("..",work) = 0, "owned build/pdos input"
+  target = work || "/operations.csv"
+  address crexx "run cmake -E rm -f :target"
+  call require rc = 0, "reset inventory output"
+  call lineout target,"kind,input,operation,records"
+  handwritten = readlines("os/pdos/assembly-inputs.txt")
+  compiled = readlines("os/pdos/compile-inputs.txt")
+  path = .string; kind = .string
+  i = .int
+  do i = 1 to handwritten.0
+    kind = word(handwritten[i],1)
+    path = work || "/source/" || word(handwritten[i],2)
+    call inventory path,kind,target
+  end
+  do i = 1 to compiled.0
+    kind = "compiled-" || word(compiled[i],1)
+    path = work || "/compiled/" || word(compiled[i],1) || ".asm"
+    call inventory path,kind,target
+  end
+  call lineout target
+  say handwritten.0 + compiled.0 "source/compiled inputs inventoried in" target "; conditional paths and macro definitions are not expanded."
+  return 0
+
+inventory: procedure = .int
+  arg path = .string, kind = .string, target = .string
+  address crexx "run test -f :path"
+  call require rc = 0, "inventory input exists: " || path
+  lines = readlines(path)
+  names = .string[]; counts = .int[]
+  line = .string; operation = .string
+  i = .int; j = .int; at = .int
+  previous_continuation = 0; entries = 0
+  do i = 1 to lines.0
+    line = lines[i]
+    if line = "" | left(line,1) = "*" then iterate
+    continuation = 0
+    if length(line) >= 72 then continuation = substr(line,72,1) <> " "
+    if previous_continuation then do
+      previous_continuation = continuation
+      operation = "<continuation>"
+    end
+    else do
+      previous_continuation = continuation
+      line = left(line,min(length(line),71))
+      if strip(line) = "" then iterate
+      if left(line,1) = " " | left(line,1) = '09'x then operation = translate(word(line,1))
+      else operation = translate(word(line,2))
+      if operation = "" then operation = "<label-only>"
+    end
+    at = 0
+    do j = 1 to entries
+      if names[j] = operation then do
+        at = j
+        leave
+      end
+    end
+    if at = 0 then do
+      entries = entries + 1
+      at = entries
+      names[at] = operation
+      counts[at] = 0
+    end
+    counts[at] = counts[at] + 1
+  end
+  do i = 1 to entries
+    call lineout target,csvfield(kind) || "," || csvfield(path) || "," || csvfield(names[i]) || "," || counts[i]
+  end
+  return 0
+
+csvfield: procedure = .string
+  arg value = .string
+  return '"' || changestr('"',value,'""') || '"'
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED:" detail
+    exit 1
+  end
+  return 0

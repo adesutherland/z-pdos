@@ -24,3 +24,7 @@ are references or consumers, not places to make new library fixes.
 - Scripts retained for development and preparation use cREXX. Private assets
   and generated objects stay outside source control. Read-only Lab/SDK input
   must not be changed during consolidation.
+
+- `reference/pdio1/` freezes a selected canonical source input for reproducing
+  the repaired OS. It is not another maintained library. Preserve that baseline
+  and qualify a deliberate lineage/profile transition before replacing it.

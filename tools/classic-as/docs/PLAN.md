@@ -136,3 +136,11 @@ native hosting, downstream link/load execution or an open source-to-IPL route.
 ## References and current checkpoint
 
 Use [the source guide](../../../architecture/SOURCES.md), [consumer inventory](CONSUMER-INVENTORY.md) and [local checkpoint](CHECKPOINT.md). Original test sources and fixed expected bytes belong here; retained native guest outputs and inherited implementations remain outside the product. No passing guest run is repeated for this seed.
+
+## Repaired PDIO1 OS consumer — 1 October
+
+The [repaired PDIO1 OS import](../../../os/pdos/README.md) preserves the actual
+qualified source and runtime selection, with all 17 C units compiling to text
+under Classic C. Its [build plan](../../../os/pdos/BUILD-PLAN.md) now owns the
+concrete OS consumer sequence and first source-language failures. The existing
+MVS 3.8/System/370 library target retains its separate scope.

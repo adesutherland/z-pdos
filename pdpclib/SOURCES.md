@@ -32,11 +32,17 @@ their material or an external IBM macro library.
 
 The Lab also used the canonical SourceForge PDOS revision
 `a65eddb9ef4b27a6844f2857db0c98696137612b`. Its PDPCLIB subtree has 324 files and
-differs materially from this mirror. We are not combining those source trees
-silently or importing its newer files. Relevant Lab C fixes were reapplied to
+differs materially from this mirror. The maintained top-level source remains
+the selected mirror lineage. Relevant Lab C fixes were reapplied to
 this selected baseline using exact unique contexts; OS configuration deltas
 became named profiles. Their content hashes and scope are in [CHANGES.md](CHANGES.md).
 
 The separate PDLD linker uses that canonical revision and its own source
 record. A library notice does not clear an entire upstream repository, a later
 native file or an external macro library for import.
+
+On 1 October, [reference/pdio1/](reference/pdio1/README.md) preserves 44 exact
+canonical runtime/header/macro inputs for the repaired OS baseline. Its
+[OS source record](../os/pdos/SOURCES.md) identifies the source and recovery
+checks. This frozen qualification selection is separate from the maintained
+top-level library; it does not silently replace or combine either lineage.

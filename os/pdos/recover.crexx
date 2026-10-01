@@ -1,0 +1,62 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Adrian Sutherland
+ * Reproduce selected PDIO1 inputs from hash-checked upstream files.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i = .int
+  if args.0 <> 2 then do
+    say "usage: crexx os/pdos/recover.crexx --args pinned-upstream-directory new-build/pdos/output"
+    return 2
+  end
+  upstream = args.1; work = args.2
+  call require left(work,11) = "build/pdos/" & length(work) > 11 & pos("..",work) = 0, "new owned build/pdos output"
+  locations = .string[]
+  address crexx "pwd" output locations
+  root = strip(locations.1)
+  out = root || "/" || work
+  address crexx "run test ! -e :out"
+  call require rc = 0, "output must not exist"
+  source = out || "/source"
+  os_source = source || "/s370"
+  runtime = source || "/pdpclib"
+  temporary = out || "/tmp"
+  address crexx "run cmake -E make_directory :os_source :runtime :temporary"
+  call require rc = 0, "create recovery output"
+  rows = readlines(root || "/os/pdos/upstream.sha256")
+  do i = 1 to rows.0
+    call require words(rows[i]) = 2, "upstream manifest row"
+    relative = word(rows[i],2)
+    call require pos("..",relative) = 0 & pos("/",relative) > 0, "selected relative source path"
+    from = upstream || "/" || relative
+    target = source || "/" || relative
+    address crexx "run cmake -E copy :from :target"
+    call require rc = 0, "copy " || relative
+  end
+  address crexx "cd :source"
+  manifest = root || "/os/pdos/upstream.sha256"
+  address system "shasum -a 256 -c " || shellquote(manifest) || " > " || shellquote(out || "/upstream-check.log")
+  call require rc = 0, "all upstream bytes pinned before patching"
+  patch = root || "/os/pdos/patches/consolidated.patch"
+  address system "env " || shellquote("TMPDIR=" || out || "/tmp") || " patch --batch --forward --fuzz=0 -p1 -i " || shellquote(patch) || " > " || shellquote(out || "/patch.log")
+  call require rc = 0, "apply consolidated OS/runtime recovery patch"
+  manifest = root || "/os/pdos/qualified.sha256"
+  address system "shasum -a 256 -c " || shellquote(manifest) || " > " || shellquote(out || "/qualified-check.log")
+  call require rc = 0, "recovered bytes equal the qualified input selection"
+  address crexx "cd :root"
+  say rows.0 "PDIO1 inputs recovered exactly in" work "; no build or guest claim."
+  return 0
+
+shellquote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'", value, "'\''") || "'"
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED:" detail
+    exit 1
+  end
+  return 0

@@ -5,6 +5,13 @@ on ordinary hosts, and eventually use to rebuild itself. This repository is the
 home of z/PDOS and **Mainframe Classic Tools**, which use traditional mainframe
 assembly and object conventions.
 
+The [repaired PDIO1 OS source](os/pdos/README.md) now preserves the kernel
+used for the 1 October cREXX beta 3 HIGH qualification, with exact source,
+runtime selection, repair history and recovery checks. Its 17 C build units
+compile with Mainframe Classic C. Independent whole-source assembly, linking,
+source-built boot and application qualification remain open under the
+[OS build plan](os/pdos/BUILD-PLAN.md).
+
 The first component is [Mainframe Classic Assembler](tools/classic-as/README.md),
 command `mf-classic-as`. Its original portable C core has a small bootstrap
 language and explicit interfaces for source records, storage and object output.

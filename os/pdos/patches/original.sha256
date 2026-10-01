@@ -1,0 +1,7 @@
+4883f759bef04d5a1debf004eaafc4bb4993f85a831541ab59acd4948043f1d9  original/pdos390/0001-multi-csect-pdld-loader.patch
+d5d726311a2aaff94076a8191f96eab29b1e8fcf6ee0cf7b991bb986e17f0b25  original/pdos390/0002-standard-s390-native-build.patch
+5c0eaaba536280fa2891bba89800892199bddf5911857b4b6842666bc899f020  original/pdos64/0001-restore-zarch-native-configuration.patch
+5f82d826e76467f85ec2074065c1789fe9113b9b8661aaea9988daacb06cd1bf  original/pdos64/0002-native-amode64-context.patch
+f24627d90b008f8840001eb3cf320315483c6c3ea79194f120a942877addcb64  original/pdos64/0003-crexx-native-pds-applications.patch
+9a6a4bb190dc0c0ac4d22432d131a7bcb8ee0dde16862dfc013159a8d33408a9  original/pdos64/0004-rmode64-high-load-applications.patch
+8cb7d08e4c20cf5cc021120d585f6faf5cd31619d9a31ff2d96c44814843405a  original/pdos64/0005-checked-dasd-writes-and-console-wrap.patch

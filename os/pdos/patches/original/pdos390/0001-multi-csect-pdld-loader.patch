@@ -1,0 +1,629 @@
+--- a/pdld/src/link.c
++++ b/pdld/src/link.c
+@@ -983,6 +983,12 @@
+     for (section = all_sections; section; section = section->next) {
+         struct section_part *part;
+ 
++        /* The MVS/XMIT writer pads every section to a doubleword. Keep
++         * symbol RVAs and relocation values at those written positions. */
++        if (ld_state->oformat == LD_OFORMAT_MVS
++            || ld_state->oformat == LD_OFORMAT_XMIT) {
++            rva = ALIGN (rva, 8);
++        }
+         rva = ALIGN (rva, section->section_alignment);
+         section->rva = rva;
+         
+--- a/pdld/src/mainframe.c
++++ b/pdld/src/mainframe.c
+@@ -196,6 +196,8 @@
+     unsigned char *pos;
+ 
+     struct section *section;
++    struct section *first_text_section = NULL;
++    struct section *last_text_section = NULL;
+     struct object_file *of;
+     size_t cesd_i;
+     size_t cesd_size;
+@@ -210,6 +212,17 @@
+ 
+     if (!(outfile = fopen (filename, "wb"))) {
+         ld_error ("cannot open '%s' for writing", filename);
++        return;
++    }
++
++    for (section = all_sections; section; section = section->next) {
++        if (section->is_bss) continue;
++        if (!first_text_section) first_text_section = section;
++        last_text_section = section;
++    }
++    if (!first_text_section) {
++        ld_error ("MVS/XMIT module has no initialized section");
++        fclose (outfile);
+         return;
+     }
+ 
+@@ -326,7 +339,8 @@
+             if (section->is_bss) continue;
+ 
+             file_size += (((ALIGN (section->total_size, DEFAULT_PART_ALIGNMENT) / CHUNK_SIZE
+-                           + !!(ALIGN (section->total_size, DEFAULT_PART_ALIGNMENT) % CHUNK_SIZE)) - 1)
++                           + !!(ALIGN (section->total_size, DEFAULT_PART_ALIGNMENT) % CHUNK_SIZE)) - 1
++                           + (section != first_text_section))
+                           * (SIZEOF_struct_member_data_header_file
+                              + member_data_record_header_size
+                              + 20 /* Dictionary Record. */));
+@@ -338,7 +352,8 @@
+ 
+             if (doing_xmit) {
+                 size_t num_extra_chunks = ((ALIGN (section->total_size, DEFAULT_PART_ALIGNMENT) / CHUNK_SIZE
+-                                            + !!(ALIGN (section->total_size, DEFAULT_PART_ALIGNMENT) % CHUNK_SIZE)) - 1);
++                                            + !!(ALIGN (section->total_size, DEFAULT_PART_ALIGNMENT) % CHUNK_SIZE)) - 1
++                                           + (section != first_text_section));
+                 size_t num_full_chunks = ALIGN (section->total_size, DEFAULT_PART_ALIGNMENT) / CHUNK_SIZE;
+ 
+                 file_size += num_extra_chunks * xmit_calculate_extra (SIZEOF_struct_member_data_header_file + 20 /* Dictionary Record. */);
+@@ -778,7 +793,7 @@
+ 
+     /* Control Record. */
+     pos[0] = 0x1 ; /* Identification, 0x1 means Control Record. */
+-    if (!num_relocs) {
++    if (!num_relocs && first_text_section == last_text_section) {
+         /* 0xC means it precedes last text record of the module (EOM = end of module).
+          * This should be set if there are no other records in the file after this one
+          * but if Relocation Dictionary Records exist, they are present later on,
+@@ -794,13 +809,13 @@
+      * 24-bit count.
+      */
+     pos[8] = 0x06;
+-    bytearray_write_3_bytes (pos + 8 + 1, all_sections ? all_sections->rva : 0, BIG_ENDIAN);
++    bytearray_write_3_bytes (pos + 8 + 1, first_text_section->rva, BIG_ENDIAN);
+     pos[8 + 4] = 0x40;
+     bytearray_write_3_bytes (pos + 8 + 5,
+-                             all_sections
+-                             ? (ALIGN (all_sections->total_size, DEFAULT_PART_ALIGNMENT) > CHUNK_SIZE
++                             first_text_section
++                             ? (ALIGN (first_text_section->total_size, DEFAULT_PART_ALIGNMENT) > CHUNK_SIZE
+                                 ? CHUNK_SIZE
+-                                : ALIGN (all_sections->total_size, DEFAULT_PART_ALIGNMENT))
++                                : ALIGN (first_text_section->total_size, DEFAULT_PART_ALIGNMENT))
+                              : 0,
+                              BIG_ENDIAN);
+     pos += 16;
+@@ -837,7 +852,12 @@
+         while (section_size) {
+             size_t this_size = section_size > CHUNK_SIZE ? CHUNK_SIZE : section_size;
+ 
+-            if (section_size != ALIGN (section->total_size, DEFAULT_PART_ALIGNMENT)) {
++            /* Every section after the first needs its own control record.
++             * The first control record above describes only the first
++             * section's first text chunk. */
++            if (section != first_text_section
++                || section_size != ALIGN (section->total_size,
++                                          DEFAULT_PART_ALIGNMENT)) {
+                 if (doing_mvs) {
+                     pos = write_member_data_record (pos, 20, &disk, &saved_pos);
+                 } else if (doing_xmit) {
+@@ -854,7 +874,8 @@
+                  * so the relocation data are not used here.
+                  */
+                 pos[0] = 0x3; /* Identification, 0x3 means Dictionary Record. */
+-                if (!num_relocs && this_size == section_size) {
++                if (!num_relocs && section == last_text_section
++                    && this_size == section_size) {
+                     pos[0] |= 0xC; /* There are no more records in the file after the following text record. */
+                 }
+                 bytearray_write_2_bytes (pos + 4, 4, BIG_ENDIAN); /* Count, in bytes, of control information after relocation data. */
+@@ -954,8 +975,8 @@
+                     }
+                     /* CESD index for source section. */
+                     bytearray_write_2_bytes (pos + 2, part->section->target_index, BIG_ENDIAN);
+-                    /* 24-bit address in section. */
+-                    bytearray_write_3_bytes (pos + 5, reloc->offset + part->rva - part->section->rva, BIG_ENDIAN);
++                    /* 24-bit address in the compacted load image. */
++                    bytearray_write_3_bytes (pos + 5, reloc->offset + part->rva, BIG_ENDIAN);
+                     if (reloc->howto == &reloc_howtos[RELOC_TYPE_64]) {
+                         pos[4] = 0x5C;
+                     } else if (reloc->howto == &reloc_howtos[RELOC_TYPE_32]) {
+--- a/s370/pdos.c
++++ b/s370/pdos.c
+@@ -4266,6 +4266,7 @@
+ 
+ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
+ {
++    enum { EXE_CAPACITY = 5 * 1024 * 1024 };
+     char *raw;
+     char *initial;
+     char *load;
+@@ -4380,13 +4381,13 @@
+         return (-1);
+     }
+ 
+-    /* assume 5 MB max */
++    /* Bound both the serialized input and expanded image. */
+ #if defined(ZARCH)
+     raw = memmgrAllocate(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
+-                         5 * 1024 * 1024, 0);
++                         EXE_CAPACITY, 0);
+ #else
+     raw = memmgrAllocate(&pdos->aspaces[pdos->curr_aspace].o.btlmem,
+-                         5 * 1024 * 1024, 0);
++                         EXE_CAPACITY, 0);
+ #endif
+     if (raw == NULL)
+     {
+@@ -4480,6 +4481,16 @@
+             continue;
+         }
+         lastcnt = cnt;
++        if (cnt > 0 && (load - initial) > EXE_CAPACITY - cnt)
++        {
++            printf("executable exceeds loader capacity\n");
++#if defined(ZARCH)
++            memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem, raw);
++#else
++            memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.btlmem, raw);
++#endif
++            return (-1);
++        }
+         memcpy(load, tbuf, cnt);
+         load += cnt;
+         j++;
+@@ -4497,7 +4508,8 @@
+     }
+     else if (pe)
+     {
+-        if (fixPE(initial, &exeLen, &entry, (int)initial) != 0)
++        if (fixPE(initial, &exeLen, &entry, (int)initial,
++                  EXE_CAPACITY) != 0)
+         {
+ #if defined(ZARCH)
+             memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem, raw);
+@@ -4506,7 +4518,8 @@
+ #endif
+             return (-1);
+         }
+-        exeLen += 0x1000; /* give some buffer */
++        if (exeLen <= EXE_CAPACITY - 0x1000)
++            exeLen += 0x1000; /* give some buffer if it fits */
+         /* unconditionally reduce the 5 MB to something reasonable */
+ #if defined(ZARCH)
+         memmgrRealloc(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
+--- a/s370/pdosutil.c
++++ b/s370/pdosutil.c
+@@ -12,6 +12,7 @@
+ 
+ #include <stdio.h>
+ #include <ctype.h>
++#include <stdlib.h>
+ #include <string.h>
+ 
+ #include "pdosutil.h"
+@@ -158,7 +159,44 @@
+ 
+ #define PE_DEBUG 0
+ 
+-int fixPE(char *buf, int *len, int *entry, int rlad)
++typedef struct {
++    int id;
++    int base;
++} PESECTION;
++
++typedef struct {
++    int start;
++    int end;
++} PEGAP;
++
++static int pe16(const unsigned char *p)
++{
++    return ((int)p[0] << 8) | p[1];
++}
++
++static int pe24(const unsigned char *p)
++{
++    return ((int)p[0] << 16) | ((int)p[1] << 8) | p[2];
++}
++
++static unsigned int pe32(const unsigned char *p)
++{
++    return ((unsigned int)p[0] << 24) | ((unsigned int)p[1] << 16)
++        | ((unsigned int)p[2] << 8) | p[3];
++}
++
++static void peput32(unsigned char *p, unsigned int value)
++{
++    p[0] = value >> 24;
++    p[1] = value >> 16;
++    p[2] = value >> 8;
++    p[3] = value;
++}
++
++static int processRLD(char *buf, int textlen, int rlad, char *rld, int len,
++                      const PESECTION *sections, int nsections);
++
++int fixPE(char *buf, int *len, int *entry, int rlad, int capacity)
+ {
+     char *p;
+     char *q;
+@@ -183,9 +221,18 @@
+     int lastt = -1;
+     char *lasttxt = NULL;
+     char *upto = buf;
+-    int initlen = *len;
++    PESECTION *sections = NULL;
++    int nsections = 0;
++    int sectioncap = 0;
++    PEGAP *gaps = NULL;
++    int ngaps = 0;
++    int gapcap = 0;
++    int nexttext = 0;
++    int lastend = 0;
++    int imageend = 0;
+     
+-    if ((*len <= 8) || (*((int *)buf + 1) != 0xca6d0f))
++    if ((*len <= 8) || capacity < *len
++        || memcmp(buf + 4, "\x00\xca\x6d\x0f", 4) != 0)
+     {
+         printf("Not an MVS PE executable\n");
+         return (-1);
+@@ -196,10 +243,11 @@
+     p = buf;
+     while (1)
+     {
++        if (rem < 2) break;
+         rec++;
+-        l = *(short *)p;
++        l = pe16((unsigned char *)p);
+         /* keep track of remaining bytes, and ensure they really exist */
+-        if (l > rem)
++        if (l < 2 || l > rem)
+         {
+             break;
+         }
+@@ -225,13 +273,12 @@
+                 break;
+             }
+             q = p + 24;
+-            l2 = *(short *)q;
++            l2 = pe16((unsigned char *)q);
+             if (l2 < 32) break;
+             ihapds = (IHAPDS *)(q + 2);
+             rmode = ihapds->pds2ftb2 & 0x10;
+             amode = (ihapds->pds2ftb2 & 0x0c) >> 2;
+-            ent = 0;
+-            memcpy((char *)&ent + sizeof(ent) - 3, ihapds->pds2epa, 3);
++            ent = pe24((unsigned char *)ihapds->pds2epa);
+             *entry = (int)(buf + ent);
+ #if PE_DEBUG
+             printf("module name is %.8s\n", ihapds->pds2name);
+@@ -272,7 +319,12 @@
+             r2 = l - 4 - 10;
+             while (1)
+             {
+-                l2 = *(short *)q;
++                if (r2 < 2)
++                {
++                    term = 1;
++                    break;
++                }
++                l2 = pe16((unsigned char *)q);
+                 r2 -= sizeof(short);
+                 if (l2 > r2)
+                 {
+@@ -290,16 +342,48 @@
+ #endif
+ 
+                 t = *q;
+-                if ((lastt == 1) || (lastt == 3) || (lastt == 0x0d))
++                if ((lastt == 1) || (lastt == 3)
++                    || (lastt == 0x0d) || (lastt == 0x0f))
+                 {
+ #if PE_DEBUG
+                     printf("rectype: program text\n");
+ #endif
++                    PEGAP *grown;
++
++                    /* A leftward overlapping move is safe: it cannot
++                     * overwrite any unconsumed input after this text. */
++                    if (nexttext < lastend || nexttext > capacity
++                        || l2 > capacity - nexttext
++                        || buf + nexttext > q)
++                    {
++                        term = 1;
++                        break;
++                    }
++                    if (nexttext > lastend)
++                    {
++                        if (ngaps == gapcap)
++                        {
++                            int newcap = gapcap ? gapcap * 2 : 8;
++                            grown = realloc(gaps, newcap * sizeof *gaps);
++                            if (grown == NULL)
++                            {
++                                term = 1;
++                                break;
++                            }
++                            gaps = grown;
++                            gapcap = newcap;
++                        }
++                        gaps[ngaps].start = lastend;
++                        gaps[ngaps].end = nexttext;
++                        ngaps++;
++                    }
+                     lasttxt = q;
+-                    memmove(upto, q, l2);
+-                    upto += l2;
++                    memmove(buf + nexttext, q, l2);
++                    lastend = nexttext + l2;
++                    if (lastend > imageend) imageend = lastend;
++                    upto = buf + imageend;
+                     t = -1;
+-                    if (lastt == 0x0d)
++                    if (lastt == 0x0d || lastt == 0x0f)
+                     {
+                         term = 1;
+                         corrupt = 0;
+@@ -308,44 +392,115 @@
+                 }
+                 else if (t == 0x20)
+                 {
+-                    /* printf("rectype: CESD\n"); */
++                    int first;
++                    int count;
++                    int i;
++
++                    if (l2 < 8 || pe16((unsigned char *)q + 6) > l2 - 8
++                        || (pe16((unsigned char *)q + 6) % 16) != 0)
++                    {
++                        term = 1;
++                        break;
++                    }
++                    first = pe16((unsigned char *)q + 4);
++                    count = pe16((unsigned char *)q + 6) / 16;
++                    for (i = 0; i < count; i++)
++                    {
++                        unsigned char *item = (unsigned char *)q + 8 + i * 16;
++                        PESECTION *grown;
++
++                        if (item[8] != 4) continue;
++                        if (nsections == sectioncap)
++                        {
++                            int newcap = sectioncap ? sectioncap * 2 : 16;
++                            grown = realloc(sections, newcap * sizeof *sections);
++                            if (grown == NULL)
++                            {
++                                term = 1;
++                                break;
++                            }
++                            sections = grown;
++                            sectioncap = newcap;
++                        }
++                        sections[nsections].id = first + i;
++                        sections[nsections].base = pe24(item + 9);
++                        if (sections[nsections].base > capacity
++                            || pe24(item + 13)
++                               > capacity - sections[nsections].base)
++                        {
++                            term = 1;
++                            break;
++                        }
++                        if (sections[nsections].base + pe24(item + 13)
++                            > imageend)
++                        {
++                            imageend = sections[nsections].base
++                                + pe24(item + 13);
++                        }
++                        nsections++;
++                    }
++                    if (term) break;
+                 }
+                 else if (t == 1)
+                 {
+-                    /* printf("rectype: Control\n"); */
++                    if (l2 < 16 || (unsigned char)q[8] != 6)
++                    {
++                        term = 1;
++                        break;
++                    }
++                    nexttext = pe24((unsigned char *)q + 9);
+                 }
+                 else if (t == 0x0d)
+                 {
+-                    /* printf("rectype: Control, about to end\n"); */
++                    if (l2 < 16 || (unsigned char)q[8] != 6)
++                    {
++                        term = 1;
++                        break;
++                    }
++                    nexttext = pe24((unsigned char *)q + 9);
+                 }
+                 else if (t == 2)
+                 {
+                     /* printf("rectype: RLD\n"); */
+-                    if (processRLD(buf, rlad, q, l2) != 0)
+-                    {
+-                        term = 1;
+-                        break;
+-                    }
+-                }
+-                else if (t == 3)
++                    if (processRLD(buf, upto - buf, rlad, q, l2,
++                                   sections, nsections) != 0)
++                    {
++                        term = 1;
++                        break;
++                    }
++                }
++                else if (t == 3 || t == 0x0f)
+                 {
+                     int l3;
+                     
+                     /* printf("rectype: Dicionary = Control + RLD\n"); */
+-                    l3 = *(short *)(q + 6) + 16;
++                    l3 = pe16((unsigned char *)q + 6) + 16;
++                    if (l3 > l2)
++                    {
++                        term = 1;
++                        break;
++                    }
+ #if 0
+                     printf("l3 is %d\n", l3);
+ #endif
+-                    if (processRLD(buf, rlad, q, l3) != 0)
+-                    {
+-                        term = 1;
+-                        break;
+-                    }
++                    if (processRLD(buf, upto - buf, rlad, q, l3,
++                                   sections, nsections) != 0)
++                    {
++                        term = 1;
++                        break;
++                    }
++                    if (l2 < 16 || (unsigned char)q[8] != 6)
++                    {
++                        term = 1;
++                        break;
++                    }
++                    nexttext = pe24((unsigned char *)q + 9);
+                 }
+                 else if (t == 0x0e)
+                 {
+                     /* printf("rectype: Last record of module\n"); */
+-                    if (processRLD(buf, rlad, q, l2) != 0)
++                    if (processRLD(buf, upto - buf, rlad, q, l2,
++                                   sections, nsections) != 0)
+                     {
+                         term = 1;
+                         break;
+@@ -405,20 +560,35 @@
+             break;
+         }
+     }
++    free(sections);
+     if (corrupt)
+     {
++        free(gaps);
+         printf("corrupt module\n");
+         return (-1);
+     }
++    if (imageend > capacity || imageend < lastend)
++    {
++        free(gaps);
++        printf("module image exceeds input buffer\n");
++        return (-1);
++    }
++    for (z = 0; z < ngaps; z++)
++    {
++        memset(buf + gaps[z].start, 0, gaps[z].end - gaps[z].start);
++    }
++    free(gaps);
++    memset(buf + lastend, 0, imageend - lastend);
+ #if 0
+     printf("dumping new module\n");
+ #endif
+-    *len = upto - buf; /* return new module length */
++    *len = imageend; /* include zero-filled sections and alignment gaps */
+     return (0);
+ }
+ 
+ 
+-int processRLD(char *buf, int rlad, char *rld, int len)
++static int processRLD(char *buf, int textlen, int rlad, char *rld, int len,
++                      const PESECTION *sections, int nsections)
+ {
+     int l;
+     char *r;
+@@ -427,16 +597,40 @@
+     int negative;
+     int ll;
+     int a;
+-    int newval;
+-    int *zaploc;
++    unsigned int newval;
++    unsigned char *zaploc;
++    int source;
++    int base;
++    int i;
+     
++    if (len < 16) return (-1);
+     r = rld + 16;
+     fin = rld + len;
+     while (r != fin)
+     {
+         if (!cont)
+         {
+-            r += 4; /* skip R & P */
++            if (r + 4 > fin)
++            {
++                printf("corrupt RLD section indexes\n");
++                return (-1);
++            }
++            source = pe16((unsigned char *)r + 2);
++            base = -1;
++            for (i = 0; i < nsections; i++)
++            {
++                if (sections[i].id == source)
++                {
++                    base = sections[i].base;
++                    break;
++                }
++            }
++            if (base < 0)
++            {
++                printf("RLD source CSECT %d has no CESD entry\n", source);
++                return (-1);
++            }
++            r += 4; /* R and P indexes; validate P's CSECT identity */
+             if (r >= fin)
+             {
+                 printf("corrupt1 at position %x\n", r - rld - 4);
+@@ -471,16 +665,20 @@
+             printf("corrupt2 at position %x\n", r - rld);
+             return (-1);
+         }
+-        a = 0;
+-        memcpy((char *)&a + sizeof(a) - 3, r, 3);
+-        /* +++ need bounds checking on this OS code */
+-        /* printf("need to zap %d bytes at offset %6x\n", ll, a); */
+-        zaploc = (int *)(buf + a - ((ll == 3) ? 1 : 0));
+-        newval = *zaploc;
++        a = pe24((unsigned char *)r);
++        if (a > textlen || ll > textlen - a
++            || (ll == 3 && a == 0))
++        {
++            printf("RLD address outside program text: CSECT %d base %x offset %x size %d text %x\n",
++                   source, base, a, ll, textlen);
++            return (-1);
++        }
++        zaploc = (unsigned char *)(buf + a - ((ll == 3) ? 1 : 0));
++        newval = pe32(zaploc);
+         /* printf("which means that %8x ", newval); */
+-        newval += rlad;
++        newval += (unsigned int)rlad;
+         /* printf("becomes %8x\n", newval); */
+-        *zaploc = newval;
++        peput32(zaploc, newval);
+         r += 3;
+     }
+     return (0);
+--- a/s370/pdosutil.h
++++ b/s370/pdosutil.h
+@@ -11,5 +11,4 @@
+ /*********************************************************************/
+ 
+ int findFile(int ipldev, char *dsn, int *c, int *h, int *r);
+-int fixPE(char *buf, int *len, int *entry, int rlad);
+-int processRLD(char *buf, int rlad, char *rld, int len);
++int fixPE(char *buf, int *len, int *entry, int rlad, int capacity);
+--- a/s370/pload.c
++++ b/s370/pload.c
+@@ -125,7 +125,8 @@
+         rec++;
+     }
+     cnt = load - start;
+-    if (fixPE(start, &cnt, (int *)&entry, (int)start) != 0)
++    if (fixPE(start, &cnt, (int *)&entry, (int)start,
++              PDOS_HEAP - PDOS_CODE) != 0)
+     {
+         printf("MVS PE module corrupt\n");
+     }

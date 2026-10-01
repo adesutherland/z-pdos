@@ -50,3 +50,11 @@ adapter and cannot follow from sharing a machine-profile name.
 The [Classic roadmap](../tools/classic-cc/ROADMAP.md) owns implementation
 decisions and acceptance gates. Assembler-language coverage and CPU instruction
 availability are separate decisions.
+
+The [repaired PDIO1 OS](../os/pdos/README.md) is an additional kernel workload
+on standard z/Architecture, with AMODE31/RMODE24 kernel metadata and native
+64-bit application context support. Its privileged support instructions and
+hexadecimal-floating runtime require an explicit kernel code-role contract;
+the SDK's historical integer application profiles do not grant that coverage.
+No new kernel selector is enabled by importing the source. The
+[OS build plan](../os/pdos/BUILD-PLAN.md) owns that contract and its gates.

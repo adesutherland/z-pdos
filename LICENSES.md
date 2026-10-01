@@ -15,11 +15,14 @@ The assembler also has its [own licence](tools/classic-as/LICENSE).
 | Original PDPCLIB changes, integration guides, patches and tests | MIT; this grant does not alter the imported library's public-domain terms |
 | Inherited compiler source and derived repairs in `tools/classic-cc/source/`, and the consolidated recovery patch | GCC 3.4.6 / cc370 lineage from revision `ece26349fc1096804e82e5618bb8255054035247`, with Mike Beer and Mainframe Lab repairs; GCC GPL version 2 or later, with individual library/header notices and exceptions retained, including `COPYING.LIB`; see [COPYING](tools/classic-cc/COPYING) and [source record](tools/classic-cc/SOURCES.md) |
 | Original Classic C host launcher, cREXX orchestration, new fixtures and documentation | MIT; this grant does not relicense the inherited compiler or its derived repairs |
+| Repaired PDOS source in `os/pdos/source/` and its upstream description | Paul Edwards's canonical SourceForge PDOS revision `a65eddb9ef4b27a6844f2857db0c98696137612b`, with retained notices and explicit Lab repairs; public-domain dedication and upstream permission in [UPSTREAM.txt](os/pdos/UPSTREAM.txt); see [source record](os/pdos/SOURCES.md) |
+| Frozen canonical runtime selection in `pdpclib/reference/pdio1/source/` | Exact selected PDIO1 inputs from canonical SourceForge PDPCLIB, retaining dedication, fallback permission and contributor notices; see [licence](pdpclib/reference/pdio1/LICENSE) and [reference guide](pdpclib/reference/pdio1/README.md) |
+| Original PDOS repairs, cREXX recipes, host fault fixture and documentation | MIT; inherited source retains its own terms; original patch records and the consolidated recovery patch identify the selected OS/runtime changes |
 | Root documentation and build configuration | Original project material, MIT |
 
 This tree contains no imported as370 implementation or assembler opcode table,
-IBM macro library, guest object/listing or OS source. It contains the original
-assembler and the explicitly attributed inherited compiler, runtime and linker
+IBM macro library or guest object/listing. It contains the original
+assembler and the explicitly attributed inherited OS, compiler, runtime and linker
 above; the GCC compiler retains its own inherited machine descriptions.
 No formal clean-room claim is made. Architecture and object-format facts are
 cited in [the source guide](architecture/SOURCES.md).

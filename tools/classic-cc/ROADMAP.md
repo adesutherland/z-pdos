@@ -63,3 +63,12 @@ ELF SDK even when both share a guest and ISA ceiling.
 - Consider CMS-hosted compiler work after the cross-built toolchain works.
 - Treat 64-bit Classic code generation, later ISAs and counterfactual profiles
   as separate backend decisions with their own tests.
+
+## Repaired PDIO1 OS consumer — 1 October
+
+The [repaired PDIO1 OS baseline](../../../os/pdos/README.md) is now retained
+with exact qualification runtime inputs. All 17 C units compile with this
+producer. Its [build plan](../../../os/pdos/BUILD-PLAN.md) makes the OS a
+concrete consumer for source handling, instruction coverage and full pipeline
+qualification. The imported 31-bit kernel also has z/Architecture support;
+its profile is distinct from a historical integer application profile.

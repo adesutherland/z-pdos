@@ -1,0 +1,2774 @@
+diff --git a/pdpclib/pdptop.mac b/pdpclib/pdptop.mac
+index d317908..34f5806 100644
+--- a/pdpclib/pdptop.mac
++++ b/pdpclib/pdptop.mac
+@@ -88,3 +88,8 @@
+          AMODE ANY
+          RMODE ANY
+ *
++* ESA/390 low-core fields absent from this z/OS IHAPSA mapping.
++* At B8 IPL leaves the subchannel identification word for SSCH.
++* CAW at 48 is only used by the older SIO path in these sources.
++FLCIOA   EQU   X'B8'
++FLCCAW   EQU   X'48'
+diff --git a/pdpclib/stdio.c b/pdpclib/stdio.c
+index cc649fa..d38e4d7 100644
+--- a/pdpclib/stdio.c
++++ b/pdpclib/stdio.c
+@@ -1424,6 +1424,15 @@ static void osfopen(void)
+     {
+         mode = 1; /* writing */
+     }
++#if defined(__PDOS390__)
++    else if ((modeType == 10) || (modeType == 11))
++    {
++        /* SAPSUPA explicitly does not support update mode. */
++        err = 1;
++        errno = 2;
++        return;
++    }
++#else
+     else if (modeType == 10)
+     {
+         fprintf(stderr, "we don't have the ability to do update, "
+@@ -1437,6 +1446,7 @@ static void osfopen(void)
+                 "but switching to write mode as a kludge\n");
+         mode = 1;
+     }
++#endif
+     else
+     {
+         mode = 2; /* update */
+@@ -1821,6 +1831,7 @@ static void osfopen(void)
+ 
+     mode &= 0x03; /* only interested in the simple mode now */
+ 
++#if !defined(__PDOS390__)
+     if (myfile->update)
+     {
+         unsigned int data[7];
+@@ -1865,6 +1876,7 @@ static void osfopen(void)
+         */
+ #endif
+     }
++#endif
+ 
+     /* recfm=f and v are effecively always line-buffered
+        because we currently do not support blocking. as
+@@ -5885,7 +5897,7 @@ __PDPCLIB_API__ int fseek(FILE *stream, long int offset, int whence)
+         }
+ #endif
+ #if defined(__MVS__) || defined(__CMS__)
+-#if defined(__MVS__)
++#if defined(__MVS__) && !defined(__PDOS390__)
+     if (stream->update)
+     {
+         unsigned int record_num;
+diff --git a/pdpclib/string.h b/pdpclib/string.h
+index b7e8411..97d5794 100644
+--- a/pdpclib/string.h
++++ b/pdpclib/string.h
+@@ -123,7 +123,7 @@ void * _Builtin __memmove(void *s1, const void *s2, size_t n);
+ #endif
+ 
+ #if defined (__GNUC__) && __GNUC__ >= 3 && !defined(__ARM__) \
+-    && !defined(__64BIT__)
++    && !defined(__64BIT__) && !defined(__PDOS390__)
+ #define memcpy(s1,s2,n) (__builtin_memcpy((s1),(s2),(n)))
+ #define memcmp(s1,s2,n) (__builtin_memcmp((s1),(s2),(n)))
+ #endif
+diff --git a/s370/pdos.c b/s370/pdos.c
+index 08311a9..12b31cd 100644
+--- a/s370/pdos.c
++++ b/s370/pdos.c
+@@ -251,7 +251,18 @@ old virtual memory map:
+ /* mandate maximum address space for z/Arch */
+ #if defined(ZARCH)
+ #ifndef ZAM31
+-#define MAXASIZE 4080 /* 16 less than theoretical maximum of 4096 */
++/* Bound the one-address-space beta3 experiment to 512 MiB. Real storage
++   at 768 MiB backs a separate 128-segment window beginning at 4 GiB. */
++#define MAXASIZE 512
++#define PDOS64_HIGH_PHYS 0x30000000U
++#define PDOS64_HIGH_MB 128
++/* Two 16-MiB RMODE64 load/stack windows after the independent 128-MiB
++   IARV64 heap. Their real frames begin above that heap and outside the
++   kernel's 0-512-MiB low allocator. Only one LOAD is active at a time. */
++#define PDOS64_CODE_MB 32
++#define PDOS64_CODE_SLOT_MB 16
++#define PDOS64_CODE_VSEG 256
++#define PDOS64_CODE_PHYS 0x38000000U
+ #else
+ /* #define MAXASIZE 2032 */ /* 16 less than theoretical maximum of 2048 */
+ #define MAXASIZE 128
+@@ -453,6 +464,13 @@ typedef struct rb {
+     char *next_exe; /* next executable's location */
+     int savearea[20]; /* needs to be in user space */
+     char *pptrs[1];
++#ifdef ZARCH
++    /* Native AMODE64 members use an independent, full-width context. */
++    int module_amode;
++    int module_rmode_any;
++    unsigned int regs64[NUM_GPR * 2];
++    unsigned int psw64[4];
++#endif
+ } RB;
+ 
+ typedef struct {
+@@ -461,7 +479,21 @@ typedef struct {
+ 
+ typedef struct {
+     char unused[24];
++#ifdef ZARCH
++    /* IEFTIOT1: dense 20-byte entries and a zero-length terminator.
++       Each even TIOEJFCB address names a 16-byte SWA queue header. */
++#define PDOS64_DD_LIMIT 32
++    unsigned char ddentry[PDOS64_DD_LIMIT + 1][20];
++    unsigned char jfcb[PDOS64_DD_LIMIT][16 + 0xb0];
++    char dsname[PDOS64_DD_LIMIT][45];
++    unsigned char dsorg[PDOS64_DD_LIMIT][2];
++    unsigned char recfm[PDOS64_DD_LIMIT];
++    unsigned short blksize[PDOS64_DD_LIMIT];
++    unsigned short lrecl[PDOS64_DD_LIMIT];
++    unsigned char count;
++#else
+     TIOENTRY tioentry;
++#endif
+ } TIOT;
+ 
+ /* note that the TCB has another 32 bytes in a prefix area */
+@@ -473,10 +505,33 @@ typedef struct {
+ } TCB;
+ 
+ typedef struct {
+-    char unused1[232];
++    int self; /* native IARV64 macro follows lowcore 16 twice */
++    char unused1[228];
+     int trkcalc; /* TRKCALC function */
++    char unused2[772 - 236];
++    int system_table; /* V1R5 system-function table at CVT+772 */
+ } CVT;
+ 
++#ifdef ZARCH
++/* Single synchronous IARV64 PC. These tables must be real-addressable:
++   the selected z/PDOS image places its static data below the first 5 MB,
++   which the fixed DAT maps with V=R. No general PC namespace is implied. */
++static CVT pdos64_cvt;
++static unsigned int pdos64_aste_space[32];
++static unsigned int pdos64_link_space[64];
++static unsigned int pdos64_entry_space[256];
++static unsigned int pdos64_sft[64];
++static unsigned char pdos64_stack_space[4112];
++/* One read-only synthetic UCB for the one private IPL DASD. Its volume
++   serial names the actual staged disk; TIOT entries point here only for
++   data sets whose VTOC says DSORG=PO. */
++static unsigned char pdos64_dasd_ucb[64];
++
++extern void p64pc(void);
++
++
++#endif
++
+ typedef struct {
+     char filler1[108];
+     void *ascbasxb;
+@@ -771,6 +826,10 @@ typedef struct {
+                                          4-8 GiB gets mapped to 0-4 GiB */
+     /* I think this requires 2k alignment, but will be 4k regardless */
+     PAGE_ENTRY pagetable[4096 * PAGES_PER_SEGMENT];
++#ifndef ZAM31
++    PAGE_ENTRY highpagetable[PDOS64_HIGH_MB][PAGES_PER_SEGMENT];
++    PAGE_ENTRY codepagetable[PDOS64_CODE_MB][PAGES_PER_SEGMENT];
++#endif
+ #endif
+ 
+     int cregs[NUM_CR];
+@@ -805,6 +864,7 @@ typedef struct {
+ #define DCBRECBR 0x10
+ 
+ #define INTERRUPT_SVC 1
++#define INTERRUPT_PROGRAM 4
+ 
+ #if 0
+ TASK *task;
+@@ -829,6 +889,45 @@ typedef struct {
+     int curr_aspace; /* current address space */
+ } PDOS;
+ 
++#ifdef ZARCH
++static void pdos64InitPc(PDOS *pdos)
++{
++    unsigned int *aste = (unsigned int *)
++        (((unsigned int)pdos64_aste_space + 63U) & ~63U);
++    unsigned int *link = (unsigned int *)
++        (((unsigned int)pdos64_link_space + 127U) & ~127U);
++    unsigned int *entry = (unsigned int *)
++        (((unsigned int)pdos64_entry_space + 511U) & ~511U);
++    unsigned char *stack = (unsigned char *)
++        (((unsigned int)pdos64_stack_space + 7U) & ~7U);
++
++    memset(aste, 0, 64);
++    {
++        int i;
++        for (i = 0; i < 32; i++) link[i] = 0x80000000U;
++    }
++    memset(entry, 0, 16 * 32);
++    memset(pdos64_sft, 0, sizeof pdos64_sft);
++    memset(stack, 0, 4096);
++    /* ESAME primary ASTE word 6: one linkage-table entry. */
++    aste[6] = 0x80000000U | (unsigned int)link;
++    /* LX 0, EX 14. ETL is in groups of four entries. */
++    link[0] = (unsigned int)entry | 3U;
++    entry[14 * 8 + 1] = 0x80000000U | (unsigned int)p64pc;
++    entry[14 * 8 + 2] = 0xffff0000U; /* caller PKM authorization */
++    entry[14 * 8 + 4] = 0x80000000U; /* stacking PC to AMODE31 */
++    pdos64_sft[208 / 4] = 0; /* native macro ORs EX 14 */
++    pdos->psa->cvt->system_table = (int)pdos64_sft;
++    /* ESAME linkage-stack header descriptor, 4000 free bytes. */
++    stack[8] = 0x09;
++    stack[10] = 0x0f;
++    stack[11] = 0xa0;
++    lcreg3(0xffff0000U);
++    lcreg5((unsigned int)aste);
++    lcreg15((unsigned int)(stack + 8));
++}
++#endif
++
+ /*static PDOS pdos;*/
+ 
+ static DCB *gendcb = NULL; /* +++ need to eliminate this state info */
+@@ -848,8 +947,21 @@ static int we_have_control = 1; /* we have control until we relinquish
+ 
+ void gotret(void);
+ int adisp(void);
++#ifdef ZARCH
++int adisp64(void);
++#define PDOS64_MODE  ((volatile unsigned char *)0x610)
++#define PDOS64_PSW   ((void *)0x620)
++#define PDOS64_GPRS  ((void *)0x700)
++/* Native AWRITE/ACLOSE can discard an I/O return code. Retain an output
++   failure until LINK completion so a missing member cannot report RC 0. */
++static int pdos64_pds_io_failed;
++#endif
+ void dread(void);
+ void dwrite(void);
++#ifdef ZARCH
++void p64drd(void);
++void p64dwr(void);
++#endif
+ void dcheck(void);
+ void dnotpnt(void);
+ void dexit(int oneexit, DCB *dcb);
+@@ -956,8 +1068,50 @@ int pdosRun(PDOS *pdos)
+         intrupt = pdosDispatchUntilInterrupt(pdos);
+         if (intrupt == INTERRUPT_SVC)
+         {
++#ifdef ZARCH
++            RB *interrupted = pdos->context;
++            int g;
++#endif
+             pdosProcessSVC(pdos);
++#ifdef ZARCH
++            /* Existing service code writes 32-bit ABI results. Preserve
++               the unmodified high halves of the interrupted LP64 GPRs. */
++            if (pdos->context == interrupted
++                && interrupted->module_amode == 1)
++            {
++                for (g = 0; g < NUM_GPR; g++)
++                    interrupted->regs64[g * 2 + 1] =
++                        (unsigned int)interrupted->regs[g];
++                interrupted->psw64[3] = interrupted->psw2;
++            }
++#endif
+         }
++#ifdef ZARCH
++        else if (intrupt == INTERRUPT_PROGRAM)
++        {
++            unsigned int code = *(unsigned int *)0x8c & 0xffff;
++            unsigned int *oldpsw = (unsigned int *)0x150;
++            RB *faulted = pdos->context;
++            printf("PDOS task program check %04x PSW %08x %08x %08x %08x\n",
++                   code, oldpsw[0], oldpsw[1], oldpsw[2], oldpsw[3]);
++            if (faulted->module_rmode_any != 1
++                || (oldpsw[0] & 0x00010000U) == 0
++                || faulted->rblinkb ==
++                   &pdos->aspaces[pdos->curr_aspace].o.first_rb)
++            {
++                pdos->shutdown = 1;
++                pdos->exitcode = 16;
++            }
++            else
++            {
++                /* End only this synchronous native application, using
++                   the existing LINK completion and allocation cleanup. */
++                faulted->regs[15] = 16;
++                pdos->psa->svc_code = 3;
++                pdosProcessSVC(pdos);
++            }
++        }
++#endif
+     }
+ 
+     return (pdos->exitcode);
+@@ -973,6 +1127,627 @@ void pdosDefaults(PDOS *pdos)
+     return;
+ }
+ 
++#ifdef ZARCH
++/* Offsets are from IEFTIOT1 and IEFJFCBN in the retained MVUZ1 listing.
++   The private disk's VTOC, rather than the caller's namespace, decides
++   whether a data set can be bound. */
++static int pdos64ReadDscbLoc(PDOS *pdos, const char *dsn, DSCB1 *result,
++                             int *outcyl, int *outhead, int *outrec)
++{
++    unsigned char key[44];
++    char label[MAXBLKSZ];
++    int cyl, head, rec, errors, n, cnt;
++    size_t length = strlen(dsn);
++
++    if (!length || length > sizeof key) return 0;
++    memset(key, ' ', sizeof key);
++    memcpy(key, dsn, length);
++    cnt = rdblock(pdos->ipldev, 0, 0, 3, label, sizeof label, 0x0e);
++    if (cnt < 20) return 0;
++    split_cchhr(label + 15, &cyl, &head, &rec);
++    rec += 2;
++    errors = 0;
++    for (n = 0; n < 1500 && errors < 4; n++)
++    {
++        cnt = rdblock(pdos->ipldev, cyl, head, rec, result,
++                      sizeof *result, 0x0e);
++        if (cnt < sizeof *result)
++        {
++            errors++;
++            if (errors == 1) rec++;
++            else if (errors == 2) { rec = 1; head++; }
++            else if (errors == 3) { rec = 1; head = 0; cyl++; }
++            continue;
++        }
++        errors = 0;
++        if (result->ds1dsnam[0] == '\0') return 0;
++        if (result->ds1fmtid == '1'
++            && memcmp(result->ds1dsnam, key, sizeof key) == 0)
++        {
++            if (outcyl != NULL) *outcyl = cyl;
++            if (outhead != NULL) *outhead = head;
++            if (outrec != NULL) *outrec = rec;
++            return 1;
++        }
++        rec++;
++    }
++    return 0;
++}
++
++static int pdos64ReadDscb(PDOS *pdos, const char *dsn, DSCB1 *result)
++{
++    return pdos64ReadDscbLoc(pdos, dsn, result, NULL, NULL, NULL);
++}
++
++#ifndef ZAM31
++/* This is the reached LOAD/DELETE subset for the low RMODE ANY launcher.
++   PDOS command loading already names private sequential load data sets as
++   <entry>.EXE. z/OS LOAD searches installed PDS libraries instead. The
++   bytes inside the data set are the same classic IEBCOPY unload member. */
++typedef struct {
++    RB *owner;
++    char name[8];
++    int slot;
++    int image_len;
++} PDOS64HIGHLOAD;
++static PDOS64HIGHLOAD pdos64_high_load;
++static int pdos64_high_next_slot;
++
++static int pdos64HighName(PDOS *pdos, char name[8], char dsn[13])
++{
++    /* This bounded macro path is issued after SAM31. The interrupted PSW
++       must actually say AMODE31; do not reinterpret a genuine AMODE64
++       address or a returned tagged LOAD entry as a low native pointer.
++       A 31-bit LA can leave GPR0's upper half from high C execution. */
++    unsigned int addr = (unsigned int)pdos->context->regs[0] & 0x7fffffffU;
++    const char *src;
++    int i, used = 0, blank = 0;
++    if ((pdos->context->psw64[0] & 1U) != 0
++        || (pdos->context->psw64[1] & 0x80000000U) == 0
++        || addr < 4096 || addr > MAXASIZE * 1024U * 1024 - 8)
++        return 0;
++    src = (const char *)addr;
++    memcpy(name, src, 8);
++    for (i = 0; i < 8; i++)
++    {
++        if (name[i] == ' ') { blank = 1; continue; }
++        if (blank || strchr(i == 0
++                            ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ@$#"
++                            : "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@$#",
++                            (unsigned char)name[i]) == NULL)
++            return 0;
++        used++;
++    }
++    if (!used) return 0;
++    memcpy(dsn, name, used);
++    memcpy(dsn + used, ".EXE", 5);
++    return 1;
++}
++
++static int pdos64HighRead(PDOS *pdos, const char *dsn,
++                          char *raw, int capacity, int *length)
++{
++    DSCB1 dscb;
++    char block[MAXBLKSZ];
++    int cyl, head, rec = 1, endcyl, endhead, count, total = 0;
++    int tracks = 0;
++    if (!pdos64ReadDscb(pdos, dsn, &dscb)) return 0;
++    cyl = ((unsigned char)dscb.startcchh[0] << 8)
++        | (unsigned char)dscb.startcchh[1];
++    head = ((unsigned char)dscb.startcchh[2] << 8)
++        | (unsigned char)dscb.startcchh[3];
++    endcyl = ((unsigned char)dscb.endcchh[0] << 8)
++        | (unsigned char)dscb.endcchh[1];
++    endhead = ((unsigned char)dscb.endcchh[2] << 8)
++        | (unsigned char)dscb.endcchh[3];
++    if (head >= 15 || endhead >= 15 || cyl > endcyl
++        || (cyl == endcyl && head > endhead)) return 0;
++    while (tracks < 256 && (cyl < endcyl
++                            || (cyl == endcyl && head <= endhead)))
++    {
++        count = rdblock(pdos->ipldev, cyl, head, rec,
++                        block, sizeof block, 0x0e);
++        if (count == 0)
++        {
++            *length = total;
++            return total > 0;
++        }
++        if (count < 0)
++        {
++            head++;
++            if (head == 15) { head = 0; cyl++; }
++            rec = 1;
++            tracks++;
++            continue;
++        }
++        if (count > capacity - total) return 0;
++        memcpy(raw + total, block, count);
++        total += count;
++        rec++;
++    }
++    return 0; /* missing EOF or outside the declared first extent */
++}
++
++static void pdos64HighService(PDOS *pdos, int svc)
++{
++    enum { RAW_CAPACITY = 5 * 1024 * 1024 };
++    char name[8], dsn[13];
++    char *raw;
++    unsigned int base, physical;
++    int length, entry, slot;
++    RB *owner = pdos->context;
++    owner->regs[15] = 8;
++    if (__ismem || (svc == 8
++                    && ((unsigned int)owner->regs[1] & 0x7fffffffU))
++        || !pdos64HighName(pdos, name, dsn)) return;
++    if (svc == 9)
++    {
++        if (pdos64_high_load.owner != owner
++            || memcmp(name, pdos64_high_load.name, 8) != 0)
++        {
++            owner->regs[15] = 4;
++            return;
++        }
++        physical = PDOS64_CODE_PHYS
++            + pdos64_high_load.slot * PDOS64_CODE_SLOT_MB * 1024U * 1024;
++        memset((char *)physical, 0, pdos64_high_load.image_len);
++        printf("P64 DELETE %.8s slot=%d bytes=%d\n", name,
++               pdos64_high_load.slot, pdos64_high_load.image_len);
++        memset(&pdos64_high_load, 0, sizeof pdos64_high_load);
++        owner->regs[15] = 0;
++        return;
++    }
++    if (pdos64_high_load.owner != NULL) return;
++    raw = memmgrAllocate(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
++                         RAW_CAPACITY, 0);
++    if (raw == NULL) return;
++    slot = pdos64_high_next_slot;
++    base = (PDOS64_CODE_VSEG + slot * PDOS64_CODE_SLOT_MB) << 20;
++    physical = PDOS64_CODE_PHYS + slot * PDOS64_CODE_SLOT_MB * 1024U * 1024;
++    if (!pdos64HighRead(pdos, dsn, raw, RAW_CAPACITY, &length)
++        || fixPEHigh(raw, &length, &entry, base, RAW_CAPACITY) != 0
++        || length > PDOS64_CODE_SLOT_MB * 1024 * 1024)
++    {
++        memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem, raw);
++        printf("P64 LOAD reject %.8s\n", name);
++        return;
++    }
++    memset((char *)physical, 0, PDOS64_CODE_SLOT_MB * 1024 * 1024);
++    memcpy((char *)physical, raw, length);
++    memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem, raw);
++    pdos64_high_load.owner = owner;
++    memcpy(pdos64_high_load.name, name, 8);
++    pdos64_high_load.slot = slot;
++    pdos64_high_load.image_len = length;
++    pdos64_high_next_slot = 1 - slot;
++    /* LOAD's GPR0 is a full-width entry with bit 63 (the low bit) set
++       for AMODE64. Module-relative offsets become an address only here. */
++    owner->regs64[0] = 1;
++    owner->regs[0] = (int)((base + (unsigned int)entry) | 1U);
++    owner->regs[1] = (length + 7) / 8;
++    owner->regs64[2] = 0;
++    owner->regs[15] = 0;
++    printf("P64 LOAD %.8s v=1%08x p=%08x e=1%08x n=%d\n",
++           name, base, physical, base + (unsigned int)entry, length);
++}
++#endif /* !ZAM31 */
++
++/* Read the real IBM PDS directory imported by dasdload. The supported
++   private-disk profile is one contiguous extent; aliases and arbitrary
++   member names use the directory's own TTR, never a name mapping. */
++static int pdos64PdsMember(PDOS *pdos, const char *dsn,
++                           const char member[8], unsigned char ttr[3],
++                           int *cyl, int *head, int *rec)
++{
++    DSCB1 dscb;
++    unsigned char block[256];
++    int basecyl, basehead, tt, rr, at, used, size;
++
++    if (!pdos64ReadDscb(pdos, dsn, &dscb)
++        || dscb.ds1dsorg != 0x0200 || dscb.ds1noepv != 1)
++        return -1;
++    basecyl = ((unsigned char)dscb.startcchh[0] << 8)
++              | (unsigned char)dscb.startcchh[1];
++    basehead = ((unsigned char)dscb.startcchh[2] << 8)
++               | (unsigned char)dscb.startcchh[3];
++    for (tt = 0; tt < 128; tt++)
++    {
++        int dcyl = basecyl + (basehead + tt) / 15;
++        int dhead = (basehead + tt) % 15;
++        for (rr = 1; rr < 100; rr++)
++        {
++            /* PDS directory records have an eight-byte CKD key. MVS
++               BSAM presents only the 256-byte data field to the caller. */
++            size = rdblock(pdos->ipldev, dcyl, dhead, rr,
++                           block, sizeof block, 0x06);
++            if (size < 0) break;
++            if (size != sizeof block) return -1;
++            used = block[0] * 256 + block[1];
++            if (used < 2 || used > 256) return -1;
++            at = 2;
++            while (at < used)
++            {
++                if (used - at < 8) return -1;
++                if (memcmp(block + at, "\xff\xff\xff\xff\xff\xff\xff\xff", 8) == 0)
++                    return 0;
++                if (used - at < 12) return -1;
++                if (memcmp(block + at, member, 8) == 0)
++                {
++                    int track;
++                    memcpy(ttr, block + at + 8, 3);
++                    track = ttr[0] * 256 + ttr[1];
++                    if (track >= 128 || ttr[2] == 0) return -1;
++                    *cyl = basecyl + (basehead + track) / 15;
++                    *head = (basehead + track) % 15;
++                    *rec = ttr[2];
++                    return 1;
++                }
++                at += 12 + 2 * (block[at + 11] & 31);
++                if (at > used) return -1;
++            }
++        }
++    }
++    return -1;
++}
++
++/* The retained PDPCLIB @@AOPEN DCB area puts ZMEM 0x90 bytes after its
++   OPEN TYPE=J list. Keep this small bridge specific to that service
++   object and refuse other output forms. The on-disk directory, VTOC and
++   extent remain the authority for every data set and member name. */
++#define PDOS64_PDS_WRITES 8
++typedef struct {
++    DCB *dcb;
++    RB *owner;
++    char dsn[45];
++    unsigned char member[8];
++    DSCB1 dscb;
++    int basecyl, basehead, endcyl, endhead;
++    int dircyl, dirhead, dirrec, diroff, replace;
++    unsigned char dirblock[256];
++    unsigned char first_ttr[3];
++    int records, failed;
++} PDOS64PDSWRITE;
++static PDOS64PDSWRITE pdos64_pds_writes[PDOS64_PDS_WRITES];
++
++static PDOS64PDSWRITE *pdos64PdsWriteState(DCB *dcb)
++{
++    int i;
++    for (i = 0; i < PDOS64_PDS_WRITES; i++)
++        if (pdos64_pds_writes[i].dcb == dcb)
++            return &pdos64_pds_writes[i];
++    return NULL;
++}
++
++static int pdos64PdsDirSlot(PDOS *pdos, PDOS64PDSWRITE *state)
++{
++    unsigned char raw[256];
++    int tt, rr, size, used, at, insertion;
++    for (tt = 0; tt < 128; tt++)
++    {
++        int cyl = state->basecyl + (state->basehead + tt) / 15;
++        int head = (state->basehead + tt) % 15;
++        if (cyl > state->endcyl
++            || (cyl == state->endcyl && head > state->endhead)) break;
++        for (rr = 1; rr < 100; rr++)
++        {
++            size = rdblock(pdos->ipldev, cyl, head, rr,
++                           raw, sizeof raw, 0x06);
++            if (size < 0) break;
++            if (size != sizeof raw)
++            {
++                printf("P64 PDS DIR BAD cyl=%d head=%d rec=%d size=%d\n",
++                       cyl, head, rr, size);
++                return 0;
++            }
++            used = raw[0] * 256 + raw[1];
++            if (used < 14 || used > 256) return 0;
++            at = 2;
++            insertion = -1;
++            while (at < used)
++            {
++                unsigned char *entry = raw + at;
++                if (used - at < 8) return 0;
++                if (memcmp(entry, "\xff\xff\xff\xff\xff\xff\xff\xff", 8) == 0)
++                {
++                    /* Keep the FF terminator and all variable-length entries.
++                       A new member precedes the first greater EBCDIC name. */
++                    if (at + 12 != used || used + 12 > 256) return 0;
++                    state->dircyl = cyl;
++                    state->dirhead = head;
++                    state->dirrec = rr;
++                    state->diroff = insertion < 0 ? at : insertion;
++                    state->replace = 0;
++                    memcpy(state->dirblock, raw, 256);
++                    return 1;
++                }
++                if (used - at < 12) return 0;
++                if (memcmp(entry, state->member, 8) == 0)
++                {
++                    if (entry[11] & 0x80) return 0; /* alias */
++                    state->dircyl = cyl;
++                    state->dirhead = head;
++                    state->dirrec = rr;
++                    state->diroff = at;
++                    state->replace = 1;
++                    memcpy(state->dirblock, raw, 256);
++                    return 1;
++                }
++                if (insertion < 0
++                    && memcmp(state->member, entry, 8) < 0)
++                    insertion = at;
++                at += 12 + 2 * (entry[11] & 31);
++                if (at > used) return 0;
++            }
++            /* A later directory block needs cross-block insertion/rebalance.
++               Refuse it rather than publish a name out of global order. */
++            return 0;
++        }
++    }
++    return 0;
++}
++
++static int pdos64PdsOpenWrite(PDOS *pdos, DCB *dcb,
++                              const char *dsn, const unsigned char member[8])
++{
++    PDOS64PDSWRITE *state = NULL;
++    int i, track, maxtrack, cyl, head, rec;
++    for (i = 0; i < PDOS64_PDS_WRITES; i++)
++        if (pdos64_pds_writes[i].dcb != NULL
++            && strcmp(pdos64_pds_writes[i].dsn, dsn) == 0)
++        {
++            printf("P64 PDS OPEN OVERLAP %s\n", dsn);
++            return 0;
++        }
++    for (i = 0; i < PDOS64_PDS_WRITES; i++)
++        if (pdos64_pds_writes[i].dcb == NULL)
++        { state = &pdos64_pds_writes[i]; break; }
++    if (state == NULL || strlen(dsn) > 44) return 0;
++    memset(state, 0, sizeof *state);
++    if (!pdos64ReadDscb(pdos, dsn, &state->dscb)
++        || state->dscb.ds1dsorg != 0x0200
++        || state->dscb.ds1noepv != 1)
++    {
++        printf("P64 PDS DSCB BAD %s org=%04x ext=%d\n", dsn,
++               (unsigned short)state->dscb.ds1dsorg,
++               state->dscb.ds1noepv);
++        return 0;
++    }
++    state->basecyl = ((unsigned char)state->dscb.startcchh[0] << 8)
++                     | (unsigned char)state->dscb.startcchh[1];
++    state->basehead = ((unsigned char)state->dscb.startcchh[2] << 8)
++                      | (unsigned char)state->dscb.startcchh[3];
++    state->endcyl = ((unsigned char)state->dscb.endcchh[0] << 8)
++                    | (unsigned char)state->dscb.endcchh[1];
++    state->endhead = ((unsigned char)state->dscb.endcchh[2] << 8)
++                     | (unsigned char)state->dscb.endcchh[3];
++    maxtrack = (state->endcyl - state->basecyl) * 15
++               + state->endhead - state->basehead;
++    track = ((unsigned char)state->dscb.ds1lstar[0] << 8)
++            | (unsigned char)state->dscb.ds1lstar[1];
++    rec = (unsigned char)state->dscb.ds1lstar[2];
++    if (state->basehead >= 15 || state->endhead >= 15
++        || track > maxtrack || rec == 0 || maxtrack >= 65536)
++    {
++        printf("P64 PDS LSTAR BAD %s track=%d rec=%d max=%d\n",
++               dsn, track, rec, maxtrack);
++        return 0;
++    }
++    strcpy(state->dsn, dsn);
++    memcpy(state->member, member, 8);
++    if (!pdos64PdsDirSlot(pdos, state))
++    {
++        printf("P64 PDS DIR SLOT BAD %s member=%.8s\n", dsn, member);
++        return 0;
++    }
++    cyl = state->basecyl + (state->basehead + track) / 15;
++    head = (state->basehead + track) % 15;
++    join_cchhr(dcb->dcbfdad + 3, cyl, head, rec);
++    state->dcb = dcb;
++    state->owner = pdos->context;
++    printf("P64 PDS OPEN %.8s %s lstar=%04x%02x %s\n",
++           member, dsn, track, rec, state->replace ? "replace" : "create");
++    return 1;
++}
++
++static int pdos64PdsRecord(PDOS *pdos, PDOS64PDSWRITE *state,
++                            DCB *dcb, const void *data, int len)
++{
++    unsigned char tbuf[MAXBLKSZ + 8];
++    int cyl, head, rec, count, track;
++    if (len < 0 || len > MAXBLKSZ || state->failed) return 0;
++    split_cchhr(dcb->dcbfdad + 3, &cyl, &head, &rec);
++    for (;;)
++    {
++        rec++;
++        track = (cyl - state->basecyl) * 15 + head - state->basehead;
++        if (track < 0 || cyl > state->endcyl
++            || (cyl == state->endcyl && head > state->endhead))
++            return 0;
++        *(short *)tbuf = cyl;
++        *(short *)(tbuf + 2) = head;
++        tbuf[4] = rec;
++        tbuf[5] = 0;
++        *(short *)(tbuf + 6) = len;
++        if (len) memcpy(tbuf + 8, data, len);
++        count = wrblock(pdos->ipldev, cyl, head, rec - 1,
++                        tbuf, len + 8, 0x1d);
++        /* A short or failed write must retry this complete record. */
++        if (count == len + 8) break;
++        rec = 0;
++        head++;
++        if (head == 15) { head = 0; cyl++; }
++    }
++    if (state->records == 0)
++    {
++        state->first_ttr[0] = track >> 8;
++        state->first_ttr[1] = track;
++        state->first_ttr[2] = rec;
++    }
++    state->records++;
++    join_cchhr(dcb->dcbfdad + 3, cyl, head, rec);
++    return 1;
++}
++
++static int pdos64PdsCloseWrite(PDOS *pdos, PDOS64PDSWRITE *state, DCB *dcb)
++{
++    DSCB1 dscb;
++    unsigned char block[256];
++    int vcyl, vhead, vrec, cyl, head, rec, track, used, at;
++    if (state->failed || !pdos64PdsRecord(pdos, state, dcb, NULL, 0))
++        return 0;
++    if (!pdos64ReadDscbLoc(pdos, state->dsn, &dscb,
++                            &vcyl, &vhead, &vrec)) return 0;
++    split_cchhr(dcb->dcbfdad + 3, &cyl, &head, &rec);
++    track = (cyl - state->basecyl) * 15 + head - state->basehead;
++    dscb.ds1lstar[0] = track >> 8;
++    dscb.ds1lstar[1] = track;
++    dscb.ds1lstar[2] = rec;
++    if (wrblock(pdos->ipldev, vcyl, vhead, vrec,
++                ((char *)&dscb) + 44, sizeof dscb - 44, 0x05)
++        != sizeof dscb - 44) return 0;
++    memcpy(block, state->dirblock, sizeof block);
++    at = state->diroff;
++    if (!state->replace)
++    {
++        used = block[0] * 256 + block[1];
++        /* Shift complete entries, including their user data and FF end. */
++        memmove(block + at + 12, block + at, used - at);
++        used += 12;
++        block[0] = used >> 8;
++        block[1] = used;
++        memcpy(block + at, state->member, 8);
++        block[at + 11] = 0;
++    }
++    memcpy(block + at + 8, state->first_ttr, 3);
++    if (wrblock(pdos->ipldev, state->dircyl, state->dirhead,
++                state->dirrec, block, sizeof block, 0x05)
++        != sizeof block) return 0;
++    printf("P64 PDS CLOSE %.8s %s ttr=%02x%02x%02x eof=%04x%02x\n",
++           state->member, state->dsn, state->first_ttr[0],
++           state->first_ttr[1], state->first_ttr[2], track, rec);
++    return 1;
++}
++
++static void pdos64WriteDd(TIOT *tiot, int slot, const char *ddname,
++                          const char *dsn)
++{
++    unsigned char *entry;
++    unsigned char *jfcb;
++    unsigned int queue;
++    int len;
++
++    entry = tiot->ddentry[slot];
++    queue = (unsigned int)tiot->jfcb[slot];
++    memset(entry, 0, 20);
++    entry[0] = 20; /* TIOELNGH */
++    memcpy(entry + 4, ddname, 8); /* TIOEDDNM */
++    entry[12] = (unsigned char)(queue >> 16);
++    entry[13] = (unsigned char)(queue >> 8);
++    entry[14] = (unsigned char)queue; /* TIOEJFCB */
++    if (tiot->dsorg[slot][0] == 0x02)
++    {
++        unsigned int ucb = (unsigned int)pdos64_dasd_ucb;
++        entry[17] = (unsigned char)(ucb >> 16);
++        entry[18] = (unsigned char)(ucb >> 8);
++        entry[19] = (unsigned char)ucb; /* TIOEFSRT */
++    }
++    jfcb = tiot->jfcb[slot] + 16;
++    memset(jfcb, 0, 0xb0);
++    memset(jfcb, ' ', 44);
++    len = strlen(dsn);
++    memcpy(jfcb, dsn, len); /* JFCBDSNM */
++    memcpy(jfcb + 0x62, tiot->dsorg[slot], 2); /* JFCDSORG */
++    jfcb[0x64] = tiot->recfm[slot]; /* JFCRECFM */
++    jfcb[0x66] = (unsigned char)(tiot->blksize[slot] >> 8);
++    jfcb[0x67] = (unsigned char)tiot->blksize[slot]; /* JFCBUFSI */
++    jfcb[0x68] = (unsigned char)(tiot->lrecl[slot] >> 8);
++    jfcb[0x69] = (unsigned char)tiot->lrecl[slot]; /* JFCLRECL */
++    strcpy(tiot->dsname[slot], dsn);
++}
++
++static int pdos64BindDd(PDOS *pdos, TIOT *tiot,
++                        const char *ddname, const char *dsn)
++{
++    int cyl, head, rec;
++    unsigned int queue;
++    DSCB1 dscb;
++    int slot;
++
++    if (tiot->count >= PDOS64_DD_LIMIT || strlen(dsn) > 44)
++        return -1;
++    if (findFile(pdos->ipldev, (char *)dsn, &cyl, &head, &rec) != 0)
++        return 0;
++    if (!pdos64ReadDscb(pdos, dsn, &dscb)) return 0;
++    slot = tiot->count;
++    queue = (unsigned int)tiot->jfcb[slot];
++    if ((queue & 1U) || (queue >= 0x1000000U))
++        return -1;
++    memcpy(tiot->dsorg[slot], &dscb.ds1dsorg, 2);
++    tiot->recfm[slot] = dscb.ds1recfm;
++    tiot->blksize[slot] = dscb.ds1blkl;
++    tiot->lrecl[slot] = dscb.ds1lrecl;
++    pdos64WriteDd(tiot, slot, ddname, dsn);
++    tiot->count++;
++    return 1;
++}
++
++static int pdos64InitSmokeTiot(PDOS *pdos, TIOT *tiot)
++{
++    static const char *ddname[2] = {"BTXT    ", "BBIN    "};
++    static const char *dsn[2] = {"B3BTXT.DAT", "B3BBIN.DAT"};
++    int i, rc;
++
++    for (i = 0; i < 2; i++)
++    {
++        rc = pdos64BindDd(pdos, tiot, ddname[i], dsn[i]);
++        if (rc < 0) return 0;
++    }
++    return 1;
++}
++
++static int pdos64DdSlot(TIOT *tiot, const char *ddname)
++{
++    int i;
++    for (i = 0; i < tiot->count; i++)
++    {
++        if (memcmp(tiot->ddentry[i] + 4, ddname, 8) == 0)
++            return i;
++    }
++    return -1;
++}
++
++static const char *pdos64BoundDd(PDOS *pdos, const char *ddname)
++{
++    TIOT *tiot = pdos->psa->psatold->tcbtio;
++    int slot = pdos64DdSlot(tiot, ddname);
++    if (slot >= 0) return tiot->dsname[slot];
++    return NULL;
++}
++
++static int pdos64FreeDd(TIOT *tiot, const char *ddname)
++{
++    int slot = pdos64DdSlot(tiot, ddname);
++    int i;
++    if (slot < 0) return 0;
++    for (i = slot; i + 1 < tiot->count; i++)
++    {
++        char nextdd[8];
++        char nextdsn[45];
++        memcpy(nextdd, tiot->ddentry[i + 1] + 4, 8);
++        strcpy(nextdsn, tiot->dsname[i + 1]);
++        memcpy(tiot->dsorg[i], tiot->dsorg[i + 1], 2);
++        tiot->recfm[i] = tiot->recfm[i + 1];
++        tiot->blksize[i] = tiot->blksize[i + 1];
++        tiot->lrecl[i] = tiot->lrecl[i + 1];
++        pdos64WriteDd(tiot, i, nextdd, nextdsn);
++    }
++    tiot->count--;
++    memset(tiot->ddentry[tiot->count], 0, 20);
++    tiot->dsname[tiot->count][0] = '\0';
++    return 1;
++}
++#endif
++
+ 
+ /* initialize PDOS */
+ /* zero return = error */
+@@ -1146,13 +1921,33 @@ int pdosInit(PDOS *pdos)
+     printf("IPL device is %x\n", pdos->ipldev);
+ #endif
+     pdos->shutdown = 0;
++#ifdef ZARCH
++    memset(&pdos64_cvt, 0, sizeof pdos64_cvt);
++    pdos->psa->cvt = &pdos64_cvt;
++    pdos64_cvt.self = (int)&pdos64_cvt;
++    memset(pdos64_dasd_ucb, 0, sizeof pdos64_dasd_ucb);
++    pdos64_dasd_ucb[0x12] = 0x20; /* UCBTBYT3: DASD */
++    memcpy(pdos64_dasd_ucb + 0x1c, "PDOS00", 6); /* UCBVOLI */
++    if ((unsigned int)pdos64_dasd_ucb >= 0x1000000U)
++        return 0; /* TIOT's 24-bit UCB address cannot represent it */
++#else
+     pdos->psa->cvt = calloc(sizeof(CVT), 1);
++#endif
+     pdos->psa->psaaold = calloc(sizeof(ASCB), 1);
+     pdos->psa->cvt->trkcalc = (int)trkclc;
+     pdosInitAspaces(pdos);
+     pdos->curr_aspace = 0;
+     pdos->psa->psatold = &pdos->aspaces[pdos->curr_aspace].o.tcb;
+     pdos->aspaces[pdos->curr_aspace].o.tcb.tcbtio = calloc(sizeof(TIOT), 1);
++#ifdef ZARCH
++    if ((pdos->aspaces[pdos->curr_aspace].o.tcb.tcbtio == NULL)
++        || !pdos64InitSmokeTiot(pdos,
++            pdos->aspaces[pdos->curr_aspace].o.tcb.tcbtio))
++    {
++        printf("native DD table unavailable\n");
++        return 0;
++    }
++#endif
+     pdos->aspaces[pdos->curr_aspace].o.tcb.tcbrbp = calloc(sizeof(RB), 1);
+     pdos->aspaces[pdos->curr_aspace].o.tcb.tcbrbp->rbcde1
+         = calloc(sizeof(CDENTRY), 1);
+@@ -1161,10 +1956,17 @@ int pdosInit(PDOS *pdos)
+     pdos->context =
+         pdos->aspaces[pdos->curr_aspace].o.curr_rb =
+         &pdos->aspaces[pdos->curr_aspace].o.first_rb;
++#ifdef ZARCH
++    memset(pdos->context, 0, sizeof *pdos->context);
++#endif
+ 
+     /* Now we set the DAT pointers for our first address space,
+        in preparation for switching DAT on. */
+     lcreg1(pdos->aspaces[pdos->curr_aspace].o.cregs[1]);
++#ifdef ZARCH
++    lcreg13(pdos->aspaces[pdos->curr_aspace].o.cregs[1]);
++    pdos64InitPc(pdos);
++#endif
+ #if defined(S380)
+     lcreg13(pdos->aspaces[pdos->curr_aspace].o.cregs[13]);
+ #endif
+@@ -1193,9 +1995,38 @@ void pdosTerm(PDOS *pdos)
+ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+ {
+     int ret;
++#ifdef ZARCH
++    int g;
++#endif
+ 
+     while (1)
+     {
++#ifdef ZARCH
++        if (pdos->context->module_amode == 1)
++        {
++            *PDOS64_MODE = 1;
++            memcpy(PDOS64_GPRS, pdos->context->regs64,
++                   sizeof pdos->context->regs64);
++            memcpy(PDOS64_PSW, pdos->context->psw64,
++                   sizeof pdos->context->psw64);
++            ret = adisp64();
++            memcpy(pdos->context->regs64, PDOS64_GPRS,
++                   sizeof pdos->context->regs64);
++            memcpy(pdos->context->psw64, (void *)0x140,
++                   sizeof pdos->context->psw64);
++            for (g = 0; g < NUM_GPR; g++)
++                pdos->context->regs[g] =
++                    (int)pdos->context->regs64[g * 2 + 1];
++            pdos->context->psw1 = pdos->context->psw64[0];
++            pdos->context->psw2 = pdos->context->psw64[3];
++            *PDOS64_MODE = 0;
++        }
++        else
++#endif
++        {
++#ifdef ZARCH
++        *PDOS64_MODE = 0;
++#endif
+         /* store registers and PSW in low memory to be loaded */
+         memcpy(pdos->psa->flcgrsav,
+                pdos->context->regs,
+@@ -1212,15 +2043,33 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+                sizeof pdos->context->regs);
+ #ifdef ZARCH
+         pdos->context->psw1 = 0x040C0000U;
+-        pdos->context->psw1 |= (*(unsigned int *)0x140 & 1);
++        pdos->context->psw1 |= (*(unsigned int *)0x140 & 0x00010001U);
+         pdos->context->psw2 = *(unsigned int *)0x14C;
+         pdos->context->psw2 |= (*(unsigned int *)0x144 & 0x80000000U);
+ #else
+         pdos->context->psw1 = pdos->psa->svcopsw[0];
+         pdos->context->psw2 = pdos->psa->svcopsw[1];
+ #endif
++        }
+         
+-        if (ret == 0) break;
++        if (ret == INTERRUPT_PROGRAM)
++            return (INTERRUPT_PROGRAM);
++        if (ret == 0)
++        {
++#ifdef ZARCH
++            if (pdos->context->module_amode == 1
++                || (pdos->context->module_amode == 2
++                    && pdos->context->module_rmode_any == 1))
++            {
++                int svc = pdos->psa->svc_code & 0xffff;
++                if (svc == 250) ret = 2;
++                else if (svc == 251) ret = 3;
++                else break;
++            }
++            else
++#endif
++            break;
++        }
+ 
+         /* non-zero returns are requests for services */
+         /* these "DLLs" don't belong in the operating system proper,
+@@ -1259,6 +2108,24 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+             len = pptr[1] & 0xffff;
+             buf = (char *)pptr[3];
+             dcb = (DCB *)pptr[2];
++#ifdef ZARCH
++            if (pdos->context->module_rmode_any == 1)
++            {
++                PDOS64PDSWRITE *state = pdos64PdsWriteState(dcb);
++                if (state != NULL)
++                {
++                    if (!pdos64PdsRecord(pdos, state, dcb, buf, len))
++                    {
++                        state->failed = 1;
++                        pdos64_pds_io_failed = 1;
++                        pdos->context->regs[15] = 12;
++                        printf("P64 PDS WRITE FAILED %.8s %s len=%d\n",
++                               state->member, state->dsn, len);
++                    }
++                    continue;
++                }
++            }
++#endif
+ 
+ #if 0
+             printf("got a request to write block %p, len %d\n", buf, len);
+@@ -1353,6 +2220,7 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+             char *buf;
+             char tbuf[MAXBLKSZ];
+             int cnt;
++            int diskcmd = 0x0e;
+             char *decb;
+             DCB *dcb;
+             int *pptr;
+@@ -1372,6 +2240,15 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+             len = pptr[1] & 0xffff;
+             buf = (char *)pptr[3];
+             dcb = (DCB *)pptr[2];
++#ifdef ZARCH
++            if (pdos->context->module_rmode_any == 1)
++            {
++                TIOT *tiot = pdos->psa->psatold->tcbtio;
++                int slot = pdos64DdSlot(tiot, dcb->dcbddnam);
++                if (slot >= 0 && tiot->dsorg[slot][0] == 0x02)
++                    diskcmd = 0x06;
++            }
++#endif
+ #if 0
+             printf("dcb read is for lrecl %d\n", dcb->dcblrecl);
+ #endif
+@@ -1494,8 +2371,8 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+                        buf,
+                        cyl, head, rec);
+ #endif
+-                cnt = rdblock(pdos->ipldev, cyl, head, rec, 
+-                              tbuf, len, 0x0e);
++                cnt = rdblock(pdos->ipldev, cyl, head, rec,
++                              tbuf, len, diskcmd);
+ #if DSKDEBUG
+                 printf("cnt is %d\n", cnt);
+ #endif
+@@ -1503,8 +2380,8 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+                 {
+                     rec = 1;
+                     head++;
+-                    cnt = rdblock(pdos->ipldev, cyl, head, rec, 
+-                                  tbuf, len, 0x0e);
++                    cnt = rdblock(pdos->ipldev, cyl, head, rec,
++                                  tbuf, len, diskcmd);
+ #if DSKDEBUG
+                     printf("cnt is %d\n", cnt);
+ #endif
+@@ -1512,8 +2389,8 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+                     {
+                         head = 0;
+                         cyl++;
+-                        cnt = rdblock(pdos->ipldev, cyl, head, rec, 
+-                                      tbuf, len, 0x0e);
++                        cnt = rdblock(pdos->ipldev, cyl, head, rec,
++                                      tbuf, len, diskcmd);
+                     }
+                 }
+ #if DSKDEBUG
+@@ -1535,6 +2412,15 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
+                 *(IOB **)(decb + 16) = &geniob;
+             }
+         }
++#ifdef ZARCH
++        if (pdos->context->module_amode == 1)
++        {
++            for (g = 0; g < NUM_GPR; g++)
++                pdos->context->regs64[g * 2 + 1] =
++                    (unsigned int)pdos->context->regs[g];
++            pdos->context->psw64[3] = pdos->context->psw2;
++        }
++#endif
+     }
+     return (INTERRUPT_SVC); /* only doing SVCs at the moment */
+ }
+@@ -1941,6 +2827,34 @@ static void pdosInitAspaces(PDOS *pdos)
+                     (s * PAGES_PER_SEGMENT + p) << 12;
+             }
+         }
++        /* Preserve the source's other 4-8 GiB effective-32 mappings;
++           override the independent heap and the two code/stack windows. */
++#ifndef ZAM31
++        for (s = 0; s < PDOS64_HIGH_MB; s++)
++        {
++            pdos->aspaces[a].o.segtable[4096 + s][0] = 0;
++            pdos->aspaces[a].o.segtable[4096 + s][1] =
++                (unsigned int)&pdos->aspaces[a].o.highpagetable[s][0];
++            for (p = 0; p < PAGES_PER_SEGMENT; p++)
++            {
++                pdos->aspaces[a].o.highpagetable[s][p][0] = 0;
++                pdos->aspaces[a].o.highpagetable[s][p][1] =
++                    PDOS64_HIGH_PHYS + (s << 20) + (p << 12);
++            }
++        }
++        for (s = 0; s < PDOS64_CODE_MB; s++)
++        {
++            pdos->aspaces[a].o.segtable[4096 + PDOS64_CODE_VSEG + s][0] = 0;
++            pdos->aspaces[a].o.segtable[4096 + PDOS64_CODE_VSEG + s][1] =
++                (unsigned int)&pdos->aspaces[a].o.codepagetable[s][0];
++            for (p = 0; p < PAGES_PER_SEGMENT; p++)
++            {
++                pdos->aspaces[a].o.codepagetable[s][p][0] = 0;
++                pdos->aspaces[a].o.codepagetable[s][p][1] =
++                    PDOS64_CODE_PHYS + (s << 20) + (p << 12);
++            }
++        }
++#endif
+         pdos->aspaces[a].o.region3[0][0] = 0;
+         pdos->aspaces[a].o.region3[0][1] =
+             (unsigned int)&pdos->aspaces[a].o.segtable[0]
+@@ -1953,12 +2867,20 @@ static void pdosInitAspaces(PDOS *pdos)
+             | 0x03; /* segment table is max size */
+         pdos->aspaces[a].o.region3[2][0] = 0;
+         pdos->aspaces[a].o.region3[2][1] =
++#ifndef ZAM31
++            (unsigned int)&pdos->aspaces[a].o.segtable[4096]
++#else
+             (unsigned int)&pdos->aspaces[a].o.segtable[0]
++#endif
+             | (0x1 << 2) /* region 3 indicator */
+             | 0x03; /* segment table is max size */
+         pdos->aspaces[a].o.region3[3][0] = 0;
+         pdos->aspaces[a].o.region3[3][1] =
++#ifndef ZAM31
++            (unsigned int)&pdos->aspaces[a].o.segtable[6144]
++#else
+             (unsigned int)&pdos->aspaces[a].o.segtable[2048]
++#endif
+             | (0x1 << 2) /* region 3 indicator */
+             | 0x03; /* segment table is max size */
+         /* pad to minimum size */
+@@ -2007,9 +2929,11 @@ static void pdosInitAspaces(PDOS *pdos)
+         {
+             /* 1024 MB less memory available because of the
+                ramdisk at the 3 GiB location */
++#if MAXASIZE > (S370_MAXMB + 1024)
+             memmgrSupply(&pdos->aspaces[a].o.atlmem,
+                          (char *)(S370_MAXMB * 1024U * 1024),
+                          (MAXASIZE - S370_MAXMB - 1024) * 1024U * 1024);
++#endif
+         }
+         else
+         {
+@@ -2038,6 +2962,40 @@ static void pdosProcessSVC(PDOS *pdos)
+ #endif
+     if (svc == 3)
+     {
++#ifdef ZARCH
++        int i;
++#ifndef ZAM31
++        if (pdos64_high_load.owner == pdos->context)
++        {
++            unsigned int physical = PDOS64_CODE_PHYS
++                + pdos64_high_load.slot * PDOS64_CODE_SLOT_MB
++                  * 1024U * 1024;
++            memset((char *)physical, 0, pdos64_high_load.image_len);
++            printf("P64 LOAD abandoned %.8s\n", pdos64_high_load.name);
++            memset(&pdos64_high_load, 0, sizeof pdos64_high_load);
++        }
++#endif
++        if (pdos->context->module_rmode_any == 1)
++        {
++            for (i = 0; i < PDOS64_PDS_WRITES; i++)
++                if (pdos64_pds_writes[i].owner == pdos->context)
++                {
++                    printf("P64 PDS ABANDON %.8s %s\n",
++                           pdos64_pds_writes[i].member,
++                           pdos64_pds_writes[i].dsn);
++                    memset(&pdos64_pds_writes[i], 0,
++                           sizeof pdos64_pds_writes[i]);
++                    pdos64_pds_io_failed = 1;
++                }
++        }
++        if (pdos->context->module_rmode_any == 1
++            && pdos64_pds_io_failed)
++        {
++            printf("P64 PDS task completion forced RC=16 after I/O failure\n");
++            pdos->context->regs[15] = 16;
++            pdos64_pds_io_failed = 0;
++        }
++#endif
+         /* if this is a LINKed program, then restore old context
+            rather than shutting down */
+         if (pdos->context->rblinkb == 
+@@ -2089,6 +3047,14 @@ static void pdosProcessSVC(PDOS *pdos)
+ #endif
+         }
+     }
++#if defined(ZARCH) && !defined(ZAM31)
++    else if ((svc == 8 || svc == 9)
++             && pdos->context->module_amode == 1
++             && pdos->context->module_rmode_any == 1)
++    {
++        pdos64HighService(pdos, svc);
++    }
++#endif
+     else if ((svc == 120) || (svc == 10))
+     {
+         /* if really getmain */
+@@ -2120,14 +3086,15 @@ static void pdosProcessSVC(PDOS *pdos)
+             {
+                 len &= 0xffffff;
+             }
+-/* If PCOMM is using MEMMGR it will request a size
+-   that is way too large, so we kludge it here */
+-#if 1 /* #ifdef S370 */
+-            if (len >= (16 * 1024 * 1024))
++/* Preserve the historical PCOMM MEMMGR workaround only for the
++   initial command processor. A native child must receive its full
++   requested allocation or a truthful failure. */
++            if (len >= (16 * 1024 * 1024)
++                && pdos->context->rblinkb ==
++                   &pdos->aspaces[pdos->curr_aspace].o.first_rb)
+             {
+                 len = PDOS_STORINC;
+             }
+-#endif
+ 
+             if (above)
+             {
+@@ -2183,12 +3150,158 @@ static void pdosProcessSVC(PDOS *pdos)
+             }
+         }
+     }
++#ifdef ZARCH
++    else if ((svc == 93) && (pdos->context->module_rmode_any == 1))
++    {
++        /* V1R5 TPUT/TGET subset used by the unchanged native bridge.
++           The high R1 bit selects TGET; all buffers remain below 2 GB. */
++        unsigned int request = (unsigned int)pdos->context->regs[1];
++        int len = pdos->context->regs[0];
++        char *buf = (char *)(request & 0x7fffffffU);
++        if ((buf == NULL) || (len < 0) || (len > 256))
++        {
++            pdos->context->regs[15] = 8;
++        }
++        else if ((request & 0x80000000U) == 0)
++        {
++            if (len > 132) pdos->context->regs[15] = 8;
++            else
++            {
++                printf("%.*s\n", len, buf);
++                pdos->context->regs[15] = 0;
++            }
++        }
++        else
++        {
++            char line[300];
++            int count;
++            if ((cons_type == 3270) || (cons_type == 3275))
++            {
++                intbuf[0] = 0xc3;
++                __conswr(sizeof intbuf, intbuf, 0);
++                intbuf[0] = 0x41;
++                count = __c3270r(sizeof line, line);
++                if ((count == 3) && ((unsigned char)line[0] == 0x7d))
++                {
++                    /* An empty Enter contains only AID and cursor address. */
++                    count = 0;
++                }
++                else if (count >= 6)
++                {
++                    memmove(line, line + 6, count - 6);
++                    count -= 6;
++                }
++                else if (count >= 0) count = -1;
++            }
++            else count = __consrd(sizeof line, line);
++            if ((count < 0) || (count > len))
++            {
++                pdos->context->regs[15] = 8;
++            }
++            else
++            {
++                memcpy(buf, line, count);
++                pdos->context->regs[1] = count;
++                pdos->context->regs[15] = 0;
++            }
++        }
++    }
++#endif
+     else if (svc == 99)
+     {
+         pdosSVC99(pdos);
+     }
++#ifdef ZARCH
++    else if (svc == 18 && pdos->context->module_rmode_any == 1)
++    {
++        /* BLDL: positive R1, list in R0. FIND type D: negative R1,
++           member name in R0. Both use the staged PDS directory. */
++        int type_d = pdos->context->regs[1] < 0;
++        unsigned int address = type_d
++            ? (unsigned int)(-pdos->context->regs[1])
++            : (unsigned int)pdos->context->regs[1];
++        DCB *dcb = (DCB *)(address & 0x7fffffffU);
++        unsigned char *arg = (unsigned char *)pdos->context->regs[0];
++        const char *dsn = pdos64BoundDd(pdos, dcb->dcbddnam);
++        unsigned char ttr[3];
++        int cyl = 0, head = 0, rec = 0, found = -1;
++        const char *member = type_d ? (char *)arg : (char *)(arg + 4);
++
++        if (dsn != NULL && (type_d || (arg[0] == 0 && arg[1] == 1
++                                  && (arg[2] * 256 + arg[3]) >= 16)))
++            found = pdos64PdsMember(pdos, dsn, member, ttr,
++                                     &cyl, &head, &rec);
++        if (found == 1)
++        {
++            if (type_d)
++                join_cchhr(dcb->dcbfdad + 3, cyl, head, rec - 1);
++            else
++            {
++                memcpy(arg + 12, ttr, 3);
++                arg[15] = 0; /* first and only concatenation */
++            }
++            pdos->context->regs[15] = 0;
++            pdos->context->regs[0] = 0;
++        }
++        else
++        {
++            pdos->context->regs[15] = found == 0 ? 4 : 8;
++            pdos->context->regs[0] = 16;
++        }
++        printf("P64 S18 %s %.8s %s rc=%d ttr=%02x%02x%02x\n",
++               type_d ? "FIND" : "BLDL", member,
++               dsn ? dsn : "(unbound)", pdos->context->regs[15],
++               found == 1 ? ttr[0] : 0, found == 1 ? ttr[1] : 0,
++               found == 1 ? ttr[2] : 0);
++    }
++    else if (svc == 27 && pdos->context->module_rmode_any == 1)
++    {
++        /* OBTAIN CAMLST SEARCH, the form used by the retained native
++           PDS adapter. Return the 96-byte format-1 DSCB data after its
++           44-byte key, as the MVS macro's fourth operand requires. */
++        unsigned int *cam = (unsigned int *)pdos->context->regs[1];
++        char dsn[45];
++        char *name = (char *)(cam[1] & 0x7fffffffU);
++        char *volume = (char *)(cam[2] & 0x7fffffffU);
++        char *output = (char *)(cam[3] & 0x7fffffffU);
++        DSCB1 dscb;
++        int n = 44;
++
++        while (n > 0 && name[n - 1] == ' ') n--;
++        memcpy(dsn, name, n);
++        dsn[n] = '\0';
++        if (cam[0] == 0xc1000000U && volume != NULL && output != NULL
++            && memcmp(volume, "PDOS00", 6) == 0
++            && pdos64ReadDscb(pdos, dsn, &dscb))
++        {
++            memcpy(output, ((char *)&dscb) + 44, sizeof dscb - 44);
++            pdos->context->regs[15] = 0;
++            pdos->context->regs[0] = 0;
++            printf("P64 S27 OBTAIN %s OK\n", dsn);
++        }
++        else
++        {
++            pdos->context->regs[15] = 8;
++            pdos->context->regs[0] = 8;
++            printf("P64 S27 OBTAIN %s FAIL flags=%08x\n", dsn, cam[0]);
++        }
++    }
++#endif
+     else if (svc == 24) /* devtype */
+     {
++#ifdef ZARCH
++        if (pdos->context->module_rmode_any == 1)
++            printf("P64 S24 dd=%.8s bound=%d\n",
++                   (char *)pdos->context->regs[1],
++                   pdos64BoundDd(pdos, (char *)pdos->context->regs[1]) != NULL);
++        if (pdos->context->module_rmode_any == 1
++            && pdos64BoundDd(pdos, (char *)pdos->context->regs[1]) == NULL)
++        {
++            memset((void *)pdos->context->regs[0], 0, 8);
++            pdos->context->regs[15] = 8; /* unallocated DD */
++            return;
++        }
++#endif
+         /* hardcoded constants that fell off the back of a truck */
+         memcpy((void *)pdos->context->regs[0], 
+                "\x30\x50\x08\x0B" /* 08 = unit record, but note
+@@ -2209,6 +3322,16 @@ static void pdosProcessSVC(PDOS *pdos)
+                mvssupa.asm, as it probably shouldn't be second-guessing
+                what is allowed - assuming that's what it is doing. */
+             ((char *)pdos->context->regs[0])[2] = 0x80; /* tape */
++#ifdef ZARCH
++            if (pdos->context->module_rmode_any == 1)
++            {
++                TIOT *tiot = pdos->psa->psatold->tcbtio;
++                int slot = pdos64DdSlot(tiot,
++                                        (char *)pdos->context->regs[1]);
++                if (slot >= 0 && tiot->dsorg[slot][0] == 0x02)
++                    ((char *)pdos->context->regs[0])[2] = 0x20; /* DASD */
++            }
++#endif
+         }
+         pdos->context->regs[15] = 0;
+     }
+@@ -2221,6 +3344,11 @@ static void pdosProcessSVC(PDOS *pdos)
+         /* DCB is pointed to by first parameter */
+         /* needs validation */
+         gendcb = (DCB *)(p[0] & 0xffffff);
++#ifdef ZARCH
++        if (pdos->context->module_rmode_any == 1)
++            printf("P64 S64 dd=%.8s bound=%d\n", gendcb->dcbddnam,
++                   pdos64BoundDd(pdos, gendcb->dcbddnam) != NULL);
++#endif
+ #if 0
+         printf("got rdjfcb for %.8s\n", gendcb->dcbddnam);
+ #endif
+@@ -2235,6 +3363,22 @@ static void pdosProcessSVC(PDOS *pdos)
+             int cyl;            
+             int head;
+             int rec;
++#ifdef ZARCH
++            /* The frozen native file adapter uses two preallocated DDs.
++               Resolve each through the task binding, not the stale
++               dynamic-allocation name used by the legacy PCOMM path. */
++            if (pdos->context->module_rmode_any == 1)
++            {
++                const char *bound =
++                    pdos64BoundDd(pdos, gendcb->dcbddnam);
++                if (bound == NULL)
++                {
++                    pdos->context->regs[15] = 12;
++                    return;
++                }
++                strcpy(lastds, bound);
++            }
++#endif
+ #if 0
+             printf("must be dataset name %s\n", lastds);
+ #endif
+@@ -2321,6 +3465,19 @@ static void pdosProcessSVC(PDOS *pdos)
+             gendcb->dcblrecl = 0;
+             gendcb->dcbblksi = 18452;
+         }
++#ifdef ZARCH
++        if (pdos->context->module_rmode_any == 1)
++        {
++            TIOT *tiot = pdos->psa->psatold->tcbtio;
++            int slot = pdos64DdSlot(tiot, gendcb->dcbddnam);
++            if (slot >= 0)
++            {
++                gendcb->u2.dcbrecfm = tiot->recfm[slot];
++                gendcb->dcblrecl = tiot->lrecl[slot];
++                gendcb->dcbblksi = tiot->blksize[slot];
++            }
++        }
++#endif
+     }
+     else if (svc == 22) /* open */
+     {
+@@ -2332,6 +3489,11 @@ static void pdosProcessSVC(PDOS *pdos)
+         /* DCB is pointed to by first parameter */
+         /* needs validation */
+         gendcb = (DCB *)(p[0] & 0xffffff);
++#ifdef ZARCH
++        if (pdos->context->module_rmode_any == 1)
++            printf("P64 S22 dd=%.8s mode=%02x\n", gendcb->dcbddnam,
++                   ((unsigned int)p[0]) >> 24);
++#endif
+ #if 0
+         printf("in open, DCB is %p\n", gendcb);
+ #endif
+@@ -2339,6 +3501,28 @@ static void pdosProcessSVC(PDOS *pdos)
+         ocode = p[0];
+         ocode >>= 24;
+         pdos->context->regs[15] = 0;
++#ifdef ZARCH
++        if (pdos->context->module_rmode_any == 1 && ocode == 0x8f)
++        {
++            TIOT *tiot = pdos->psa->psatold->tcbtio;
++            int slot = pdos64DdSlot(tiot, gendcb->dcbddnam);
++            if (slot >= 0 && tiot->dsorg[slot][0] == 0x02)
++            {
++                const unsigned char *member = (unsigned char *)p + 0x90;
++                printf("P64 PDS REQUEST dd=%.8s member=%.8s\n",
++                       gendcb->dcbddnam, member);
++                if (member[0] == ' ' || member[0] == 0
++                    || !pdos64PdsOpenWrite(pdos, gendcb,
++                                            tiot->dsname[slot], member))
++                {
++                    pdos->context->regs[15] = 12;
++                    printf("P64 PDS OPEN FAILED dd=%.8s dsn=%s\n",
++                           gendcb->dcbddnam, tiot->dsname[slot]);
++                    return;
++                }
++            }
++        }
++#endif
+         gendcb->dcbcheck = (int)dcheck;
+         gendcb->dcbnotepoint = (int)dnotpnt;
+         oneexit = gendcb->u2.dcbexlsa & 0xffffff;
+@@ -2355,14 +3539,24 @@ static void pdosProcessSVC(PDOS *pdos)
+ #if 0
+             printf("opening for input\n");
+ #endif
+-            gendcb->u1.dcbgetput = (int)dread;
++#ifdef ZARCH
++            if (pdos->context->module_rmode_any == 1)
++                gendcb->u1.dcbgetput = (int)p64drd;
++            else
++#endif
++                gendcb->u1.dcbgetput = (int)dread;
+         }
+         else if (ocode == 0x8f) /* out */
+         {
+ #if 0
+             printf("opening for output\n");
+ #endif
+-            gendcb->u1.dcbgetput = (int)dwrite;
++#ifdef ZARCH
++            if (pdos->context->module_rmode_any == 1)
++                gendcb->u1.dcbgetput = (int)p64dwr;
++            else
++#endif
++                gendcb->u1.dcbgetput = (int)dwrite;
+         }
+         else if (ocode == 0x83) /* inout */
+         {
+@@ -2370,7 +3564,12 @@ static void pdosProcessSVC(PDOS *pdos)
+ 	    /* this needs to be changed (everything should be using a
+ 	       generic read/write routine), but for now at least allow
+ 	       the open and first read to succeed */
+-            gendcb->u1.dcbgetput = (int)dread;
++#ifdef ZARCH
++            if (pdos->context->module_rmode_any == 1)
++                gendcb->u1.dcbgetput = (int)p64drd;
++            else
++#endif
++                gendcb->u1.dcbgetput = (int)dread;
+         }
+         else /* don't understand - refuse to open */
+         {
+@@ -2571,6 +3770,24 @@ static void pdosProcessSVC(PDOS *pdos)
+ 
+         ocode = p[0];
+         ocode >>= 24;
++#ifdef ZARCH
++        if (pdos->context->module_rmode_any == 1 && ocode == 0x8f)
++        {
++            PDOS64PDSWRITE *state = pdos64PdsWriteState(dcb);
++            if (state != NULL)
++            {
++                int ok = pdos64PdsCloseWrite(pdos, state, dcb);
++                memset(state, 0, sizeof *state);
++                if (!ok)
++                {
++                    pdos64_pds_io_failed = 1;
++                    pdos->context->regs[15] = 12;
++                    printf("P64 PDS CLOSE FAILED dd=%.8s\n", dcb->dcbddnam);
++                }
++                return;
++            }
++        }
++#endif
+ 
+         /* if this is a disk file, and, it was open for write, need to 
+            write an EOF record */
+@@ -2632,6 +3849,14 @@ static void pdosProcessSVC(PDOS *pdos)
+             join_cchhr(dcb->dcbfdad + 3, cyl, head, rec);
+         }
+     }
++#ifdef ZARCH
++    else if (pdos->context->module_rmode_any == 1)
++    {
++        printf("P64 unsupported SVC %d\n", svc);
++        pdos->context->regs[15] = 12;
++        pdos->context->regs[0] = 12;
++    }
++#endif
+     return;
+ }
+ 
+@@ -2659,6 +3884,100 @@ typedef struct {
+      not correct in the first place */
+ } SVC99TU;
+ 
++#ifdef ZARCH
++/* The retained native adapter reaches SVC99 through @@DYNAL. Accept
++   DDNAME, returned DDNAME, DSNAME and SHR disposition only. A real VTOC
++   lookup makes provider/root names data-driven; unknown data sets fail. */
++static void pdos64SVC99(PDOS *pdos, SVC99RB *rb)
++{
++    TIOT *tiot = pdos->psa->psatold->tcbtio;
++    unsigned int *list = (unsigned int *)rb->tu_list;
++    unsigned char ddname[8];
++    char dsn[45];
++    SVC99TU *return_dd = NULL;
++    int have_dd = 0, have_dsn = 0, disposition = 0;
++    int i, rc;
++    static unsigned int next_dd = 1;
++
++    memset(ddname, ' ', sizeof ddname);
++    memset(dsn, 0, sizeof dsn);
++    rb->error_reason = rb->info_reason = 0;
++    for (i = 0; i < 16; i++)
++    {
++        unsigned int raw = list[i];
++        SVC99TU *tu = (SVC99TU *)(raw & 0x7fffffffU);
++        int n;
++        if (tu == NULL) break;
++        n = (unsigned short)tu->parm1_len;
++        if (tu->key == 0x1c && tu->numparms == 0)
++        {
++            if (raw & 0x80000000U) break;
++            continue;
++        }
++        if (tu->numparms != 1 || n < 1)
++            goto fail;
++        if (tu->key == 1 && n == 8)
++        {
++            memcpy(ddname, tu->parm1, 8);
++            have_dd = 1;
++        }
++        else if (tu->key == 0x55 && n == 8)
++        {
++            return_dd = tu;
++        }
++        else if (tu->key == 2 && n <= 44)
++        {
++            memcpy(dsn, tu->parm1, n);
++            have_dsn = 1;
++        }
++        else if (tu->key == 4 && n == 1)
++            disposition = (unsigned char)tu->parm1[0];
++        else if (tu->key != 0x49 && tu->key != 0x42)
++            goto fail;
++        if (raw & 0x80000000U) break;
++    }
++    if (i == 16 || (i < 16 && !(list[i] & 0x80000000U)))
++        goto fail;
++    if (rb->verb == 2 && have_dd)
++    {
++        if (!pdos64FreeDd(tiot, (char *)ddname)) goto fail;
++        goto success;
++    }
++    if (rb->verb != 1 || !have_dsn || disposition != 8)
++        goto fail;
++    if (!have_dd && return_dd != NULL)
++    {
++        char name[9];
++        int attempts;
++        for (attempts = 0; attempts < 999999; attempts++)
++        {
++            sprintf(name, "PD%06u", next_dd++ % 1000000U);
++            if (pdos64DdSlot(tiot, name) < 0) break;
++        }
++        if (attempts == 999999) goto fail;
++        memcpy(ddname, name, 8);
++        have_dd = 1;
++    }
++    if (!have_dd || pdos64DdSlot(tiot, (char *)ddname) >= 0)
++        goto fail;
++    rc = pdos64BindDd(pdos, tiot, (char *)ddname, dsn);
++    if (rc != 1) goto fail;
++    if (return_dd != NULL) memcpy(return_dd->parm1, ddname, 8);
++success:
++    printf("P64 S99 OK verb=%d dd=%.8s dsn=%s disp=%d count=%d\n",
++           rb->verb, ddname, dsn, disposition, tiot->count);
++    pdos->context->regs[15] = 0;
++    pdos->context->regs[0] = 0;
++    return;
++fail:
++    printf("P64 S99 FAIL verb=%d dd=%.8s dsn=%s disp=%d count=%d\n",
++           rb->verb, ddname, dsn, disposition, tiot->count);
++    rb->error_reason = 12;
++    pdos->context->regs[15] = 12;
++    pdos->context->regs[0] = 12;
++}
++#endif
++
+ 
+ static void pdosSVC99(PDOS *pdos)
+ {
+@@ -2672,6 +3991,13 @@ static void pdosSVC99(PDOS *pdos)
+     svc99rb = *(SVC99RB **)pdos->context->regs[1];
+     /* the rb can have the high bit set, so it needs to be cleared */
+     svc99rb = (SVC99RB *)((unsigned int)svc99rb & 0x7fffffffU);
++#ifdef ZARCH
++    if (pdos->context->module_rmode_any == 1)
++    {
++        pdos64SVC99(pdos, svc99rb);
++        return;
++    }
++#endif
+     if (svc99rb->verb == 2) /* unallocate */
+     {
+         /* unconditional success */
+@@ -4266,6 +5592,7 @@ static int pdosRamDisk(PDOS *pdos, char *parm)
+ 
+ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
+ {
++    enum { EXE_CAPACITY = 5 * 1024 * 1024 };
+     char *raw;
+     char *initial;
+     char *load;
+@@ -4288,6 +5615,11 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
+     int imgsize;
+     static int first = 1; /* first executable, ie command.exe */
+     int iscom = 0;
++#ifdef ZARCH
++    int loadAmode = -1;
++    int loadRmodeAny = -1;
++    int g;
++#endif
+ 
+     if (!first || (!__istape && !__iscard && !__ismem))
+     {
+@@ -4380,13 +5712,13 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
+         return (-1);
+     }
+ 
+-    /* assume 5 MB max */
++    /* Bound both the serialized input and expanded image. */
+ #if defined(ZARCH)
+     raw = memmgrAllocate(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
+-                         5 * 1024 * 1024, 0);
++                         EXE_CAPACITY, 0);
+ #else
+     raw = memmgrAllocate(&pdos->aspaces[pdos->curr_aspace].o.btlmem,
+-                         5 * 1024 * 1024, 0);
++                         EXE_CAPACITY, 0);
+ #endif
+     if (raw == NULL)
+     {
+@@ -4480,6 +5812,16 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
+             continue;
+         }
+         lastcnt = cnt;
++        if (cnt > 0 && (load - initial) > EXE_CAPACITY - cnt)
++        {
++            printf("executable exceeds loader capacity\n");
++#if defined(ZARCH)
++            memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem, raw);
++#else
++            memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.btlmem, raw);
++#endif
++            return (-1);
++        }
+         memcpy(load, tbuf, cnt);
+         load += cnt;
+         j++;
+@@ -4497,7 +5839,14 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
+     }
+     else if (pe)
+     {
+-        if (fixPE(initial, &exeLen, &entry, (int)initial) != 0)
++        if (
++#ifdef ZARCH
++            fixPEMode(initial, &exeLen, &entry, (int)initial,
++                      EXE_CAPACITY, &loadAmode, &loadRmodeAny)
++#else
++            fixPE(initial, &exeLen, &entry, (int)initial, EXE_CAPACITY)
++#endif
++            != 0)
+         {
+ #if defined(ZARCH)
+             memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem, raw);
+@@ -4506,7 +5855,8 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
+ #endif
+             return (-1);
+         }
+-        exeLen += 0x1000; /* give some buffer */
++        if (exeLen <= EXE_CAPACITY - 0x1000)
++            exeLen += 0x1000; /* give some buffer if it fits */
+         /* unconditionally reduce the 5 MB to something reasonable */
+ #if defined(ZARCH)
+         memmgrRealloc(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
+@@ -4564,6 +5914,32 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
+         pdos->context->pptrs[0] = parm;
+     
+         pdos->context->regs[1] = (int)pdos->context->pptrs;
++#ifdef ZARCH
++        pdos->context->module_amode = loadAmode;
++        pdos->context->module_rmode_any = loadRmodeAny;
++        if (loadAmode == 2 && loadRmodeAny == 1)
++        {
++            /* The legacy default runs the shell in AMODE64. A native
++               AMODE31/RMODE ANY directory requires AMODE31 at entry. */
++            pdos->context->psw1 &= ~1U;
++            pdos->context->psw1 |= 0x00010000U;
++        }
++        if (loadAmode == 1)
++        {
++            for (g = 0; g < NUM_GPR; g++)
++            {
++                pdos->context->regs64[g * 2] = 0;
++                pdos->context->regs64[g * 2 + 1] =
++                    (unsigned int)pdos->context->regs[g];
++            }
++            /* DAT + problem state + AMODE64, key zero, masked external
++               and I/O interrupts. Low code executes below 2 GiB. */
++            pdos->context->psw64[0] = 0x04010001U;
++            pdos->context->psw64[1] = 0x80000000U;
++            pdos->context->psw64[2] = 0;
++            pdos->context->psw64[3] = (unsigned int)entry;
++        }
++#endif
+ 
+ #if 0
+         printf("finished loading executable\n");
+@@ -4705,15 +6081,22 @@ static void write3270(char *buf, size_t lenbuf, int cr)
+         }
+         first = 0;
+     }
+-    memset(intbuf + 6 + lineupto * 80, ' ', 80);
+-    memcpy(intbuf + 6 + lineupto * 80, buf, lenbuf);
+-    __conswr(sizeof intbuf, intbuf, 0);
+-    lineupto++;
+-    if (lineupto == 22)
++    /* Keep output within the protected rows, before the input field. */
++    do
+     {
+-        lineupto--;
+-        memmove(intbuf + 6, intbuf + 6 + 80, lineupto * 80);
+-    }
++        size_t part = lenbuf > 80 ? 80 : lenbuf;
++        memset(intbuf + 6 + lineupto * 80, ' ', 80);
++        memcpy(intbuf + 6 + lineupto * 80, buf, part);
++        __conswr(sizeof intbuf, intbuf, 0);
++        lineupto++;
++        if (lineupto == 22)
++        {
++            lineupto--;
++            memmove(intbuf + 6, intbuf + 6 + 80, lineupto * 80);
++        }
++        buf += part;
++        lenbuf -= part;
++    } while (lenbuf != 0);
+ }
+ 
+ static int cprintf(char *format, ...)
+diff --git a/s370/pdossup.asm b/s370/pdossup.asm
+index 720cf16..e049bed 100644
+--- a/s370/pdossup.asm
++++ b/s370/pdossup.asm
+@@ -46,6 +46,15 @@ AM64BIT  EQU X'00000000'
+ *
+ *
+          CSECT
++*
++* The z/Architecture-only scratch area is below the 8-KiB PSA boundary.
++* The old 31-bit FLCGRSAV/FLCFLA path remains unchanged.
++         AIF ('&XSYS' NE 'ZARCH').P64EQEND
++P64MODE  EQU   X'610'
++P64PSW   EQU   X'620'
++P64GPRS  EQU   X'700'
++P64KREG  EQU   X'800'
++.P64EQEND ANOP
+ **********************************************************************
+ *                                                                    *
+ *  INITSYS - initialize system                                       *
+@@ -78,7 +87,7 @@ INITSYS  DS    0H
+ .ZSW64   ANOP
+          MVC   FLCEINPW(16),WAITER7
+          MVC   FLCEMNPW(16),WAITER1
+-         MVC   FLCEPNPW(16),WAITER3
++         MVC   FLCEPNPW(16),NEWPGM
+          MVC   FLCESNPW(16),NEWSVC
+ .ZSW64B  ANOP
+ *
+@@ -138,6 +147,10 @@ NEWSVC   DC    A(X'00040000'+AM64BIT)
+          DC    A(AMBIT)
+          DC    A(0)
+          DC    A(GOTSVC)
++NEWPGM   DC    A(X'00040000'+AM64BIT)
++         DC    A(AMBIT)
++         DC    A(0)
++         DC    A(GOTPGM)
+ .WAIT64B ANOP
+ *
+ *
+@@ -231,6 +244,11 @@ WRBLOCK  DS    0H
+          DC    H'0'
+ WRCONT   DS    0H           Interrupt will automatically come here
+          AIF   ('&XSYS' EQ 'S390' OR '&XSYS' EQ 'ZARCH').WR31H
++* Zero residual and chain end do not imply success after unit check.
++         CLI   FLCCSW+4,X'0C'  Channel end and device end only
++         BNE   WRERROR
++         CLI   FLCCSW+5,0      No channel error
++         BNE   WRERROR
+          SH    R7,FLCCSW+6  Subtract residual count to get bytes written
+          LR    R15,R7
+ * After a successful CCW chain, CSW should be pointing to end
+@@ -239,11 +257,17 @@ WRCONT   DS    0H           Interrupt will automatically come here
+          AGO   .WR24H
+ .WR31H   ANOP
+          TSCH  0(R9)
++         BNZ   WRERROR         Require a valid status block
++         CLI   8(R9),X'0C'     Channel end and device end only
++         BNE   WRERROR
++         CLI   9(R9),0         No channel error
++         BNE   WRERROR
+          SH    R7,10(R9)
+          LR    R15,R7
+          CLC   4(4,R9),=A(WRFINCHN)
+          BE    WRALLFIN
+ .WR24H   ANOP
++WRERROR  DS    0H
+          L     R15,=F'-1'   error return
+ WRALLFIN DS    0H
+          RETURN (14,12),RC=(15)
+@@ -349,8 +373,32 @@ ADISPRET DS    0H
+          LA    R15,0
+ ADISPRT2 DS    0H
+          RETURN (14,12),RC=(15)
++         AIF ('&XSYS' NE 'ZARCH').P64PGMRET
++ADISPPGM LA    R15,4
++         RETURN (14,12),RC=(15)
++.P64PGMRET ANOP
+          LTORG
+ *
++* Native AMODE64 member dispatch: full-width GPRs and 16-byte PSW.
++* The application enters in problem state, key zero, with I/O and
++* external interrupts masked by the C request block. SVC returns here.
++         AIF ('&XSYS' NE 'ZARCH').P64DISEND
++         ENTRY ADISP64
++ADISP64  DS    0H
++         SAVE  (14,12),,ADISP64
++         LR    R12,R15
++         USING ADISP64,R12
++         STMG  R0,R15,P64KREG
++         LMG   R0,R15,P64GPRS
++         LPSWE P64PSW
++AD64RET  DS    0H
++         LA    R15,0
++         RETURN (14,12),RC=(15)
++AD64PGM  LA    R15,4
++         RETURN (14,12),RC=(15)
++         LTORG
++.P64DISEND ANOP
++*
+ *
+ *
+ **********************************************************************
+@@ -362,9 +410,84 @@ ADISPRT2 DS    0H
+ **********************************************************************
+ *
+ GOTSVC   DS    0H
++         AIF ('&XSYS' NE 'ZARCH').P64SVCEND
++         TM    P64MODE,X'01'
++         BRCL  1,GOTS64
++.P64SVCEND ANOP
+          STM   R0,R15,FLCGRSAV        Save application registers
+          LM    R0,R15,FLCFLA        Load OS registers
+-         B     ADISPRET
++         BRCL  15,ADISPRET
++         AIF ('&XSYS' NE 'ZARCH').P64SVC64END
++GOTS64   DS    0H
++         STMG  R0,R15,P64GPRS
++         LMG   R0,R15,P64KREG
++         B     AD64RET
++.P64SVC64END ANOP
++*
++* Return a user program interruption to the C task dispatcher. The old
++* extended PSW and interruption code remain in the architectural PSA.
++         AIF ('&XSYS' NE 'ZARCH').P64PGMEND
++GOTPGM   DS    0H
++         TM    P64MODE,X'01'
++         BRCL  1,GOTPGM64
++         STM   R0,R15,FLCGRSAV
++         LM    R0,R15,FLCFLA
++         BRCL  15,ADISPPGM
++GOTPGM64 STMG R0,R15,P64GPRS
++         LMG   R0,R15,P64KREG
++         B     AD64PGM
++.P64PGMEND ANOP
++*
++* One source-built z/PDOS IARV64 PC entry. The native V1R5 macro issues
++* PC EX 14 uses AMODE31. ESAME linkage restores GPR2-14,
++* the caller PSW and its problem state on PR. Only R0/R15 are results.
++*
++         AIF ('&XSYS' NE 'ZARCH').P64PCEND
++         ENTRY P64PC
++P64PC    DS    0H
++         LARL  R12,P64PC
++         USING P64PC,R12
++         CLI   0(R1),X'00'
++         BNE   P64PCBAD
++         TM    5(R1),X'80'
++         BZ    P64PCBAD
++         CLI   1(R1),X'01'
++         BE    P64PCGET
++         CLI   1(R1),X'03'
++         BE    P64PCDET
++         B     P64PCBAD
++P64PCGET DS    0H
++         CLC   8(8,R1),P64PC32
++         BE    P64PCSOK
++         CLC   8(8,R1),P64PC128
++         BNE   P64PCBAD
++P64PCSOK DS    0H
++         CLI   P64PCUSED,X'00'
++         BNE   P64PCBAD
++         MVI   P64PCUSED,X'01'
++         MVC   40(8,R1),P64PCADDR
++         B     P64PCOK
++P64PCDET DS    0H
++         CLI   P64PCUSED,X'01'
++         BNE   P64PCBAD
++         CLC   56(8,R1),P64PCADDR
++         BNE   P64PCBAD
++         MVI   P64PCUSED,X'00'
++P64PCOK  DS    0H
++         SR    R0,R0
++         SR    R15,R15
++         PR
++P64PCBAD DS    0H
++         LA    R0,8
++         LA    R15,8
++         PR
++         DS    0D
++P64PC32 DC    XL8'0000000000000020'
++P64PC128 DC   XL8'0000000000000080'
++P64PCADDR DC   XL8'0000000100000000'
++P64PCUSED DC   X'00'
++         DROP  R12
++.P64PCEND ANOP
+ *
+ *
+ *
+@@ -424,7 +547,7 @@ DREAD    DS    0H
+          CALL  @@SETM31
+ .MOD24G  ANOP
+          LA    R15,3
+-         B     ADISPRT2
++         BRCL  15,ADISPRT2
+ *
+ *
+ *
+@@ -463,7 +586,18 @@ DWRITE   DS    0H
+          CALL  @@SETM31
+ .MOD24D  ANOP
+          LA    R15,2
+-         B     ADISPRT2
++         BRCL  15,ADISPRT2
++
++* Native problem-state DCB exits reach the existing PDOS disk service
++* through an architectural SVC. The interrupted PSW returns to the BR.
++         AIF ('&XSYS' NE 'ZARCH').P64DCBEND
++         ENTRY P64DWR
++P64DWR   SVC   250
++         BR    R14
++         ENTRY P64DRD
++P64DRD   SVC   251
++         BR    R14
++.P64DCBEND ANOP
+          DROP  ,
+ *
+ *
+@@ -601,6 +735,35 @@ LCREG1   DS    0H
+          LA    R15,0
+          RETURN (14,12),RC=(15)
+          LTORG
++         AIF ('&XSYS' NE 'ZARCH').P64CREND
++         ENTRY LCREG3
++LCREG3   DS    0H
++         SAVE  (14,12),,LCREG3
++         LR    R12,R15
++         USING LCREG3,R12
++         LCTL  3,3,0(R1)
++         LA    R15,0
++         RETURN (14,12),RC=(15)
++         LTORG
++         ENTRY LCREG5
++LCREG5   DS    0H
++         SAVE  (14,12),,LCREG5
++         LR    R12,R15
++         USING LCREG5,R12
++         LCTL  5,5,0(R1)
++         LA    R15,0
++         RETURN (14,12),RC=(15)
++         LTORG
++         ENTRY LCREG15
++LCREG15  DS    0H
++         SAVE  (14,12),,LCREG15
++         LR    R12,R15
++         USING LCREG15,R12
++         LCTL  15,15,0(R1)
++         LA    R15,0
++         RETURN (14,12),RC=(15)
++         LTORG
++.P64CREND ANOP
+ **********************************************************************
+ *                                                                    *
+ *  LCREG13 - load control register 13                                *
+diff --git a/s370/pdosutil.c b/s370/pdosutil.c
+index c86c1da..edfe586 100644
+--- a/s370/pdosutil.c
++++ b/s370/pdosutil.c
+@@ -12,6 +12,7 @@
+ 
+ #include <stdio.h>
+ #include <ctype.h>
++#include <stdlib.h>
+ #include <string.h>
+ 
+ #include "pdosutil.h"
+@@ -158,7 +159,64 @@ int findFile(int ipldev, char *dsn, int *c, int *h, int *r)
+ 
+ #define PE_DEBUG 0
+ 
+-int fixPE(char *buf, int *len, int *entry, int rlad)
++typedef struct {
++    int id;
++    int base;
++} PESECTION;
++
++typedef struct {
++    int start;
++    int end;
++} PEGAP;
++
++static int pe16(const unsigned char *p)
++{
++    return ((int)p[0] << 8) | p[1];
++}
++
++static int pe24(const unsigned char *p)
++{
++    return ((int)p[0] << 16) | ((int)p[1] << 8) | p[2];
++}
++
++static unsigned int pe32(const unsigned char *p)
++{
++    return ((unsigned int)p[0] << 24) | ((unsigned int)p[1] << 16)
++        | ((unsigned int)p[2] << 8) | p[3];
++}
++
++static void peput32(unsigned char *p, unsigned int value)
++{
++    p[0] = value >> 24;
++    p[1] = value >> 16;
++    p[2] = value >> 8;
++    p[3] = value;
++}
++
++typedef struct {
++    int offset;
++} PEHIGHRELOC;
++
++typedef struct {
++    PEHIGHRELOC *items;
++    int count;
++    int capacity;
++} PEHIGHRELOCS;
++
++static int peHighRelocCompare(const void *left, const void *right)
++{
++    const PEHIGHRELOC *a = left;
++    const PEHIGHRELOC *b = right;
++    return (a->offset > b->offset) - (a->offset < b->offset);
++}
++
++static int processRLD(char *buf, int textlen, int rlad, char *rld, int len,
++                      const PESECTION *sections, int nsections,
++                      PEHIGHRELOCS *high);
++
++static int fixPEModeBase(char *buf, int *len, int *entry, int rlad,
++                         int capacity, int *module_amode,
++                         int *module_rmode_any, int high)
+ {
+     char *p;
+     char *q;
+@@ -183,9 +241,21 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+     int lastt = -1;
+     char *lasttxt = NULL;
+     char *upto = buf;
+-    int initlen = *len;
++    PESECTION *sections = NULL;
++    int nsections = 0;
++    int sectioncap = 0;
++    PEGAP *gaps = NULL;
++    int ngaps = 0;
++    int gapcap = 0;
++    int nexttext = 0;
++    int lastend = 0;
++    int imageend = 0;
++    PEHIGHRELOCS highrelocs = {NULL, 0, 0};
+     
+-    if ((*len <= 8) || (*((int *)buf + 1) != 0xca6d0f))
++    if (module_amode != NULL) *module_amode = -1;
++    if (module_rmode_any != NULL) *module_rmode_any = -1;
++    if ((*len <= 8) || capacity < *len
++        || memcmp(buf + 4, "\x00\xca\x6d\x0f", 4) != 0)
+     {
+         printf("Not an MVS PE executable\n");
+         return (-1);
+@@ -196,10 +266,11 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+     p = buf;
+     while (1)
+     {
++        if (rem < 2) break;
+         rec++;
+-        l = *(short *)p;
++        l = pe16((unsigned char *)p);
+         /* keep track of remaining bytes, and ensure they really exist */
+-        if (l > rem)
++        if (l < 2 || l > rem)
+         {
+             break;
+         }
+@@ -225,14 +296,26 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+                 break;
+             }
+             q = p + 24;
+-            l2 = *(short *)q;
++            l2 = pe16((unsigned char *)q);
+             if (l2 < 32) break;
+             ihapds = (IHAPDS *)(q + 2);
+             rmode = ihapds->pds2ftb2 & 0x10;
+-            amode = (ihapds->pds2ftb2 & 0x0c) >> 2;
+-            ent = 0;
+-            memcpy((char *)&ent + sizeof(ent) - 3, ihapds->pds2epa, 3);
+-            *entry = (int)(buf + ent);
++            /* V1R5 native directory: low two bits are AMODE; bit 4 is
++               RMODE ANY. The old diagnostic-only mask read bits 2-3. */
++            amode = ihapds->pds2ftb2 & 0x03;
++            if ((high && (amode != 1
++                          || (ihapds->pds2ftb2 & 0x30) != 0x30))
++                || (module_amode != NULL
++                    && (amode == 3 || (amode == 1 && !rmode))))
++            {
++                printf("unsupported native AMODE/RMODE directory byte %x\n",
++                       ihapds->pds2ftb2 & 0xff);
++                break;
++            }
++            if (module_amode != NULL) *module_amode = amode;
++            if (module_rmode_any != NULL) *module_rmode_any = !!rmode;
++            ent = pe24((unsigned char *)ihapds->pds2epa);
++            *entry = high ? ent : (int)(buf + ent);
+ #if PE_DEBUG
+             printf("module name is %.8s\n", ihapds->pds2name);
+             printf("rmode is %s\n", rmode ? "ANY" : "24");
+@@ -272,7 +355,12 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+             r2 = l - 4 - 10;
+             while (1)
+             {
+-                l2 = *(short *)q;
++                if (r2 < 2)
++                {
++                    term = 1;
++                    break;
++                }
++                l2 = pe16((unsigned char *)q);
+                 r2 -= sizeof(short);
+                 if (l2 > r2)
+                 {
+@@ -289,17 +377,49 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+                        *q, l2, q - p);
+ #endif
+ 
+-                t = *q;
+-                if ((lastt == 1) || (lastt == 3) || (lastt == 0x0d))
++                t = (unsigned char)*q;
++                if ((lastt == 1) || (lastt == 3)
++                    || (lastt == 0x0d) || (lastt == 0x0f))
+                 {
+ #if PE_DEBUG
+                     printf("rectype: program text\n");
+ #endif
++                    PEGAP *grown;
++
++                    /* A leftward overlapping move is safe: it cannot
++                     * overwrite any unconsumed input after this text. */
++                    if (nexttext < lastend || nexttext > capacity
++                        || l2 > capacity - nexttext
++                        || buf + nexttext > q)
++                    {
++                        term = 1;
++                        break;
++                    }
++                    if (nexttext > lastend)
++                    {
++                        if (ngaps == gapcap)
++                        {
++                            int newcap = gapcap ? gapcap * 2 : 8;
++                            grown = realloc(gaps, newcap * sizeof *gaps);
++                            if (grown == NULL)
++                            {
++                                term = 1;
++                                break;
++                            }
++                            gaps = grown;
++                            gapcap = newcap;
++                        }
++                        gaps[ngaps].start = lastend;
++                        gaps[ngaps].end = nexttext;
++                        ngaps++;
++                    }
+                     lasttxt = q;
+-                    memmove(upto, q, l2);
+-                    upto += l2;
++                    memmove(buf + nexttext, q, l2);
++                    lastend = nexttext + l2;
++                    if (lastend > imageend) imageend = lastend;
++                    upto = buf + imageend;
+                     t = -1;
+-                    if (lastt == 0x0d)
++                    if (lastt == 0x0d || lastt == 0x0f)
+                     {
+                         term = 1;
+                         corrupt = 0;
+@@ -308,44 +428,126 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+                 }
+                 else if (t == 0x20)
+                 {
+-                    /* printf("rectype: CESD\n"); */
++                    int first;
++                    int count;
++                    int i;
++
++                    if (l2 < 8 || pe16((unsigned char *)q + 6) > l2 - 8
++                        || (pe16((unsigned char *)q + 6) % 16) != 0)
++                    {
++                        term = 1;
++                        break;
++                    }
++                    first = pe16((unsigned char *)q + 4);
++                    count = pe16((unsigned char *)q + 6) / 16;
++                    for (i = 0; i < count; i++)
++                    {
++                        unsigned char *item = (unsigned char *)q + 8 + i * 16;
++                        PESECTION *grown;
++
++                        /* Native V1R5 binder emits named section type 0
++                           as well as unnamed section type 4. Both own RLD
++                           P indexes; ignoring type 0 loses CSECT 1. */
++                        if (item[8] != 0 && item[8] != 4) continue;
++                        if (nsections == sectioncap)
++                        {
++                            int newcap = sectioncap ? sectioncap * 2 : 16;
++                            grown = realloc(sections, newcap * sizeof *sections);
++                            if (grown == NULL)
++                            {
++                                term = 1;
++                                break;
++                            }
++                            sections = grown;
++                            sectioncap = newcap;
++                        }
++                        sections[nsections].id = first + i;
++                        sections[nsections].base = pe24(item + 9);
++                        if (sections[nsections].base > capacity
++                            || pe24(item + 13)
++                               > capacity - sections[nsections].base)
++                        {
++                            term = 1;
++                            break;
++                        }
++                        if (sections[nsections].base + pe24(item + 13)
++                            > imageend)
++                        {
++                            imageend = sections[nsections].base
++                                + pe24(item + 13);
++                        }
++                        nsections++;
++                    }
++                    if (term) break;
+                 }
+                 else if (t == 1)
+                 {
+-                    /* printf("rectype: Control\n"); */
++                    if (l2 < 16 || (unsigned char)q[8] != 6)
++                    {
++                        term = 1;
++                        break;
++                    }
++                    nexttext = pe24((unsigned char *)q + 9);
+                 }
+                 else if (t == 0x0d)
+                 {
+-                    /* printf("rectype: Control, about to end\n"); */
++                    if (l2 < 16 || (unsigned char)q[8] != 6)
++                    {
++                        term = 1;
++                        break;
++                    }
++                    nexttext = pe24((unsigned char *)q + 9);
+                 }
+                 else if (t == 2)
+                 {
+                     /* printf("rectype: RLD\n"); */
+-                    if (processRLD(buf, rlad, q, l2) != 0)
++                    if (processRLD(buf, upto - buf, rlad, q, l2,
++                                   sections, nsections,
++                                   high ? &highrelocs : NULL) != 0)
+                     {
+                         term = 1;
+                         break;
+                     }
+                 }
+-                else if (t == 3)
++                else if (t == 3 || t == 0x0f)
+                 {
+                     int l3;
+                     
+                     /* printf("rectype: Dicionary = Control + RLD\n"); */
+-                    l3 = *(short *)(q + 6) + 16;
++                    if (l2 < 16)
++                    {
++                        term = 1;
++                        break;
++                    }
++                    l3 = pe16((unsigned char *)q + 6) + 16;
++                    if (l3 > l2)
++                    {
++                        term = 1;
++                        break;
++                    }
+ #if 0
+                     printf("l3 is %d\n", l3);
+ #endif
+-                    if (processRLD(buf, rlad, q, l3) != 0)
++                    if (processRLD(buf, upto - buf, rlad, q, l3,
++                                   sections, nsections,
++                                   high ? &highrelocs : NULL) != 0)
+                     {
+                         term = 1;
+                         break;
+                     }
++                    if (l2 < 16 || (unsigned char)q[8] != 6)
++                    {
++                        term = 1;
++                        break;
++                    }
++                    nexttext = pe24((unsigned char *)q + 9);
+                 }
+                 else if (t == 0x0e)
+                 {
+                     /* printf("rectype: Last record of module\n"); */
+-                    if (processRLD(buf, rlad, q, l2) != 0)
++                    if (processRLD(buf, upto - buf, rlad, q, l2,
++                                   sections, nsections,
++                                   high ? &highrelocs : NULL) != 0)
+                     {
+                         term = 1;
+                         break;
+@@ -360,7 +562,13 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+                 }
+                 else
+                 {
+-                    /* printf("rectype: unknown %x\n", t); */
++                    if (high)
++                    {
++                        printf("unsupported high module record %x\n", t);
++                        term = 1;
++                        break;
++                    }
++                    /* Retain the legacy low-loader record tolerance. */
+                 }
+ #if 0
+                 if ((t == 0x20) || (t == 2))
+@@ -405,20 +613,95 @@ int fixPE(char *buf, int *len, int *entry, int rlad)
+             break;
+         }
+     }
++    free(sections);
+     if (corrupt)
+     {
++        free(highrelocs.items);
++        free(gaps);
+         printf("corrupt module\n");
+         return (-1);
+     }
++    if (imageend > capacity || imageend < lastend)
++    {
++        free(highrelocs.items);
++        free(gaps);
++        printf("module image exceeds input buffer\n");
++        return (-1);
++    }
++    for (z = 0; z < ngaps; z++)
++    {
++        memset(buf + gaps[z].start, 0, gaps[z].end - gaps[z].start);
++    }
++    free(gaps);
++    memset(buf + lastend, 0, imageend - lastend);
++    if (high)
++    {
++        int i;
++        unsigned int base = (unsigned int)rlad;
++        if (*entry < 0 || *entry >= imageend || (*entry & 1))
++        {
++            free(highrelocs.items);
++            printf("invalid high module entry offset\n");
++            return (-1);
++        }
++        qsort(highrelocs.items, highrelocs.count,
++              sizeof *highrelocs.items, peHighRelocCompare);
++        /* Preflight every target before modifying even one relocated field. */
++        for (i = 0; i < highrelocs.count; i++)
++        {
++            int off = highrelocs.items[i].offset;
++            if (off < 0 || off > imageend - 8
++                || (i && off < highrelocs.items[i - 1].offset + 8)
++                || pe32((unsigned char *)buf + off) != 0
++                || pe32((unsigned char *)buf + off + 4)
++                   >= (unsigned int)imageend)
++            {
++                free(highrelocs.items);
++                printf("invalid or overlapping high module relocation\n");
++                return (-1);
++            }
++        }
++        for (i = 0; i < highrelocs.count; i++)
++        {
++            unsigned char *where = (unsigned char *)buf
++                + highrelocs.items[i].offset;
++            unsigned int oldlo = pe32(where + 4);
++            unsigned int newlo = oldlo + base;
++            peput32(where, 1U + (newlo < oldlo));
++            peput32(where + 4, newlo);
++        }
++        free(highrelocs.items);
++    }
+ #if 0
+     printf("dumping new module\n");
+ #endif
+-    *len = upto - buf; /* return new module length */
++    *len = imageend; /* include zero-filled sections and alignment gaps */
+     return (0);
+ }
+ 
++int fixPEMode(char *buf, int *len, int *entry, int rlad, int capacity,
++              int *module_amode, int *module_rmode_any)
++{
++    return fixPEModeBase(buf, len, entry, rlad, capacity,
++                         module_amode, module_rmode_any, 0);
++}
++
++int fixPEHigh(char *buf, int *len, int *entry_offset,
++              unsigned int base_low, int capacity)
++{
++    return fixPEModeBase(buf, len, entry_offset, (int)base_low,
++                         capacity, NULL, NULL, 1);
++}
++
++int fixPE(char *buf, int *len, int *entry, int rlad, int capacity)
++{
++    return fixPEMode(buf, len, entry, rlad, capacity, NULL, NULL);
++}
+ 
+-int processRLD(char *buf, int rlad, char *rld, int len)
++
++static int processRLD(char *buf, int textlen, int rlad, char *rld, int len,
++                      const PESECTION *sections, int nsections,
++                      PEHIGHRELOCS *high)
+ {
+     int l;
+     char *r;
+@@ -427,16 +710,40 @@ int processRLD(char *buf, int rlad, char *rld, int len)
+     int negative;
+     int ll;
+     int a;
+-    int newval;
+-    int *zaploc;
++    unsigned int newval;
++    unsigned char *zaploc;
++    int source;
++    int base;
++    int i;
+     
++    if (len < 16) return (-1);
+     r = rld + 16;
+     fin = rld + len;
+     while (r != fin)
+     {
+         if (!cont)
+         {
+-            r += 4; /* skip R & P */
++            if (r + 4 > fin)
++            {
++                printf("corrupt RLD section indexes\n");
++                return (-1);
++            }
++            source = pe16((unsigned char *)r + 2);
++            base = -1;
++            for (i = 0; i < nsections; i++)
++            {
++                if (sections[i].id == source)
++                {
++                    base = sections[i].base;
++                    break;
++                }
++            }
++            if (base < 0)
++            {
++                printf("RLD source CSECT %d has no CESD entry\n", source);
++                return (-1);
++            }
++            r += 4; /* R and P indexes; validate P's CSECT identity */
+             if (r >= fin)
+             {
+                 printf("corrupt1 at position %x\n", r - rld - 4);
+@@ -449,9 +756,11 @@ int processRLD(char *buf, int rlad, char *rld, int len)
+             printf("got a negative adjustment - unsupported\n");
+             return (-1);
+         }
+-        ll = (*r & 0x0c) >> 2;
+-        ll++;
+-        if ((ll != 4) && (ll != 3))
++        ll = ((*r & 0x0c) >> 2) + 1;
++        if (*r & 0x40) ll += 4;
++        if (high != NULL ? (ll != 8 || ((*r & 0x30) != 0x10
++                                       && (*r & 0x30) != 0))
++                         : (ll != 4 && ll != 3))
+         {
+             printf("untested and unsupported relocation %d\n", ll);
+             return (-1);
+@@ -471,16 +780,35 @@ int processRLD(char *buf, int rlad, char *rld, int len)
+             printf("corrupt2 at position %x\n", r - rld);
+             return (-1);
+         }
+-        a = 0;
+-        memcpy((char *)&a + sizeof(a) - 3, r, 3);
+-        /* +++ need bounds checking on this OS code */
+-        /* printf("need to zap %d bytes at offset %6x\n", ll, a); */
+-        zaploc = (int *)(buf + a - ((ll == 3) ? 1 : 0));
+-        newval = *zaploc;
++        a = pe24((unsigned char *)r);
++        if (a > textlen || ll > textlen - a
++            || (ll == 3 && a == 0))
++        {
++            printf("RLD address outside program text: CSECT %d base %x offset %x size %d text %x\n",
++                   source, base, a, ll, textlen);
++            return (-1);
++        }
++        if (high != NULL)
++        {
++            PEHIGHRELOC *grown;
++            if (high->count == high->capacity)
++            {
++                int newcap = high->capacity ? high->capacity * 2 : 128;
++                grown = realloc(high->items, newcap * sizeof *grown);
++                if (grown == NULL) return (-1);
++                high->items = grown;
++                high->capacity = newcap;
++            }
++            high->items[high->count++].offset = a;
++            r += 3;
++            continue;
++        }
++        zaploc = (unsigned char *)(buf + a - ((ll == 3) ? 1 : 0));
++        newval = pe32(zaploc);
+         /* printf("which means that %8x ", newval); */
+-        newval += rlad;
++        newval += (unsigned int)rlad;
+         /* printf("becomes %8x\n", newval); */
+-        *zaploc = newval;
++        peput32(zaploc, newval);
+         r += 3;
+     }
+     return (0);
+diff --git a/s370/pdosutil.h b/s370/pdosutil.h
+index fa85a33..ea6a75d 100644
+--- a/s370/pdosutil.h
++++ b/s370/pdosutil.h
+@@ -11,5 +11,9 @@
+ /*********************************************************************/
+ 
+ int findFile(int ipldev, char *dsn, int *c, int *h, int *r);
+-int fixPE(char *buf, int *len, int *entry, int rlad);
+-int processRLD(char *buf, int rlad, char *rld, int len);
++int fixPE(char *buf, int *len, int *entry, int rlad, int capacity);
++/* Return the native directory's AMODE code: 0=24, 1=64, 2=31, 3=ANY. */
++int fixPEMode(char *buf, int *len, int *entry, int rlad, int capacity,
++              int *module_amode, int *module_rmode_any);
++int fixPEHigh(char *buf, int *len, int *entry_offset,
++              unsigned int base_low, int capacity);
+diff --git a/s370/pload.c b/s370/pload.c
+index c628349..19acecb 100644
+--- a/s370/pload.c
++++ b/s370/pload.c
+@@ -125,7 +125,8 @@ int main(int argc, char **argv)
+         rec++;
+     }
+     cnt = load - start;
+-    if (fixPE(start, &cnt, (int *)&entry, (int)start) != 0)
++    if (fixPE(start, &cnt, (int *)&entry, (int)start,
++              PDOS_HEAP - PDOS_CODE) != 0)
+     {
+         printf("MVS PE module corrupt\n");
+     }
