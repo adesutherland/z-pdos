@@ -1,0 +1,20 @@
+/* SPDX-License-Identifier: MIT */
+options levelb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 5 then return 2
+  compiler = args.1; cli = args.2; linker = args.3; checker = args.4; work = args.5
+  if work = "" | work = "." | work = "/" then return 2
+  address crexx "run cmake -E make_directory :work"
+  if rc <> 0 then return rc
+  source = work || "/fullword.asm"; deck = work || "/fullword.obj"; binary = work || "/fullword.bin"
+  address crexx "run cmake -E rm -f :deck :binary"
+  if rc <> 0 then return rc
+  address crexx "run :compiler -S -Os tools/classic-cc/tests/fullword-bits.c -o :source"
+  if rc <> 0 then return rc
+  address crexx "run :cli --macros -I pdpclib/profiles/pdos-zarch -I pdpclib :source :deck"
+  if rc <> 0 then return rc
+  address crexx "run :linker --oformat binary --image-base 0 -e WORDS -o :binary :deck"
+  if rc <> 0 then return rc
+  address crexx "run :checker fullword-bits :binary"
+  return rc

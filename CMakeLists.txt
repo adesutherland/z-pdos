@@ -24,6 +24,18 @@ endif()
 find_program(CREXX_EXECUTABLE crexx)
 if(CREXX_EXECUTABLE)
   if(MF_CLASSIC_LINKER)
+    if(MF_TRADITIONAL_MACROS)
+      foreach(variant mvs cms)
+        set(compiler ${PROJECT_SOURCE_DIR}/build/classic-cc/${variant}/gcc/mf-classic-cc)
+        if(EXISTS ${compiler})
+          add_test(NAME classic_fullword_${variant}
+            COMMAND ${CREXX_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/classic-cc/check-fullword.crexx
+              --args ${compiler} $<TARGET_FILE:mf-classic-as> $<TARGET_FILE:mf-classic-ld>
+              $<TARGET_FILE:test_cli_output> ${PROJECT_BINARY_DIR}/fullword-${variant})
+          set_tests_properties(classic_fullword_${variant} PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+        endif()
+      endforeach()
+    endif()
     add_test(NAME classic_local_v_link
       COMMAND ${CREXX_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check-local-v.crexx
         --args $<TARGET_FILE:mf-classic-as> $<TARGET_FILE:mf-classic-ld>

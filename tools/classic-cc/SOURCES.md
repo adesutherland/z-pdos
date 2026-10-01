@@ -76,6 +76,12 @@ prevent the bounded available-source checkpoint.
   crashed `cc1` with a valid 700-character function identifier; the common-variable
   path still emitted a 101-column comment. Both defects are reproduced and fixed.
 
+- Emit raw 32-bit data as representable signed F values, preserving automatic
+  alignment and exact bits on wider hosts. PDOS MATH reproduced the failure
+  with 2827508273; the assembler must reject that out-of-range signed nominal.
+  IBM [fixed-point constants](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=value-fixed-point-constantsf-h)
+  documents signed and explicitly unsigned ranges. No target ISA/ABI changes.
+
 ## Recovering the source
 
 `patches/consolidated.patch` is a normalized compiler-only diff against the

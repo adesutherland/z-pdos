@@ -52,6 +52,16 @@ int main(int argc, char **argv)
     FILE *input;
 
     CHECK(argc == 3);
+    if (!strcmp(argv[1], "fullword-bits")) {
+        static const unsigned char words[28] = {0,0,0,0,0x7f,0xff,0xff,0xff,
+            0x80,0,0,0,0xff,0xff,0xff,0xff,0xa8,0x88,0x5a,0x31,
+            0x12,0x34,0x56,0x78,0x87,0x65,0x43,0x21};
+        input = fopen(argv[2], "rb"); CHECK(input != NULL);
+        got = fread(card, 1, sizeof card, input);
+        CHECK(got == sizeof words && !memcmp(card, words, sizeof words));
+        CHECK(!ferror(input) && fclose(input) == 0);
+        puts("fullword bits: all 28 independently expected bytes passed"); return 0;
+    }
     if (!strcmp(argv[1], "local-v")) {
         static const unsigned char linked[14] = {0,0,0x10,0x0c,0,0,0x10,0x0c,0,0,0x10,0,7,0xfe};
         input = fopen(argv[2], "rb"); CHECK(input != NULL);

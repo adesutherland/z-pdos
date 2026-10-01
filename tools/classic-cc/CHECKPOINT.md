@@ -16,9 +16,9 @@ copy of that private source series.
 - Reproduced surviving comment-emission defects and checked later descriptions
   as recorded in [MANUAL-RECONCILIATION.md](MANUAL-RECONCILIATION.md).
 - Maintained 819-file source manifest SHA-256:
-  `ec8fdaffd9c60e173203703f92c07f330d04c10b04ba0b7d008ec87af562de3f`.
+  `b3adf1e052255307c46fcda81f8e73a04f3b95207d5897df075afccb6ad6c381`.
 - Consolidated recovery patch SHA-256:
-  `cb25690232b7ed5be111142d82912a7abd9c494cc02724fccd4ad77a23a1cbca`.
+  `e1b6cc10e9e054458ec17f3e37eea2f067f2046949dc900488596829ce647c82`.
 - Native host: macOS 26.6.2, build 25G83, Apple Silicon;
   Apple Clang 21.0.0 (`clang-2100.1.1.101`), GNU89 host compiler mode.
 - Targets: `i370-ibm-mvspdp` and `i370-ibm-cms`, inherited PDPCLIB macro ABI,
@@ -87,3 +87,17 @@ verifies its complete object bytes and relocations; see the
 [OS checkpoint](../../os/pdos/CHECKPOINT.md). This supersedes the earlier COPY
 probe for that bounded language path. Link/load, whole-source and guest gates
 remain open.
+
+## Representable fullword data — 1 October 2026
+
+PDOS MATH exposed raw word 2827508273 emitted as an out-of-range signed F
+constant. The producer now emits its equivalent signed value -1467459023,
+preserving all target bits and automatic fullword alignment. Host-width-safe
+arithmetic also covers 80000000, FFFFFFFF and both halves of a DI constant.
+The assembler continues to reject out-of-range signed F values.
+
+Both MVS and CMS host builds and all 23 inherited regression groups pass; the
+new fixture passes at O0/O1/O2/Os. Clean recovery again reproduces all 819 files.
+A compile/assemble/link check independently validates the fixture's 28 exact
+bytes for both producers. This proves constant encoding through the flat-binary
+route, without target execution or general floating-point qualification.

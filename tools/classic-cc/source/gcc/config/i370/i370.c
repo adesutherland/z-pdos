@@ -2584,9 +2584,14 @@ i370_hlasm_assemble_integer (rtx x, unsigned int size, int aligned_p)
       case 4:
         if (GET_CODE (x) == CONST_INT)
         {
-          fputs ("\tDC\tF'", asm_out_file);
-          output_addr_const (asm_out_file, x);
-          fputs ("'\n", asm_out_file);
+          /* Classic C repair, 2026-10-01: RTL may hold a raw 32-bit word
+             as a positive wider-host integer. F constants are signed. Keep
+             fullword alignment and the exact target bits without relying on
+             out-of-range assembler truncation or host signed narrowing. */
+          unsigned long bits = (unsigned long) INTVAL (x) & 0xffffffffUL;
+          long signed_word = bits & 0x80000000UL
+            ? -1L - (long) ((~bits) & 0x7fffffffUL) : (long) bits;
+          fprintf (asm_out_file, "\tDC\tF'%ld'\n", signed_word);
         }
         else
         {

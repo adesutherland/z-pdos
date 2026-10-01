@@ -75,7 +75,7 @@ index 86e5184..810a886 100644
        {
  	enum machine_mode mode;
  
-diff --git a/gcc/config/i370/cms.h b/gcc/config/i370/cms.h
+diff --git a/tools/classic-cc/source/gcc/config/i370/cms.h b/gcc/config/i370/cms.h
 new file mode 100644
 index 0000000..1d1b0e6
 --- /dev/null
@@ -217,7 +217,7 @@ index 3bef79e..c3de9d0 100644
  extern void mvs_add_alias (const char *, const char *, int);
  extern int mvs_need_alias (const char *);
 diff --git a/gcc/config/i370/i370.c b/gcc/config/i370/i370.c
-index 7c7cbef..0d75a8c 100644
+index 7c7cbef..60e35ef 100644
 --- a/gcc/config/i370/i370.c
 +++ b/gcc/config/i370/i370.c
 @@ -1,3 +1,5 @@
@@ -419,7 +419,25 @@ index 7c7cbef..0d75a8c 100644
        aliasname[MAX_MVS_LABEL_SIZE] = '\0';
        return 1;
      }
-@@ -2553,6 +2652,35 @@ i370_hlasm_assemble_integer (rtx x, unsigned int size, int aligned_p)
+@@ -2485,9 +2584,14 @@ i370_hlasm_assemble_integer (rtx x, unsigned int size, int aligned_p)
+       case 4:
+         if (GET_CODE (x) == CONST_INT)
+         {
+-          fputs ("\tDC\tF'", asm_out_file);
+-          output_addr_const (asm_out_file, x);
+-          fputs ("'\n", asm_out_file);
++          /* Classic C repair, 2026-10-01: RTL may hold a raw 32-bit word
++             as a positive wider-host integer. F constants are signed. Keep
++             fullword alignment and the exact target bits without relying on
++             out-of-range assembler truncation or host signed narrowing. */
++          unsigned long bits = (unsigned long) INTVAL (x) & 0xffffffffUL;
++          long signed_word = bits & 0x80000000UL
++            ? -1L - (long) ((~bits) & 0x7fffffffUL) : (long) bits;
++          fprintf (asm_out_file, "\tDC\tF'%ld'\n", signed_word);
+         }
+         else
+         {
+@@ -2553,6 +2657,35 @@ i370_hlasm_assemble_integer (rtx x, unsigned int size, int aligned_p)
     used in the function.  This function is responsible for knowing
     which registers should not be saved even if used.  */
  
@@ -455,7 +473,7 @@ index 7c7cbef..0d75a8c 100644
  static void
  i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
  {
-@@ -2568,11 +2696,11 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2568,11 +2701,11 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
    /* Don't print stack and args in PDPMAC as it makes the
       comment too long */
  #ifdef TARGET_PDPMAC
@@ -469,7 +487,7 @@ index 7c7cbef..0d75a8c 100644
             nlen, mvs_function_name,
  	   l,
  	   current_function_outgoing_args_size);
-@@ -2604,7 +2732,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2604,7 +2737,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
  	   STACK_FRAME_BASE + l + current_function_outgoing_args_size,
  	   BASE_REGISTER,
  	   mvs_need_entry ? "YES" : "NO");
@@ -478,7 +496,7 @@ index 7c7cbef..0d75a8c 100644
  #ifdef TARGET_DIGNUS
    fprintf (f, "@FRAMESIZE_%d DC F'%d'\n",
  	   mvs_page_num,
-@@ -2613,7 +2741,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2613,7 +2746,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
  #ifdef TARGET_PDPMAC
    fprintf (f, "\tLTORG\n");
  #endif
@@ -487,7 +505,7 @@ index 7c7cbef..0d75a8c 100644
    fprintf (f, "\tDROP\t%d\n", BASE_REGISTER);
    fprintf (f, "\tBALR\t%d,0\n", BASE_REGISTER);
    fprintf (f, "\tUSING\t*,%d\n", BASE_REGISTER);
-@@ -2647,7 +2775,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2647,7 +2780,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
        function_minute = function_time->tm_min;
        function_second = function_time->tm_sec;
      }
@@ -496,7 +514,7 @@ index 7c7cbef..0d75a8c 100644
    fprintf (f, "FDSE%03d\tDSECT\n", function_label_index);
    fprintf (f, "\tDS\tD\n");
    fprintf (f, "\tDS\tCL(" HOST_WIDE_INT_PRINT_DEC ")\n",
-@@ -2732,7 +2860,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2732,7 +2865,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
                  function_hour, function_minute, function_second);
        fprintf (f, "\tDC\tCL2'01',CL4'0100'\n");
      }
@@ -505,7 +523,7 @@ index 7c7cbef..0d75a8c 100644
    fprintf (f, "FDSD%03d\tDSECT\n", function_label_index);
    fprintf (f, "\tDS\tD\n");
    fprintf (f, "\tDS\tCL(%d)\n", STACK_POINTER_OFFSET + l
-@@ -2780,10 +2908,10 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2780,10 +2913,10 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
  
  #endif /* TARGET_MACROS */
  
@@ -519,7 +537,7 @@ index 7c7cbef..0d75a8c 100644
  
    mvs_free_label_list ();
    mvs_page_code = 6;
-@@ -2799,7 +2927,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2799,7 +2932,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
  static void
  i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
  {
@@ -528,7 +546,7 @@ index 7c7cbef..0d75a8c 100644
             mvs_need_entry ? 'X' : 'S',
             CURRFUNC);
  
-@@ -2843,7 +2971,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
+@@ -2843,7 +2976,7 @@ i370_output_function_prologue (FILE *f, HOST_WIDE_INT l)
    fprintf (f, "\tST\tr15,76(r13)\n");
  
    fprintf (f, "\tL\tr%d,=A(.LPGT%d)\n", PAGE_REGISTER, mvs_page_num);
@@ -537,7 +555,7 @@ index 7c7cbef..0d75a8c 100644
  
    mvs_free_label_list ();
    mvs_page_code = 6;
-@@ -2990,7 +3118,7 @@ i370_globalize_label (FILE *stream, const char *name)
+@@ -2990,7 +3123,7 @@ i370_globalize_label (FILE *stream, const char *name)
      }
    if (mvs_need_to_globalize)
      {
@@ -546,7 +564,7 @@ index 7c7cbef..0d75a8c 100644
        fputs ("\tENTRY\t", stream);
        assemble_name (stream, name);
        fputs ("\n", stream);
-@@ -3068,7 +3196,7 @@ i370_globalize_label (FILE *stream, const char *name)
+@@ -3068,7 +3201,7 @@ i370_globalize_label (FILE *stream, const char *name)
      }
    if (mvs_need_to_globalize)
      {
@@ -555,7 +573,7 @@ index 7c7cbef..0d75a8c 100644
        fputs ("\tENTRY\t", stream);
        assemble_name (stream, name);
        fputs ("\n", stream);
-@@ -3102,7 +3230,7 @@ i370_output_function_epilogue (FILE *file, HOST_WIDE_INT l ATTRIBUTE_UNUSED)
+@@ -3102,7 +3235,7 @@ i370_output_function_epilogue (FILE *file, HOST_WIDE_INT l ATTRIBUTE_UNUSED)
  
    check_label_emit ();
    mvs_check_page (file, 14, 0);
@@ -564,7 +582,7 @@ index 7c7cbef..0d75a8c 100644
    mvs_page_num++;
  
  #ifdef TARGET_MACROS
-@@ -3133,16 +3261,16 @@ i370_output_function_epilogue (FILE *file, HOST_WIDE_INT l ATTRIBUTE_UNUSED)
+@@ -3133,16 +3266,16 @@ i370_output_function_epilogue (FILE *file, HOST_WIDE_INT l ATTRIBUTE_UNUSED)
  
  #endif /* TARGET_MACROS */
  
@@ -585,7 +603,7 @@ index 7c7cbef..0d75a8c 100644
    mvs_need_entry = 0;
  }
  
-@@ -3154,10 +3282,10 @@ i370_output_function_epilogue (FILE *file, HOST_WIDE_INT l ATTRIBUTE_UNUSED)
+@@ -3154,10 +3287,10 @@ i370_output_function_epilogue (FILE *file, HOST_WIDE_INT l ATTRIBUTE_UNUSED)
    fprintf (file, "\tL\tr14,12(r13,r0)\n");
    fprintf (file, "\tLM\t0,12,20(r13)\n");
    fprintf (file, "\tBR\tr14\n");
