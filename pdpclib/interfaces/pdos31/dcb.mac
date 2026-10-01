@@ -1,10 +1,21 @@
 * SPDX-License-Identifier: MIT
-* Original selected QSAM PS template; public field/bit facts in README.md.
+* Original selected sequential/partitioned/EXCP templates; public facts.
          MACRO
-&N       DCB &MACRF=,&DSORG=,&DDNAME=,&EODAD=,&EXLST=
-         LCLA  &REFERENCE
+&N       DCB &MACRF=,&DSORG=,&DDNAME=,&EODAD=,&EXLST=,                 X
+               &REPOS=,&BLKSIZE=,&DEVD=,&RECFM=
+         LCLA  &REFERENCE,&ORG,&FORMAT,&KIND
          LCLC  &EOF,&EXITS
-         AIF   ('&N' EQ '' OR '&DSORG' NE 'PS').BAD
+         AIF   ('&N' EQ '').BAD
+&ORG     SETA  16384
+         AIF   ('&DSORG' EQ 'PS').MODE
+         AIF   ('&DSORG' NE 'PO').BAD
+&ORG     SETA  512
+.MODE    ANOP
+         AIF   ('&MACRF' EQ '(R,W)').BPAM
+         AIF   ('&MACRF' EQ '(RP,WP)').BSAM
+         AIF   ('&MACRF' EQ 'E').EXCP
+         AIF   ('&DSORG' NE 'PS').BAD
+         AIF   ('&REPOS' NE '' OR '&DEVD' NE '').BAD
          AIF   ('&MACRF' EQ 'GL').GL
          AIF   ('&MACRF' EQ 'PL').PL
          AIF   ('&MACRF' NE 'PM').BAD
@@ -15,7 +26,30 @@
          AGO   .POINTERS
 .PL      ANOP
 &REFERENCE SETA 72
+         AGO   .POINTERS
+.BPAM    AIF   ('&DSORG' NE 'PO').BAD
+&REFERENCE SETA 8224
+&KIND    SETA  1
+         AGO   .BASIC
+.BSAM    AIF   ('&DSORG' NE 'PS').BAD
+&REFERENCE SETA 9252
+&KIND    SETA  1
+.BASIC   AIF   ('&REPOS' NE '' OR '&DEVD' NE '').BAD
+         AGO   .POINTERS
+.EXCP    AIF   ('&DSORG' NE 'PS' OR '&DEVD' NE 'TA').BAD
+         AIF   ('&BLKSIZE' NE '0').BAD
+         AIF   ('&REPOS' NE '' AND '&REPOS' NE 'N' AND                 X
+               '&REPOS' NE 'Y').BAD
+&KIND    SETA  2
+&REFERENCE SETA 53256
+         AIF   ('&REPOS' NE 'Y').POINTERS
+&REFERENCE SETA &REFERENCE+1024
 .POINTERS ANOP
+&FORMAT  SETA  0
+         AIF   ('&RECFM' EQ '').EOF
+         AIF   ('&RECFM' NE 'U').BAD
+&FORMAT  SETA  192
+.EOF     ANOP
 &EOF     SETC  '&EODAD'
 &EXITS   SETC  '&EXLST'
          AIF   ('&EOF' NE '').EXITS
@@ -23,9 +57,20 @@
 .EXITS   AIF   ('&EXITS' NE '').EMIT
 &EXITS   SETC  '0'
 .EMIT    DS    0F
-&N       DC    26X'00',X'4000',4X'00'
-         DC    A(&EOF),A(&EXITS),CL8'&DDNAME'
-         DC    XL2'0000',AL2(&REFERENCE),44X'00'
+&N       DC    26X'00',AL2(&ORG),4X'00'
+         DC    A(&EOF),A(&EXITS+&FORMAT*16777216),CL8'&DDNAME'
+         DC    XL2'0000',AL2(&REFERENCE)
+         AIF   (&KIND EQ 2).EXTEND
+         AIF   ('&BLKSIZE' EQ '').NOBLOCK
+         DC    10X'00',AL2(&BLKSIZE),8X'00'
+         AGO   .TAIL
+.NOBLOCK DC    20X'00'
+.TAIL    AIF   (&KIND EQ 0).QSAM
+         DC    X'01',15X'00'
          MEXIT
-.BAD     MNOTE 8,'unsupported selected QSAM DCB template'
+.QSAM    DC    24X'00'
+         MEXIT
+.EXTEND  DC    20X'00'
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected DCB template'
          MEND

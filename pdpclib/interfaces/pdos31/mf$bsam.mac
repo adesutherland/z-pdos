@@ -1,0 +1,50 @@
+* SPDX-License-Identifier: MIT
+* Original classic 20-byte sequential request and DCB entry linkage.
+         MACRO
+&N       MF$BSAM &KIND,&EVENT,&TYPE,&DCB,&AREA,&LENGTH,&MF=
+         LCLC  &DP,&AP,&LEN
+         AIF   ('&TYPE' NE 'SF' OR '&EVENT' EQ '').BAD
+         AIF   ('&KIND' NE 'READ' AND '&KIND' NE 'WRITE').BAD
+         AIF   ('&MF' EQ 'E').EXEC
+         AIF   ('&MF' NE 'L').BAD
+&DP      SETC  '&DCB'
+&AP      SETC  '&AREA'
+&LEN     SETC  '&LENGTH'
+         AIF   ('&DP' NE '').AREA
+&DP      SETC  '0'
+.AREA    AIF   ('&AP' NE '').LENGTH
+&AP      SETC  '0'
+.LENGTH  AIF   ('&LEN' NE '').LIST
+&LEN     SETC  '0'
+.LIST    DS    0F
+&N       DS    0F
+&EVENT   DC    F'0'
+         AIF   ('&KIND' EQ 'WRITE').WLIST
+         DC    X'0080'
+         AGO   .WORDS
+.WLIST   DC    X'0020'
+.WORDS   DC    AL2(&LEN),A(&DP,&AP,0)
+         MEXIT
+.EXEC    ANOP
+&N       MF$REG 1,&EVENT
+         AIF   ('&DCB' EQ '').DATA
+         MF$REG 0,&DCB
+         ST    0,8(,1)
+.DATA    AIF   ('&AREA' EQ '').LEN
+         MF$REG 0,&AREA
+         ST    0,12(,1)
+.LEN     AIF   ('&LENGTH' EQ '').TYPE
+         MF$REG 0,&LENGTH
+         STH   0,6(,1)
+.TYPE    AIF   ('&KIND' EQ 'WRITE').WTYPE
+         MVI   5(1),128
+         AGO   .CALL
+.WTYPE   MVI   5(1),32
+.CALL    L     15,8(,1)
+         N     15,=X'00FFFFFF'
+         L     15,48(,15)
+         N     15,=X'00FFFFFF'
+         BALR  14,15
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected classic BSAM request'
+         MEND

@@ -98,7 +98,8 @@ QSAM; its selected fields follow [public SAM layouts and macro-reference
 bits](https://www.ibm.com/docs/en/zos/2.5.0?topic=aids-dcb-excp-sam-bpam).
 Unused template bytes are zero, and DDNAME is space-padded. Pointer words
 receive ordinary four-byte fixups; the image gate must verify their required
-24-bit placement. No BSAM/BPAM/EXCP, DCBE or other keyword forms are claimed.
+24-bit placement. Selected BSAM/BPAM/EXCP forms are described below; DCBE
+and other keyword forms remain unsupported.
 The retained PDOS OPEN handler consumes the shared DCB fields, but its behavior
 has not been requalified with this new producer.
 
@@ -189,3 +190,34 @@ consumer checks 68 independently expected bytes, including the empty list,
 UCB/record/balance register setup, flags, call and preservation sequence.
 PDOS's track-calculation routine is still its inherited placeholder; correct
 service results and device capacities are not established by this host check.
+
+## Selected basic access templates and requests
+
+DCB additionally accepts `DSORG=PO,MACRF=(R,W)` for an 88-byte BPAM
+block and `DSORG=PS,MACRF=(RP,WP)` for an 88-byte BSAM block. Both
+reserve the full device/common/foundation sections and set NCP to one.
+BLKSIZE may be omitted or an absolute halfword value. The selected EXCP
+form requires PS, MACRF=E, DEVD=TA and BLKSIZE=0; REPOS is empty/N/Y.
+It emits a 72-byte block with the common and foundation-extension bits,
+five-word device interface and optional accurate-block-count bit. RECFM
+may be omitted or U. The retained consumer adds its own volume-count and
+channel-word storage after this block. These layouts and mode bits follow
+[public DCB fields](https://www.ibm.com/docs/en/zos/3.1.0?topic=aids-dcb-excp-sam-bpam)
+and the [BPAM](https://www.ibm.com/docs/en/zos/3.1.0?topic=descriptions-dcbconstruct-data-control-block-bpam)
+and [BSAM](https://www.ibm.com/docs/en/zos/3.1.0?topic=descriptions-dcbconstruct-data-control-block-bsam)
+parameter contracts. A linked original fixture checks all 248 bytes of
+three templates, including their distinct sizes, names, bits and zero fields.
+
+READ/WRITE support SF with `MF=L` and `MF=E`. The list is a fullword-aligned
+20-byte DECB: ECB, operation/length halfwords, DCB and area addresses, and
+IOB pointer. The execute form updates supplied DCB/area/length operands,
+preserves omitted ones, changes the read/write operation byte, then calls
+through the opened DCB entry at offset 49 while passing the DECB in R1.
+Addresses must be below 16 MiB in the selected 24-bit runtime mode. Register
+forms use the shared helper; ordinary execute operands must fit LA's RX
+address class. R0/R1/R14/R15 are scratch. The public
+[READ contract](https://www.ibm.com/docs/en/zos/3.1.0?topic=descriptions-readread-block-bpam-bsam)
+and [original DECB data area](https://ftpmirror.your.org/pub/misc/bitsavers/pdf/ibm/360/fe/S229-3169-2_360_Operating_System_FE_Handbook_Jul70.pdf)
+identify the request fields. An original consumer checks 100 independent
+linked bytes; an SF64 request must fail without a deck. SF64, backward I/O,
+standard inline forms and VSAM requests remain separate interfaces.

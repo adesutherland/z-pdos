@@ -114,6 +114,35 @@ int main(int argc, char **argv)
 
     CHECK(argc == 3);
     if (!strcmp(argv[1],"pdos31-io")) { io_templates(argv[2]); return 0; }
+    if (!strcmp(argv[1],"pdos31-basic-dcb")) {
+        static const unsigned char names[24] = {
+            0xc2,0xe2,0xc1,0xd4,0x40,0x40,0x40,0x40,
+            0xc2,0xd7,0xc1,0xd4,0x40,0x40,0x40,0x40,
+            0xc5,0xe7,0xc3,0xd7,0x40,0x40,0x40,0x40};
+        unsigned char actual[249], expected[248];
+        memset(expected,0,sizeof expected);
+        expected[26] = 0x40; expected[50] = expected[51] = 0x24; expected[72] = 1;
+        expected[114] = 2; expected[138] = expected[139] = 0x20; expected[160] = 1;
+        expected[202] = 0x40; expected[212] = 0xc0; expected[226] = 0xd4; expected[227] = 8;
+        memcpy(expected+40,names,8); memcpy(expected+128,names+8,8); memcpy(expected+216,names+16,8);
+        input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(actual,1,sizeof actual,input);
+        CHECK(got == sizeof expected && !memcmp(actual,expected,sizeof expected));
+        CHECK(!ferror(input) && fclose(input) == 0); puts("basic DCB templates: sizes, organization, modes and fields pass"); return 0;
+    }
+    if (!strcmp(argv[1],"pdos31-bsam")) {
+        static const unsigned char linked[100] = {
+            0,0,0,0,0,0x80,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+            0x41,0x10,0xc0,0,0x18,0x0a,0x50,0,0x10,8,0x18,8,0x50,0,0x10,12,
+            0x18,9,0x40,0,0x10,6,0x92,0x80,0x10,5,0x58,0xf0,0x10,8,
+            0x54,0xf0,0xc0,0x60,0x58,0xf0,0xf0,0x30,0x54,0xf0,0xc0,0x60,5,0xef,
+            0x41,0x10,0xc0,0,0x92,0x20,0x10,5,0x58,0xf0,0x10,8,
+            0x54,0xf0,0xc0,0x60,0x58,0xf0,0xf0,0x30,0x54,0xf0,0xc0,0x60,5,0xef,
+            7,0xfe,0,0,0,0,0,0xff,0xff,0xff};
+        unsigned char actual[101];
+        input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(actual,1,sizeof actual,input);
+        CHECK(got == sizeof linked && !memcmp(actual,linked,sizeof linked));
+        CHECK(!ferror(input) && fclose(input) == 0); puts("BSAM: independent request/list and read/write entry bytes pass"); return 0;
+    }
     if (!strcmp(argv[1],"pdos31-trkcalc")) {
         static const unsigned char linked[68] = {
             0,0,0,0,0,0,0,0,0,0,0,0,0x90,0xec,0xd0,0x0c,

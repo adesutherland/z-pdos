@@ -1,0 +1,5 @@
+* SPDX-License-Identifier: MIT
+         MACRO
+&N       WRITE &EVENT,&TYPE,&DCB,&AREA,&LENGTH,&MF=
+&N       MF$BSAM WRITE,&EVENT,&TYPE,&DCB,&AREA,&LENGTH,MF=&MF
+         MEND

@@ -1,0 +1,3 @@
+BADBSAM  CSECT
+         READ  REQUEST,SF64,,,,MF=L
+         END   BADBSAM
