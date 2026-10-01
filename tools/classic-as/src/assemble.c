@@ -855,7 +855,7 @@ static enum mf_status emit_constant(struct mf_as *as, const struct constant *c)
     }
     return MF_OK;
 }
-/* Only F signed decimal, X octets and V(single-name) literals are selected.
+/* Selected H/F signed decimal, X/XL octets, A and V(single-name) literals.
  * The table owns identities, not source statements or complete pool images. */
 static enum mf_status literal_constant(struct mf_as *as, struct mf_span text,
     struct constant *c)
@@ -864,13 +864,13 @@ static enum mf_status literal_constant(struct mf_as *as, struct mf_span text,
     if (!text.length || text.data[0] != 0x3d) return MF_SOURCE;
     status = constant_parse(as, subspan(text, 1, text.length - 1), 0, c);
     if (status != MF_OK) return status;
-    if (c->repeat != 1 || c->explicit_length ||
-        (c->type != 0x46 && c->type != 0x58 && c->type != 0x56 && c->type != 0x41)) return MF_UNSUPPORTED;
-    if (c->type == 0x46) {
+    if (c->repeat != 1 || (c->explicit_length && c->type != 0x58) ||
+        (c->type != 0x48 && c->type != 0x46 && c->type != 0x58 && c->type != 0x56 && c->type != 0x41)) return MF_UNSUPPORTED;
+    if (c->type == 0x48 || c->type == 0x46) {
         v = zero_value();
         status = mf_u64_parse(c->value, &v.magnitude, &v.negative);
         if (status != MF_OK) return status;
-        status = numeric_bytes(v, 4, 1, bytes); if (status != MF_OK) return status;
+        status = numeric_bytes(v, c->width, 1, bytes); if (status != MF_OK) return status;
     } else if (c->type == 0x56) {
         status = implicit_external(as, c->value, NULL); if (status != MF_OK) return status;
     } else {

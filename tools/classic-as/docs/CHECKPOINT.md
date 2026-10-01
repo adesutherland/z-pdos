@@ -152,3 +152,15 @@ The original `local-v.asm` fixture links through Classic Linker at image base
 4108 and section address 4096. This is a flat-binary host path, not OS loading
 or guest execution.
 Affected Classic checks pass 33/33 in normal and sanitizer builds.
+
+## Masked compare and selected literals — 1 October 2026
+
+The original encoder now includes S/370 CLM with independent boundary vectors
+and rejection under S/360. The source engine accepts signed H literals and
+explicit-length X literals with checked widths and padding. A small original
+source checks their combined instruction bytes and literal-pool placement.
+Actual PCOMM, PDOSUTIL, START and STRING C outputs now assemble, alongside
+the earlier eight successful units. PDOS and STDIO reach the desktop literal
+capacity; MATH/STDLIB/TIME still reach fixed/floating constant/instruction gaps.
+These are host language/object checks, not the kernel ISA or complete OS build.
+Affected Classic checks pass 33/33 in normal and sanitizer builds.

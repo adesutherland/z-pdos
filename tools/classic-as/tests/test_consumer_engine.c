@@ -65,6 +65,18 @@ static void address_literal(void)
     CHECK(f.fixups[0].target_kind == MF_REF_SECTION && f.fixups[0].target == 1 && f.fixups[0].address_kind == MF_ADDRESS_A);
     clean(&f);
 }
+static void masked_literals(void)
+{
+    static const mf_octet expected[] = {0xbd,0x21,0xc0,0x16,0x4c,0x40,0xc0,0x14,
+        0x54,0x60,0xc0,0x10,0,0,0,0,0,0,0xff,0xff,0x0b,0xf1,0xf1};
+    struct fixture f;
+    consumer_init(&f, "S CSECT\n USING S,12\n CLM 2,1,=XL1'F1'\n MH 4,=H'3057'\n N 6,=XL4'0000FFFF'\n END S\n");
+    f.config.profile = MF_S370; successful(&f);
+    CHECK(f.sections[0].length == sizeof expected && !memcmp(f.data[0], expected, sizeof expected));
+    CHECK(f.gaps == 1 && !f.fixup_count); clean(&f);
+    consumer_init(&f, "S CSECT\n CLM 2,1,0(12)\n END S\n");
+    CHECK(run(&f) == MF_UNSUPPORTED); clean(&f);
+}
 static void pool_grouping(void)
 {
     struct fixture f;
@@ -156,9 +168,9 @@ static void symbolic_ss(void)
 static void consumer_failures(void)
 {
     static const struct bad_case cases[] = {
-        {"S CSECT\n USING S,12\n L 1,=H'1'\n END\n",MF_UNSUPPORTED},
+        {"S CSECT\n USING S,12\n L 1,=H'32768'\n END\n",MF_RANGE},
         {"S CSECT\n USING S,12\n L 1,=2F'1'\n END\n",MF_UNSUPPORTED},
-        {"S CSECT\n USING S,12\n L 1,=XL4'01'\n END\n",MF_UNSUPPORTED},
+        {"S CSECT\n USING S,12\n L 1,=XL1'0102'\n END\n",MF_RANGE},
         {"S CSECT\n USING S,12\n L 1,=F'2147483648'\n END\n",MF_RANGE},
         {"S CSECT\n USING S,12\n L 1,=F'-2147483649'\n END\n",MF_RANGE},
         {"S CSECT\n USING S,12\n L 1,=F'NAME'\n END\n",MF_SOURCE},
@@ -255,7 +267,7 @@ static void repeated_literal_storage(void)
 }
 int main(void)
 {
-    aliases(); address_literal(); literal_bytes(); pool_grouping(); multiple_pools_and_sections();
+    aliases(); address_literal(); literal_bytes(); masked_literals(); pool_grouping(); multiple_pools_and_sections();
     implicit_externals(); local_v_names(); symbolic_ss(); consumer_failures();
     literal_replay_and_writer_errors(); literal_sink_contract(); repeated_literal_storage();
     printf("consumer engine: %lu checks passed\n", checks); return 0;

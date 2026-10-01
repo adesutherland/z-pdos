@@ -39,7 +39,7 @@ publication semantics.
 | DS | Reservation/alignment for the documented constant types, including `0H`, `0F`, `0D`; no emitted bytes for gaps |
 | Addressability | One base per USING statement, DROP, explicit base/index fields; same-section symbolic addresses need a matching USING |
 | Visibility and entry | ENTRY, EXTRN, implicit externals for a single-name V constant, and END with an optional section-relative entry |
-| Literals | Selected `=F'number'`, `=X'hex'`, `=A(expression)` and `=V(name)`, explicit LTORG and implicit END pool |
+| Literals | Selected `=H'number'`, `=F'number'`, `=X'hex'`/`=XLn'hex'`, `=A(expression)` and `=V(name)`, explicit LTORG and implicit END pool |
 | Modes | AMODE 24/31/ANY; RMODE 24/31/ANY; name associates the declaration with its section, including a later section |
 
 Mode declarations do not create a section. A blank name selects the unnamed
@@ -68,9 +68,9 @@ optional provider selected below. Unsupported
 constructs fail explicitly. The source parser's documented subset is distinct
 from the pure encoder's instruction descriptions.
 
-The selected literals have no duplication, explicit length or nested nominal
-list. A literals accept the ordinary checked address expression and addend. F literals are signed decimal; X literals contain an
-even, nonzero number of hexadecimal digits; V takes one external name. Identity
+The selected literals have no duplication or nested nominal list. Only X
+literals accept explicit length, with checked padding and no truncation. A literals accept the ordinary checked address expression and addend. H/F literals are signed decimal; X literals contain a
+nonzero number of hexadecimal digits with left zero padding; V takes one external name. Identity
 is case-insensitive source spelling within one pool: differently spelled
 numeric values are not automatically merged. Pending literals collect globally
 across sections. LTORG emits them in the current real section; END emits the
@@ -95,7 +95,7 @@ attributes; it does not grant a historical CPU a new address mode.
 | SI | TM, MVI, NI, CLI, OI, XI: `d(b),immediate` |
 | SS character | MVC, NC, CLC, OC, XC, TR, TRT, ED, EDMK: `d1(length,b1),d2(b2)` |
 | SS decimal | MVO, PACK, UNPK, ZAP, CP, AP, SP, MP, DP: `d1(length1,b1),d2(length2,b2)` |
-| Selected S/370 additions | BASR, BAS, STCM, ICM, CS, CDS, MVCL, CLCL |
+| Selected S/370 additions | BASR, BAS, CLM, STCM, ICM, CS, CDS, MVCL, CLCL |
 
 Branch aliases lower to the ordinary BC/BCR encodings: B, BO, BH/BP, BL/BM,
 BNE/BNZ, BE/BZ, BNL/BNM, BNH/BNP, BNO and NOP. Each takes an address operand;

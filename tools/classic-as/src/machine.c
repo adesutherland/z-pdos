@@ -99,6 +99,7 @@ static const mf_octet name_DP[] = { 0x44, 0x50 };
 static const mf_octet name_BASR[] = { 0x42, 0x41, 0x53, 0x52 };
 static const mf_octet name_BAS[] = { 0x42, 0x41, 0x53 };
 static const mf_octet name_STCM[] = { 0x53, 0x54, 0x43, 0x4d };
+static const mf_octet name_CLM[] = { 0x43, 0x4c, 0x4d };
 static const mf_octet name_ICM[] = { 0x49, 0x43, 0x4d };
 static const mf_octet name_CS[] = { 0x43, 0x53 };
 static const mf_octet name_CDS[] = { 0x43, 0x44, 0x53 };
@@ -193,6 +194,7 @@ static const struct mf_instruction instructions[] = {
     { { name_BASR, 4 }, MF_S370, MF_RR, 0x0d, 2 },
     { { name_BAS, 3 }, MF_S370, MF_RX, 0x4d, 4 },
     { { name_STCM, 4 }, MF_S370, MF_RS, 0xbe, 4 },
+    { { name_CLM, 3 }, MF_S370, MF_RS, 0xbd, 4 },
     { { name_ICM, 3 }, MF_S370, MF_RS, 0xbf, 4 },
     { { name_CS, 2 }, MF_S370, MF_RS, 0xba, 4 },
     { { name_CDS, 3 }, MF_S370, MF_RS, 0xbb, 4 },
