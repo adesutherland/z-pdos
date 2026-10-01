@@ -202,3 +202,14 @@ CLI instruction-byte check. The six raw inputs now reach concrete next gaps:
 forward PSA mapping/USING, source-dependent duplication, PUSH USING, GETMAIN
 and the empty FIXWRITE prototype. No missing service was treated as a no-op.
 Affected normal and sanitizer suites pass 45/45.
+
+## Source addressability checkpoint
+
+The engine now supports multiple-register USING, zero-register mappings,
+absolute addressability, deferred forward USING expressions and a 16-frame
+PUSH/POP USING stack. PUSH preserves the active mappings. Independent instruction
+bytes cover the zero base, successive 4096-byte regions, minimum-displacement
+selection, DROP-all and restored mappings. Missing forward definitions, stack
+underflow and capacity exhaustion fail. All 84 integrated host tests pass.
+The six raw PDOS modules advance to ISA, duplication, OS service and macro
+prototype gaps; no complete kernel or guest result is claimed.

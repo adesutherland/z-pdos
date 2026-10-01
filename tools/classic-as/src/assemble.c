@@ -22,7 +22,7 @@ struct literal {
     struct mf_span text; unsigned section, alignment; size_t pool;
     mf_u32 offset; int placed, seen;
 };
-struct base_state { int active; unsigned section; mf_u32 offset; };
+struct base_state { int active, pending; unsigned section; mf_u32 offset; };
 struct fingerprint { mf_u32 a, b; struct mf_u64 bytes; unsigned long count; int complete; };
 struct mf_as {
     struct mf_as_config config;
@@ -34,7 +34,7 @@ struct mf_as {
     struct mf_symbol *symbols;
     struct symbol_state *symbol_state;
     struct literal *literals; size_t literal_count, pool;
-    struct base_state bases[16];
+    struct base_state bases[16], base_stack[16][16]; size_t base_depth;
     struct mf_statement statement;
     const struct mf_object_writer *writer;
     const struct mf_diagnostics *diagnostics;
@@ -488,26 +488,56 @@ static enum mf_status mode(struct mf_as *as, int address)
 }
 static enum mf_status using_statement(struct mf_as *as, int drop)
 {
-    struct mf_span parts[2]; size_t count; struct value v; mf_u32 reg;
+    struct mf_span parts[16], operand; size_t count, i; struct value v; mf_u32 reg, offset;
     enum mf_status status;
     if (as->statement.label.length) return MF_SOURCE;
-    status = split(as->statement.operand, parts, 2, &count);
+    operand = trim(as->statement.operand);
+    if (drop && (!operand.length || (operand.length == 1 && operand.data[0] == 0x2c))) {
+        memset(as->bases, 0, sizeof as->bases); return MF_OK;
+    }
+    status = split(operand, parts, 16, &count);
     if (status != MF_OK) return status;
     if (drop) {
-        size_t i;
         for (i = 0; i < count; ++i) {
             status = number(as, parts[i], 15, &reg); if (status != MF_OK) return status;
-            as->bases[reg].active = 0;
+            memset(as->bases + reg, 0, sizeof as->bases[reg]);
         }
         return MF_OK;
     }
-    if (count != 2) return MF_SOURCE;
-    status = evaluate(as, parts[0], &v); if (status != MF_OK) return status;
-    if (v.coefficient != 1 || v.kind != MF_REF_SECTION || v.negative || v.magnitude.hi) return MF_SOURCE;
-    status = number(as, parts[1], 15, &reg); if (status != MF_OK) return status;
-    if (!reg) return MF_RANGE;
-    as->bases[reg].active = 1; as->bases[reg].section = v.target;
-    as->bases[reg].offset = v.magnitude.lo; return MF_OK;
+    if (count < 2) return MF_SOURCE;
+    status = evaluate(as, parts[0], &v);
+    if (status != MF_OK && !(status == MF_UNDEFINED && as->pass == 1)) return status;
+    offset = 0;
+    if (status == MF_OK) {
+        if (v.negative || v.magnitude.hi || v.coefficient < 0 || v.coefficient > 1 ||
+            (v.coefficient && v.kind != MF_REF_SECTION)) return MF_SOURCE;
+        offset = v.magnitude.lo;
+        if (count - 2 > (U32MAX - offset) / 4096UL) return MF_RANGE;
+    }
+    for (i = 1; i < count; ++i) {
+        enum mf_status reg_status;
+        reg_status = number(as, parts[i], 15, &reg); if (reg_status != MF_OK) return reg_status;
+        if (!reg && (i != 1 || (status == MF_OK && offset))) return MF_RANGE;
+        as->bases[reg].active = status == MF_OK; as->bases[reg].pending = status == MF_UNDEFINED;
+        as->bases[reg].section = status == MF_OK && v.coefficient ? v.target : 0;
+        as->bases[reg].offset = offset;
+        if (i + 1 < count) offset += 4096UL;
+    }
+    return MF_OK;
+}
+static enum mf_status using_stack(struct mf_as *as, int pop)
+{
+    static const mf_octet using[] = {0x55,0x53,0x49,0x4e,0x47};
+    if (as->statement.label.length) return MF_SOURCE;
+    if (!word(as->statement.operand, using, sizeof using)) return MF_UNSUPPORTED;
+    if (pop) {
+        if (!as->base_depth) return MF_SOURCE;
+        memcpy(as->bases, as->base_stack[--as->base_depth], sizeof as->bases);
+    } else {
+        if (as->base_depth == 16) return MF_LIMIT;
+        memcpy(as->base_stack[as->base_depth++], as->bases, sizeof as->bases);
+    }
+    return MF_OK;
 }
 /* Address operand: displacement, optional index/length, and explicit base.
  * A symbolic displacement needs a matching USING even with explicit base. */
@@ -576,21 +606,23 @@ static enum mf_status address(struct mf_as *as, struct mf_span s, int indexed,
         if (status == MF_UNDEFINED && as->pass == 1) { *disp = 0; if (!explicit_base) *base = 0; return MF_OK; }
         if (status != MF_OK) return status;
     }
-    if (!v.coefficient) {
-        status = small_value(v, 4095, disp);
-        if (status != MF_OK) return status;
-        if (!explicit_base) *base = 0;
-        return MF_OK;
-    }
-    if (v.coefficient != 1 || v.kind != MF_REF_SECTION || v.negative || v.magnitude.hi) return MF_SOURCE;
-    chosen = 0; best = 4096;
-    for (r = 1; r <= 15; ++r) {
+    if (v.negative || v.magnitude.hi || v.coefficient < 0 || v.coefficient > 1 ||
+        (v.coefficient && v.kind != MF_REF_SECTION)) return MF_SOURCE;
+    if (!v.coefficient && explicit_base) return small_value(v, 4095, disp);
+    chosen = 16; best = 4096;
+    if (!v.coefficient && v.magnitude.lo <= 4095) { chosen = 0; best = v.magnitude.lo; }
+    for (r = 0; r <= 15; ++r) {
         if (explicit_base && r != *base) continue;
-        if (!as->bases[r].active || as->bases[r].section != v.target || v.magnitude.lo < as->bases[r].offset) continue;
+        if (!as->bases[r].active || as->bases[r].section != (v.coefficient ? v.target : 0) ||
+            v.magnitude.lo < as->bases[r].offset) continue;
         d = v.magnitude.lo - as->bases[r].offset;
         if (d <= 4095 && d <= best) { chosen = r; best = d; }
     }
-    if (!chosen) return MF_RANGE;
+    if (chosen == 16) {
+        if (as->pass == 1) for (r = 0; r <= 15; ++r) if (as->bases[r].pending &&
+            (!explicit_base || r == *base)) { *base = r; *disp = 0; return MF_OK; }
+        return MF_RANGE;
+    }
     *base = chosen; *disp = best; return MF_OK;
 }
 static enum mf_status instruction(struct mf_as *as, const struct mf_instruction *ins)
@@ -1045,6 +1077,7 @@ static enum mf_status print_statement(struct mf_as *as)
 }
 static enum mf_status process(struct mf_as *as)
 {
+    static const mf_octet push[] = {0x50,0x55,0x53,0x48}, pop[] = {0x50,0x4f,0x50};
     static const mf_octet title[] = {0x54,0x49,0x54,0x4c,0x45};
     static const mf_octet print[] = {0x50,0x52,0x49,0x4e,0x54};
     static const mf_octet csect[] = {0x43,0x53,0x45,0x43,0x54};
@@ -1064,6 +1097,8 @@ static enum mf_status process(struct mf_as *as)
     op = as->statement.operation;
     if (!op.length) return as->statement.label.length || as->statement.operand.length ? MF_SOURCE : MF_OK;
     if (as->ended) return MF_SOURCE;
+    if (word(op, push, sizeof push)) return using_stack(as, 0);
+    if (word(op, pop, sizeof pop)) return using_stack(as, 1);
     if (word(op, title, sizeof title)) return title_statement(as);
     if (word(op, print, sizeof print)) return print_statement(as);
     if (word(op, csect, sizeof csect)) return select_section(as, 0);
@@ -1139,7 +1174,7 @@ static enum mf_status run_pass(struct mf_as *as, const struct mf_statements *sou
     for (i = 0; i < as->section_count; ++i) {
         as->section_state[i].position = 0;
     }
-    as->pool = 0; as->title_names = 0;
+    as->pool = 0; as->title_names = 0; as->base_depth = 0;
     if (as->pass == 2) for (i = 0; i < as->literal_count; ++i) as->literals[i].seen = 0;
     memset(as->bases, 0, sizeof as->bases); as->current = NIL; as->ended = 0; as->fixup_count = 0;
     fingerprint_init(fingerprint);

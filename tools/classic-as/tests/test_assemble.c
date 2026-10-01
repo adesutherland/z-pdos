@@ -368,7 +368,7 @@ static void bad_sources(void)
         {" MP 0(2,1),0(2,2)\n END\n", MF_RANGE},
         {" MR 1,2\n END\n", MF_RANGE},
         {" BASR 1,2\n END\n", MF_UNSUPPORTED},
-        {"S CSECT\n USING S,0\n LR 1,2\n END\n", MF_RANGE},
+        {"S CSECT\n USING S+1,0\n LR 1,2\n END\n", MF_RANGE},
         {"S CSECT\n USING S,12\n DROP 12\n L 1,S\n END\n", MF_RANGE},
         {"S CSECT\n USING S,12\n L 1,S(,11)\n END\n", MF_RANGE},
         {"S CSECT\n USING S,12\n DS 4096C\n L 1,*\n END\n", MF_RANGE},
@@ -562,6 +562,22 @@ static void boundary_and_regression_cases(void)
     CHECK(mf_as_assemble(f.as, &f.wrapped, &f.writer, NULL, &result) == MF_SOURCE);
     CHECK(result.status == MF_SOURCE && !result.valid_output); clean(&f);
 }
+static void address_state(void)
+{
+    static const mf_octet expected[] = {0x58,0x10,0,4,0x58,0x20,0xa0,0,0x58,0x30,0xa0,0,0x58,0x40,0xc0,8};
+    struct fixture f; char source[512]; unsigned i;
+    init(&f, "S CSECT\n USING D,0\n L 1,FIELD\n USING S,12\n PUSH USING\n USING S+8,10\n L 2,S+8\n DROP ,\n USING S+8,10\n L 3,S+8\n POP USING\n L 4,S+8\nD DSECT\n DS F\nFIELD DS F\n END S\n");
+    successful(&f); CHECK(f.sections[0].length == sizeof expected);
+    CHECK(!memcmp(f.data[0],expected,sizeof expected)); clean(&f);
+    init(&f, "S CSECT\n USING 4096,3\n LA 1,4100\n USING 0,4\n LA 2,8\n END S\n");
+    successful(&f); CHECK(f.data[0][2] == 0x30 && f.data[0][3] == 4 && f.data[0][6] == 0x40 && f.data[0][7] == 8); clean(&f);
+    init(&f, "S CSECT\n USING S,12,11\n L 1,S+4098\n END S\n");
+    successful(&f); CHECK(f.data[0][2] == 0xb0 && f.data[0][3] == 2); clean(&f);
+    init(&f, "S CSECT\n POP USING\n END S\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
+    strcpy(source,"S CSECT\n"); for (i = 0; i < 17; ++i) strcat(source," PUSH USING\n"); strcat(source," END S\n");
+    init(&f,source); CHECK(run(&f) == MF_LIMIT); clean(&f);
+    init(&f, "S CSECT\n USING MISSING,0\n L 1,0\n END S\n"); CHECK(run(&f) == MF_UNDEFINED); clean(&f);
+}
 static void source_metadata(void)
 {
     static const mf_octet id[8] = {0xc4,0xc5,0xc3,0xd2,0x40,0x40,0x40,0x40};
@@ -580,7 +596,7 @@ static void source_metadata(void)
 }
 int main(void)
 {
-    source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
+    address_state(); source_metadata(); constants(); forms(); narrow_addresses(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
     printf("assemble: %lu checks passed\n", checks); return 0;

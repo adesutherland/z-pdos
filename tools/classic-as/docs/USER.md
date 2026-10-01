@@ -39,7 +39,7 @@ publication semantics.
 | PRINT | Validated ON/OFF, GEN/NOGEN, DATA/NODATA controls and null operands; no listing output in this component. Labels and other control forms are rejected. |
 | DC | H/F integers, AL1/AL2/AL3 absolute and A addresses, absolute eight-byte AD, external V, hexadecimal X and CP037 C/CL character constants; checked duplication and target length |
 | DS | Reservation/alignment for the documented constant types, including `0H`, `0F`, `0D`; no emitted bytes for gaps |
-| Addressability | One base per USING statement, DROP, explicit base/index fields; same-section symbolic addresses need a matching USING |
+| Addressability | USING with up to 15 registers at successive 4096-byte bases, register-zero mappings at offset zero, DROP lists or all; symbolic addresses need a matching USING |
 | Visibility and entry | ENTRY, EXTRN, implicit externals for a single-name V constant, and END with an optional section-relative entry |
 | Literals | Selected `=H'number'`, `=F'number'`, `=X'hex'`/`=XLn'hex'`, `=A(expression)` and `=V(name)`, explicit LTORG and implicit END pool |
 | Modes | AMODE 24/31/ANY; RMODE 24/31/ANY; name associates the declaration with its section, including a later section |
@@ -187,3 +187,10 @@ raw-record/model steps per pass. They share the driver's 32 MiB payload budget.
 Definitions, frames and workspaces are acquired at creation; advancing/replaying
 does not acquire per-invocation storage. Failures invalidate output through the
 same assembler/writer contract.
+
+`PUSH USING` saves the current addressability state without changing it;
+`POP USING` restores it. The fixed stack has 16 frames. Underflow and overflow
+fail explicitly. `DROP` with no operand or a single comma drops every mapping.
+Absolute implicit addresses also use applicable absolute USING mappings.
+Forward USING expressions defer resolution to pass two; unresolved mappings
+never produce a successful deck. Other PUSH/POP state classes remain unsupported.

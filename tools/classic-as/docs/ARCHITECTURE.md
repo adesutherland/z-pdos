@@ -102,3 +102,11 @@ The original machine descriptions and value helpers can serve a future decoder
 or emulator. CPU execution, memory, interrupts, devices and OS policy remain
 separate. Do not infer a new ISA, ABI or complete HLASM implementation from this
 seed. See [next consumer work](CONSUMERS.md) and [reference sources](../../../architecture/SOURCES.md).
+
+The original address-state implementation follows IBM HLASM
+[PUSH](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=statements-push-instruction):
+saving USING state does not drop or change mappings.
+[Base registers and absolute addresses](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=instruction-base-registers-absolute-addresses)
+and Language Reference SC26-4940-09, USING, supply the successive 4096-byte
+regions and register-zero restriction. Original tests check instruction octets
+and failure contracts independently of the encoder.
