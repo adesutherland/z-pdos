@@ -152,3 +152,18 @@ eight bytes after a named standard invocation; a halfword pad can follow
 the appended fields. No multiple-line, reply, token, execute, or extended
 options are provided. Independent linking checks all 49 bytes of two standard
 calls and one list, including the source's text-patching alias convention.
+
+SNAP selects the public release-2 24-byte parameter format, PDATA=(PSW,REGS),
+one storage-list address and one header-list address, or DCB/ID execute form.
+The [SNAPX public mapping](https://www.ibm.com/docs/en/zos/2.5.0?topic=xtl-snapx-information)
+records the shared fields and release flags. No extended SNAPX fields are
+generated. Its execute form supplies R1, updates the DCB word and ID byte and
+issues SVC51. ABEND accepts a constant user code 0–4095 and optional DUMP,
+with the public [SVC13 R1 flags](https://www.ibm.com/docs/en/zos/3.2.0?topic=descriptions-svc-13-0a0d).
+NOTE and POINT use the low-three-byte DCB entry at offset 85; POINT uses its
+entry four bytes later and supplies the token address in R0. The retained
+PDOS DNOTPNT entry declares these two entry offsets; its position results
+remain the inherited limited implementation. Large block tokens are excluded.
+All 120 independently expected template, setup, call and literal bytes pass
+after linking, with a rejected SNAP option control. This does not prove dump,
+abnormal termination or positioning service behavior in a guest.

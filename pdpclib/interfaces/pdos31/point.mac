@@ -1,0 +1,14 @@
+* SPDX-License-Identifier: MIT
+* Original selected classic small-block-token POINT linkage.
+         MACRO
+&N       POINT &DCB,&TOKEN
+         AIF   ('&TOKEN' EQ '').BAD
+&N       MF$REG 0,&TOKEN
+         MF$REG 1,&DCB
+         L     15,84(,1)
+         N     15,=X'00FFFFFF'
+         LA    15,4(,15)
+         BALR  14,15
+         MEXIT
+.BAD     MNOTE 8,'selected POINT requires a token address'
+         MEND

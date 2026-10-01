@@ -1,0 +1,9 @@
+* SPDX-License-Identifier: MIT
+* Original selected classic small-block-token NOTE linkage.
+         MACRO
+&N       NOTE &DCB
+&N       MF$REG 1,&DCB
+         L     15,84(,1)
+         N     15,=X'00FFFFFF'
+         BALR  14,15
+         MEND

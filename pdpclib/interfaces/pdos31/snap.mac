@@ -1,0 +1,26 @@
+* SPDX-License-Identifier: MIT
+* Original selected release-2 SNAP list and DCB/ID execute interface.
+         MACRO
+&N       SNAP &PDATA=,&LIST=,&STRHDR=,&DCB=,&ID=,&MF=
+         LCLA  &FLAGS
+         AIF   ('&MF' NE 'L').EXEC
+         AIF   ('&PDATA' NE '(PSW,REGS)').BAD
+         AIF   ('&LIST' EQ '' OR '&STRHDR' EQ '').BAD
+         AIF   ('&DCB' NE '' OR '&ID' NE '').BAD
+         DS    0F
+&N       DC    AL1(0,83,0,0,0,0,36,0),A(0,0,&LIST,&STRHDR)
+         MEXIT
+.EXEC    AIF   (N'&MF NE 2).BAD
+         AIF   ('&MF(1)' NE 'E' OR '&MF(2)' EQ '').BAD
+         AIF   ('&PDATA' NE '' OR '&LIST' NE '' OR '&STRHDR' NE '').BAD
+         AIF   ('&DCB' EQ '' OR '&ID' EQ '').BAD
+&N       MF$REG 1,&MF(2)
+         MF$REG 0,&DCB
+         ST    0,8(,1)
+         MF$REG 0,&ID
+         STC   0,0(,1)
+         OI    1(1),8
+         SVC   51
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected SNAP form'
+         MEND

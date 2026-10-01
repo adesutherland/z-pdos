@@ -1,0 +1,15 @@
+* SPDX-License-Identifier: MIT
+* Original selected user completion code interface to SVC13.
+         MACRO
+&N       ABEND &CODE,&OPTION
+         LCLA  &NUMBER
+&NUMBER  SETA  &CODE
+         AIF   (&NUMBER LT 0 OR &NUMBER GT 4095).BAD
+         AIF   ('&OPTION' NE '' AND '&OPTION' NE 'DUMP').BAD
+&N       LA    1,&NUMBER
+         AIF   ('&OPTION' NE 'DUMP').ISSUE
+         O     1,=X'80000000'
+.ISSUE   SVC   13
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected user ABEND form'
+         MEND
