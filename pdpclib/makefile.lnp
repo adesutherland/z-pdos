@@ -1,0 +1,40 @@
+# This is the makefile for Linux to build pdpclib using
+# the pdos gcc compiler.
+#
+# Also define __W32EMUL__ if you wish to make the
+# pseudo-bios. It has no meaning outside of that -
+# it isn't Linux-related
+
+# This uses coff format until the link step
+
+CC=gccwin
+AR=xar
+AS=pdas --oformat coff
+
+# Alternative toolchain
+# Disable builtins to stop memset calling memset
+#CC=gcc --no-pie -m32 -fno-stack-protector -nostdlib -fno-builtin
+#AR=ar
+#AS=pdas --oformat elf
+
+LD=pdld --oformat elf
+
+COPTS=-D__W32EMUL__ -U__WIN32__ -S -O2 -D__gnu_linux__ -D__NOBIVA__ -I.
+
+pdptest: linstart.o linsupa.o pdptest.o stdio.o string.o stdlib.o \
+       start.o time.o errno.o assert.o signal.o locale.o \
+       ctype.o setjmp.o math.o __memmgr.o
+  rm -f pdplinux.a
+  $(AR) r pdplinux.a linstart.o linsupa.o stdio.o string.o stdlib.o
+  $(AR) r pdplinux.a start.o time.o errno.o assert.o signal.o
+  $(AR) r pdplinux.a locale.o ctype.o setjmp.o math.o __memmgr.o
+  $(AR) s pdplinux.a
+  $(LD) -s --emit-relocs -nostdlib -e __pdpent -o pdptest.exe linstart.o pdptest.o pdplinux.a
+
+.c.o:
+  $(CC) $(COPTS) -o $*.s $<
+  $(AS) -o $*.o $*.s
+  rm -f $*.s
+
+.asm.o:
+  $(AS) -o $@ $<

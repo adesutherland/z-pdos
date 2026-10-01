@@ -1,0 +1,26 @@
+# This is the makefile to build pdpclib for ARM64 UEFI using
+# the Visual C compiler and pdld.
+
+CC=cl
+COPTS=-nologo -O2 -Oi- -Zl -u -X -GS- -D__EFI__ -D__EFIBIOS__ -c -D__ARM__ -D__64BIT__ -I . -D__MSC__ \
+    -D__W64SHELL__
+
+pdptest: efistart.obj a64supb.obj pdptest.obj stdio.obj string.obj stdlib.obj \
+       start.obj time.obj errno.obj assert.obj signal.obj locale.obj \
+       ctype.obj math.obj __memmgr.obj
+    rm -f pdpefi.lib
+    lib -nologo -out:pdpefi.lib efistart.obj a64supb.obj stdio.obj string.obj stdlib.obj
+    lib -nologo -out:pdpefi.lib pdpefi.lib start.obj time.obj errno.obj assert.obj signal.obj
+    lib -nologo -out:pdpefi.lib pdpefi.lib locale.obj ctype.obj math.obj __memmgr.obj
+#    link -nologo -subsystem:efi_application -out:pdptest.efi -entry:efimain efistart.obj pdptest.obj pdpefi.lib
+# I normally use the below when using the Visual C linker
+# Note that unlike pdld, it doesn't allow me to use an address below 4 GiB
+#    link -nologo -fixed:no -subsystem:efi_application -base:0x100400000 -out:pdptest.efi -entry:efimain efistart.obj pdptest.obj pdpefi.lib
+    pdld --no-insert-timestamp --emit-relocs --image-base 0x400000 -o pdptest.efi -e efimain --oformat coff --subsystem 10 efistart.obj pdptest.obj pdpefi.lib
+
+.c.obj:
+    $(CC) $(COPTS) $<
+
+a64supb.obj: a64supb.asm
+    armasm64 -nologo -o $@ $*.asm
+#    ml64 -o $@ $*.asm

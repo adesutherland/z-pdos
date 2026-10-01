@@ -7,6 +7,11 @@ reference files; none of their source, private macro libraries or expansions
 has been imported by this review. No source was changed, assembled, linked or
 executed for this inventory.
 
+After this inventory, I chose to maintain PDPCLIB in
+[`z-pdos/pdpclib`](../../../pdpclib/README.md). Its source record and change
+ledger own the subsequent import, fixes and explicit profiles. The source hashes
+and supplied default switches below remain the historical inventory inputs.
+
 ## Exact baseline and notices
 
 I use the **untouched local upstream source files and supplied PDPTOP** as the

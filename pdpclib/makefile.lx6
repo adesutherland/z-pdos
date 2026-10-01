@@ -1,0 +1,37 @@
+# This is the makefile for Linux to build pdpclib using
+# the gccx64 compiler. This is a compiler that forced
+# short, int and long to 64-bit and used the stack, to
+# get around a compiler issue that was eventually found
+# and fixed, so this compiler is not being distributed
+# until it starts being used for something
+#
+# You can use gcc if you prefer, but you need to take
+# away one underscore from the ld start entry point name
+# You also need to disable optimization for unknown reasons
+
+CC=gccx64
+#CC=gcc -fno-stack-protector
+AS=as
+LD=ld
+AR=ar
+
+COPTS=-S -O2 -U__WIN32__ -D__gnu_linux__ -fno-builtin \
+    -mregparm=0 -D__FORCE_ALL_64__ \
+    -DUSE_MEMMGR -D__64BIT__ -I . -m64 -D__NOBIVA__ -fno-common
+
+pdptest: linstart.o l64supa.o pdptest.o stdio.o string.o stdlib.o \
+       start.o time.o errno.o assert.o signal.o locale.o \
+       ctype.o setjmp.o math.o __memmgr.o
+	rm -f pdplinux.a
+	ar r pdplinux.a linstart.o l64supa.o stdio.o string.o stdlib.o
+	ar r pdplinux.a start.o time.o errno.o assert.o signal.o
+	ar r pdplinux.a locale.o ctype.o setjmp.o math.o __memmgr.o
+	$(LD) -s -e __start -static -nostdlib -o pdptest linstart.o l64supa.o pdptest.o pdplinux.a
+
+.c.o:
+	$(CC) -o $*.s $(COPTS) $<
+        $(AS) -o $@ $*.s
+        rm -f $*.s
+
+l64supa.o: l64supa.asm
+	$(AS) --64 --defsym STACKPARM=1 -o $@ $*.asm

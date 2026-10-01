@@ -1,0 +1,31 @@
+# This builds a.out files for PDOS386, on Windows
+# For the 32-bit version of PDOS we define __PDOS386__
+
+CC=gccwin
+COPTS=-S -O2 -ansi -U__WIN32__ -DNOLIBALLOC -fno-common \
+      -D__W32DLL__ -D__PDOS386__ -D__32BIT__ -I. -I../src
+AR=xar
+
+pdptest.exe: pdosst32.obj pdptest.obj stdio.obj string.obj stdlib.obj \
+       start.obj time.obj errno.obj assert.obj signal.obj locale.obj \
+       ctype.obj setjmp.obj math.obj pos.obj supportf.obj pdossupc.obj
+  rm -f pdos.lib
+  $(AR) r pdos.lib pdosst32.obj stdio.obj string.obj stdlib.obj
+  $(AR) r pdos.lib start.obj time.obj errno.obj assert.obj signal.obj
+  $(AR) r pdos.lib locale.obj ctype.obj setjmp.obj math.obj
+  $(AR) r pdos.lib pos.obj supportf.obj pdossupc.obj
+  $(AR) s pdos.lib
+  pdld --no-insert-timestamp -s -e ___pdosst32 -o pdptest.exe pdosst32.obj pdptest.obj pdos.lib
+
+pos.obj: ../src/pos.c
+  $(CC) $(COPTS) -o $*.s ../src/pos.c
+  pdas --oformat coff -o $@ $*.s
+  rm -f $*.s
+
+supportf.obj: ../src/supportf.asm
+  as86 -f coff -o $@ ../src/supportf.asm
+
+.c.obj:
+  $(CC) $(COPTS) -o $*.s $<
+  pdas --oformat coff -o $@ $*.s
+  rm -f $*.s

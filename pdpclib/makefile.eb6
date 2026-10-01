@@ -1,0 +1,36 @@
+# This builds EFI executables for x86_64
+# We put no-builtin to stop the optimizer from making memset call memset
+
+CC=x86_64-w64-mingw32-gcc
+#CC=gccx64
+#AR=x86_64-w64-mingw32-ar
+AR=xar
+LD=x86_64-w64-mingw32-ld
+#LD=pdld --no-insert-timestamp
+AS=x86_64-w64-mingw32-as
+#AS=pdas --64 --oformat coff
+COPTS=-S -O2 -mno-red-zone -D__64BIT__ -D__EFI__ -D__EFIBIOS__ -D__W64SHELL__ -U__WIN32__ -I. -fno-builtin -fno-common -ansi
+
+TARGET=pdptest.efi
+OBJS=efistart.o stdio.o string.o stdlib.o start.o time.o errno.o \
+    assert.o signal.o locale.o ctype.o setjmp.o math.o x64supb.o
+
+$(TARGET): clean pdptest.o $(OBJS)
+  rm -f pdpefi.a
+  $(AR) r pdpefi.a $(OBJS)
+  $(AR) s pdpefi.a
+  $(LD) -s -subsystem 10 -e efimain -nostdlib -o $(TARGET) pdptest.o $(OBJS)
+
+.c.o:
+  $(CC) $(COPTS) -o $*.s $<
+  $(AS) -o $*.o $*.s
+#  pdas --oformat coff --64 -o $@ $*.s
+  rm -f $*.s
+
+.asm.o:
+  $(AS) -o $@ $<
+#  pdas --oformat coff --64 -o $@ $<
+
+clean:
+  rm -f *.o
+  rm -f $(TARGET)

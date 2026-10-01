@@ -109,17 +109,45 @@ original-entry control has the same defect: expected `0x30290`, stored
 `0x34080`. The source uses that pointer for a write and the IKJPARS prefix-parser
 control list; the erroneous linked value would direct the write outside the
 module. The earlier DD-oriented core checks do not
-exercise that path. Whole-module correctness remains blocked by this inherited
-input/linker defect. No guest execution or linker repair was performed.
+exercise that path. The inherited input/linker defect blocked whole-module
+acceptance at that checkpoint. No guest execution or linker repair was
+performed in that experiment.
+
+## Maintained linker repair
+
+The subsequent [Mainframe Classic Linker](../../tools/classic-ld/README.md)
+delivery imports the reviewed PDLD lineage into `tools/classic-ld/`, command
+`mf-classic-ld`. It keeps each classic section's assembled origin separate from
+its placement in the merged object. TXT positions, LD labels and RLD positions
+use that distinction; an A constant receives the relocation delta rather than
+having its original target origin added again. The optional lean source
+omission is not needed to hide this defect.
+
+Relinking the same three retained inputs corrects the field at `0x2fb48` to
+`0x30238`, matching `@@PCLST`. The 243,840-byte XMIT has SHA-256
+`dc422d41b8cf1ea3d923303edc8348898998c4527be1a54477dbd9b92467f913`.
+The coordinator independently read the package and verified that every other
+image byte and every structural load record is unchanged from the earlier
+independently checked candidate. All 4,573 relocation positions are retained;
+the one failing address now matches its independent expectation. XMIT framing,
+member closure and AMODE 31/RMODE 24 also pass.
+
+This closes the host linked-image address audit for those exact retained
+objects. It does not assemble the newly imported full PDPCLIB source or qualify
+guest execution. Focused original fixtures and malformed controls qualify the
+changed linker paths; its general format coverage and inherited MVS writer
+limits are recorded with that component. The [library consolidation checkpoint](../../pdpclib/CHECKPOINT.md)
+records source ownership, profile preparation and changed C checks.
 
 ## Remaining work
 
 Entry source, host object semantics, target C layout and the entry-only host
-link gate are checked. We must close the inherited nonzero-origin issue before a whole
-linked-image claim or execution gate. The small caller's link/run is also open.
+link gate are checked, and the subsequent maintained linker closes the retained
+package's nonzero-origin address audit. The small caller's link/run is still open.
 I selected MVS 3.8 / real System/370 / AMODE 24 and RMODE 24 for the first
-complete PDPCLIB qualification. Its configuration member still needs to be
-implemented. Full assembly also needs ordinary language features, source-owned
+complete PDPCLIB qualification. Its explicit configuration member is now
+maintained under `pdpclib/profiles/mvs38-s370-24/`. Full assembly still needs
+ordinary language features, source-owned
 traditional macros and independently supplied service/mapping definitions.
 [The native-support inventory](../../tools/classic-as/docs/NATIVE-SUPPORT-INVENTORY.md)
 records those needs and the later loader/kernel steps. Native assembler hosting

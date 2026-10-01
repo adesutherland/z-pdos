@@ -1,0 +1,24 @@
+PDPCLIB upstream licence notice
+==============================
+
+The following notice is retained from the imported pdpclib.txt. Individual
+source files retain their notices and contributor history. Original z-pdos
+changes and integration files follow the repository MIT grant; that grant
+does not alter these upstream terms.
+
+Written by Paul Edwards.
+Released to the public domain.
+You may use this entire package for any purpose whatsoever without
+restriction.
+
+Here is a more formal wording governing the software:
+
+I, the author of this work, hereby release it into the
+public domain. This applies worldwide.
+
+In case this is not legally possible, I grant any entity the right
+to use this work for any purpose, without any conditions, unless
+such conditions are required by law.
+
+You can also follow this if you wish:
+http://creativecommons.org/publicdomain/zero/1.0/

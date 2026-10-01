@@ -1,0 +1,281 @@
+# Produce Windows executables
+# links with PDPCLIB created by makefile.std
+
+VPATH=src;src/bytearray;src/hashtab;src/ftebc
+
+ifeq "$(crt)" "ucrt"
+CRTCOPTS=-D_UCRT -D_USE_32BIT_TIME_T
+CRTEXTRA=../pdpclib/ucrtwrap.lib ../pdpclib/ucrtbase.lib
+else
+CRTEXTRA=../pdpclib/msvcrt.lib
+endif
+
+
+ifeq "$(targ)" "arm"
+# Use makefile.war with the ARM versions of the tools
+CC=gccprm
+CFLAGS=-O0
+AS=asprm
+AR=arprm
+COPTS=-S $(CFLAGS) -Wall -fno-common -I./src -I./src/bytearray \
+    -I./src/hashtab -I../pdpclib -D__WIN32__ -D__USEBIVA__ \
+    -D__ARM__ -msoft-float -mapcs-32 -fno-leading-underscore \
+    -DNO_LONG_LONG -ansi -pedantic-errors -I./src/ftebc $(CRTCOPTS)
+LD=pdld
+LDFLAGS=-s -nostdlib --no-insert-timestamp
+EXTRA1=../pdpclib/w32start.obj
+EXTRA2=../pdpclib/armsupa.obj ../pdpclib/fpfuncsa.obj $(CRTEXTRA)
+
+
+else ifeq "$(targ)" "lin386"
+# Use makefile.lnp with the Linux versions of the tools
+CC=gccwin
+CFLAGS=-O2
+AS=pdas --oformat elf
+AR=xar
+COPTS=-S $(CFLAGS) -Wall -fno-common -I./src -I./src/bytearray \
+    -I./src/hashtab -I../pdpclib -D__gnu_linux__ -D__NOBIVA__ \
+    -DXNO_LONG_LONG -DOWN_LONG_LONG -I./src/ftebc
+LD=pdld
+LDFLAGS=-s -nostdlib --no-insert-timestamp -e __pdpent
+EXTRA1=../pdpclib/linstart.o
+EXTRA2=../pdpclib/pdplinux.a
+
+
+else ifeq "$(targ)" "zpg"
+# Need to run makefile.zpg first
+CC=gccmvs
+CFLAGS=-Os
+AS=as370 -mhlasm -mebcdic
+AR=xar
+# Producing an ASCII Windows executable with embedded
+# EBCDIC strings (ie pdas emitting EBCDIC) suitable
+# for a pseudo-bios running on
+# ASCII Windows requires you to specify
+# -DCONV_CHARSET -DCONVFMAC=
+# but NOT specify =DCONVTMAC=
+#
+# A pure ASCII executable produced on an EBCDIC machine
+# (including pdas outputting ASCII strings) requires
+# just -DCONV_CHARSET so that the default ASCII conversion
+# routines fasc/tasc are executed (not overridden)
+# so that the drectve strings are interpreted
+
+# A pure EBCDIC system requires none of those, although
+# if there was an embedded ASCII lex table for instance,
+# then -DCONV_CHARSET -DCONVFMAC= =DCONVTMAC=
+# would be required. We might want to decouple CONV_CHARSET
+# from the others, so that conversion of a lex table doesn't
+# imply that you want to do other conversion.
+COPTS=-S $(CFLAGS) -Wall -fno-common -I./src -I./src/bytearray \
+    -I./src/hashtab -I../pdpclib \
+    -DNOFLOAT -U__MVS__ -D__MF32__ -D__PDOSGEN__ -D__NOBIVA__ \
+    -DNO_LONG_LONG -ansi -pedantic-errors \
+    -I../generic -I../src -I./src/ftebc -DSHORT_NAMES
+LD=pdld
+LDFLAGS=-s -nostdlib --no-insert-timestamp
+EXTRA1=--oformat mvs ../pdpclib/pgastart.o
+
+
+
+else ifeq "$(targ)" "macarm"
+# makefile.m64 needs to have been run in pdpclib first
+CC=clang -S -O2 -D__ARM__ -fno-builtin -D__MACOS__ \
+    -D__64BIT__ -fno-stack-protector -D__USEBIVA__ \
+    -Wno-error=implicit-function-declaration \
+    -I./src -I./src/bytearray \
+    -I./src/hashtab -I../pdpclib \
+    -I../generic -I../src -I./src/ftebc \
+    -mmacosx-version-min=10 \
+    -D__LONG64__ -DNO_LONG_LONG
+AR=ar
+AS=as -mmacosx-version-min=10
+LD=clang -Wl,-e, -Wl,___pdpent -mmacosx-version-min=10
+EXTRA2=../pdpclib/pdpmacos.a
+
+
+else ifeq "$(targ)" "macamd64"
+# makefile.mx6 needs to have been run in pdpclib first
+CC=clang -arch x86_64 -mmacosx-version-min=11 \
+    -S -O2 -fno-builtin -D__MACOS__ \
+    -D__64BIT__ -D__LONG64__ \
+    -fno-stack-protector  -D__gnu_linux__  -D__USEBIVA__ \
+    -nostdinc \
+    -DNO_LONG_LONG \
+    -I./src -I./src/bytearray \
+    -I./src/hashtab -I../pdpclib \
+    -I../generic -I../src -I./src/ftebc
+AR=ar
+AS=as -arch x86_64 -mmacosx-version-min=11
+LD=clang -arch x86_64 -Wl,-no_uuid -Wl,-no_adhoc_codesign \
+    -Wl,-e, -Wl,__start \
+    -mmacosx-version-min=11
+EXTRA2=../pdpclib/pdpmacos.a
+
+
+else ifeq "$(targ)" "macwin"
+# makefile.gar needs to have been run in pdpclib first
+CC=aarch64-none-elf-gcc \
+    -S -I../src -D__ARM__ -I. -D__WIN32__ -D__PDPCLIB_DLL \
+    -DNOUNDMAIN -D__GENSHELL__ -O2 -U__gnu_linux__ \
+    -D__64BIT__ -nostdlib -nostdinc \
+    -D__NODECLSPEC__ \
+    -fno-stack-protector \
+    -I./src -I./src/bytearray \
+    -I./src/hashtab -I../pdpclib \
+    -I../generic -I../src -I./src/ftebc \
+    --no-pie $(CRTCOPTS)
+AR=aarch64-none-elf-ar
+AS=aarch64-none-elf-as
+LD=pdld --no-insert-timestamp
+EXTRA1=../pdpclib/w32start.obj
+EXTRA2=$(CRTEXTRA)
+
+
+else ifeq "$(targ)" "gccarm64"
+# makefile.a64 needs to have been run in pdpclib first
+CC=gcc -S -O2 -D__ARM__ -nostdinc -nostdlib -fno-builtin \
+    -D__64BIT__ -fno-stack-protector --no-pie -D__USEBIVA__ \
+    -I./src -I./src/bytearray \
+    -D__LONG64__ -DNO_LONG_LONG \
+    -I./src/hashtab -I../pdpclib \
+    -I../generic -I../src -I./src/ftebc
+AR=ar
+AS=as
+# -m64 isn't always recognized
+LD=gcc -static -s -nostdlib
+EXTRA1=../pdpclib/linstart.o
+EXTRA2=../pdpclib/pdplinux.a
+
+
+else ifeq "$(targ)" "gccamd64"
+# makefile.l64 needs to have been run in pdpclib first
+# If you want to create Windows EBCDIC executables, on
+# an ASCII host, build with:
+# tgtchs=ebcdic
+# and force the extra directory through as per comments
+# further down (otherwise you get a link error)
+
+CC=gcc -S -O2 -D__gnu_linux__ -nostdinc -nostdlib -fno-builtin \
+    -D__64BIT__ -fno-stack-protector --no-pie -D__USEBIVA__ \
+    -m64 -fno-common -D__LONG64__ -DNO_LONG_LONG \
+    -I./src -I./src/bytearray \
+    -I./src/hashtab -I../pdpclib \
+    -I../generic -I../src -I./src/ftebc
+AR=ar
+AS=as
+LD=gcc -s -static -m64 -nostdlib -Wl,-e -Wl,__pdpent
+EXTRA1=../pdpclib/linstart.o ../pdpclib/pdplinux.a
+EXTRA2=../pdpclib/pdplinux.a
+
+
+
+else ifeq "$(targ)" "gccia32"
+# makefile.lnx needs to have been run in pdpclib first
+CC=gcc -S -O2 -D__gnu_linux__ -nostdinc -nostdlib -fno-builtin \
+    -fno-stack-protector --no-pie -D__NOBIVA__ \
+    -m32 -fno-common \
+    -DNO_LONG_LONG \
+    -I./src -I./src/bytearray \
+    -I./src/hashtab -I../pdpclib \
+    -I../generic -I../src -I./src/ftebc
+AR=ar
+AS=as --32
+LD=gcc -s -static -m32 -nostdlib
+EXTRA1=../pdpclib/linstart.o ../pdpclib/pdplinux.a
+EXTRA2=../pdpclib/pdplinux.a
+
+
+
+else ifeq "$(targ)" "x64"
+# links with PDPCLIB created with makefile.s64
+CC=x86_64-w64-mingw32-gcc
+CFLAGS=-O2
+AS=pdas --64 --oformat coff
+AR=xar
+COPTS=-S $(CFLAGS) -Wall -fno-common -I./src -I./src/bytearray \
+    -I./src/hashtab -I./src/ftebc -I../pdpclib -D__WIN32__ -D__NOBIVA__ -D__64BIT__ $(CRTCOPTS)
+LD=pdld
+LDFLAGS=-s -nostdlib --no-insert-timestamp
+EXTRA1=../pdpclib/w32start.obj
+EXTRA2=$(CRTEXTRA) ../pdpclib/x64supa.obj
+
+
+
+else
+CC=gccwin
+CFLAGS=-O2
+####CFLAGS=-O2 -DNO_LONG_LONG -ansi -pedantic-errors
+AS=pdas --oformat coff
+AR=xar
+# To produce an EBCDIC Windows executable on an ASCII
+# environment, add:
+# -DCONV_CHARSET -DCONVTMAC=tebc
+# and delete zpg from:
+# ifeq "$(targ)" "zpg"
+# to get the extra directory
+
+COPTS=-S $(CFLAGS) -Wall -I./src -I./src/bytearray \
+    -I./src/hashtab -I./src/ftebc -I../pdpclib -D__WIN32__ -D__NOBIVA__ $(CRTCOPTS)
+LD=pdld
+LDFLAGS=-s -nostdlib --no-insert-timestamp
+EXTRA1=../pdpclib/w32start.obj
+EXTRA2=$(CRTEXTRA)
+endif
+
+
+
+
+OBJS=aout.obj aout_bytearray.obj atari.obj atari_bytearray.obj \
+    binary.obj bytearray.obj cms.obj coff.obj coff_bytearray.obj \
+    coff_implib_compat.obj elf.obj \
+    elf_bytearray.obj error.obj febc.obj hashtab.obj hunk.obj \
+    ld.obj libld.obj link.obj lx.obj lx_bytearray.obj \
+    macho.obj macho_bytearray.obj \
+    mainframe.obj map.obj mts.obj musicsp.obj omf.obj \
+    read.obj sections.obj symbols.obj \
+    tebc.obj vse.obj xmit.obj z390.obj xmalloc.obj int64sup.obj
+
+# switch to this when doing EBCDIC on x64
+# ifeq "$(targ)" "gccamd64"
+# (and comment out the zpg one)
+ifeq "$(targ)" "zpg"
+VPATH:=$(VPATH);src/ftasc
+OBJS:=$(OBJS) fasc.obj tasc.obj
+COPTS:=$(COPTS) -I./src/ftasc
+else ifdef tgtchs
+VPATH:=$(VPATH);src/ftasc
+OBJS:=$(OBJS) fasc.obj tasc.obj
+COPTS:=$(COPTS) -I./src/ftasc
+endif
+
+ifeq "$(tgtchs)" "ebcdic"
+COPTS:=$(COPTS) -DCONV_CHARSET -DCONVTMAC=tebc
+endif
+
+TARGET=pdld.exe
+
+all: clean $(TARGET)
+
+$(TARGET): $(OBJS)
+  $(AR) s temp.lib
+  $(LD) $(LDFLAGS) -o $(TARGET) $(EXTRA1) ld.obj temp.lib $(EXTRA2)
+
+.c.obj:
+  $(CC) $(COPTS) -o $*.s $<
+  $(AS) -o $@ $*.s
+  $(AR) r temp.lib $@
+  rm -f $*.s
+
+clean:
+  rm -f temp.lib
+  rm -f $(TARGET)
+
+BOOTSTRAP_AS=aswin
+BOOTSTRAP_LD=ldwin
+
+bootstrap: set_bootstrap all
+
+set_bootstrap:
+  $(eval AS=$(BOOTSTRAP_AS))
+  $(eval LD=$(BOOTSTRAP_LD))

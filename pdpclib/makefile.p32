@@ -1,0 +1,53 @@
+# This is the makefile for Win32 to build pdpclib using
+# the gcc compiler, and using custom-built Windows tools
+# and for static linking. Use with pdmake etc.
+
+# You should have run makek32.std in src first
+
+# define OLDWIN if you want to produce executables that can
+# run under command.com, with dosonly and ansi.sys in config.nt,
+# and using HX (as an unusual way to run PE executables,
+# but at least you then get ANSI). As per comments in stdio.c,
+# you don't want OLDWIN defined if the executable is intended
+# to run on PDOS/386 that doesn't have the extra functions.
+
+CC=gccwin
+COPTS=-S -fno-common -ansi -O2 -D__WIN32__ -D__STATIC__ -D__NOBIVA__ -I . -I../src -DXOLDWIN
+AR=xar
+
+# define this if you are producing an EBCDIC to ASCII pseudo-bios
+# The -funsigned-char should be done a different way
+# it is currently being used to get the case statement for
+# tasc to generate correct code
+# char needs to be unsigned for EBCDIC so this should be
+# a default in the compiler
+ifeq "$(tgtchs)" "ascii"
+COPTS:=$(COPTS) -DCONV_CHARSET -DCONVFMAC=fasc -DCONVTMAC=tasc -funsigned-char
+endif
+
+
+all: pdptest.exe
+
+pdptest.exe: p32start.obj pdptest.obj stdio.obj string.obj stdlib.obj \
+       start.obj time.obj errno.obj assert.obj signal.obj locale.obj \
+       ctype.obj setjmp.obj math.obj __memmgr.obj winsupa.obj
+  rm -f pdpwin32.lib
+  $(AR) r pdpwin32.lib p32start.obj stdio.obj string.obj stdlib.obj winsupa.obj
+  $(AR) r pdpwin32.lib start.obj time.obj errno.obj assert.obj signal.obj
+  $(AR) r pdpwin32.lib locale.obj ctype.obj setjmp.obj math.obj __memmgr.obj
+  $(AR) s pdpwin32.lib
+  pdld -s -o pdptest.exe p32start.obj pdptest.obj pdpwin32.lib ../src/kernel32.lib
+
+.c.obj:
+  $(CC) $(COPTS) -o $*.s $<
+  pdas --oformat coff -o $@ $*.s
+  rm -f $*.s
+
+.asm.obj:
+  as86 -f coff -o $@ $<
+#  ml -nologo -coff -c -Fo$@ $<
+#  wasm -zq -zcm -fo=$@ $<
+
+clean:
+  rm -f *.obj
+  rm -f pdptest.exe

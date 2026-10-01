@@ -1,0 +1,75 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Adrian Sutherland
+ * Prepare an explicit library profile from maintained z-pdos source.
+ * Source preparation is not complete assembly or guest qualification.
+ */
+options levelb
+import rxfnsb
+
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 2 then do
+    say "usage: crexx tools/prepare-pdpclib.crexx --args profile new-build-directory"
+    return 2
+  end
+  profile = args.1; work = args.2
+  valid = profile = "mvs38-s370-24" | profile = "tso31-lean" | profile = "tso-zos15-24" | profile = "pdos390-esa" | profile = "pdos-zarch-reference"
+  call require valid, "known explicit profile"
+  call require left(work, 6) = "build/" & length(work) > 6 & pos("..", work) = 0, "new owned directory under build/"
+  address system "test ! -e " || shellquote(work)
+  call require rc = 0, "output does not already exist"
+  address system "cmake -E make_directory " || shellquote(work)
+  call require rc = 0, "create owned directory"
+  hashfile = work || "/source.sha256"
+  address system "shasum -a 256 pdpclib/mvssupa.asm > " || shellquote(hashfile)
+  call require rc = 0, "hash maintained native source"
+  call require word(readfile(hashfile), 1) = "f66fa3f287847b45172f8049953ced0429fa1e34e7e842d13b1b7413d5efde45", "reviewed maintained native source"
+  address system "cmake -E copy_directory pdpclib " || shellquote(work || "/pdpclib")
+  call require rc = 0, "copy maintained library"
+  if profile = "tso31-lean" then patch = "omit-prefix-parser.patch"
+  else if profile = "tso-zos15-24" then patch = "swareq.patch"
+  else patch = ""
+  if patch <> "" then do
+    address system "patch --batch --forward --fuzz=0 -p1 -d " || shellquote(work) || " -i " || shellquote("pdpclib/profiles/" || profile || "/" || patch)
+    call require rc = 0, "apply named profile delta"
+  end
+  address system "cmake -E copy " || shellquote("pdpclib/profiles/" || profile || "/pdptop.mac") || " " || shellquote(work || "/pdpclib/pdptop.mac")
+  call require rc = 0, "select explicit configuration member"
+  manifest = work || "/profile-source.sha256"
+  address system "shasum -a 256 " || shellquote(work || "/pdpclib/mvssupa.asm") || " " || shellquote(work || "/pdpclib/pdptop.mac") || " " || shellquote(work || "/pdpclib/string.h") || " " || shellquote(work || "/pdpclib/stdio.c") || " > " || shellquote(manifest)
+  call require rc = 0, "record prepared source identities"
+  say "Prepared " || profile || " in " || work || "; no assembly, link or guest run."
+  return 0
+
+shellquote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'", value, "'\''") || "'"
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED: " || detail
+    exit 1
+  end
+  return 0
+
+readfile: procedure = .string
+  arg path = .string
+  file_id = 0; mode = "rb"
+  assembler fopen file_id,path,mode
+  call require file_id <> 0, "open source hash"
+  result = ""; eof = 0; read_status = 0
+  do forever
+    data = ""
+    assembler freadline data,file_id
+    assembler ferror read_status,file_id
+    call require read_status = 0, "read source hash"
+    assembler feof eof,file_id
+    if length(data) = 0 & eof <> 0 then leave
+    result = result || data || '0A'x
+    call require length(result) <= 4096, "bounded source hash"
+  end
+  close_status = 0
+  assembler fclose close_status,file_id
+  call require close_status = 0, "close source hash"
+  return result

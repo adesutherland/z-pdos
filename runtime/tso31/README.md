@@ -6,8 +6,9 @@ invocation and no IBM Language Environment dependency. It is not a z/PDOS
 service implementation or a general macro library.
 
 See [the dated checkpoint](CHECKPOINT.md) for exact host assembly, target C
-compilation and entry-only link results. An inherited PDPCLIB relocation defect
-still prevents whole-module acceptance.
+compilation and link results. The subsequent Mainframe Classic Linker repair
+closes the inherited nonzero-origin address audit for the retained package.
+Guest execution and rebuilding the complete native library remain open.
 
 `reference-entry31.asm` preserves the exact project-authored reference selected
 for this work. Its SHA-256 is

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
  * Copyright (c) 2026 Adrian Sutherland
- * Gate 1 reference consumer, not a maintained PDPCLIB source transformation.
+ * Gate 1 consumer of the maintained PDPCLIB source, not a source rewrite.
  * The supplied file's public-domain notice and contributor header are retained
  * in the test-owned subset. No IBM macro library or expansion is consumed.
  */
@@ -21,7 +21,7 @@ main: procedure = .int
   address system "shasum -a 256 " || shellquote(original) || " > " || shellquote(hashfile)
   call require rc = 0, "hash supplied source"
   hash = word(readfile(hashfile), 1)
-  call require hash = "27758af986baae46fb726fe9bb35ed993898b98d547e315587328940c2f41e31", "reviewed source identity"
+  call require hash = "f66fa3f287847b45172f8049953ced0429fa1e34e7e842d13b1b7413d5efde45", "reviewed maintained source identity"
   source = readfile(original)
   subset = extract_lines(source, 2, 59) || extract_lines(source, 298, 302) || extract_lines(source, 306, 309) || extract_lines(source, 455, 459)
   subset = subset || "MACREF   CSECT" || '0A'x || "R14      EQU   14" || '0A'x

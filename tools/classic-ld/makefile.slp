@@ -1,0 +1,56 @@
+# This builds the Linux 32-bit version
+# You will need to build PDPCLIB with makefile.lnp first
+
+# Because pdpclib doesn't support a %lld etc, you need
+# to define NO_LONG_LONG
+
+VPATH=src;src/bytearray;src/hashtab;src/ftebc
+CC=gccwin
+#CFLAGS=-O2
+CFLAGS=-O2 -DNO_LONG_LONG -ansi -pedantic-errors
+LD=pdld
+LDFLAGS=-s --no-insert-timestamp -nostdlib --oformat elf --emit-relocs
+AS=pdas --oformat coff
+AR=xar
+COPTS=-S $(CFLAGS) -Wall -fno-common \
+    -I./src -I./src/bytearray -I./src/hashtab -I../pdpclib \
+    -I./src/ftebc \
+    -U__WIN32__ -D__NOBIVA__ \
+    -D__gnu_linux__
+
+OBJS=aout.obj aout_bytearray.obj \
+    atari.obj atari_bytearray.obj binary.obj bytearray.obj \
+    cms.obj coff.obj coff_bytearray.obj \
+    coff_implib_compat.obj elf.obj elf_bytearray.obj \
+    error.obj febc.obj hashtab.obj hunk.obj ld.obj libld.obj link.obj \
+    lx.obj lx_bytearray.obj macho.obj macho_bytearray.obj \
+    mainframe.obj \
+    map.obj omf.obj read.obj sections.obj \
+    symbols.obj tebc.obj vse.obj xmalloc.obj xmit.obj z390.obj
+
+TARGET=pdld.exe
+
+all: clean $(TARGET)
+
+$(TARGET): $(OBJS)
+  $(AR) s temp.lib
+  $(LD) $(LDFLAGS) -o $(TARGET) ../pdpclib/linstart.o ld.obj temp.lib ../pdpclib/pdplinux.a
+
+.c.obj:
+  $(CC) $(COPTS) -o $*.s $<
+  $(AS) -o $@ $*.s
+  $(AR) r temp.lib $@
+  rm -f $*.s
+
+clean:
+  rm -f $(OBJS) $(TARGET)
+  rm -f temp.lib
+
+BOOTSTRAP_AS=aswin
+BOOTSTRAP_LD=ldwin
+
+bootstrap: set_bootstrap all
+
+set_bootstrap:
+  $(eval AS=$(BOOTSTRAP_AS))
+  $(eval LD=$(BOOTSTRAP_LD))

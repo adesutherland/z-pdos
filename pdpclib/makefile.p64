@@ -1,0 +1,46 @@
+# This is the makefile for Win32 to build pdpclib using
+# the x64 version of gcc and static linking. Use pdmake etc
+# And using the new standard tools
+
+# Use the l64 version if you want a 64-bit long
+
+# You need to have built kernel32 with makek32.s64 first
+
+#CC=gccw64_l64
+CC=gccw64
+CFLAGS=-O2 -D__LONG64__ -D__USEBIVA__ -D__W64SHELL__
+
+# Use these if you want to use mingw64 instead
+#CC=x86_64-w64-mingw32-gcc
+#CFLAGS=-O2
+
+COPTS=-S $(CFLAGS) -fno-common -fno-builtin -ansi -D__WIN32__ -D__STATIC__ -I . -I../src -D__64BIT__ -DNOUNDMAIN
+
+AR=xar
+LD=pdld
+
+all: pdptest.exe
+
+pdptest.exe: p32start.obj pdptest.obj stdio.obj string.obj stdlib.obj \
+       start.obj time.obj errno.obj assert.obj signal.obj locale.obj \
+       ctype.obj setjmp.obj math.obj __memmgr.obj x64supa.obj
+  cmd /c if exist pdpwin64.lib del pdpwin64.lib
+  $(AR) r pdpwin64.lib p32start.obj stdio.obj string.obj stdlib.obj x64supa.obj
+  $(AR) r pdpwin64.lib start.obj time.obj errno.obj assert.obj signal.obj
+  $(AR) r pdpwin64.lib locale.obj ctype.obj setjmp.obj math.obj __memmgr.obj
+  $(AR) s pdpwin64.lib
+  $(LD) -s --no-insert-timestamp -nostdlib -o pdptest.exe p32start.obj pdptest.obj pdpwin64.lib ../src/kernel32.lib
+
+.c.obj:
+  $(CC) $(COPTS) $<
+  pdas --oformat coff --64 -o $@ $*.s
+  rm -f $*.s
+
+.asm.obj:
+  pdas --oformat coff --defsym PDAS=1 --no-pseudo-dot --64 -o $@ $<
+#  as86 -o $@ $<
+#  ml64 -c -nologo -Fo$@ $<
+
+clean:
+  rm -rf *.obj
+  rm -rf pdptest.exe

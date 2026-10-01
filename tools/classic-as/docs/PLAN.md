@@ -20,6 +20,12 @@ The completed bootstrap is published as
 I subsequently approved committing and publishing the reviewed TSO31 entry
 and first PDPCLIB language delivery, and selected MVS 3.8 / real System/370 /
 24-bit as the first complete PDPCLIB target.
+I then selected this repository as the maintained home of PDPCLIB and our
+library fixes. The [library source record](../../../pdpclib/SOURCES.md)
+identifies the complete import; its [change ledger](../../../pdpclib/CHANGES.md)
+consolidates the six Lab/SDK deltas without mixing source lineages or target
+profiles. The selected MVS 3.8 configuration member is now present; full
+assembly and native service qualification remain open.
 
 Read the [architecture](APPROVED-DESIGN.md) and [component interfaces](APPROVED-CONTRACTS.md)
 first. The home is [adesutherland/z-pdos](https://github.com/adesutherland/z-pdos).
@@ -55,6 +61,8 @@ z-pdos/
   LICENSES.md                   Component terms and source ownership map
   architecture/                 Original machine/profile descriptions and citations
   lib/mf-machine/               Portable values and encode/decode utilities as needed
+  pdpclib/                      Maintained inherited C library and named profiles
+  tools/classic-ld/             Mainframe Classic Linker, inherited PDLD implementation
   tools/classic-as/
     README.md                   Purpose, implemented capabilities and build entry
     LICENSE                     Grant for original assembler material
@@ -71,8 +79,9 @@ z-pdos/
 
 This is the selected layout. Create shared libraries and optional directories only
 when they have actual contents/consumers; no empty emulator implementation or
-placeholder compiler is required. OS and future compiler/linker/librarian source
-areas are separate additions. The assembler's documented direct C compile/link
+placeholder compiler is required. The classic linker and PDPCLIB now have their
+own components. OS and future compiler/librarian source areas are separate
+additions. The assembler's documented direct C compile/link
 recipe must work without cREXX or a code generator on a bootstrap host. Retained
 project orchestration/generation scripts use cREXX on hosts that can run it.
 
@@ -93,8 +102,8 @@ project orchestration/generation scripts use cREXX on hosts that can run it.
    are separate source inputs, not silently retagged as classic syntax.
    The initial [consumer inventory](CONSUMER-INVENTORY.md)
    records the local source hashes and feature groups. The first complete
-   PDPCLIB target is selected; its configuration member and service-definition
-   edition, later build variants and compiler-output consumers remain open.
+   PDPCLIB target and source member are selected; its service-definition
+   edition, later build qualification and compiler-output consumers remain open.
 4. **Build a narrow original vertical slice — complete locally.** Implement the basic source
    adapter, provider, bounded expression/symbol/layout engine, selected formats
    and classic object output needed by the first reviewed sources. No macro
@@ -105,12 +114,13 @@ project orchestration/generation scripts use cREXX on hosts that can run it.
    Service macros/definitions live with their source component. Document any
    simplified bootstrap variants rather than hiding a source transformation.
    The [TSO31 entry checkpoint](../../../runtime/tso31/CHECKPOINT.md) closes its
-   host assembly, target layout and entry-only link checks. Whole linked-image
-   acceptance remains blocked by an inherited PDPCLIB nonzero-origin relocation
-   defect. The [first PDPCLIB language checkpoint](PDPCLIB-CHECKPOINT.md) closes
+   host assembly, target layout and entry-only link checks. The subsequent
+   `mf-classic-ld` repair closes the nonzero-origin address audit for its retained
+   package; full maintained-library assembly and guest execution remain open.
+   The [first PDPCLIB language checkpoint](PDPCLIB-CHECKPOINT.md) closes
    bounded ordinary layout semantics and the optional streaming traditional
    substitution provider. Conditional controls, further layout/attributes, service definitions,
-   target-member implementation and whole-library assembly remain open.
+   target-member assembly and whole-library qualification remain open.
 6. **Qualify native hosting separately.** Cross-build the same portable source
    for the chosen z/PDOS host; measure code, data/BSS, stack and peak memory;
    assemble a real component there and compare output. Missing services are

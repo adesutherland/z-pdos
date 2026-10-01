@@ -1,0 +1,31 @@
+# This builds ARM ELF executables for Linux
+
+#CC=gccarm
+#CC=gccerm
+CC=gccprm
+AR=arprm
+#LD=lderm
+LD=pdld --oformat elf
+AS=asprm
+COPTS=-S -O0 -fno-common -mapcs-32 -D__ARM__ \
+   -I. -msoft-float -fno-leading-underscore \
+   -D__GENSHELL__
+#COPTS=-S -O2 -fno-common -mapcs-32 -D__ARM__ -DUSE_MEMMGR -DNEED_MPROTECT -DSTACKPARM -I.
+
+pdptest.exe: linstart.o pdptest.o stdio.o string.o stdlib.o \
+       start.o time.o errno.o assert.o signal.o locale.o \
+       ctype.o math.o armsupa.o __memmgr.o fpfuncsa.o
+  rm -f pdperm.a
+  $(AR) r pdperm.a stdio.o string.o stdlib.o
+  $(AR) r pdperm.a start.o time.o errno.o assert.o signal.o locale.o
+  $(AR) r pdperm.a ctype.o math.o armsupa.o __memmgr.o fpfuncsa.o
+  $(LD) --emit-relocs -e __start -s -nostdlib -o pdptest.exe linstart.o pdptest.o pdperm.a
+#  echo $(LD) -s -nostdlib -o pdptest.exe linstart.o pdptest.o pdperm.a
+
+.c.o:
+  $(CC) $(COPTS) -o $*.s $<
+  $(AS) -o $*.o $*.s
+  rm -f $*.s
+
+.asm.o:
+  $(AS) --defsym LINUX=1 --defsym ELF=0 --defsym STACKPARM=0 -o $@ $<

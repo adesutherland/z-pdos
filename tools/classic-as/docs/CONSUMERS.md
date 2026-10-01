@@ -32,10 +32,20 @@ The supplied PDPTOP selects S/380 and z/Architecture options unconditionally;
 a historical build needs a separately identified target configuration.
 I selected MVS 3.8 / real System/370 / AMODE 24 and RMODE 24 for the first
 complete PDPCLIB qualification. The configuration member and service-definition
-edition still need implementation and review.
+edition were initially open. The selected member now lives in
+[`pdpclib/profiles/mvs38-s370-24`](../../../pdpclib/profiles/mvs38-s370-24/).
+Full source/service assembly and execution remain open.
 The [first PDPCLIB checkpoint](PDPCLIB-CHECKPOINT.md) qualifies ordinary layout
 changes and three unchanged source-owned macro definitions through the original
 optional provider. It does not qualify the complete library or its services.
+
+PDPCLIB is now maintained in [`pdpclib/`](../../../pdpclib/README.md) with its
+own notices and consolidated fixes. That tree is our library source of truth;
+Lab inputs above identify historical qualification variants. The default full
+source retains the prefix parser. Target-specific omissions and compatibility
+code are explicit profiles, not hidden rewrites. PDLD's classic relocation
+handling belongs to [Mainframe Classic Linker](../../classic-ld/README.md),
+command `mf-classic-ld`, in the sibling `tools/classic-ld/` component.
 
 Traditional service and control-block macros need individual rights review.
 Where suitable, independently written small definitions or explicit source code

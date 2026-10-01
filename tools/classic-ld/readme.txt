@@ -1,0 +1,238 @@
+This is the documentation for the pdld product
+
+
+Both the source code and documentation are fully public domain.
+
+
+
+pdld is a linker originally designed to target Windows x86
+but later expanded to support a variety of other targets of
+interest.
+
+pdld --help
+
+tells you which targets are currently supported, by looking
+at the list after:
+
+--oformat FORMAT
+
+
+The syntax of pdld is somewhat similar to ld, but pdld is
+neither beholden to remain compatible with ld for anything,
+and nor are the results expected to be identical or
+interchangeable. Mixing and matching object code and tools
+is done at your own risk.
+
+Generally it is advised to follow an active build procedure
+to get a working toolchain, e.g. doing:
+
+pdmake -f makefile.std
+
+in pdos/pdpclib
+
+of the PDOS source tree. Read makefile.std first, to see
+what the dependencies are.
+
+
+Here are some other options:
+
+--kill-at
+
+Some external references used by some tools generate a
+"decorated" function name, such as:
+
+foo@4
+
+where the "4" is the total length of the parameters passed on
+the stack to that function.
+
+In certain circumstances, such as when creating a system
+DLL like kernel32.dll, the DLL itself needs to have the @4
+removed, while the library itself needs to have the full,
+"decorated" name. The kill-at kills the name in the DLL only,
+not the library. This is intentional.
+
+Note that although pdld can create both the DLL and correct
+--kill-at import library in a single command, the GNU tools
+we used to use are not capable of creating a correct --kill-at
+import library (the DLL is fine though), so instead
+you need to separately create
+the DLL (using ldwin) and the library (using dlltwin). You
+can see an example of this being done in PDPCLIB (src/makek32.w32).
+This is why it is always best to start with a working system and
+make changes to get where you are trying to go, so that if
+something breaks you can step back and try a different
+approach. Hopefully someone else has already suffered the
+heartache in getting a working system. You get to inherit that
+knowledge.
+
+In the case of both pdld and ld the end result is the same -
+a valid DLL and a valid library.
+
+However, sometimes tools have dependencies above and beyond
+what the minimum requirements are to be "technically valid".
+Microsoft's linker adds an additional
+symbol __IMPORT_DESCRIPTOR_kernel32
+There is nothing wrong with doing this - it doesn't violate
+any spec. And so long as you use the same tool that that
+vendor used to produce the final executable, it will retrieve
+that metadata and use it, and all is well.
+
+It so happens that pdld (when generating an executable)
+doesn't use the same method that
+Microsoft uses to pass the idata table from the library to
+the final executable. pdld instead generates its own idata
+table. As mentioned, nothing wrong with either approach.
+
+But it does mean that Microsoft's link can't handle a pdld
+archive, as that (undocumented internals) extra member is
+not present.
+
+HOWEVER. Due to popular demand, pdld now has a non-default
+option "--implib-compat" which creates an import library
+that Microsoft link (and other tools, like modern GNU ld)
+will accept. This option has no relationship to the ldwin
+"--compat-implib" option.
+
+Some more technical information about the libraries produced
+by both pdld and ld - the first member of the library is
+known as the "archive symbol table" and despite the fact
+that kill-at has been used, they maintain the @nn decoration.
+Also note that dlltwin (gnu tool) has a "-k" option, or you
+can write it in full as "--kill-at", which does the same
+thing as a single pdld command, which is to leave the
+decorated @@ in the symbol table names, but remove them from
+the .idata import names.
+
+Clarification:
+
+I have used the word "library" above to refer to a traditional
+.lib file (.a on Unix), and DLL to refer to ".dll" (.so on
+Unix), but in actual fact, both of those things are in fact
+"libraries", the former being more technically a "import
+library" and the DLL being a "dynamic link library".
+
+The PE/COFF specification has the concept of an "archive", and
+import libraries are included in this. The first member of an
+archive/import library is called the "first linker member"
+and can be considered to be an "archive symbol table".
+
+
+Technical note:
+
+Microsoft link expects most members of the library to be
+the same name as the dll, in this case, kernel32.dll, like this:
+
+D:\devel\pdos\src>lib -nologo -list kernel32.lib
+kernel32.dll
+kernel32.dll
+kernel32.dll
+kernel32.dll
+kernel32.dll
+kernel32.dll
+...
+
+
+otherwise Microsoft link won't apply correct relocations to
+data appearing in the archive member containing
+__IMPORT_DESCRIPTOR_kernel32
+
+
+
+Notes for DOS/VS (or VSE/380 etc) object/executable format.
+When shipping executables, they are actually shipped in
+object format. pdld will convert multiple object code into
+a single object file, and require that all references be
+resolved. However, the transported format is still processed
+by the DOS/VS linker (LNKEDT) before being placed into the CIL,
+which is an internal format. You can extract from the CIL, but
+you just end up with the same object code you put in.
+
+The object code format is documented in this manual:
+https://bitsavers.org//pdf/ibm/370/DOS_VS/Rel_34_Apr77/
+  SY33-8571-6_DOS_VS_Handbook_Rel_34_Volume_1_Jul77.pdf
+
+Specifically pages II-60 to II-62 (126-128) has the ESD
+card format etc, and page II-21 (87) explains the "PHASE"
+card (we use "S+0x50" which means that the executable
+begins on the next card - 80 bytes for each card). And
+page II-20 (86) mentions the "/*" being ignored. Both of
+these things appear when a PHASE is punched.
+
+Note that page II-60 (126) fails to mention that the
+"type code" can have a high nibble of x'F' which should
+apparently be ignored. Perhaps it was used to show that
+it is a system object file.
+
+
+
+Notes for Mach-O executables being run on MacOS:
+
+The following existing documentation is available:
+
+https://github.com/aidansteele/osx-abi-macho-file-format-reference
+Official documentation from 2009 that contains basics of Mach-O format.
+
+https://github.com/qyang-nj/llios/blob/main/dynamic_linking/chained_fixups.md
+Explains chained fixups and also links to exports trie explanation.
+
+https://github.com/qyang-nj/llios/tree/main/macho_parser/docs
+Contains a variety of files with useful information, in particular:
+
+https://github.com/qyang-nj/llios/blob/main/macho_parser/docs/LC_FUNCTION_STARTS.md
+Explains FUNCTION_STARTS
+
+
+Above and beyond the existing publicly available documentation,
+be aware:
+
+Segments (groups of sections) must be page aligned
+and page size must be 16384 bytes instead of typical 4096.
+
+Sections themselves do not need special alignment above what object files say.
+
+Sections need to be sorted in order readonly text/data,
+initialized data and uninitialized data and must
+have "." prefix replaced with "__".
+
+Segments are loaded whole from disk, so section
+RVA relative to segment RVA must be same as section
+file offset relative to segment file offset.
+
+The order of contents of __LINKEDIT segment is important.
+Symbol table must be last and LC_DATA_IN_CODE should point to it.
+
+Both LC_SYMTAB and LC_DYSYMTAB must be present and
+LC_SYMTAB needs to contain symbol "__mh_execute_header".
+
+Content of LC_FUNCTION_STARTS can be padded to an 8-byte
+boundary using ULEB128 0 (zero bytes) to align the commands
+that follow it.
+
+Some OS versions require the symbol table to start on an
+8-byte boundary, and if LC_MAIN is used, LC_LOAD_DYLIB
+must be used to specify dylib.
+
+GOT can be avoided by converting the ldr instruction with
+GOT relocation into non-GOT add instruction.
+
+ARM64_RELOC_PAGEOFF12 groups multiple relocations which
+need to be decided based on instruction.
+
+Most of the #defines in macho.h are not in official
+documentation, so the values are difficult to determine.
+
+
+Note that COFF and Mach-O do not have way to specify
+common symbol alignment but ARM64 cannot access
+unaligned memory. Aligning every common symbol on a
+multiple of its size solves the problem and to avoid
+wasting memory, the maximum alignment should be
+SectionAlignment for COFF and page size for Mach-O.
+
+
+Note that PDLD automatically removes empty sections. This
+may have originally been done because some OS executable
+formats were rejected if the section was empty. They are
+retained for the binary format where that doesn't make
+any difference. So you can still see them in the map.

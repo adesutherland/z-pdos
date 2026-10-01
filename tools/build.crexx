@@ -21,7 +21,8 @@ main: procedure = .int
     build_dir = "build/classic-as-sanitize"
     sanitize = "ON"
   end
-  address crexx "run cmake -S . -B :build_dir -DMF_SANITIZERS=:sanitize"
+  sanitize_option = "-DMF_SANITIZERS=" || sanitize
+  address crexx "run cmake -S . -B :build_dir :sanitize_option"
   if rc <> 0 then return rc
   address crexx "run cmake --build :build_dir"
   if rc <> 0 then return rc

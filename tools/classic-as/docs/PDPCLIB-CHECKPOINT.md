@@ -6,13 +6,21 @@ published as `e87652d2bc1efdee4439302be4420a5c3ac8911e`. I approved committing
 and publishing this independently reviewed follow-on delivery. It does not
 qualify whole MVSSUPA, its external services or a booted OS.
 
+The subsequent [PDPCLIB consolidation](../../../pdpclib/README.md) brings
+the maintained library and six Lab/SDK deltas into this repository. The macro
+consumer now binds the maintained MVSSUPA identity
+`f66fa3f287847b45172f8049953ced0429fa1e34e7e842d13b1b7413d5efde45`;
+the three selected definitions and their fixed object bytes are unchanged.
+The pristine identity below remains the origin of the earlier reference check.
+
 ## First complete PDPCLIB target
 
 I selected MVS 3.8 on real System/370 with 24-bit addressing (AMODE 24/RMODE 24)
 for the first complete PDPCLIB qualification. It uses traditional MVS linkage
 and classic object decks. This is a target decision; the separately maintained
-configuration member and exact service-definition sources still need to be
-implemented and qualified. The supplied PDPTOP remains a read-only reference
+configuration member is now maintained in the selected library profile; full
+member/source assembly and exact service-definition sources still need to be
+qualified. The supplied PDPTOP retains its imported upstream
 with different defaults. The existing TSO31 entry experiment retains its own
 31-bit profile and does not establish this new target's acceptance.
 
@@ -134,7 +142,7 @@ emission strategy. Source-owned macros and OS/service definitions are separate
 dependencies. The supplied PDPTOP unconditionally selects S/380 and
 z/Architecture branches; it cannot silently stand for a real S/370 build.
 The first complete target is now MVS 3.8 / real System/370 / 24-bit. Its
-configuration member and service-definition edition remain open, as recorded
+member/source assembly and service-definition edition remain open, as recorded
 in [the inventory](NATIVE-SUPPORT-INVENTORY.md).
 
 The inherited nonzero-origin PDPCLIB input/link defect in the

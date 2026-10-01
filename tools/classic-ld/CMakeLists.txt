@@ -1,0 +1,86 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Adrian Sutherland
+cmake_minimum_required(VERSION 3.16)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  project(mainframe_classic_linker C)
+  enable_testing()
+endif()
+
+option(PDLD_SANITIZERS "Enable address/undefined-behaviour checks for PDLD" OFF)
+# The parent keeps the original bootstrap assembler strict. Remove only the
+# fatal-warning switches inherited into this legacy component directory;
+# the original C90 checker below explicitly restores them for its own target.
+get_directory_property(PDLD_DIRECTORY_OPTIONS COMPILE_OPTIONS)
+list(REMOVE_ITEM PDLD_DIRECTORY_OPTIONS -Werror -pedantic-errors)
+set_property(DIRECTORY PROPERTY COMPILE_OPTIONS "${PDLD_DIRECTORY_OPTIONS}")
+file(GLOB_RECURSE PDLD_SOURCES CONFIGURE_DEPENDS src/*.c)
+add_executable(mf-classic-ld ${PDLD_SOURCES})
+set_target_properties(mf-classic-ld PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
+if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+  foreach(folder src src/bytearray src/hashtab src/ftebc)
+    target_compile_options(mf-classic-ld PRIVATE -iquote${CMAKE_CURRENT_SOURCE_DIR}/${folder})
+  endforeach()
+  # Inherited PDLD uses C99 and has legacy diagnostics. Keep the bootstrap
+  # assembler's strict C90 settings separate from this inherited target.
+  if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+    target_compile_options(mf-classic-ld PRIVATE -Wno-macro-redefined)
+  endif()
+  if(PDLD_SANITIZERS)
+    target_compile_options(mf-classic-ld PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+    target_link_options(mf-classic-ld PRIVATE -fsanitize=address,undefined)
+  endif()
+else()
+  target_include_directories(mf-classic-ld PRIVATE src src/bytearray src/hashtab src/ftebc)
+endif()
+
+add_executable(test_pdld_origin tests/test_origin.c)
+set_target_properties(test_pdld_origin PROPERTIES C_STANDARD 90 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
+if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+  target_compile_options(test_pdld_origin PRIVATE -Wall -Wextra -Werror -pedantic-errors)
+  if(PDLD_SANITIZERS)
+    target_compile_options(test_pdld_origin PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+    target_link_options(test_pdld_origin PRIVATE -fsanitize=address,undefined)
+  endif()
+endif()
+set(fixture_dir ${CMAKE_CURRENT_BINARY_DIR}/origin-fixtures)
+file(MAKE_DIRECTORY ${fixture_dir})
+add_test(NAME pdld_origin_prepare COMMAND test_pdld_origin prepare ${fixture_dir})
+set_tests_properties(pdld_origin_prepare PROPERTIES FIXTURES_SETUP pdld_origin_inputs)
+
+function(pdld_origin_case name source base format entry)
+  set(output ${fixture_dir}/${name}.${format})
+  set(inputs ${fixture_dir}/${source}.obj)
+  set(checker_case ${source})
+  if(source STREQUAL "caller")
+    list(APPEND inputs ${fixture_dir}/nonzero.obj)
+  elseif(format STREQUAL "mvs")
+    # The inherited writer needs a PC identity for its output source CESD.
+    # Exercise the retained mixed PC/SD input route, as in PDPCLIB packages.
+    list(PREPEND inputs ${fixture_dir}/prefix.obj)
+    set(checker_case prefix_${source})
+  endif()
+  add_test(NAME pdld_origin_${name}_link COMMAND mf-classic-ld --oformat ${format}
+    --image-base ${base} -e ${entry} -Map ${fixture_dir}/${name}.map -o ${output} ${inputs})
+  set_tests_properties(pdld_origin_${name}_link PROPERTIES
+    FIXTURES_REQUIRED pdld_origin_inputs FIXTURES_SETUP pdld_origin_${name}_output)
+  add_test(NAME pdld_origin_${name}_check COMMAND test_pdld_origin check ${checker_case}
+    ${base} ${format} ${output} ${fixture_dir}/${name}.map)
+  set_tests_properties(pdld_origin_${name}_check PROPERTIES FIXTURES_REQUIRED pdld_origin_${name}_output)
+endfunction()
+pdld_origin_case(nonzero nonzero 0 binary SOURCE)
+pdld_origin_case(nonzero_high nonzero 0x1000 binary SOURCE)
+pdld_origin_case(zero zero 0 binary SOURCE)
+pdld_origin_case(zero_high zero 0x1000 binary SOURCE)
+pdld_origin_case(source source 0 binary SOURCE)
+pdld_origin_case(source_high source 0x1000 binary SOURCE)
+pdld_origin_case(private private 0 binary ENTRY)
+pdld_origin_case(caller caller 0 binary ENTRY)
+pdld_origin_case(caller_high caller 0x1000 binary ENTRY)
+pdld_origin_case(nonzero_mvs nonzero 0 mvs SOURCE)
+pdld_origin_case(source_mvs source 0 mvs SOURCE)
+pdld_origin_case(caller_mvs caller 0 mvs ENTRY)
+foreach(name bad_txt_before bad_txt_after bad_rld_before bad_rld_after bad_ld_before bad_id bad_target bad_hole)
+  add_test(NAME pdld_origin_${name} COMMAND mf-classic-ld --oformat binary --image-base 0
+    -e SOURCE -o ${fixture_dir}/${name}.bin ${fixture_dir}/${name}.obj)
+  set_tests_properties(pdld_origin_${name} PROPERTIES FIXTURES_REQUIRED pdld_origin_inputs WILL_FAIL TRUE)
+endforeach()
