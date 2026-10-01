@@ -101,7 +101,7 @@ struct mf_section {
     unsigned id;
     struct mf_span name;
     mf_u32 length;
-    unsigned amode; /* supported: 24 or 31 */
+    unsigned amode; /* 0 means ANY, otherwise 24 or 31 */
     unsigned rmode; /* 24 or 31 (ANY encoded as 31) */
     int dummy;
 };

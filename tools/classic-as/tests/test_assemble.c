@@ -288,6 +288,15 @@ static void expressions_and_bases(void)
     CHECK(f.entry.present && f.entry.section == 1 && f.entry.offset == 4);
     CHECK(f.fixup_count == 0); clean(&f);
 }
+static void deferred_modes(void)
+{
+    struct fixture f;
+    init(&f, " AMODE ANY\n RMODE ANY\nLATER AMODE 31\nLATER RMODE 24\n CSECT\n LR 1,2\nLATER CSECT\n LR 3,4\n END\n");
+    successful(&f); CHECK(f.result.sections == 2);
+    CHECK(f.sections[0].amode == 0 && f.sections[0].rmode == 31);
+    CHECK(f.sections[1].amode == 31 && f.sections[1].rmode == 24);
+    CHECK(f.sections[0].length == 2 && f.sections[1].length == 2); clean(&f);
+}
 static void relocations_and_sections(void)
 {
     static const mf_octet first[] = {0,0,0,1,0,0,0,0,0xff,0xff,0xff,0xff,0,0,0,0};
@@ -357,7 +366,7 @@ static void bad_sources(void)
         {"S CSECT\n USING S,12\n DS 4096C\n L 1,*\n END\n", MF_RANGE},
         {"S CSECT\n USING S,12\nT CSECT\n L 1,T\n END\n", MF_RANGE},
         {"S CSECT\n AMODE 64\n LR 1,2\n END\n", MF_RANGE},
-        {"S CSECT\n RMODE 31\n LR 1,2\n END\n", MF_UNSUPPORTED},
+        {"S CSECT\n RMODE 31\n LR 1,2\n END\n", MF_UNDEFINED},
         {" MACRO\n END\n", MF_UNSUPPORTED},
         {" COPY MEMBER\n END\n", MF_UNSUPPORTED},
         {" ORG 0\n END\n", MF_UNSUPPORTED},
@@ -547,7 +556,7 @@ static void boundary_and_regression_cases(void)
 }
 int main(void)
 {
-    constants(); forms(); expressions_and_bases(); relocations_and_sections();
+    constants(); forms(); deferred_modes(); expressions_and_bases(); relocations_and_sections();
     bad_sources(); limits(); replay_and_providers(); writer_failures();
     integrated_sink_failures(); constant_storage(); boundary_and_regression_cases();
     printf("assemble: %lu checks passed\n", checks); return 0;

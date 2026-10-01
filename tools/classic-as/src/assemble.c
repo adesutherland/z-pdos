@@ -17,6 +17,7 @@ struct value {
 };
 struct symbol_state { struct value value; int defined, implicit_external; };
 struct section_state { mf_u32 position; unsigned mode_mask; };
+struct mode_declaration { struct mf_span name; unsigned mask, amode, rmode; };
 struct literal {
     struct mf_span text; unsigned section, alignment; size_t pool;
     mf_u32 offset; int placed, seen;
@@ -29,6 +30,7 @@ struct mf_as {
     size_t requested, section_count, symbol_count, fixup_count, current;
     struct mf_section *sections;
     struct section_state *section_state;
+    struct mode_declaration *modes; size_t mode_count;
     struct mf_symbol *symbols;
     struct symbol_state *symbol_state;
     struct literal *literals; size_t literal_count, pool;
@@ -442,22 +444,33 @@ static enum mf_status literal_pool(struct mf_as *, int);
 static enum mf_status mode(struct mf_as *as, int address)
 {
     static const mf_octet any[] = { 0x41, 0x4e, 0x59 };
-    mf_u32 n; enum mf_status status; unsigned mask; struct section_state *state;
-    if (as->current == NIL || as->sections[as->current].dummy) return MF_SOURCE;
-    if (as->statement.label.length && !same_name(as->statement.label, as->sections[as->current].name)) return MF_SOURCE;
-    if (!address && word(as->statement.operand, any, sizeof any)) n = 31;
+    mf_u32 n; enum mf_status status; unsigned mask; size_t i;
+    struct mode_declaration *mode;
+    if (word(as->statement.operand, any, sizeof any)) n = address ? 0 : 31;
     else {
-        status = number(as, as->statement.operand, 31, &n);
-        if (status != MF_OK) return status;
-        if (n != 24 && (address ? n != 31 : 1)) return MF_UNSUPPORTED;
+        status = number(as, as->statement.operand, 31, &n); if (status != MF_OK) return status;
+        if (n != 24 && n != 31) return MF_UNSUPPORTED;
     }
-    state = &as->section_state[as->current]; mask = address ? 1U : 2U;
-    if (as->pass == 2 || (state->mode_mask & mask)) {
-        if ((address ? as->sections[as->current].amode : as->sections[as->current].rmode) != n)
-            return as->pass == 2 ? MF_REPLAY : MF_SOURCE;
-    } else if (address) as->sections[as->current].amode = (unsigned)n;
-    else as->sections[as->current].rmode = (unsigned)n;
-    state->mode_mask |= mask; return MF_OK;
+    for (i = 0; i < as->mode_count; ++i)
+        if (same_name(as->modes[i].name, as->statement.label)) break;
+    mask = address ? 1U : 2U;
+    if (as->pass == 2) {
+        if (i == as->mode_count || !(as->modes[i].mask & mask) ||
+            (address ? as->modes[i].amode : as->modes[i].rmode) != n) return MF_REPLAY;
+        return MF_OK;
+    }
+    if (i == as->mode_count) {
+        if (i == as->config.max_sections) return MF_LIMIT;
+        mode = as->modes + i; memset(mode, 0, sizeof *mode);
+        if (as->statement.label.length) {
+            status = copy_name(as, as->statement.label, &mode->name); if (status != MF_OK) return status;
+        }
+        ++as->mode_count;
+    }
+    mode = as->modes + i;
+    if (mode->mask & mask) return MF_DUPLICATE;
+    if (address) mode->amode = (unsigned)n; else mode->rmode = (unsigned)n;
+    mode->mask |= mask; return MF_OK;
 }
 static enum mf_status using_statement(struct mf_as *as, int drop)
 {
@@ -1054,7 +1067,7 @@ static enum mf_status hash_statement(struct fingerprint *f, const struct mf_stat
 static enum mf_status run_pass(struct mf_as *as, const struct mf_statements *source,
     struct fingerprint *fingerprint)
 {
-    enum mf_status status, semantic_error; size_t n, i; struct mf_origin error_origin;
+    enum mf_status status, semantic_error; size_t n, i, j; struct mf_origin error_origin;
     for (i = 0; i < as->section_count; ++i) {
         as->section_state[i].position = 0;
     }
@@ -1100,6 +1113,13 @@ static enum mf_status run_pass(struct mf_as *as, const struct mf_statements *sou
         return semantic_error;
     }
     if (!as->ended || !as->section_count) return MF_SOURCE;
+    if (as->pass == 1) for (i = 0; i < as->mode_count; ++i) {
+        for (j = 0; j < as->section_count; ++j)
+            if (!as->sections[j].dummy && same_name(as->modes[i].name, as->sections[j].name)) break;
+        if (j == as->section_count) return MF_UNDEFINED;
+        if (as->modes[i].mask & 1U) as->sections[j].amode = as->modes[i].amode;
+        if (as->modes[i].mask & 2U) as->sections[j].rmode = as->modes[i].rmode;
+    }
     for (i = 0; i < as->section_count; ++i) {
         if (as->pass == 1) as->sections[i].length = as->section_state[i].position;
         else if (as->sections[i].length != as->section_state[i].position) return MF_REPLAY;
@@ -1109,7 +1129,7 @@ static enum mf_status run_pass(struct mf_as *as, const struct mf_statements *sou
 enum mf_status mf_as_create(const struct mf_as_config *config,
     const struct mf_storage *storage, struct mf_as **out)
 {
-    struct mf_as *as; size_t a, b, c, d, e, total;
+    struct mf_as *as; size_t a, b, c, d, e, f, total;
     if (out) *out = NULL;
     if (!config || !storage || !storage->acquire || !out) return MF_SOURCE;
     if (config->profile != MF_S360 && config->profile != MF_S370) return MF_UNSUPPORTED;
@@ -1119,7 +1139,8 @@ enum mf_status mf_as_create(const struct mf_as_config *config,
         !allocation_size(config->max_sections, sizeof(struct section_state), &b) ||
         !allocation_size(config->max_symbols, sizeof(struct mf_symbol), &c) ||
         !allocation_size(config->max_symbols, sizeof(struct symbol_state), &d) ||
-        !allocation_size(config->max_literals, sizeof(struct literal), &e)) return MF_LIMIT;
+        !allocation_size(config->max_literals, sizeof(struct literal), &e) ||
+        !allocation_size(config->max_sections, sizeof(struct mode_declaration), &f)) return MF_LIMIT;
     total = sizeof *as;
     if (a > (size_t)-1 - total) return MF_LIMIT;
     total += a;
@@ -1130,6 +1151,8 @@ enum mf_status mf_as_create(const struct mf_as_config *config,
     if (d > (size_t)-1 - total) return MF_LIMIT;
     total += d;
     if (e > (size_t)-1 - total) return MF_LIMIT;
+    total += e;
+    if (f > (size_t)-1 - total) return MF_LIMIT;
     as = (struct mf_as *)storage->acquire(storage->cookie, sizeof *as);
     if (!as) return MF_LIMIT;
     memset(as, 0, sizeof *as); as->config = *config; as->storage = *storage; as->requested = sizeof *as;
@@ -1137,7 +1160,8 @@ enum mf_status mf_as_create(const struct mf_as_config *config,
     as->section_state = (struct section_state *)acquire(as, b);
     as->symbols = (struct mf_symbol *)acquire(as, c);
     as->symbol_state = (struct symbol_state *)acquire(as, d);
-    if (!as->sections || !as->section_state || !as->symbols || !as->symbol_state) return MF_LIMIT;
+    as->modes = (struct mode_declaration *)acquire(as, f);
+    if (!as->sections || !as->section_state || !as->symbols || !as->symbol_state || !as->modes) return MF_LIMIT;
     if (e) {
         as->literals = (struct literal *)acquire(as, e);
         if (!as->literals) return MF_LIMIT;

@@ -130,3 +130,14 @@ division by zero, MEXIT, SYSNDX replay and inactive undefined operands. Existing
 allocation/replay/I/O and deck checks remain. The selected PDPTOP now passes its
 variable setup; the real output reaches the next engine dependency, its leading
 AMODE ANY before the unnamed CSECT. No source/profile rewrite is used.
+
+## Deferred section modes, 1 October 2026
+
+AMODE/RMODE associate by section name independently of source position; blank
+names identify an actual unnamed section. Declarations create no section and
+missing targets or duplicate declarations fail. AMODE ANY is distinct from 31
+and the object writer emits its independently checked ESD flag. The bootstrap
+fixture now names its CODE and SECOND mode declarations correctly; the expected
+object bytes remain unchanged. The selected PDPTOP is consumed unchanged and
+the real ASSERT output reaches the prologue's external SAVE dependency.
+Normal and sanitizer affected checks pass 37/37, including the TSO31 consumer.

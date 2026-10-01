@@ -140,6 +140,14 @@ static void good_deck(void)
     CHECK(f.writer.finish(f.writer.cookie,1)==MF_OBJECT && f.finishes==1);
     clean(&f);
 }
+static void any_mode(void)
+{
+    struct fixture f; struct mf_section s;
+    init(&f); s = sec(1, 0); s.amode = 0; s.rmode = 31;
+    CHECK(f.writer.begin(f.writer.cookie, &s, 1, NULL, 0) == MF_OK);
+    CHECK(f.bytes[28] == 7);
+    CHECK(f.writer.finish(f.writer.cookie, 1) == MF_OK && f.valid); clean(&f);
+}
 static void failure(unsigned which, enum mf_status expected)
 {
     static const mf_octet badname[]={0xc3,0xa9};
@@ -288,7 +296,7 @@ int main(void)
     static const enum mf_status expected[]={MF_UNSUPPORTED,MF_RANGE,MF_LIMIT,MF_UNSUPPORTED,
         MF_DUPLICATE,MF_IO,MF_IO,MF_RANGE,MF_UNSUPPORTED,MF_OBJECT,MF_RANGE,
         MF_UNSUPPORTED,MF_UNDEFINED,MF_RANGE,MF_RANGE,MF_IO,MF_IO,MF_SOURCE,MF_SOURCE};
-    unsigned i;good_deck();for(i=0;i<sizeof(expected)/sizeof(expected[0]);++i)failure(i,expected[i]);
+    unsigned i;any_mode();good_deck();for(i=0;i<sizeof(expected)/sizeof(expected[0]);++i)failure(i,expected[i]);
     edges();definitions();relocation_failures();short_writes();
     printf("object: %u checks passed\n",checks);return 0;
 }

@@ -40,7 +40,12 @@ publication semantics.
 | Addressability | One base per USING statement, DROP, explicit base/index fields; same-section symbolic addresses need a matching USING |
 | Visibility and entry | ENTRY, EXTRN, implicit externals for a single-name V constant, and END with an optional section-relative entry |
 | Literals | Selected `=F'number'`, `=X'hex'` and `=V(name)`, explicit LTORG and implicit END pool |
-| Modes | AMODE 24/31; RMODE 24/ANY, checked independently of the instruction profile |
+| Modes | AMODE 24/31/ANY; RMODE 24/31/ANY; name associates the declaration with its section, including a later section |
+
+Mode declarations do not create a section. A blank name selects the unnamed
+section, which must exist by END; it does not select the current named section.
+Each mode may be declared once per section. ANY addressing is represented
+separately from AMODE31 and emits the classic ANY flag.
 
 H and F are signed 16- and 32-bit constants. Positive A values can use all 32
 bits; absolute AD uses two 32-bit parts, including sign-extended negative values.

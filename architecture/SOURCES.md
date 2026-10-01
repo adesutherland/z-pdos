@@ -17,6 +17,7 @@ does not establish that all its contents are public domain.
 | IBM HLASM [DC duplication factor](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=instruction-subfield-1-duplication-factor) | A zero factor produces alignment and label semantics without a value; a nominal may be omitted; zero-duplication literals are not permitted |
 | IBM HLASM [COPY](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=statements-copy-instruction) | Library member insertion, distinct from a macro call; definition-time COPY remains outside the first resolver slice |
 | IBM HLASM [scalar declarations](https://www.ibm.com/docs/en/hla-and-tf/1.6?topic=symbols-lcla-lclb-lclc-instructions), [SETA](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=symbols-seta-instruction) and [conditional language](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=reference-macro-conditional-assembly-language-summary) | Selected scoped scalar, signed 32-bit arithmetic and conditional branch semantics; documented provider subset only |
+| IBM z/VM [AMODE and RMODE](https://www.ibm.com/docs/en/zvm/7.2.0?topic=modes-amode-rmode-instructions) and HLASM [RMODE](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=statements-rmode-instruction) | Named association anywhere in source; blank association requires an actual unnamed section and does not create it |
 | [RFC 3629](https://www.rfc-editor.org/rfc/rfc3629.html) | UTF-8 text contract; ASCII is a valid subset |
 
 Character constants and external names select IBM CP037 explicitly. The

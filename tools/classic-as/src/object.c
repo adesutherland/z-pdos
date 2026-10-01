@@ -126,7 +126,7 @@ static enum mf_status begin(void *cookie, const struct mf_section *secs,
         for (j = 0; j < i; ++j)
             if (o->sections[j].id == s->id) return fail(o, MF_DUPLICATE);
         if (s->length > 0xffffffUL) return fail(o, MF_RANGE);
-        if ((s->amode != 24 && s->amode != 31) ||
+        if ((s->amode != 0 && s->amode != 24 && s->amode != 31) ||
             (s->rmode != 24 && s->rmode != 31)) return fail(o, MF_UNSUPPORTED);
         if (!s->dummy) {
             st = name(secs[i].name, s->name, 1);
@@ -177,7 +177,7 @@ static enum mf_status begin(void *cookie, const struct mf_section *secs,
         card(p, 0xc5, 0xe2, 0xc4); store(p + 10, 16, 2);
         store(p + 14, s->esdid, 2); memcpy(p + 16, s->name, 8);
         p[24] = (mf_octet)(s->named ? 0 : 4); store(p + 25, 0, 3);
-        p[28] = (mf_octet)((s->amode == 24 ? 1 : 2) |
+        p[28] = (mf_octet)((s->amode == 0 ? 3 : s->amode == 24 ? 1 : 2) |
             (s->rmode == 31 ? 4 : 0)); store(p + 29, s->length, 3);
         if (emit(o, p) != MF_OK) return o->error;
     }
