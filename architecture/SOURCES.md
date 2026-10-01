@@ -58,3 +58,8 @@ the same internal representation. That future host remains to be qualified.
   alignment fill and A-type address treatment. The architecture channel
   chapter defines 31-bit format-1 data addresses. Original code and
   independently stated object/link bytes use these facts.
+
+The selected continuation reader uses the public [HLASM continuation rules](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=conventions-continuation-lines)
+for columns 72 and 16 and the [macro operand rules](https://www.ibm.com/docs/en/zos/3.2.0?topic=format-rules-continuation-lines)
+for comma-truncated fields. Its bounds and rejected continued remarks are
+explicit implementation limits.

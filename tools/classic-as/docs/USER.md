@@ -13,7 +13,7 @@ The default instruction profile is `s360`. Source files contain ASCII bytes in
 short lines or fixed cards, with LF or CRLF endings. Core record adapters can
 also supply CP037 records. Tabs and non-ASCII syntax are rejected. A label starts
 in column 1; statements without a label start with a space. Columns 1–71 contain
-syntax, column 72 continuation is unsupported, and columns 73–80 are ignored
+syntax, column 72 continuation requires the optional macro provider, and columns 73–80 are ignored
 sequence fields. A `*` in column 1 starts a comment. Spaces inside quoted
 constants and doubled apostrophes are preserved; whitespace after an unquoted
 operand begins a remark. Do not insert spaces inside ordinary operands.
@@ -181,7 +181,7 @@ Library diagnostics name the supplying file. Desktop bounds are 16 directories,
 256 source identities, 16 simultaneous members and 1,024 path bytes.
 
 The provider accepts the scalar variables, conditional branches and SYSNDX
-described in the macro guide. It rejects continuation, COPY inside macro
+described in the macro guide. It rejects continued remarks, COPY inside macro
 definitions, variable arrays, general symbol attributes, dynamic or nested sublist indexing, escaped
 ampersands and nested definitions. The [macro guide](MACROS.md) gives an original example and the
 storage/replay/provenance contract. This is a language subset; it supplies no
@@ -229,3 +229,10 @@ single-section address is checked to 31 bits at assembly time; relocatable
 addresses receive an ordinary four-byte A fixup at offset four. Alignment
 fill is emitted as zeros. Final relocated channel addresses still require the
 load-image audit. CCW/CCW0 remain unsupported.
+
+With `--macros`, a nonblank column 72 joins the next card from column 16.
+Columns 1–15 on continuation cards must be blank. Comma-terminated padding
+and remarks are discarded; quoted bytes and spaces inside parentheses are
+preserved. The preallocated statement limit bounds joined text. Every card
+is fingerprinted and charged against the provider step limit. Missing cards,
+invalid prefixes and continued remarks outside the selected subset fail.

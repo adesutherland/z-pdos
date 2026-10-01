@@ -270,3 +270,9 @@ forward A relocation and all 30 final bytes at image base 4096. Oversized
 fields, a 32nd address bit and missing addresses fail. The repaired kernel
 advances beyond its write CCW chain. Channel execution and final OS address
 constraints remain unqualified; CCW0 support remains open.
+
+Fixed-card continuation now works in the optional provider without streaming
+allocations. Original cases cover comma truncation, quoted column padding, a
+continued logical condition, CP037, changed replay, missing/invalid cards,
+statement capacity and physical-card step limits. Kernel support advances
+from the continued AIF to external mapping declarations.

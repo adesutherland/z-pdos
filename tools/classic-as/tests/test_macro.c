@@ -318,6 +318,40 @@ static void replay_and_io(void)
     expected(&f, "", "LR", "1,2", 1); CHECK(drain(&f, &n) == MF_REPLAY); clean(&f);
     card[80] = ' '; card[81] = '\n'; card[82] = 0; bad_source(card, MF_LIMIT);
 }
+static void continuation_cards(void)
+{
+    struct fixture f; unsigned long n; size_t calls; char source[320], changed[320], operand[80];
+    memset(source,' ',sizeof source); memcpy(source," LR 1,",6);
+    source[71] = '+'; source[72] = '\n'; memcpy(source+88,"2\n",2); source[90] = 0;
+    init(&f,source); CHECK(create(&f) == MF_OK); calls = f.calls;
+    expected(&f,"","LR","1,2",1); CHECK(drain(&f,&n) == MF_EOF && f.calls == calls);
+    CHECK(f.statements.replay(f.statements.cookie) == MF_OK);
+    expected(&f,"","LR","1,2",1); CHECK(drain(&f,&n) == MF_EOF && f.calls == calls); clean(&f);
+    init(&f,source); f.records.encoding = MF_CP037; CHECK(create(&f) == MF_OK);
+    expected(&f,"","LR","1,2",1); CHECK(drain(&f,&n) == MF_EOF); clean(&f);
+    memcpy(changed,source,sizeof changed); changed[88] = '3';
+    init(&f,source); f.second = changed; CHECK(create(&f) == MF_OK);
+    expected(&f,"","LR","1,2",1); CHECK(drain(&f,&n) == MF_EOF);
+    CHECK(f.statements.replay(f.statements.cookie) == MF_OK);
+    expected(&f,"","LR","1,3",1); CHECK(drain(&f,&n) == MF_REPLAY); clean(&f);
+    init(&f,source); f.config.max_statement_bytes = 6; CHECK(create(&f) == MF_OK);
+    CHECK(drain(&f,&n) == MF_LIMIT); clean(&f);
+    init(&f,source); f.config.max_steps = 1; CHECK(create(&f) == MF_OK);
+    CHECK(drain(&f,&n) == MF_LIMIT); clean(&f);
+    changed[73] = 'X'; bad_source(changed,MF_SOURCE);
+    source[73] = 0; bad_source(source,MF_SOURCE);
+    memset(source,'A',sizeof source); memcpy(source," DC C'",6);
+    source[71] = '+'; source[72] = '\n'; memset(source+73,' ',15);
+    memcpy(source+88,"B'\n",3); source[91] = 0;
+    memcpy(operand,"C'",2); memset(operand+2,'A',65); memcpy(operand+67,"B'",2); operand[69] = 0;
+    init(&f,source); CHECK(create(&f) == MF_OK);
+    expected(&f,"","DC",operand,1); CHECK(drain(&f,&n) == MF_EOF); clean(&f);
+    memset(source,' ',sizeof source); memcpy(source," AIF ('A' EQ 'B' OR",19);
+    source[71] = '+'; source[72] = '\n';
+    memcpy(source+88,"'A' EQ 'A').YES\n LR 3,4\n.YES ANOP\n LR 1,2\n",43);
+    init(&f,source); CHECK(create(&f) == MF_OK);
+    expected(&f,"","LR","1,2",5); CHECK(drain(&f,&n) == MF_EOF); clean(&f);
+}
 static void constant_storage(void)
 {
     struct fixture f; unsigned long n; size_t short_calls, short_used, calls;
@@ -336,6 +370,6 @@ static void constant_storage(void)
 }
 int main(void)
 {
-    templates(); binding(); failures(); limits(); replay_and_io(); constant_storage();
+    continuation_cards(); templates(); binding(); failures(); limits(); replay_and_io(); constant_storage();
     printf("macro provider: %lu checks passed\n", checks); return 0;
 }

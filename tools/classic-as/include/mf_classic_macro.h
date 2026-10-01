@@ -63,11 +63,14 @@ void mf_macro_destroy(struct mf_macro *);
  * identify numeric, omitted or unknown text; ordinary-symbol queries remain
  * unsupported. Parameter K'/N' and literal decimal sublist indices are supported.
  * Severity 8..255 MNOTE fails explicitly; lower severities are unsupported.
- * COPY inside definitions, continuation, variable/dynamic/nested indexing,
+ * COPY inside definitions, variable/dynamic/nested indexing,
  * other attributes, escaped ampersands and nested definitions are unsupported.
  * Definitions cannot be redefined. Names compare case-insensitively; character
  * argument values retain their original octets. ASCII and CP037 records use
- * fixed cards (syntax1..71; continuation72 rejected; sequence73..80 ignored).
+ * fixed cards (syntax1..71; continuation72 joins from column16; sequence73..80
+ * ignored). Logical text is bounded by max_statement_bytes; every physical
+ * card consumes a step and participates in replay. Comma-truncated and full
+ * operand-field continuation are selected; continued remarks are unsupported.
  *
  * Spans survive until next/replay. On error only origin is meaningful. A
  * generated statement's primary origin is the outermost source invocation.

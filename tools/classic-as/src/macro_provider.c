@@ -35,7 +35,7 @@ struct mf_macro {
     struct frame *frames;
     struct mf_macro_frame_info *trace;
     struct mf_span *values;
-    mf_octet *assigned, *arguments, *definition_bytes, *output, *pending;
+    mf_octet *assigned, *arguments, *definition_bytes, *output, *pending, *logical;
     mf_octet card[80];
     size_t definition_count, model_count, definition_used, depth;
     unsigned long steps;
@@ -133,27 +133,87 @@ static enum mf_status step(struct mf_macro *m)
     if (m->steps == m->config.max_steps) return MF_LIMIT;
     ++m->steps; return MF_OK;
 }
+/* Every physical card remains a separately bounded, fingerprinted input. */
+static enum mf_status physical(struct mf_macro *m, struct mf_records *records,
+    struct mf_record *r)
+{
+    enum mf_status st;
+    memset(r,0,sizeof *r); st = records->next(records->cookie,r);
+    m->last_origin = r->origin;
+    if (st != MF_OK) return st;
+    if (r->bytes.length > 80 || (r->bytes.length && !r->bytes.data))
+        return r->bytes.length > 80 ? MF_LIMIT : MF_SOURCE;
+    st = step(m); if (st != MF_OK) return st;
+    return hash_record(&m->current,r);
+}
+static enum mf_status card_byte(const struct mf_record *r, enum mf_encoding encoding,
+    size_t at, mf_octet *c)
+{
+    enum mf_status st;
+    *c = at < r->bytes.length ? r->bytes.data[at] : 0x20;
+    if (at < r->bytes.length && encoding == MF_CP037) {
+        st = mf_ebcdic_to_ascii(*c,c); if (st != MF_OK) return st;
+    }
+    return *c >= 0x20 && *c <= 0x7e ? MF_OK : MF_SOURCE;
+}
+static enum mf_status joined(struct mf_macro *m, struct mf_records *records,
+    struct mf_record *r, struct mf_statement *s, int *skip)
+{
+    struct mf_record text; struct mf_origin origin; enum mf_status st;
+    size_t i, begin, used, operand, level; int quoted, continued, first;
+    mf_octet c, previous;
+    origin = r->origin; used = level = 0; quoted = 0; first = 1; previous = 0;
+    operand = (size_t)(s->operation.data - m->card) + s->operation.length;
+    for (;;) {
+        st = card_byte(r,records->encoding,71,&c); if (st != MF_OK) return st;
+        continued = c != 0x20; begin = first ? 0 : 15;
+        if (!first) for (i = 0; i < 15; ++i) {
+            st = card_byte(r,records->encoding,i,&c); if (st != MF_OK) return st;
+            if (c != 0x20) { m->last_origin.column = (unsigned)i+1; return MF_SOURCE; }
+        }
+        for (i = begin; i < 71 && i < r->bytes.length; ++i) {
+            st = card_byte(r,records->encoding,i,&c); if (st != MF_OK) return st;
+            if (first && i >= operand && !quoted && !level && c == 0x20) {
+                /* Skip the separating spaces before the first operand. */
+                if (!previous) { if (used == m->config.max_statement_bytes) return MF_LIMIT;
+                    m->logical[used++] = c; continue; }
+            }
+            if ((!first || i >= operand) && !quoted && !level && c == 0x20 && previous) {
+                if (continued && previous != 0x2c) return MF_UNSUPPORTED;
+                break; /* comma-terminated card padding and remarks */
+            }
+            if (used == m->config.max_statement_bytes) return MF_LIMIT;
+            m->logical[used++] = c;
+            if (!first || i >= operand) {
+                if (c == 0x27) quoted = !quoted;
+                else if (!quoted && c == 0x28) ++level;
+                else if (!quoted && c == 0x29) { if (!level) return MF_SOURCE; --level; }
+                if (c != 0x20) previous = c;
+            }
+        }
+        if (!continued) break;
+        st = physical(m,records,r); if (st == MF_EOF) return MF_SOURCE;
+        if (st != MF_OK) return st;
+        first = 0;
+    }
+    text.bytes.data = m->logical; text.bytes.length = used; text.origin = origin;
+    return mf_macro_card(&text,MF_ASCII,m->logical,m->config.max_statement_bytes,s,skip,0,1);
+}
 static enum mf_status raw(struct mf_macro *m, struct mf_statement *s)
 {
-    struct mf_record r; struct mf_records *records; enum mf_status st; int skip;
+    struct mf_record r; struct mf_records *records; enum mf_status st; int skip, active;
     for (;;) {
-        memset(&r, 0, sizeof r);
         records = m->member_depth ? &m->members[m->member_depth - 1].records : &m->records;
-        st = records->next(records->cookie, &r);
-        m->last_origin = r.origin;
-        if (st != MF_OK) return st;
-        if (r.bytes.length > 80 || (r.bytes.length && !r.bytes.data))
-            return r.bytes.length > 80 ? MF_LIMIT : MF_SOURCE;
-        st = step(m); if (st != MF_OK) return st;
-        st = hash_record(&m->current, &r); if (st != MF_OK) return st;
-        st = mf_macro_card(&r, records->encoding, m->card, sizeof m->card, s, &skip, m->skip_length != 0);
+        st = physical(m,records,&r); if (st != MF_OK) return st;
+        st = mf_macro_card(&r,records->encoding,m->card,sizeof m->card,s,&skip,1,0);
+        active = !m->skip_length;
         if (st == MF_OK && !skip && m->skip_length && !m->skip_nesting) {
             struct mf_span target; target.data = m->skip_name; target.length = m->skip_length;
-            if (mf_macro_same(target,s->label))
-                st = mf_macro_card(&r, records->encoding, m->card, sizeof m->card, s, &skip, 0);
+            if (mf_macro_same(target,s->label)) active = 1;
         }
-        m->last_origin = s->origin;
+        if (st == MF_OK && !skip && active) st = joined(m,records,&r,s,&skip);
         if (st != MF_OK) return st;
+        m->last_origin = s->origin;
         if (!skip) return MF_OK;
     }
 }
@@ -768,6 +828,7 @@ enum mf_status mf_macro_create(const struct mf_macro_config *c,
     ALLOC(definition_bytes, c->max_definition_bytes, mf_octet);
     ALLOC(output, c->max_statement_bytes, mf_octet);
     ALLOC(pending, c->max_statement_bytes, mf_octet);
+    ALLOC(logical, c->max_statement_bytes, mf_octet);
     ALLOC(members, c->max_depth, struct member);
 #undef ALLOC
     m->variable_slots = c->max_model_statements * (c->max_depth + 2);

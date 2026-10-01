@@ -27,7 +27,7 @@ static enum mf_status decode(mf_octet c, enum mf_encoding e, mf_octet *out)
     return e == MF_CP037 ? mf_ebcdic_to_ascii(c, out) : MF_OK;
 }
 enum mf_status mf_macro_card(const struct mf_record *r, enum mf_encoding e,
-    mf_octet *b, size_t cap, struct mf_statement *s, int *skip, int prefix_only)
+    mf_octet *b, size_t cap, struct mf_statement *s, int *skip, int prefix_only, int logical)
 {
     size_t n, i, j, start, level;
     int quoted; mf_octet c; enum mf_status status;
@@ -35,7 +35,7 @@ enum mf_status mf_macro_card(const struct mf_record *r, enum mf_encoding e,
     s->label.data = s->operation.data = s->operand.data = b;
     s->label.length = s->operation.length = s->operand.length = 0;
     if (r->bytes.length && !r->bytes.data) return MF_SOURCE;
-    if (r->bytes.length > 80) return MF_LIMIT;
+    if (!logical && r->bytes.length > 80) return MF_LIMIT;
     if (!r->bytes.length) { *skip = 1; return MF_OK; }
     status = decode(r->bytes.data[0], e, &c); if (status != MF_OK) return status;
     if (c == 0x2a) { *skip = 1; return MF_OK; }
@@ -43,7 +43,7 @@ enum mf_status mf_macro_card(const struct mf_record *r, enum mf_encoding e,
         status = decode(r->bytes.data[1], e, &c); if (status != MF_OK) return status;
         if (c == 0x2a) { *skip = 1; return MF_OK; }
     }
-    n = r->bytes.length < 71 ? r->bytes.length : 71;
+    n = logical ? r->bytes.length : (r->bytes.length < 71 ? r->bytes.length : 71);
     if (n > cap) return MF_LIMIT;
     for (i = 0; i < n; ++i) {
         status = decode(r->bytes.data[i], e, b + i);
@@ -67,7 +67,7 @@ enum mf_status mf_macro_card(const struct mf_record *r, enum mf_encoding e,
     while (i < n && b[i] != 0x20) ++i;
     s->operation.data = b + start; s->operation.length = i - start;
     if (prefix_only) return MF_OK;
-    if (r->bytes.length >= 72) {
+    if (!logical && r->bytes.length >= 72) {
         status = decode(r->bytes.data[71], e, &c); if (status != MF_OK) return status;
         if (c != 0x20) { s->origin.column = 72; return MF_UNSUPPORTED; }
     }
