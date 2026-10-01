@@ -1,0 +1,33 @@
+/* SPDX-License-Identifier: MIT */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 4 then return 2
+  cli = args.1; linker = args.2; checker = args.3; work = args.4
+  if work = "" | work = "." | work = "/" then return 2
+  address crexx "run cmake -E make_directory :work"
+  if rc <> 0 then return rc
+  do i = 1 to 2
+    source = word("pdos31-io-templates pdos31-get",i)
+    entry = word("IOTEST GETTEST",i)
+    mode = word("pdos31-io pdos31-get",i)
+    deck = work || "/" || source || ".obj"
+    binary = work || "/" || source || ".bin"
+    source = "tools/classic-as/tests/fixtures/" || source || ".asm"
+    address crexx "run cmake -E rm -f :deck :binary"
+    if rc <> 0 then return rc
+    address crexx "run :cli --macros -I pdpclib/interfaces/pdos31 :source :deck"
+    if rc <> 0 then return rc
+    address crexx "run :linker --oformat binary --image-base 4096 -e :entry -o :binary :deck"
+    if rc <> 0 then return rc
+    address crexx "run :checker :mode :binary"
+    if rc <> 0 then return rc
+  end
+  failed = work || "/io-failed.obj"
+  address crexx "run cmake -E rm -f :failed"
+  if rc <> 0 then return rc
+  address crexx "run :cli --macros -I pdpclib/interfaces/pdos31 tools/classic-as/tests/fixtures/pdos31-io-unsupported.asm :failed"
+  if rc = 0 then return 1
+  address crexx "run :checker absent :failed"
+  return rc

@@ -66,6 +66,11 @@ if(CREXX_EXECUTABLE)
         --args $<TARGET_FILE:mf-classic-as> $<TARGET_FILE:mf-classic-ld>
         $<TARGET_FILE:test_cli_output> ${PROJECT_BINARY_DIR}/pdos31-storage-link)
     set_tests_properties(classic_pdos31_storage_link PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    add_test(NAME classic_pdos31_io_link
+      COMMAND ${CREXX_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check-pdos31-io.crexx
+        --args $<TARGET_FILE:mf-classic-as> $<TARGET_FILE:mf-classic-ld>
+        $<TARGET_FILE:test_cli_output> ${PROJECT_BINARY_DIR}/pdos31-io-link)
+    set_tests_properties(classic_pdos31_io_link PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
   endif()
   add_test(NAME pdpclib_profile_sources
     COMMAND ${CREXX_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check-pdpclib-profiles.crexx

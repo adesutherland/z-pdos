@@ -1,0 +1,25 @@
+* SPDX-License-Identifier: MIT
+* Original locate-mode call through the public DCB 24-bit entry field.
+         MACRO
+&N       GET &DCB
+         LCLA  &REGNO
+         LCLC  &TEXT
+         AIF   ('&DCB' EQ '').BAD
+         AIF   ('&DCB'(1,1) EQ '(').REG
+&N       LA    1,&DCB
+         AGO   .ENTRY
+.REG     AIF   (K'&DCB LT 3).BAD
+         AIF   ('&DCB'(K'&DCB,1) NE ')').BAD
+&TEXT    SETC  '&DCB'(2,K'&DCB-2)
+         AIF   ('&TEXT'(1,1) NE 'R').NUMBER
+&TEXT    SETC  '&TEXT'(2,*)
+.NUMBER  ANOP
+&REGNO   SETA  &TEXT
+         AIF   (&REGNO LT 1 OR &REGNO GT 12).BAD
+&N       LR    1,&REGNO
+.ENTRY   L     15,48(1)
+         N     15,=X'00FFFFFF'
+         BALR  14,15
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected locate GET'
+         MEND

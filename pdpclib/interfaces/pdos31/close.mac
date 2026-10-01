@@ -1,0 +1,10 @@
+* SPDX-License-Identifier: MIT
+* Original single short-form placeholder template; README.md.
+         MACRO
+&N       CLOSE &DCBS,&MF=
+         AIF   ('&MF' NE 'L' OR '&DCBS' NE '()').BAD
+         DS    0F
+&N       DC    X'80000000'
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected CLOSE template'
+         MEND

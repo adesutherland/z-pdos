@@ -62,6 +62,26 @@ static void storage_requests(const char *path)
     CHECK(step < 64 && calls == 4);
     puts("Storage interfaces: four independently expected SVC register requests pass");
 }
+static void io_templates(const char *path)
+{
+    static const unsigned char names[3][8] = {
+        {0xc9,0xd5,0xd7,0xe4,0xe3,0x40,0x40,0x40},
+        {0xd6,0xe4,0xe3,0xd7,0xe4,0xe3,0x40,0x40},
+        {0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40}
+    };
+    unsigned char expected[308], actual[309]; size_t got, at; unsigned i; FILE *input;
+    memset(expected,0,sizeof expected); expected[0] = expected[8] = 0x80; expected[4] = 0x8f;
+    for (i = 0; i < 3; ++i) {
+        at = 12+i*96; expected[at+26] = 0x40; memcpy(expected+at+40,names[i],8);
+    }
+    expected[46] = expected[50] = 0x11; expected[47] = 0x2c; expected[51] = 0x30;
+    expected[62] = 0x48; expected[159] = 0x50; expected[255] = 0x48;
+    expected[300] = 7; expected[301] = 0xfe;
+    input = fopen(path,"rb"); CHECK(input != NULL); got = fread(actual,1,sizeof actual,input);
+    CHECK(got == sizeof expected && !memcmp(actual,expected,sizeof expected));
+    CHECK(!ferror(input) && fclose(input) == 0);
+    puts("I/O templates: all 308 independent field, reserved and relocation bytes pass");
+}
 
 int main(int argc, char **argv)
 {
@@ -93,6 +113,13 @@ int main(int argc, char **argv)
     FILE *input;
 
     CHECK(argc == 3);
+    if (!strcmp(argv[1],"pdos31-io")) { io_templates(argv[2]); return 0; }
+    if (!strcmp(argv[1],"pdos31-get")) {
+        static const unsigned char linked[20] = {0x18,0x12,0x58,0xf0,0x10,0x30,0x54,0xf0,0xc0,0x10,5,0xef,7,0xfe,0,0,0,0xff,0xff,0xff};
+        input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(card,1,sizeof card,input);
+        CHECK(got == sizeof linked && !memcmp(card,linked,sizeof linked));
+        CHECK(!ferror(input) && fclose(input) == 0); puts("GET: all 20 independent linkage bytes pass"); return 0;
+    }
     if (!strcmp(argv[1],"pdos31-storage")) { storage_requests(argv[2]); return 0; }
     if (!strcmp(argv[1], "pdos31-maps")) {
         static const unsigned char linked[64] = {0,32,0,64,0,96,0,104,0,112,0,120,1,0,1,128,2,28,2,32,2,36,2,128,0,32,0,16,0,4,0,0,0,8,0,12,0,16,1,8,0,13,0,8,0,8,0,16,0,108,0,20,1,48,0,16,0,0,0,4,0,5,0,6};

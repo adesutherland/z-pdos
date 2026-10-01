@@ -113,3 +113,8 @@ pass independent linked register-setup checks and failure controls under
 normal and sanitizer builds. Complete MVSSTART assembly now passes with
 identical decks from both builds. Allocation, I/O, image and guest evidence
 remain separate; no native macro source or expansion was used.
+
+Selected original short OPEN/CLOSE placeholder lists, 96-byte QSAM PS DCB
+templates (GL/PL/PM) and locate GET linkage now pass independent binary checks.
+The DCB check covers all 308 linked bytes, including EODAD/EXLST relocations;
+GET covers all 20 bytes. Other service forms remain explicit failures.

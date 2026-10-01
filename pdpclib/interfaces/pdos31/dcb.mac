@@ -1,0 +1,31 @@
+* SPDX-License-Identifier: MIT
+* Original selected QSAM PS template; public field/bit facts in README.md.
+         MACRO
+&N       DCB &MACRF=,&DSORG=,&DDNAME=,&EODAD=,&EXLST=
+         LCLA  &REFERENCE
+         LCLC  &EOF,&EXITS
+         AIF   ('&N' EQ '' OR '&DSORG' NE 'PS').BAD
+         AIF   ('&MACRF' EQ 'GL').GL
+         AIF   ('&MACRF' EQ 'PL').PL
+         AIF   ('&MACRF' NE 'PM').BAD
+&REFERENCE SETA 80
+         AGO   .POINTERS
+.GL      ANOP
+&REFERENCE SETA 18432
+         AGO   .POINTERS
+.PL      ANOP
+&REFERENCE SETA 72
+.POINTERS ANOP
+&EOF     SETC  '&EODAD'
+&EXITS   SETC  '&EXLST'
+         AIF   ('&EOF' NE '').EXITS
+&EOF     SETC  '0'
+.EXITS   AIF   ('&EXITS' NE '').EMIT
+&EXITS   SETC  '0'
+.EMIT    DS    0F
+&N       DC    26X'00',X'4000',4X'00'
+         DC    A(&EOF),A(&EXITS),CL8'&DDNAME'
+         DC    XL2'0000',AL2(&REFERENCE),44X'00'
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected QSAM DCB template'
+         MEND

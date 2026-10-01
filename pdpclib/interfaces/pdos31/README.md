@@ -1,8 +1,8 @@
 # Selected PDOS31 mappings
 
-This explicit library contains original sparse mappings for the retained
-PDIO1 C32 kernel, loader and command-runtime inputs. It provides only the
-fields below, not an IBM macro library, a complete control block or OS services.
+This explicit library contains original sparse mappings and selected service
+interfaces for the retained PDIO1 C32 inputs. The mapping definitions provide
+only the fields below, not an IBM macro library or complete control block.
 No IBM macro source or native expansion was used. Names identify public
 interfaces; omitted fields and operand forms fail when referenced.
 
@@ -75,3 +75,36 @@ An independent consumer interprets only the small instruction subset emitted
 by four original calls and checks their SVC number, R0/R1/R15 and preserved
 registers after linking. It supplies synthetic SVC returns, so this proves
 register setup rather than actual allocation or guest execution.
+
+## Selected sequential I/O interfaces
+
+OPEN `MF=L` accepts one empty DCB placeholder with INPUT or OUTPUT, with
+TYPE omitted or J. CLOSE `MF=L` accepts one empty placeholder `()`.
+Both produce a fullword-aligned four-byte short parameter template. Their
+option/end bytes follow public [OPEN SVC22](https://www.ibm.com/docs/en/zos/3.1.0?topic=descriptions-svc-22-0a16)
+and [CLOSE SVC23](https://www.ibm.com/docs/en/zos/3.1.0?topic=descriptions-svc-23-0a17)
+facts. These list forms perform no service call; execute, long-list and other
+forms remain unsupported.
+
+DCB requires a label, DSORG=PS and MACRF=GL/PL/PM. Optional DDNAME, EODAD
+and EXLST populate their public fields. The original template is 96 bytes for
+QSAM; its selected fields follow [public SAM layouts and macro-reference
+bits](https://www.ibm.com/docs/en/zos/2.5.0?topic=aids-dcb-excp-sam-bpam).
+Unused template bytes are zero, and DDNAME is space-padded. Pointer words
+receive ordinary four-byte fixups; the image gate must verify their required
+24-bit placement. No BSAM/BPAM/EXCP, DCBE or other keyword forms are claimed.
+The retained PDOS OPEN handler consumes the shared DCB fields, but its behavior
+has not been requalified with this new producer.
+
+GET accepts a DCB address or register 1–12, with no area operand. Its original
+locate-mode linkage supplies R1, loads the low-three-byte DCB entry at offset
+49 and calls through R15 with R14 as return link. It preserves the caller's
+addressing mode and requires a compatible entry below 16 MiB. Public
+[GET locate semantics](https://www.ibm.com/docs/en/zos/3.1.0?topic=descriptions-getobtain-next-logical-record-qsam)
+return the record address in R1. The caller must open a compatible DCB;
+move-mode and extended-entry forms remain unsupported.
+
+Independent linking checks all 308 bytes of three DCBs and OPEN/CLOSE
+templates, including relocated EODAD/EXLST words, and all 20 GET linkage bytes.
+Invalid MODE=31 input fails without publishing an object. These are template
+and linkage checks, not record-I/O or guest qualification.
