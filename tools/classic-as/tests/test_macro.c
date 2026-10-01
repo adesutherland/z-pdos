@@ -191,6 +191,17 @@ static void binding(void)
     expected(&f, "QZSUF", "DC", "F'7'", 6); expected(&f, "", "DC", "C'Z.'", 6);
     expected(&f, "RSUF", "DC", "", 7); expected(&f, "", "DC", "C'.'", 7);
     CHECK(drain(&f, &n) == MF_EOF); clean(&f);
+    init(&f, " MACRO\n&N KEYS &R=3,&S=4\n&N LR &R,&S\n MEND\n KEYS\nLBL KEYS ,\n KEYS R=5\n");
+    CHECK(create(&f) == MF_OK);
+    expected(&f, "", "LR", "3,4", 5);
+    expected(&f, "LBL", "LR", "3,4", 6);
+    expected(&f, "", "LR", "5,4", 7);
+    CHECK(drain(&f, &n) == MF_EOF);
+    CHECK(f.statements.replay(f.statements.cookie) == MF_OK);
+    expected(&f, "", "LR", "3,4", 5);
+    expected(&f, "LBL", "LR", "3,4", 6);
+    expected(&f, "", "LR", "5,4", 7);
+    CHECK(drain(&f, &n) == MF_EOF); clean(&f);
     init(&f, " MACRO\n NULL &A,&B\n DC &A,&B\n MEND\n NULL\n NULL ,\n");
     CHECK(create(&f) == MF_OK); expected(&f, "", "DC", ",", 5);
     expected(&f, "", "DC", ",", 6); CHECK(drain(&f, &n) == MF_EOF); clean(&f);
@@ -241,6 +252,8 @@ static void failures(void)
     bad_source(" MEND\n", MF_UNSUPPORTED);
     bad_source(" MACRO\n X ,,\n MEND\n", MF_SOURCE);
     bad_source(" MACRO\n X\n MEND\n X ,,\n", MF_UNSUPPORTED);
+    bad_source(" MACRO\n X &A=1\n LR &A,2\n MEND\n X 3\n", MF_UNSUPPORTED);
+    bad_source(" MACRO\n X &A=1\n LR &A,2\n MEND\n X ,,\n", MF_UNSUPPORTED);
     bad_source(" MACRO\n X &A\n LR &A,2\n MEND\n X ,\n", MF_UNSUPPORTED);
     bad_source("&V SETA L'LABEL\n", MF_UNSUPPORTED);
     bad_source(" DC N'NAME\n", MF_UNSUPPORTED);

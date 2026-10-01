@@ -179,7 +179,10 @@ arguments are empty; missing keywords keep their literal default. Positional
 actuals fill only positional formal slots and must precede keyword actuals.
 Definitions cannot be redefined. It accepts both `*` and `.*` comment cards.
 A comma on MACRO/MEND is an empty marker operand; a comma on a call represents
-two empty positional arguments and is checked against the prototype.
+two empty positional arguments and is checked against the prototype. For a
+prototype with only keyword parameters, a single comma instead means no
+operands and preserves all defaults, just as for a zero-parameter prototype.
+Nonempty positional actuals and additional commas still fail in that case.
 
 With `--macros`, repeat `-I directory` to select ordered library directories.
 The host searches lower-case and original-case member names with `.mac`, `.asm`,

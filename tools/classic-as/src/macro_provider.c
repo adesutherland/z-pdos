@@ -335,7 +335,8 @@ static enum mf_status push(struct mf_macro *m, size_t definition, const struct m
     if (call->label.length && !d->label.length) return MF_UNSUPPORTED;
     st = copy(call->label, b, m->config.max_argument_bytes, &used, v + m->config.max_parameters);
     if (st != MF_OK) return st;
-    if (call->operand.length && !(d->parameters == 0 && empty(call->operand))) {
+    if (call->operand.length && !(empty(call->operand) &&
+        (d->parameters == 0 || p[0].keyword))) {
         cur = positional = 0; keywords_seen = 0;
         while ((st = mf_macro_arguments(call->operand, &cur, &arg)) == MF_OK) {
             eq = equals(arg); value = arg;
