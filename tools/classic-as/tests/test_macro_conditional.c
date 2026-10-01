@@ -83,6 +83,19 @@ static void label_attributes(void)
     }
     clean(&f);
 }
+static void variable_counts(void)
+{
+    struct fixture f; unsigned long n;
+    init(&f," GBLC &G\n&G SETC 'A''B'\n LCLA &I\n&I SETA -12\n"
+        " MACRO\n COUNT\n GBLC &G\n LCLC &C,&EMPTY\n&C SETC '(R10)'\n"
+        " DC AL1(K'&C),AL1(K'&G),AL1(K'&EMPTY),AL1(K'&SYSNDX)\n MEND\n COUNT\n DC AL1(K'&I)\n");
+    CHECK(create(&f) == MF_OK);
+    expected(&f,"","DC","AL1(5),AL1(3),AL1(0),AL1(4)",12);
+    expected(&f,"","DC","AL1(3)",13);
+    CHECK(drain(&f,&n) == MF_EOF); clean(&f);
+    bad_source(" LCLC &C\n DC AL1(N'&C)\n",MF_UNSUPPORTED);
+    bad_source(" DC AL1(K'&UNDEFINED)\n",MF_UNDEFINED);
+}
 static void substrings(void)
 {
     struct fixture f; unsigned long n;
@@ -117,5 +130,5 @@ static void inactive_source(void)
 }
 int main(void)
 {
-    inactive_source(); scoped(); expressions(); argument_attributes(); label_attributes(); substrings(); printf("conditional macros: %lu checks passed\n", checks); return 0;
+    inactive_source(); scoped(); expressions(); argument_attributes(); label_attributes(); variable_counts(); substrings(); printf("conditional macros: %lu checks passed\n", checks); return 0;
 }

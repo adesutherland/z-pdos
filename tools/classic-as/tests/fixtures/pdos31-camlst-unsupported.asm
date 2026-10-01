@@ -1,0 +1,4 @@
+* SPDX-License-Identifier: MIT
+IOTEST   CSECT
+BAD      CAMLST RECAT,DSNAME,VOLUME,AREA
+         END

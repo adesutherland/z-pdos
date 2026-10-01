@@ -1,0 +1,12 @@
+* SPDX-License-Identifier: MIT
+* Original classic FIND D: negative DCB in R1, eight-byte name in R0.
+         MACRO
+&N       FIND &DCB,&NAME,&TYPE
+         AIF   ('&TYPE' NE 'D').BAD
+&N       MF$REG 1,&DCB
+         LCR   1,1
+         MF$REG 0,&NAME
+         SVC   18
+         MEXIT
+.BAD     MNOTE 8,'only selected classic FIND type D is supported'
+         MEND

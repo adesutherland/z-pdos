@@ -78,13 +78,19 @@ register setup rather than actual allocation or guest execution.
 
 ## Selected sequential I/O interfaces
 
-OPEN `MF=L` accepts one empty DCB placeholder with INPUT or OUTPUT, with
-TYPE omitted or J. CLOSE `MF=L` accepts one empty placeholder `()`.
+OPEN `MF=L` accepts one DCB symbol or empty placeholder, with INPUT, OUTPUT,
+UPDAT, EXTEND, INOUT, OUTIN, OUTINX or RDBACK and TYPE omitted or J.
+CLOSE `MF=L` accepts one DCB symbol or empty placeholder `()`.
 Both produce a fullword-aligned four-byte short parameter template. Their
 option/end bytes follow public [OPEN SVC22](https://www.ibm.com/docs/en/zos/3.1.0?topic=descriptions-svc-22-0a16)
 and [CLOSE SVC23](https://www.ibm.com/docs/en/zos/3.1.0?topic=descriptions-svc-23-0a17)
-facts. These list forms perform no service call; execute, long-list and other
-forms remain unsupported.
+facts. The selected `MF=(E,list)` forms accept an existing short list and
+optionally update its DCB address from a symbol or register 1–12. Explicit
+OPEN modes replace its option byte. OPEN uses SVC19 (TYPE=J: 22), CLOSE uses
+SVC20 (TYPE=T: 23), and RDJFCB uses SVC64. An omitted DCB on the execute form
+preserves the prepared entry. List and referenced blocks must be below 16 MiB.
+Long lists, multiple entries and other options remain unsupported. MF$SHORT
+and MF$REG are private original helpers whose names are reserved for this library.
 
 DCB requires a label, DSORG=PS and MACRF=GL/PL/PM. Optional DDNAME, EODAD
 and EXLST populate their public fields. The original template is 96 bytes for
@@ -108,6 +114,18 @@ Independent linking checks all 308 bytes of three DCBs and OPEN/CLOSE
 templates, including relocated EODAD/EXLST words, and all 20 GET linkage bytes.
 Invalid MODE=31 input fails without publishing an object. These are template
 and linkage checks, not record-I/O or guest qualification.
+
+Original OBTAIN and LOCATE setup uses the public SVC27/SVC26 R1 list-address
+contracts; DEVTYPE selects the SVC24 eight-byte output contract. CAMLST
+supports sixteen-byte SEARCH, SEEK and NAME records. These use factual
+register and parameter formats from [z/OS V2R1 Diagnosis: Reference,
+pages 124–127](https://publib.boulder.ibm.com/epubs/pdf/iea3v201.pdf).
+BLDL and classic FIND D use SVC18 with a positive or arithmetically negated
+DCB in R1 and the list or eight-byte member name in R0. Their selected classic
+contract follows [OS/390 V2R10 Diagnosis: Reference,
+page 4-24](https://publibz.boulder.ibm.com/epubs/pdf/iea1v231.pdf).
+No extended FIND parameter list or BLDL prefix is provided. Independent linked
+fixtures check 120 short-list/catalog bytes and 40 directory-service bytes.
 
 IEFJFCBN LIST=YES supplies an original inline 176-byte selected classic JFCB
 map, including DSNM, RECFM, BLKSI and LRECL. It does not allocate the modern

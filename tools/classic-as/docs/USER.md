@@ -72,6 +72,10 @@ optional provider selected below. Unsupported
 constructs fail explicitly. The source parser's documented subset is distinct
 from the pure encoder's instruction descriptions.
 
+The provider's K count attribute also accepts scalar SETA/SETB/SETC and
+supported system-variable values. N and T remain limited to immediate formal
+parameter text; ordinary-symbol queries and dimensioned SET variables are open.
+
 Selected DC H/F/A/AD/V/X forms accept comma-separated nominal values, with
 duplication applied to the complete list. X values have separate left padding;
 explicit XL lengths apply to each value. Labels retain the first value's length.

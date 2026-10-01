@@ -1,17 +1,13 @@
 * SPDX-License-Identifier: MIT
-* Original single short-form placeholder template; README.md.
+* Original selected short-form list/execute interface; README.md.
          MACRO
 &N       OPEN &DCBS,&MF=,&TYPE=
-         AIF   ('&MF' NE 'L').BAD
          AIF   ('&TYPE' NE '' AND '&TYPE' NE 'J').BAD
-         AIF   (N'&DCBS NE 2 OR '&DCBS(1)' NE '').BAD
-         DS    0F
-         AIF   ('&DCBS(2)' EQ 'INPUT').INPUT
-         AIF   ('&DCBS(2)' NE 'OUTPUT').BAD
-&N       DC    X'8F000000'
+         AIF   ('&TYPE' EQ 'J').J
+&N       MF$SHORT 19,&DCBS,&MF
          MEXIT
-.INPUT   ANOP
-&N       DC    X'80000000'
+.J       ANOP
+&N       MF$SHORT 22,&DCBS,&MF
          MEXIT
 .BAD     MNOTE 8,'unsupported selected OPEN template'
          MEND

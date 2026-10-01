@@ -8,26 +8,30 @@ main: procedure = .int
   if work = "" | work = "." | work = "/" then return 2
   address crexx "run cmake -E make_directory :work"
   if rc <> 0 then return rc
-  do i = 1 to 3
-    source = word("pdos31-io-templates pdos31-get pdos31-io-maps",i)
-    entry = word("IOTEST GETTEST IOMAPS",i)
-    mode = word("pdos31-io pdos31-get pdos31-io-maps",i)
+  do i = 1 to 5
+    source = word("pdos31-io-templates pdos31-get pdos31-io-maps pdos31-io-services pdos31-directory",i)
+    entry = word("IOTEST GETTEST IOMAPS IOSVCS DIRTEST",i)
+    mode = word("pdos31-io pdos31-get pdos31-io-maps pdos31-io-services pdos31-directory",i)
     deck = work || "/" || source || ".obj"
     binary = work || "/" || source || ".bin"
     source = "tools/classic-as/tests/fixtures/" || source || ".asm"
     address crexx "run cmake -E rm -f :deck :binary"
     if rc <> 0 then return rc
-    address crexx "run :cli --macros -I pdpclib/interfaces/pdos31 :source :deck"
+    address crexx "run :cli --profile s370 --macros -I pdpclib/interfaces/pdos31 :source :deck"
     if rc <> 0 then return rc
     address crexx "run :linker --oformat binary --image-base 4096 -e :entry -o :binary :deck"
     if rc <> 0 then return rc
     address crexx "run :checker :mode :binary"
     if rc <> 0 then return rc
   end
-  failed = work || "/io-failed.obj"
-  address crexx "run cmake -E rm -f :failed"
-  if rc <> 0 then return rc
-  address crexx "run :cli --macros -I pdpclib/interfaces/pdos31 tools/classic-as/tests/fixtures/pdos31-io-unsupported.asm :failed"
-  if rc = 0 then return 1
-  address crexx "run :checker absent :failed"
-  return rc
+  do i = 1 to 3
+    source = "tools/classic-as/tests/fixtures/" || word("pdos31-io-unsupported pdos31-directory-unsupported pdos31-camlst-unsupported",i) || ".asm"
+    failed = work || "/io-failed.obj"
+    address crexx "run cmake -E rm -f :failed"
+    if rc <> 0 then return rc
+    address crexx "run :cli --profile s370 --macros -I pdpclib/interfaces/pdos31 :source :failed"
+    if rc = 0 then return 1
+    address crexx "run :checker absent :failed"
+    if rc <> 0 then return rc
+  end
+  return 0

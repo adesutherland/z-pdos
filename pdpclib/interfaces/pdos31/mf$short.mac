@@ -1,0 +1,73 @@
+* SPDX-License-Identifier: MIT
+* Private original single-entry short-list interface, reserved MF$ name.
+         MACRO
+&N       MF$SHORT &FUNC,&DCBS,&MF,&HASMODE=YES
+         LCLA  &OPT,&REGNO
+         LCLC  &MODE,&PTR,&LIST,&TEXT
+&OPT     SETA  128
+         AIF   ('&DCBS' EQ '' OR '&DCBS' EQ '()').EMPTY
+         AIF   (N'&DCBS LT 1 OR N'&DCBS GT 2).BAD
+&PTR     SETC  '&DCBS(1)'
+         AIF   (N'&DCBS EQ 1).EMPTY
+         AIF   ('&HASMODE' NE 'YES').BAD
+&MODE    SETC  '&DCBS(2)'
+         AIF   ('&MODE' EQ '' OR '&MODE' EQ 'INPUT').EMPTY
+         AIF   ('&MODE' EQ 'OUTPUT').OUTPUT
+         AIF   ('&MODE' EQ 'UPDAT').UPDAT
+         AIF   ('&MODE' EQ 'EXTEND').EXTEND
+         AIF   ('&MODE' EQ 'INOUT').INOUT
+         AIF   ('&MODE' EQ 'OUTINX').OUTINX
+         AIF   ('&MODE' EQ 'OUTIN').OUTIN
+         AIF   ('&MODE' NE 'RDBACK').BAD
+&OPT     SETA  129
+         AGO   .EMPTY
+.OUTPUT  ANOP
+&OPT     SETA  143
+         AGO   .EMPTY
+.UPDAT   ANOP
+&OPT     SETA  132
+         AGO   .EMPTY
+.EXTEND  ANOP
+&OPT     SETA  142
+         AGO   .EMPTY
+.INOUT   ANOP
+&OPT     SETA  131
+         AGO   .EMPTY
+.OUTINX  ANOP
+&OPT     SETA  134
+         AGO   .EMPTY
+.OUTIN   ANOP
+&OPT     SETA  135
+.EMPTY   AIF   ('&MF' EQ 'L').LIST
+         AIF   (N'&MF NE 2 OR '&MF(1)' NE 'E').BAD
+&LIST    SETC  '&MF(2)'
+         AIF   ('&LIST' EQ '' OR '&LIST'(1,1) EQ '(').BAD
+&N       DS    0H
+         AIF   ('&PTR' EQ '').CALL
+         AIF   ('&PTR'(1,1) EQ '(').REG
+         LA    15,&PTR
+         STCM  15,7,&LIST+1
+         AGO   .OPTION
+.REG     AIF   (K'&PTR LT 3 OR '&PTR'(K'&PTR,1) NE ')').BAD
+&TEXT    SETC  '&PTR'(2,K'&PTR-2)
+         AIF   ('&TEXT'(1,1) NE 'R').NUMBER
+&TEXT    SETC  '&TEXT'(2,*)
+.NUMBER  ANOP
+&REGNO   SETA  &TEXT
+         AIF   (&REGNO LT 1 OR &REGNO GT 12).BAD
+         STCM  &REGNO,7,&LIST+1
+.OPTION  AIF   ('&MODE' EQ '').CALL
+         MVI   &LIST,&OPT
+.CALL    LA    1,&LIST
+         SVC   &FUNC
+         MEXIT
+.LIST    AIF   ('&PTR' EQ '').ZERO
+         AIF   ('&PTR'(1,1) EQ '(').BAD
+         DS    0F
+&N       DC    A(&PTR+&OPT*16777216)
+         MEXIT
+.ZERO    DS    0F
+&N       DC    A(&OPT*16777216)
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected single-entry short-list form'
+         MEND

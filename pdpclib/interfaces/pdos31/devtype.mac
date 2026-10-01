@@ -1,0 +1,11 @@
+* SPDX-License-Identifier: MIT
+* Original eight-byte SVC24 output request; no extended options.
+         MACRO
+&N       DEVTYPE &DDNAME,&AREA
+         AIF   ('&DDNAME' EQ '' OR '&AREA' EQ '').BAD
+&N       LA    1,&DDNAME
+         LA    0,&AREA
+         SVC   24
+         MEXIT
+.BAD     MNOTE 8,'DEVTYPE requires DDNAME and output-area addresses'
+         MEND

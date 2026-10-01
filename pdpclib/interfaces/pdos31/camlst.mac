@@ -1,0 +1,28 @@
+* SPDX-License-Identifier: MIT
+* Original selected sixteen-byte public CAMLST parameter records.
+         MACRO
+&N       CAMLST &FUNC,&FIRST,&SECOND,&AREA
+         LCLC  &FLAGS
+         AIF   ('&N' EQ '' OR '&FIRST' EQ '' OR '&AREA' EQ '').BAD
+         AIF   ('&FUNC' EQ 'NAME').NAME
+         AIF   ('&SECOND' EQ '').BAD
+         AIF   ('&FUNC' EQ 'SEARCH').SEARCH
+         AIF   ('&FUNC' NE 'SEEK').BAD
+&FLAGS   SETC  'C0800000'
+         AGO   .EMIT
+.SEARCH  ANOP
+&FLAGS   SETC  'C1000000'
+         AGO   .EMIT
+.NAME    AIF   ('&SECOND' NE '').BAD
+&FLAGS   SETC  '00000000'
+.EMIT    ANOP
+&N       DS    0F
+         DC    X'&FLAGS',A(&FIRST)
+         AIF   ('&SECOND' EQ '').ZERO
+         DC    A(&SECOND)
+         AGO   .AREA
+.ZERO    DC    A(0)
+.AREA    DC    A(&AREA)
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected CAMLST parameter record'
+         MEND

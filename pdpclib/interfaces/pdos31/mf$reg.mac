@@ -1,0 +1,23 @@
+* SPDX-License-Identifier: MIT
+* Private original address/register setup for selected R0/R1 services.
+         MACRO
+&N       MF$REG &TARGET,&OPERAND
+         LCLA  &REGNO
+         LCLC  &TEXT
+         AIF   ('&TARGET' NE '0' AND '&TARGET' NE '1').BAD
+         AIF   ('&OPERAND' EQ '').BAD
+         AIF   ('&OPERAND'(1,1) EQ '(').REG
+&N       LA    &TARGET,&OPERAND
+         MEXIT
+.REG     AIF   (K'&OPERAND LT 3).BAD
+         AIF   ('&OPERAND'(K'&OPERAND,1) NE ')').BAD
+&TEXT    SETC  '&OPERAND'(2,K'&OPERAND-2)
+         AIF   ('&TEXT'(1,1) NE 'R').NUMBER
+&TEXT    SETC  '&TEXT'(2,*)
+.NUMBER  ANOP
+&REGNO   SETA  &TEXT
+         AIF   (&REGNO LT 0 OR &REGNO GT 12).BAD
+&N       LR    &TARGET,&REGNO
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected address/register operand'
+         MEND

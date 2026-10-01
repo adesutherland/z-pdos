@@ -1,0 +1,8 @@
+* SPDX-License-Identifier: MIT
+* Original classic SVC18 directory list setup; no prefix/extended options.
+         MACRO
+&N       BLDL &DCB,&LIST
+&N       MF$REG 1,&DCB
+         MF$REG 0,&LIST
+         SVC   18
+         MEND

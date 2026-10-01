@@ -96,6 +96,12 @@ change emitted storage or instructions. The original qualified file remains
 in Git. Complete SAPSUPA now assembles identically in normal and sanitizer
 builds; linking and service execution remain separate.
 
+The original short-list library now covers selected OPEN/CLOSE/RDJFCB execute
+forms and list addresses, catalog SEARCH/SEEK/NAME records, OBTAIN/LOCATE,
+eight-byte DEVTYPE and classic BLDL/FIND D setup. Independent linked fixtures
+check 160 additional bytes; unsupported mode, FIND type and catalog-function
+controls reject the object. These interface checks do not qualify guest I/O.
+
 `interfaces/classic-linkage` supplies newly authored bounded SAVE/RETURN macro
 definitions from documented public register-save contracts. It is an explicit
 assembler library input, not an inherited IBM macro library. The small Classic C

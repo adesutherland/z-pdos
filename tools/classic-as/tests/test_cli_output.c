@@ -114,6 +114,30 @@ int main(int argc, char **argv)
 
     CHECK(argc == 3);
     if (!strcmp(argv[1],"pdos31-io")) { io_templates(argv[2]); return 0; }
+    if (!strcmp(argv[1],"pdos31-directory")) {
+        static const unsigned char linked[40] = {0x18,0x1a,0x41,0,0xc0,0x14,0x0a,0x12,
+            0x18,0x1a,0x13,0x11,0x41,0,0xc0,0x20,0x0a,0x12,7,0xfe,
+            0,0,0,0,0,0,0,0,0,0,0,0,0xe3,0xc5,0xe2,0xe3,0x40,0x40,0x40,0x40};
+        input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(card,1,sizeof card,input);
+        CHECK(got == sizeof linked && !memcmp(card,linked,sizeof linked));
+        CHECK(!ferror(input) && fclose(input) == 0); puts("directory services: all 40 independent bytes pass"); return 0;
+    }
+    if (!strcmp(argv[1],"pdos31-io-services")) {
+        static const unsigned char linked[120] = {
+            0xbe,0xa7,0xc0,0x31,0x41,0x10,0xc0,0x30,0x0a,0x40,
+            0x41,0x10,0xc0,0x30,0x0a,0x16,0x41,0x10,0xc0,0x30,0x0a,0x14,
+            0x41,0x10,0xc0,0x34,0x41,0,0xc0,0x3c,0x0a,0x18,
+            0x41,0x10,0xc0,0x48,0x0a,0x1b,0x41,0x10,0xc0,0x48,0x0a,0x1a,7,0xfe,0,0,
+            0x80,0,0x10,0x44,0xc4,0xc1,0xe3,0xc1,0x40,0x40,0x40,0x40,
+            0,0,0,0,0,0,0,0,0,0,0,0,
+            0xc1,0,0,0,0,0,0x10,0x34,0,0,0x10,0x34,0,0,0x10,0x3c,
+            0xc0,0x80,0,0,0,0,0x10,0x34,0,0,0x10,0x34,0,0,0x10,0x3c,
+            0,0,0,0,0,0,0x10,0x34,0,0,0,0,0,0,0x10,0x3c};
+        unsigned char actual[121];
+        input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(actual,1,sizeof actual,input);
+        CHECK(got == sizeof linked && !memcmp(actual,linked,sizeof linked));
+        CHECK(!ferror(input) && fclose(input) == 0); puts("short-list/catalog services: all 120 independent bytes pass"); return 0;
+    }
     if (!strcmp(argv[1],"pdos31-io-maps")) {
         static const unsigned char linked[40] = {0,0,0,44,0,100,0,102,0,104,0,176,0,176,0,0,0,1,0,2,0,4,0,9,0,12,0,16,0,20,0,24,0,28,0,32,0,1,0,7};
         input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(card,1,sizeof card,input);

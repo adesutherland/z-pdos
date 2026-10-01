@@ -1,0 +1,10 @@
+* SPDX-License-Identifier: MIT
+* Original SVC27 entry using the public R1 parameter-list contract.
+         MACRO
+&N       OBTAIN &LIST
+         AIF   ('&LIST' EQ '').BAD
+&N       LA    1,&LIST
+         SVC   27
+         MEXIT
+.BAD     MNOTE 8,'OBTAIN requires a parameter-list address'
+         MEND

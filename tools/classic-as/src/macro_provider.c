@@ -516,7 +516,7 @@ static enum mf_status substitute(struct mf_macro *m, struct mf_span s,
             if (attribute) {
                 /* This selected attribute describes immediate argument text.
                  * Ordinary-symbol attributes still need an engine query. */
-                if (!formal_parameter(m, name)) return MF_UNSUPPORTED;
+                if (!formal_parameter(m, name) && attribute != 0x4b) return MF_UNSUPPORTED;
                 if (attribute == 0x54) {
                     st = mf_u64_parse(value, &magnitude, &negative);
                     buffer[0] = buffer[2] = 0x27;

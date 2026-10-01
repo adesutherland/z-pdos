@@ -1,0 +1,19 @@
+* SPDX-License-Identifier: MIT
+IOSVCS   CSECT
+         USING IOSVCS,12
+         RDJFCB ((R10)),MF=(E,LIST)
+         OPEN  MF=(E,LIST),TYPE=J
+         CLOSE MF=(E,LIST)
+         DEVTYPE DD,AREA
+         OBTAIN CAT
+         LOCATE CAT
+         BR    14
+LIST     OPEN  (BUFFER,INPUT),MF=L
+DD       DC    CL8'DATA'
+AREA     DS    8C
+BUFFER   DS    4C
+CAT      CAMLST SEARCH,DD,DD,AREA
+SEEK     CAMLST SEEK,DD,DD,AREA
+NAME     CAMLST NAME,DD,,AREA
+R10      EQU   10
+         END   IOSVCS

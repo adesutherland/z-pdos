@@ -1,0 +1,10 @@
+* SPDX-License-Identifier: MIT
+* Original SVC26 entry using the public R1 parameter-list contract.
+         MACRO
+&N       LOCATE &LIST
+         AIF   ('&LIST' EQ '').BAD
+&N       LA    1,&LIST
+         SVC   26
+         MEXIT
+.BAD     MNOTE 8,'LOCATE requires a parameter-list address'
+         MEND
