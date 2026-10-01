@@ -114,6 +114,12 @@ int main(int argc, char **argv)
 
     CHECK(argc == 3);
     if (!strcmp(argv[1],"pdos31-io")) { io_templates(argv[2]); return 0; }
+    if (!strcmp(argv[1],"pdos31-io-maps")) {
+        static const unsigned char linked[40] = {0,0,0,44,0,100,0,102,0,104,0,176,0,176,0,0,0,1,0,2,0,4,0,9,0,12,0,16,0,20,0,24,0,28,0,32,0,1,0,7};
+        input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(card,1,sizeof card,input);
+        CHECK(got == sizeof linked && !memcmp(card,linked,sizeof linked));
+        CHECK(!ferror(input) && fclose(input) == 0); puts("JFCB/IOB: 20 independent field and length values pass"); return 0;
+    }
     if (!strcmp(argv[1],"pdos31-get")) {
         static const unsigned char linked[20] = {0x18,0x12,0x58,0xf0,0x10,0x30,0x54,0xf0,0xc0,0x10,5,0xef,7,0xfe,0,0,0,0xff,0xff,0xff};
         input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(card,1,sizeof card,input);

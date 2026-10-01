@@ -1,0 +1,25 @@
+* SPDX-License-Identifier: MIT
+* Original selected standard-section IOB mapping, without prefixes.
+         MACRO
+&N       IEZIOB
+         AIF   ('&N' NE '').BAD
+IOB      DSECT
+IOBSTDRD DS    0C
+IOBFLAG1 DS    C
+IOBFLAG2 DS    C
+IOBSENS0 DS    C
+IOBSENS1 DS    C
+IOBECBPT DS    A
+IOBFLAG3 DS    C
+IOBCSW   DS    CL7
+         ORG   IOBSTDRD+12
+IOBUSTAT DS    C
+         ORG   IOBSTDRD+16
+IOBSTART DS    A
+IOBDCBPT DS    A
+IOBRESTR DS    A
+IOBINCAM DS    H
+         DS    H
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IEZIOB mapping'
+         MEND

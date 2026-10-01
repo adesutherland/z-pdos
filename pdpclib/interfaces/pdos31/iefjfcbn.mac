@@ -1,0 +1,17 @@
+* SPDX-License-Identifier: MIT
+* Original inline sparse 176-byte JFCB compatibility map; README.md.
+         MACRO
+&N       IEFJFCBN &LIST=YES
+         AIF   ('&N' NE '' OR '&LIST' NE 'YES').BAD
+         DS    0F
+JFCBDSNM DS    CL44
+         DS    CL56
+JFCRECFM DS    C
+         DS    C
+JFCBLKSI DS    H
+JFCLRECL DS    H
+         DS    CL70
+JFCBLGTH EQU   176
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected inline JFCB mapping'
+         MEND

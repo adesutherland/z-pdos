@@ -8,10 +8,10 @@ main: procedure = .int
   if work = "" | work = "." | work = "/" then return 2
   address crexx "run cmake -E make_directory :work"
   if rc <> 0 then return rc
-  do i = 1 to 2
-    source = word("pdos31-io-templates pdos31-get",i)
-    entry = word("IOTEST GETTEST",i)
-    mode = word("pdos31-io pdos31-get",i)
+  do i = 1 to 3
+    source = word("pdos31-io-templates pdos31-get pdos31-io-maps",i)
+    entry = word("IOTEST GETTEST IOMAPS",i)
+    mode = word("pdos31-io pdos31-get pdos31-io-maps",i)
     deck = work || "/" || source || ".obj"
     binary = work || "/" || source || ".bin"
     source = "tools/classic-as/tests/fixtures/" || source || ".asm"

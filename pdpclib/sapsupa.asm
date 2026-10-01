@@ -1204,7 +1204,7 @@ OPENMB   DS    CL(OPENMLN)
 WOPENMB  DS    CL(WOPENMLN)
 MEMBER24 DS    CL8
 ZDCBLEN  EQU   *-ZDCBAREA
-         IEZIOB                   Input/Output Block
+         IEZIOB ,                 Input/Output Block
 *
          CVT   DSECT=YES
          IKJTCB

@@ -108,3 +108,14 @@ Independent linking checks all 308 bytes of three DCBs and OPEN/CLOSE
 templates, including relocated EODAD/EXLST words, and all 20 GET linkage bytes.
 Invalid MODE=31 input fails without publishing an object. These are template
 and linkage checks, not record-I/O or guest qualification.
+
+IEFJFCBN LIST=YES supplies an original inline 176-byte selected classic JFCB
+map, including DSNM, RECFM, BLKSI and LRECL. It does not allocate the modern
+192-byte block or map its extensions. Its offsets follow the public
+[JFCB layout](https://www.ibm.com/docs/en/zos/2.5.0?topic=rqe-jfcb-information).
+IEZIOB supplies a sparse DSECT covering the first 32 bytes of the standard
+section, without access-method prefixes or extensions. In the public
+[IOB layout](https://www.ibm.com/docs/en/zos/2.5.0?topic=aids-iob), IOBCSW
+names the low seven CSW bytes at offset 9; offset 8 is IOBFLAG3.
+An independent linked fixture checks 20 offsets and lengths against literal
+expected values. Neither mapping claims a complete IBM macro interface.

@@ -89,6 +89,13 @@ There is no automatic transfer of their previous whole-source qualification.
 
 ## Original selected linkage interfaces — 1 October 2026
 
+Original selected JFCB and standard-section IOB maps now pass 20 independent
+field/length checks. SAPSUPA's IEZIOB call receives a comma before its remark,
+as required when the operand is omitted. This source correction does not
+change emitted storage or instructions. The original qualified file remains
+in Git. Complete SAPSUPA now assembles identically in normal and sanitizer
+builds; linking and service execution remain separate.
+
 `interfaces/classic-linkage` supplies newly authored bounded SAVE/RETURN macro
 definitions from documented public register-save contracts. It is an explicit
 assembler library input, not an inherited IBM macro library. The small Classic C
