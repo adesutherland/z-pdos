@@ -142,3 +142,27 @@ Selected original short OPEN/CLOSE placeholder lists, 96-byte QSAM PS DCB
 templates (GL/PL/PM) and locate GET linkage now pass independent binary checks.
 The DCB check covers all 308 linked bytes, including EODAD/EXLST relocations;
 GET covers all 20 bytes. Other service forms remain explicit failures.
+
+## Named PDOS services — 2 October 2026
+
+The selected configuration now sets OS=PDOS. MVSSUPA retains the common
+MVS implementation and conditionally rejects services the owned PDOS kernel
+does not supply: TSO terminal/command processing, VSAM, IDCAMS and MODESET.
+Normal sequential DD I/O, allocation, ATTACH/DETACH and supported diagnostics
+retain their service paths. Prefix queries return no prefix; odd SWA tokens
+return no address; DCB lookup stays within the current task. Subtask completion
+uses PDOS's completion word without reading absent MVS TCB flags. The normal
+MVS/TSO branches are retained under their other explicit configurations.
+
+The SNAP flag address now groups its DCB-relative difference before adding
+the independent SNAP-area base; its mathematical address is unchanged. The
+lean omission patch is rebased to remove the whole guarded parser and its
+stub reference. The SWAREQ patch still applies with zero fuzz. Every profile
+has a new whole-source hash and needs its own future guest qualification.
+
+All six handwritten PDOS support modules assemble with explicit z900 ISA and
+literal/model/definition limits. Normal and ASan/UBSan objects match exactly.
+The 53 affected assembler/runtime checks pass in both builds. Current recovery
+reproduces all 81 selected files from pinned upstream with zero-fuzz patching;
+actual repaired I/O functions and their old failing controls also pass their
+host checks. This establishes source and host assembly evidence only.

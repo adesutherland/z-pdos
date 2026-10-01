@@ -19,7 +19,7 @@
           PRINT GEN,ON
           SPACE 1
  *-----------------------ASSEMBLY OPTIONS------------------------------*
-@@ -3842,278 +3830,9 @@
+@@ -3912,283 +3900,8 @@
  *
  *
  ***********************************************************************
@@ -46,6 +46,13 @@
 -*-     >>>>> RELEASED TO THE PUBLIC DOMAIN <<<<<                     -*
 -*-                                                                   -*
 -***********************************************************************
+-* No TSO/E profile or parser exists in PDOS. Return no prefixed name.
+-         AIF   ('&OS' NE 'PDOS').PDGEPF
+-         ENTRY @@GETEPF
+-@@GETEPF LA    R15,0
+-         BR    R14
+-         AGO   .PDGEEND
+-.PDGEPF  ANOP
 -         ENTRY @@GETEPF            ENTRY POINT
 -@@GETEPF SAVE  (14,12),,@@GETEPF-NOV/2020-J.REGINATO
 -*                                  SAVE CALLER'S REGISTERS
@@ -292,22 +299,20 @@
 -         DS    CL(44+1)            NULL-TERMINATED DSNAME
 -WKCBUFT  EQU   *-WKCBUF            TOTAL LENGTH
 -WKTRT    DC    X'FF',255X'00'      SEARCH FOR X'00'
--*
--*
--*
-+* TSO31 lean service deck omits unused @@GETEPF and IKJPARM table.   *
-+* The five retained FILESVC entry points do not call this parser.    *
-+***********************************************************************
- **********************************************************************
- *                                                                    *
- *  TEST31 - see if we are running in AMODE 31                        *
-@@ -4746,15 +4465,6 @@
+-.PDGEEND ANOP
++* The lean service deck omits unused @@GETEPF and IKJPARM table.
++* The five retained FILESVC entry points do not call this parser.
+ *
+ *
+ *
+@@ -4834,16 +4547,6 @@
           LA    R2,0
           BSM   R2,0
           ST    R2,NEEDBOA this will be suitable for ORing
 -*
 -*
 -         AIF   ('&ZSYS' EQ 'S370').NODSNS3  Only S/380+90 needs a stub
+-         AIF   ('&OS' EQ 'PDOS').NODSNS3
 -
 -         L     R3,=A(DSNCBOA) the DSN check stub needs this too
 -         ST    R2,0(,R3)

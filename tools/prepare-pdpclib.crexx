@@ -23,7 +23,7 @@ main: procedure = .int
   hashfile = work || "/source.sha256"
   address system "shasum -a 256 pdpclib/mvssupa.asm > " || shellquote(hashfile)
   call require rc = 0, "hash maintained native source"
-  call require word(readfile(hashfile), 1) = "9bb9430d7cb4c93bc8e1b443a3bc32856365c311cf419c3afdbe3808e725aa5b", "reviewed maintained native source"
+  call require word(readfile(hashfile), 1) = "8327b212648224f25dc0d0268b8d32fffb69ca36cce5cd304c08f75852f3c3d0", "reviewed maintained native source"
   address system "cmake -E copy_directory pdpclib " || shellquote(work || "/pdpclib")
   call require rc = 0, "copy maintained library"
   if profile = "tso31-lean" then patch = "omit-prefix-parser.patch"

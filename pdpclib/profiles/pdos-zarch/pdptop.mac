@@ -76,7 +76,7 @@
 &STEPD   SETC 'YES'               Indicate we want to step down
 &OUTM    SETC 'M'                 Indicate move mode
 * &OUTM    SETC 'L'               Indicate locate mode
-&OS      SETC 'UNKNOWN'           Indicate that the OS is not known
+&OS      SETC 'PDOS'              Select implemented PDOS services
 * &OS      SETC 'MVS'             Indicate that this is for MVS
 * &OS      SETC 'MUSIC'           Indicate that this is for MUSIC/SP
 *

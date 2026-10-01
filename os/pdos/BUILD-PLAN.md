@@ -13,7 +13,7 @@ runtime is a new candidate for the later link, boot and application gates.
 | PD-01: preserve source | Original qualified input preserved by commit; one maintained OS/runtime selection, notices, manifests and clean recovery; real-function old/new failure controls | Complete locally; see CHECKPOINT.md |
 | PD-02: new C producer | All 17 selected units compile with pinned Classic C and explicit source/runtime configuration | Complete for assembly-text generation; symbol/helper closure and target execution open |
 | PD-03: first Classic object | A small C function uses the retained PDPMAC convention, assembles independently and passes separately expected object/relocation checks | Complete locally; PDPROBE has independently checked bytes and two A relocations |
-| PD-04: source assembly | The selected runtime, loader and kernel source assemble under an explicit z/Architecture kernel contract, with required macro/service and instruction coverage | C-object portion complete; PDOSSUP/PLOADSUP/SAPSTART/SAPSUPA/MVSSTART complete locally with original selected interfaces; MVSSUPA service/macro closure and named kernel ISA open |
+| PD-04: source assembly | The selected runtime, loader and kernel source assemble under an explicit z/Architecture kernel contract, with required macro/service and instruction coverage | Complete locally: all 17 C objects and six handwritten modules, including MVSSUPA; selected original interfaces and the explicit kernel contract below |
 | PD-05: independent link/image | Fresh PLOAD, PDOS and PCOMM link without reused native objects; validate entry/mode, relocation, payload and source-described IPL records | Open |
 | PD-06: source-built boot | Fresh 100-cylinder 3390 image boots to a usable PCOMM prompt on the selected standard z/Architecture profile | Open for Classic-produced output |
 | PD-07: application qualification | Pinned cREXX package passes compile/assemble/fresh execution, supplied/interactive I/O, diagnostics, checked-write recovery and complete stopped output readback | Open for the rebuilt candidate; historical PDIO1 result retained separately |
@@ -62,8 +62,13 @@ this decision policy and the existing alias/profile limitations.
 The OS machine contract is standard z/Architecture, one CPU, 4,096 MiB real
 storage, a 100-cylinder 3390 and the qualified IBM1047 console behavior.
 The kernel's AMODE31/RMODE24 metadata and 32-bit C pointers do not restrict
-its support instructions to System/370. Define an explicit kernel code-role
-ceiling consistently across both tool families before enabling a selector.
+its support instructions to System/370. The named `pdos-zarch` kernel contract selects the z900 base ISA ceiling.
+Classic C currently emits the System/370 subset of that ceiling; handwritten
+support uses the assembler z900 subset, including 64-bit and channel support.
+Compiler pointer width remains 32 bits; final modules use classic objects and
+AMODE31/RMODE24. This code role does not select the SDK's integer application
+ABI or claim a new instruction facility. Later selectors must use the same
+hardware ceiling in Classic and ELF tools.
 The SDK's historical integer application profiles remain separate contracts.
 Retain the existing generous high heap and code/stack mappings for 64-bit
 applications. The later native 64-bit kernel conversion remains separate work.

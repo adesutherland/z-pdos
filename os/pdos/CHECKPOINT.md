@@ -1,8 +1,9 @@
 # Repaired PDIO1 and consolidated runtime checkpoint
 
 1 October 2026. **One maintained OS/runtime selection; host controls and
-C-to-assembly-text generation pass.** Independent whole-source assembly,
-linking, boot and guest qualification of this candidate remain open.
+C compilation and complete selected assembly pass.** Fresh whole-module
+links also pass locally; load-image validation, disk construction, boot and
+guest qualification remain separate gates.
 
 The original exact qualified input is preserved by commit
 [`d62b109`](https://github.com/adesutherland/z-pdos/commit/d62b109ed986bd455732484173ff4ebe0533045a).
@@ -10,14 +11,14 @@ All 37 OS files remain unchanged. We compared its 44 runtime inputs to the
 maintained library, merged the relevant differences and removed the duplicate
 runtime directory. The current OS and application recipes use `pdpclib/`,
 with explicit configuration/service profiles for genuine target differences.
-The current selection contains 81 files, 1,396,934 bytes.
+The current selection contains 81 files, 1,400,063 bytes.
 
 | Current record | SHA-256 |
 | --- | --- |
-| Repository-relative maintained selection manifest | `b4fd6e044875593f63466a121f13fce93c6be9f975d5485252642c4b67b53d16` |
+| Repository-relative maintained selection manifest | `ea155653d15c92b7be8e0f9759e8b6e012921d3974784b6dd6e55ec7155d143c` |
 | Selected canonical upstream manifest | `53b98cece9972a9589d54407de4094119a5a40a1f725cbc2d3b85a3765d2d813` |
-| Prepared-layout manifest | `e59d51e28e0fb2898a1d85e556e439e166dc1965fec8bd2cc1ebc4028736db9e` |
-| Consolidated current OS/runtime recovery patch | `9800394bc50943692d025903ea71c6f67dce9e284a29c5b27e23351b4d341c41` |
+| Prepared-layout manifest | `5c315c80f87c00864c4ad4019d519999b448d2775b3e510ece756435e3e3adb9` |
+| Consolidated current OS/runtime recovery patch | `3999b3a6712290c7cede320fd06c9a42de74accb32ab58941fed293b728303e1` |
 
 A clean selected canonical upstream copy plus the current recovery patch
 reproduces every selected input exactly. The retained preparation recipe also
@@ -100,3 +101,14 @@ closure, linking, image construction or boot/application gates. The accepted
 Lab guest remains untouched.
 Affected normal/sanitizer suites pass 42/42; all 17 C objects also pass
 through the sanitizer assembler using the retained recipe.
+
+## Complete selected assembly — 2 October 2026
+
+All 17 C objects and six handwritten modules now assemble independently.
+MVSSUPA emits 3,981 statements, 20 sections, 908 symbols and 50 fixups.
+The six normal and sanitizer decks are byte identical. The named PDOS service
+configuration explicitly rejects absent MVS/TSO facilities; its details are
+in PDPCLIB's change record. The current 81-file selection has new hashes above.
+Clean upstream recovery and real-function pre/post-repair controls pass.
+The 53 affected assembler/runtime regressions pass in normal and sanitizer
+builds. No guest state or accepted PDIO1 image has been changed.

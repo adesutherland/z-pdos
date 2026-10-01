@@ -2696,7 +2696,20 @@
      }
 --- a/pdpclib/mvssupa.asm
 +++ b/pdpclib/mvssupa.asm
-@@ -902,6 +902,8 @@
+@@ -895,13 +895,21 @@
+ *DEFER*  BNZ   DDCPMEM              No; sequential
+ DDCPPDS  OI    DDWFLAG2,CWFPDS    SET PDS ONLY
+          B     DDCKPDS              Test LSTAR & SMS
++* PDOS has no VSAM service. Reject before constructing a VSAM handle.
++         AIF   ('&OS' NE 'PDOS').PDVDD
++DDCVSAM  B     BADDSORG
++         AGO   .PDVDDE
++.PDVDD   ANOP
+ DDCVSAM  OI    DDWFLAG2,CWFVSM    SHOW VSAM MODE
+          B     DDCX1DD              NEXT DD
++.PDVDDE  ANOP
+ DDCPMEM  OI    DDWFLAG2,CWFPDQ    SHOW SEQUENTIAL PDS USE
+ DDCKPDS  DS    0H
  *  Note that this test may fail for data sets written under DOS
           TM    FM1SMSFG,FM1STRP+FM1PDSEX+FM1DSAE  Usable
           BNZ   BADDSORG             No; too bad
@@ -2705,7 +2718,246 @@
           LA    R0,ORFBDPDS        Preset - not initialized
           ICM   R15,7,DS1LSTAR     Any directory blocks?
           BZ    OPRERR               No; fail
-@@ -3725,7 +3727,8 @@
+@@ -1385,7 +1393,7 @@
+          BALR  R14,R15            CALL SNAPPER
+          MVC   OPBADDD,DWDDNAM    SHOW WHAT
+          WTO   'MVSSUPA - OPEN FAILED FOR nnnnnnnn',ROUTCDE=11
+-OPBADDD  EQU   *-6-8,8,C'C'       Insert bad DD
++OPBADDD  EQU   *-8-8,8,C'C'       Text tail before flags and R0/SVC
+ FREEOSTO LTR   R10,R10            Should never happen
+          BZ    FREEDSTO             but it did during testing
+          FREEMAIN R,LV=ZDCBLEN,A=(R10),SP=SUBPOOL  Free DCB area
+@@ -1429,7 +1437,7 @@
+          MVC   BADMEMDD,ZDDN      Identify bad DD
+          WTO   'MVSSUPA - Output PDS missing member name for DD nnnnnnn*
+                n',ROUTCDE=11
+-BADMEMDD EQU   *-6-8,8,C'C'       Insert bad DD
++BADMEMDD EQU   *-8-8,8,C'C'       Text tail before flags and R0/SVC
+          WTO   'MVSSUPA - Refuses to write over PDS directory',        C
+                ROUTCDE=11
+          ABEND 123                Abend without a dump
+@@ -1493,6 +1501,12 @@
+ *   Establish ZDCBAREA for either @@AWRITE or @@AREAD processing to
+ *   a terminal, or SYSTSIN/SYSTERM in batch.
+ *---------------------------------------------------------------------*
++* Terminal console I/O in PDOS uses ordinary DDs, not TSO/E services.
++         AIF   ('&OS' NE 'PDOS').PDTOPEN
++TERMOPEN LA    R0,ORFBDMOD        Unsupported terminal-service mode
++         B     OPRERR
++         AGO   .PDTERMEN
++.PDTOPEN ANOP
+ TERMOPEN MVC   IOMFLAGS,WWORK     Save for duration
+          NI    IOMFLAGS,IOFTERM+IOFOUT      IGNORE ALL OTHERS
+          L     R15,=A(TERMDCB)    Point to pattern
+@@ -1568,6 +1582,7 @@
+          XC    0(4,R1),0(R1)      Clear the RECFM=U Record Desc. Word
+          MVI   ZPPIX,ZPIXTRM      SET FOR TERMINAL I/O
+ *DELETED POP   USING
++.PDTERMEN ANOP
+          SPACE 1
+ *   Lots of code tests DCBRECFM twice, to distinguish among F, V, and
+ *     U formats. We set the index byte to 0,4,8 to allow a single test
+@@ -1910,8 +1925,10 @@
+          ORG   ,
+ EXCPDCBL EQU   *-EXCPDCB     PATTERN TO MOVE
+          SPACE 1
++         AIF   ('&OS' EQ 'PDOS').PDTMEND
+ TERMDCB  PUTLINE MF=L        PATTERN FOR TERMINAL I/O
+ TERMDCBL EQU   *-TERMDCB     SIZE OF IOPL
++.PDTMEND ANOP
+ ***********************************************************************
+ *                                                                     *
+ *    AOPEN SUBROUTINES.                                               *
+@@ -1961,6 +1978,11 @@
+ *   VSAM OPEN support                                                 *
+ ***********************************************************************
+ OPENVSAM OSUBHEAD ,          Define extended entry
++         AIF   ('&OS' NE 'PDOS').PDVOPEN
++         LA    R0,ORFBADSO        PDOS has no VSAM access method
++         OBRAN OPRERR
++         AGO   .PDVORET
++.PDVOPEN ANOP
+          LA    R0,ORFBDMOD        Preset for bad mode
+          TM    WWORK,X'06'        Plain input or output?
+          OBRAN OPRERR,OP=BNZ        No; fail for now
+@@ -2005,14 +2027,17 @@
+          MODCB RPL=(R2),OPTCD=(ADR,SEQ,NUP,LOC),ARG=(R3),              *
+                MF=(G,ZAMODCB)     Set for write
+          OSUBRET ROUTE=      Return from extended entry
++.PDVORET ANOP
+ VECTOR   OSUBRET ROUTE=(14)  Return from extended entry
+          SPACE 1
++         AIF   ('&OS' EQ 'PDOS').PDVPEND
+ VSAMDCB  ACB   DDNAME=VSAMDCB,EXLST=EXLSTACB,                          *
+                MACRF=(SEQ)
+ VSAMDCBL EQU   *-VSAMDCB
+ VSAMRPL  RPL   ACB=VSAMDCB,OPTCD=(SEQ,LOC,SYN)  read or write
+ VSAMRPLL EQU   *-VSAMRPL
+ EXLSTACB EXLST AM=VSAM,EODAD=VSAMEOD,LERAD=VLERAD,SYNAD=VSYNAD
++.PDVPEND ANOP
+          SPACE 1
+          POP   USING
+          SPACE 2
+@@ -2414,6 +2439,10 @@
+          ST    R8,KEPTREC         Remember record info
+          B     READGOOD
+          SPACE 1
++         AIF   ('&OS' NE 'PDOS').PDTRD
++TGETREAD B     EXRDBAD            Invalid unavailable-service handle
++         AGO   .PDTRDE
++.PDTRD   ANOP
+ TGETREAD L     R6,ZIOECT          RESTORE ECT ADDRESS
+          L     R7,ZIOUPT          RESTORE UPT ADDRESS
+          MVI   ZGETLINE+2,X'80'   EXPECTED FLAG
+@@ -2459,6 +2488,7 @@
+          ICM   R0,8,=AL1(1)       SUBPOOL 1
+          FREEMAIN R,LV=(0),A=(1)  FREE SYSTEM BUFFER
+          B     READEXIT
++.PDTRDE  ANOP
+ READGOOD SR    R6,R6              Set good return
+          B     READEXIT           TAKE NORMAL EXIT
+          SPACE 1
+@@ -2473,6 +2503,10 @@
+ *---------------------------------------------------------------------*
+ *   VSAM read
+ *---------------------------------------------------------------------*
++         AIF   ('&OS' NE 'PDOS').PDVRD
++VSAMREAD B     EXRDBAD            Invalid unavailable-service handle
++         AGO   .PDVRDE
++.PDVRD   ANOP
+ VSAMREAD LA    R8,ZARPL      GET RPL ADDRESS
+          LM    R5,R6,ZBUFF1  GET AVAILABLE BUFFER
+          GAMOS
+@@ -2505,6 +2539,7 @@
+ VLERAD   DS    0H
+ VSYNAD   LA    R15,8         DITTO
+          BR    R14           RETURN TO VSAM
++.PDVRDE  ANOP
+          SPACE 1
+ *---------------------------------------------------------------------*
+ *   VTOC read
+@@ -2744,6 +2779,10 @@
+          BZ    WRITEEX              No; just return
+          LM    R4,R5,KEPTREC      Residual text & length
+          B     WRITENEW             Finish record
++         AIF   ('&OS' NE 'PDOS').PDVWR
++VSAMWRIT B     WRITBAD            Invalid unavailable-service handle
++         AGO   .PDVWRE
++.PDVWR   ANOP
+ VSAMWRIT LA    R8,ZARPL      GET RPL ADDRESS
+          L     R5,ZBUFF1     GET BUFFER
+          MODCB RPL=(R8),AREA=(R4),AREALEN=(R5),OPTCD=(MVE),            *
+@@ -2752,8 +2791,13 @@
+          BXH   R15,R15,WRITBAD FAIL ON ERROR
+          CHECK RPL=(R8)      TAKE APPLICABLE EXITS
+          BXLE  R15,R15,WRITEEX    Return
++.PDVWRE  ANOP
+ WRITBAD  ABEND 001,DUMP           Or set error code?
+          SPACE 1
++         AIF   ('&OS' NE 'PDOS').PDTWR
++TPUTWRIT B     WRITBAD            Invalid unavailable-service handle
++         AGO   .PDTWRE
++.PDTWR   ANOP
+ TPUTWRIT CLI   RECFMIX,IXVAR      RECFM=V ?
+          BE    TPUTWRIV           YES
+          L     R1,BUFFADDR        GET MY (INPUT?) BUFFER
+@@ -2773,6 +2817,7 @@
+                OUTPUT=((R4),DATA),TERMPUT=EDIT,MF=(E,ZIOPL)
+          GAMAPP ,
+          SPACE 1
++.PDTWRE  ANOP
+ WRITEEX  TM    IOPFLAGS,IOFCURSE  RECURSION REQUESTED?
+          BNZ   WRITMORE           PROCESS REMAINING DATA
+          FUNEXIT RC=0             EXIT
+@@ -3046,6 +3091,10 @@
+          EX    R3,EXSWAODD   SEE WHETHER IT'S AN ODD ADDRESS
+          BZ    LOOKSVA       NO; HAVE ADDRESS
+          SR    R15,R15       NOTHING FOUND - RETURN 0
++         AIF   ('&OS' NE 'PDOS').PDODDSWA
++         B     LOOKSWAT      PDOS has no odd SWA tokens
++         AGO   .PDSWAEND
++.PDODDSWA ANOP
+          L     R5,PSATOLD-PSA GET TCB
+          USING TCB,R5
+          L     R5,TCBJSCB
+@@ -3091,6 +3140,7 @@
+          LA    R4,1(,R4)     ALIGN
+ LOOKSWAX ALR   R3,R4         ADD QMAT BASE
+          L     R3,0(,R3)     GET HEADER ADDRESS
++.PDSWAEND ANOP
+ LOOKSVA  LA    R15,16(,R3)   SKIP HEADER
+ LOOKSWAT L     R13,4(,R13)   PREVIOUS SAVE AREA                          *JOAO*
+          ST    R15,16(,R13)  SAVE RC                                     *JOAO*
+@@ -3162,10 +3212,15 @@
+          BNE   AQZDEBLP             NO; CHECK NEXT
+          LR    R15,R4             RETURN DCB ADDRESS
+          B     AQZDCBEX
++         AIF   ('&OS' NE 'PDOS').PDDCBTCB
++AQZUPTCB B     AQZDCBEX          PDOS exposes only the current task
++         AGO   .PDDCBEND
++.PDDCBTCB ANOP
+ AQZUPTCB CL    R3,TCBJSTCB        JOB STEP TCB?
+          BE    AQZDCBEX                YES; NO MORE RISING
+          ICM   R3,15,TCBOTC       GET HIGHER TCB
+          BNZ   AQZTCBLK             AND LOOK AT ITS DEBS
++.PDDCBEND ANOP
+ AQZDCBEX ST    R15,24(,R13)       RETURN ADDRESS OR 0 IN R1
+          LM    R14,R12,12(R13)    RESTORE MOST
+          BR    R14                RETURN ZDCBAREA ADDRESS OR 0
+@@ -3444,6 +3499,10 @@
+          B     SYSATCOM           GO TO COMMON ATTACH ROUTINE
+ *   TSO CP REQUEST - PREPARE PARM, CPPL, ETC.
+ *
++         AIF   ('&OS' NE 'PDOS').PDTCP
++SYSATCP  B     SYSATEXT           Keep the bad-request return code
++         AGO   .PDTCPE
++.PDTCP   ANOP
+ SYSATCP  LTR   R7,R7              ANY LENGTH ?
+          BM    SYSATEXT           NO; OOPS
+          LA    R1,SYSATOTX-SYSATOPL(,R7)  LENGTH WITH HEADER
+@@ -3502,6 +3561,7 @@
+          BNE   SYSATCOM           HAVE SOMETHING
+          OI    ECTSWS,ECTNOPD     ALL BLANK
+          POP   USING
++.PDTCPE  ANOP
+ SYSATCOM LA    R1,SYSATPRM        PASS ADDRESS OF PARM ADDRESS
+          LA    R2,SYSATPGM        POINT TO NAME
+          LA    R3,SYSATECB        AND ECB
+@@ -3517,9 +3577,11 @@
+          L     R2,SYSATTCB        GET SUBTASK TCB
+          USING TCB,R2             DECLARE IT
+          MVC   0(4,R11),TCBCMP    COPY RETURN OR ABEND CODE
++         AIF   ('&OS' EQ 'PDOS').PDATCC
+          TM    TCBFLGS,TCBFA      ABENDED ?
+          BZ    *+8                NO
+          MVI   0(R11),X'80'       SET ABEND FLAG
++.PDATCC  ANOP
+          DETACH SYSATTCB          GET RID OF SUBTASK
+          DROP  R2
+          B     SYSATEXT           AND RETURN
+@@ -3555,6 +3617,13 @@
+          PUSH  USING
+          DROP  ,
+ @@IDCAMS FUNHEAD SAVE=IDCSAVE,US=NO  EXECUTE IDCAMS REQUEST
++         AIF   ('&OS' NE 'PDOS').PDIDC
++         LA    R15,12             IDCAMS IS NOT A PDOS SERVICE
++         FUNEXIT RC=(15)
++         POP   USING
++IDCSAVE  DC    18F'0'
++         AGO   .PDIDCEND
++.PDIDC   ANOP
+          LA    R1,0(,R1)          ADDRESS OF IDCAMS REQUEST (V-CON)
+          ST    R1,IDC@REQ         SAVE REQUEST ADDRESS
+          MVI   EXFLAGS,0          INITIALIZE FLAGS
+@@ -3650,6 +3719,7 @@
+ EXFSKIP  EQU   X'40'                SKIP SUBSEQUENT MESSAGES
+ EXFGLOB  EQU   EXFMALL+EXFSUPP+EXFRET  GLOBAL FLAGS
+          POP   USING
++.PDIDCEND ANOP
+          SPACE 2
+ ***********************************************************************
+ *                                                                     *
+@@ -3725,7 +3795,8 @@
  *   PREPARE DYNAMIC ALLOCATION REQUEST LISTS
  *
           LA    R0,ALLARB
@@ -2715,7 +2967,7 @@
           LA    R0,ALLATXTP
           ST    R0,ALLARB+8        TEXT UNIT POINTER
           LA    R0,ALLAXDSN
-@@ -3751,7 +3754,8 @@
+@@ -3751,7 +3822,8 @@
  DYNALDDN SR    R5,R5              SIGNAL NO FEEDBACK
  *  WHEN USER SUPPLIES A DD NAME, DO AN UNCONDITIONAL UNALLOCATE ON IT
           LA    R0,ALLURB
@@ -2725,7 +2977,90 @@
           LA    R0,ALLUTXTP
           ST    R0,ALLURB+8        TEXT UNIT POINTER
           LA    R2,ALLUXDDN
-@@ -4813,7 +4817,7 @@
+@@ -3816,6 +3888,7 @@
+          USING @@GETPFX,R12
+ *
+          LA    R15,0
++         AIF   ('&OS' EQ 'PDOS').PDGPEND
+          LA    R0,0    Not really needed, just looks nice
+          USING PSA,R0
+          ICM   R2,15,PSATOLD
+@@ -3832,6 +3905,7 @@
+          USING UPT,R5
+          LA    R15,UPTPREFX       RETURN ADDRESS (CL7/AL1)
+ *
++.PDGPEND ANOP
+ RETURNGP RETURN (14,12),RC=(15)
+          POP   USING
+ *
+@@ -3861,6 +3935,13 @@
+ *-     >>>>> RELEASED TO THE PUBLIC DOMAIN <<<<<                     -*
+ *-                                                                   -*
+ ***********************************************************************
++* No TSO/E profile or parser exists in PDOS. Return no prefixed name.
++         AIF   ('&OS' NE 'PDOS').PDGEPF
++         ENTRY @@GETEPF
++@@GETEPF LA    R15,0
++         BR    R14
++         AGO   .PDGEEND
++.PDGEPF  ANOP
+          ENTRY @@GETEPF            ENTRY POINT
+ @@GETEPF SAVE  (14,12),,@@GETEPF-NOV/2020-J.REGINATO
+ *                                  SAVE CALLER'S REGISTERS
+@@ -4107,6 +4188,7 @@
+          DS    CL(44+1)            NULL-TERMINATED DSNAME
+ WKCBUFT  EQU   *-WKCBUF            TOTAL LENGTH
+ WKTRT    DC    X'FF',255X'00'      SEARCH FOR X'00'
++.PDGEEND ANOP
+ *
+ *
+ *
+@@ -4274,8 +4356,13 @@
+          SAVE  (14,12),,@@GOSUP
+          LR    R12,R15
+          USING @@GOSUP,R12
++         AIF   ('&OS' NE 'PDOS').PDGOSUP
++         LA    R15,12             MODESET IS NOT A PDOS SERVICE
++         AGO   .PDGOSEND
++.PDGOSUP ANOP
+          MODESET MODE=SUP
+          LA    R15,0
++.PDGOSEND ANOP
+          RETURN (14,12),RC=(15)
+ *
+          LTORG ,
+@@ -4294,8 +4381,13 @@
+          SAVE  (14,12),,@@GOPROB
+          LR    R12,R15
+          USING @@GOPROB,R12
++         AIF   ('&OS' NE 'PDOS').PDGOPRB
++         LA    R15,12             MODESET IS NOT A PDOS SERVICE
++         AGO   .PDGOPEND
++.PDGOPRB ANOP
+          MODESET MODE=PROB
+          LA    R15,0
++.PDGOPEND ANOP
+          RETURN (14,12),RC=(15)
+ *
+          LTORG ,
+@@ -4435,7 +4527,7 @@
+          SPACE 1
+ SNAPCLOS ICM   R10,15,@SNAPDCB    EVER GOTTEN STORAGE ?
+          BZ    SNAPRET              NO; JUST RETURN
+-         TM    SNAPDCB+DCBOFLGS-IHADCB,DCBOFOPN  OPEN ?
++         TM    SNAPDCB+(DCBOFLGS-IHADCB),DCBOFOPN  OPEN ?
+          BZ    SNAPFREE             NO; JUST FREE STORAGE
+          CLOSE MF=(E,SNAPOCL)
+ SNAPFREE L     R0,#SNAPDCB
+@@ -4745,6 +4837,7 @@
+ *
+ *
+          AIF   ('&ZSYS' EQ 'S370').NODSNS3  Only S/380+90 needs a stub
++         AIF   ('&OS' EQ 'PDOS').NODSNS3
+ 
+          L     R3,=A(DSNCBOA) the DSN check stub needs this too
+          ST    R2,0(,R3)
+@@ -4813,7 +4906,7 @@
  FM1FLAG  EQU   DS1NOBDB+1,1,C'X'  MORE FLAGS
  FM1COMPR EQU   X'80'           COMPRESSABLE EXTENDED IF DS1STRP
  FM1CPOIT EQU   X'40'           CHECKPOINTED D S
@@ -2734,8 +3069,79 @@
  FM1SMSDS EQU   X'80'           SMS D S
  FM1SMSUC EQU   X'40'           NO BCS ENTRY
  FM1REBLK EQU   X'20'           MAY BE REBLOCKED
+@@ -4937,12 +5030,14 @@
+          ORG   IHADCB             Only using one DCB
+          DS    CL(BSAMDCBL)
+          ORG   IHADCB             Only using one DCB
++         AIF   ('&OS' EQ 'PDOS').PDVAREA
+ ZAACB    DS    CL(VSAMDCBL)       VSAM ACB
+ ZARPL    RPL   ACB=ZAACB,OPTCD=(SEQ,SYN,LOC)
+ ZAMODCB  DS    XL(ZAMODCBL)  MODCB WORK AREA
+ ZASHOCB  DS    XL(ZASHOCBL)  SHOCB WORK AREA
+ ZAARG    DS    A                  Pointer
+ ZARRN    DS    F                  Relative record number
++.PDVAREA ANOP
+          SPACE 2
+          ORG   IHADCB             Only using one DCB
+ TAPEDCB  DCB   DDNAME=TAPE,MACRF=E,DSORG=PS,REPOS=Y,BLKSIZE=0,         *
+@@ -4961,6 +5056,7 @@
+          DC    2A(0)
+          SPACE 1
+          ORG   IHADCB
++         AIF   ('&OS' EQ 'PDOS').PDTAREA
+ ZPUTLINE PUTLINE MF=L        PATTERN FOR TERMINAL I/O
+ *DSECT*  IKJIOPL ,
+          SPACE 1
+@@ -4974,6 +5070,7 @@
+ ZIOUPT   DS    A                   UPT
+ ZIODDNM  DS    CL8      DD NAME AT OFFSET X'28' FOR DCB COMPAT.
+ ZGETLINE GETLINE MF=L             TWO WORD GTPB
++.PDTAREA ANOP
+          SPACE 2
+ *   VTOC READ ACCESS - INTERLEAVE WITH BSAM DCB
+ *
+@@ -5062,10 +5159,12 @@
+          IHAPSA ,            MAP LOW STORAGE
+          CVT DSECT=YES
+          IKJTCB ,            MAP TASK CONTROL BLOCK
++         AIF   ('&OS' EQ 'PDOS').PDTSMAP
+          IKJECT ,            MAP ENV. CONTROL BLOCK
+          IKJPTPB ,           PUTLINE PARAMETER BLOCK
+          IKJCPPL ,
+          IKJPSCB ,
++.PDTSMAP ANOP
+          IEZJSCB ,
+          IEZIOB ,
+          IEFZB4D0 ,          MAP SVC 99 PARAMETER LIST
+@@ -5077,11 +5176,17 @@
+          IEZDEB ,
+          IHAPDS PDSBLDL=YES
+          SPACE 1
++         AIF   ('&OS' EQ 'PDOS').PDVSMAP
+          IFGACB ,
+          SPACE 1
+          IFGRPL ,
++.PDVSMAP ANOP
++         AIF   ('&OS' EQ 'PDOS').PDJSMAP
+          IEFJESCT ,
++.PDJSMAP ANOP
++         AIF   ('&OS' EQ 'PDOS').PDUPEND
+          IKJUPT ,
++.PDUPEND ANOP
+ R0       EQU   0             NO STANDARD REGEQU MACRO
+ R1       EQU   1             NO STANDARD REGEQU MACRO
+ R2       EQU   2             NO STANDARD REGEQU MACRO
 --- a/pdpclib/pdptop.mac
 +++ b/pdpclib/pdptop.mac
+@@ -76,7 +76,7 @@
+ &STEPD   SETC 'YES'               Indicate we want to step down
+ &OUTM    SETC 'M'                 Indicate move mode
+ * &OUTM    SETC 'L'               Indicate locate mode
+-&OS      SETC 'UNKNOWN'           Indicate that the OS is not known
++&OS      SETC 'PDOS'              Select implemented PDOS services
+ * &OS      SETC 'MVS'             Indicate that this is for MVS
+ * &OS      SETC 'MUSIC'           Indicate that this is for MUSIC/SP
+ *
 @@ -88,3 +88,8 @@
           AMODE ANY
           RMODE ANY
@@ -2745,6 +3151,17 @@
 +* CAW at 48 is only used by the older SIO path in these sources.
 +FLCIOA   EQU   X'B8'
 +FLCCAW   EQU   X'48'
+--- a/pdpclib/sapsupa.asm
++++ b/pdpclib/sapsupa.asm
+@@ -1204,7 +1204,7 @@
+ WOPENMB  DS    CL(WOPENMLN)
+ MEMBER24 DS    CL8
+ ZDCBLEN  EQU   *-ZDCBAREA
+-         IEZIOB                   Input/Output Block
++         IEZIOB ,                 Input/Output Block
+ *
+          CVT   DSECT=YES
+          IKJTCB
 --- a/pdpclib/stdio.c
 +++ b/pdpclib/stdio.c
 @@ -1424,6 +1424,15 @@

@@ -39,7 +39,7 @@ Deliberate omissions and target-specific changes live under `profiles/`.
 | `tso31-lean` | Existing S390/31-bit TSO service variant with the unused prefix parser omitted. Its five-call subset is distinct from the full library. |
 | `tso-zos15-24` | z/OS 1.5 compatibility recipe for a 24-bit caller, using temporary AM31 for SWAREQ. Its retained service member selects AMODE 31/RMODE ANY; final module mode and load/execution qualification are separate. Requires a later machine and cannot be used for the real S/370 target. |
 | `pdos390-esa` | Retained ESA/390 OS configuration, with the two low-core equates from the Lab native-build work. |
-| `pdos-zarch` | Active repaired OS configuration, with S380 application/ZARCH OS switches and low-core equates. These inherited switches do not imply a community S/380 application ISA or ABI. |
+| `pdos-zarch` | Active repaired OS configuration, with OS=PDOS, inherited S380 application/ZARCH OS switches and low-core equates. These inherited switches do not imply a community S/380 application ISA or ABI. |
 
 The top-level imported `pdptop.mac` retains its upstream S380/ZARCH defaults.
 It must not silently become the selected MVS 3.8 configuration. Preparation
@@ -60,10 +60,10 @@ or acquire an external macro library.
 ## Qualification
 
 Focused host tests cover changed C behavior, profile preparation and the three
-already qualified source-owned macro definitions. Full MVSSUPA still needs
-conditional assembly, attributes, COPY/continuations, additional layout and
-service definitions in `mf-classic-as`. No IBM macro library or guest object
-is part of this import.
+already qualified source-owned macro definitions. Full MVSSUPA now assembles
+under the named PDOS configuration and selected original interfaces; other
+whole-library profiles retain separate assembly and service gates. No IBM macro
+library or guest object is part of this import.
 
 The root CMake build includes these focused checks. See the
 [C test scope](tests/README.md); the profile recipe can also be checked with

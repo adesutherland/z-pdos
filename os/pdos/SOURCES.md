@@ -12,7 +12,7 @@ duplicate frozen runtime; Git preserves the earlier qualification input.
 | Original qualified source checkpoint | [`d62b109`](https://github.com/adesutherland/z-pdos/commit/d62b109ed986bd455732484173ff4ebe0533045a), exact 37 OS and 44 runtime inputs, 1,396,526 bytes |
 | Maintained OS | `os/pdos/source/s370/`; all 37 files remain identical to that qualified checkpoint |
 | Maintained runtime | Shared `pdpclib/`, selected by [runtime-inputs.txt](runtime-inputs.txt), with `pdpclib/profiles/pdos-zarch/pdptop.mac` |
-| Current selected input | 81 files, 1,396,934 bytes; a new runtime/build candidate |
+| Current selected input | 81 files, 1,400,063 bytes; a new runtime/build candidate |
 | Original repair series | [Seven retained patches](patches/series.txt), individually identified by [original.sha256](patches/original.sha256); provenance records, not additional source versions |
 | Accepted native kernel | PDIO1 strict RDW SHA-256 `1fcae79b32314adce6838498e60760bfdc612d759c46fb025635073f960ca199`; native bytes and listings remain private |
 | 1 October guest acceptance | Fresh cREXX beta 3 at commit `ae1607b8e145174422cee7f3e73fbcc37a65226c`; managed image label `beta3-ae1607b8e145-20261001`, unchanged PDIO1 kernel |
