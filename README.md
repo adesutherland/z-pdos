@@ -10,23 +10,24 @@ used for the 1 October cREXX beta 3 HIGH qualification, with repair history
 and recovery checks. It uses our one maintained PDPCLIB, with the relevant
 canonical upstream and Lab fixes merged into that library. Its 17 C build units
 compile with Mainframe Classic C. The earlier exact qualified input is kept
-in Git history. Independent whole-source assembly, linking,
-source-built boot and application qualification remain open under the
+in Git history. All selected sources now independently assemble and link into
+a checked fresh 100-cylinder 3390 image. Source-built boot and application
+qualification remain open under the
 [OS build plan](os/pdos/BUILD-PLAN.md).
 
 The first component is [Mainframe Classic Assembler](tools/classic-as/README.md),
 command `mf-classic-as`. Its original portable C core has a small bootstrap
 language and explicit interfaces for source records, storage and object output.
 The first optional traditional macro provider uses those interfaces; conditional
-assembly and optional cREXX integration follow. This is a host component proof; complete
-runtime/OS assembly and native z/PDOS hosting remain future qualification steps.
+assembly supports the selected PDOS sources. Host assembly and disk building
+pass; native z/PDOS hosting remains a future qualification step.
 
 The first real consumer, the [TSO31 entry adapter](runtime/tso31/README.md), now
 assembles with independent object checks and passes target C layout assertions.
 Its [checkpoint](runtime/tso31/CHECKPOINT.md) records entry-only host link
 qualification and the subsequent repair of an inherited PDPCLIB address defect
-in the maintained linker. Guest execution and complete PDPCLIB/PDOS source
-assembly remain open.
+in the maintained linker. Guest execution remains open; the selected PDOS
+runtime now assembles through the independent route.
 
 [PDPCLIB](pdpclib/README.md), Paul Edwards's Public Domain C Library, is now
 maintained here with its upstream notices and named target variants. I use
@@ -57,8 +58,8 @@ using its [component instructions](tools/classic-ld/README.md).
 **[Mainframe Classic C](tools/classic-cc/README.md)**, command `mf-classic-cc`,
 now maintains the GCC 3.4.6 / cc370 compiler source with the reconciled upstream,
 Mike Beer and Mainframe Lab repairs. Native MVS and CMS cross-builds pass the
-code-generation checks. The independent assembler integration and complete
-compile/assemble/link/guest route remain open. See its
+code-generation checks. The selected PDOS compile/assemble/link/image route
+passes locally; guest execution remains open. See its
 [checkpoint](tools/classic-cc/CHECKPOINT.md), [roadmap](tools/classic-cc/ROADMAP.md),
 [licences](LICENSES.md) and [agent guidance](AGENTS.md).
 

@@ -1,0 +1,152 @@
+/* SPDX-License-Identifier: MIT
+ * Fresh PDIO1 build and checked private CKD media. Run from repository root.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i = .int
+  if args.0 < 2 | args.0 > 3 then return usage()
+  work = args.1; hercules = args.2; mode = "normal"
+  if args.0 = 3 then mode = args.3
+  call require left(work,11) = "build/pdos/" & length(work) > 11 & pos("..",work) = 0, "owned build/pdos output"
+  call require left(hercules,1) = "/", "absolute Hercules utilities directory"
+  call require mode = "normal" | mode = "sanitize", "normal or sanitize tools"
+  address crexx "run test -e :work"
+  call require rc = 1, "new output directory required"
+  locations = .string[]
+  address crexx "pwd" output locations
+  root = strip(locations.1); out = root || "/" || work
+  tools = "build/classic-as"
+  if mode = "sanitize" then tools = "build/classic-as-sanitize"
+  cli = tools || "/tools/classic-as/mf-classic-as"
+  linker = tools || "/tools/classic-ld/mf-classic-ld"
+  compiler = "build/classic-cc/mvs/gcc/mf-classic-cc"
+  cc1 = "build/classic-cc/mvs/gcc/cc1"
+  do i = 1 to 5
+    tool = word("dasdload cckd2ckd ckd2cckd",i)
+    path = hercules || "/" || tool
+    if i = 4 then path = cli
+    if i = 5 then path = linker
+    address crexx "run test -x :path"
+    call require rc = 0, "built tool " || path
+  end
+  address crexx "run test -x :compiler"
+  call require rc = 0, "build Classic C MVS compiler first"
+  address crexx "run cmake -E make_directory :out"
+  call require rc = 0, "create owned output"
+  directory = root || "/tools/classic-cc"
+  address crexx "cd :directory"
+  call require rc = 0, "compiler manifest directory"
+  address system "shasum -a 256 -c source.sha256 > " || shellquote(out || "/compiler-source-check.log")
+  call require rc = 0, "compiler source identities"
+  address crexx "cd :root"
+  check = work || "/check"; c = work || "/c"; support = work || "/support"; linked = work || "/linked"
+  call runlog "crexx os/pdos/build.crexx --args check " || shellquote(check), out || "/source-check.log"
+  call runlog "crexx os/pdos/assemble.crexx --args " || shellquote(c) || " " || shellquote(cli), out || "/compile-assemble.log"
+  call runlog "crexx os/pdos/assemble-support.crexx --args " || shellquote(support) || " " || shellquote(cli), out || "/support.log"
+  call runlog "crexx os/pdos/link.crexx --args " || shellquote(c || "/objects") || " " || shellquote(support) || " " || shellquote(linked) || " " || shellquote(linker), out || "/link.log"
+  installer = out || "/install-ipl"
+  address crexx "run clang -std=c90 -Wall -Wextra -pedantic -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer os/pdos/install-ipl.c -o :installer"
+  call require rc = 0, "build IPL writer/checker with ASAN/UBSAN"
+  media = out || "/media"
+  address crexx "run cmake -E make_directory :media"
+  call require rc = 0, "create media output"
+  from = linked || "/PLOAD-0.bin"; pload = media || "/pload.sys"
+  address crexx "run cmake -E copy :from :pload"
+  call require rc = 0, "fresh flat PLOAD"
+  from = linked || "/PDOS.mvs"; pdos = media || "/pdos.sys"
+  address crexx "run cmake -E copy :from :pdos"
+  call require rc = 0, "fresh PDOS load module"
+  from = linked || "/PCOMM.mvs"; pcomm = media || "/pcomm.exe"
+  address crexx "run cmake -E copy :from :pcomm"
+  call require rc = 0, "fresh PCOMM load module"
+  config = media || "/config.sys"
+  /* Target text: 0009 3270 and the inherited compiler's NEL newline. */
+  call put_binary config,'F0F0F0F940F3F2F7F015'x
+  ctl = media || "/ctl.txt"
+  call lineout ctl,"PDOS00 3390-1 100"
+  call lineout ctl,"PLOAD.SYS SEQ pload.sys TRK 10 1 0 PS F 18452 18452"
+  call lineout ctl,"SYSVTOC VTOC CYL 2"
+  call lineout ctl,"PDOS.SYS SEQ pdos.sys CYL 1 1 0 PS F 18452 18452"
+  call lineout ctl,"CONFIG.SYS SEQ config.sys CYL 1 1 0 PS F 10 10"
+  call lineout ctl,"COMMAND.EXE SEQ pcomm.exe CYL 1 1 0 PS F 18452 18452"
+  call lineout ctl
+  /* SEQ uses physical fixed blocks. The PDOS/PCOMM payload is an RDW stream. */
+  address crexx "cd :media"
+  call runlog shellquote(hercules || "/dasdload") || " -bz2 ctl.txt datasets.cckd", media || "/dasdload.log"
+  call runlog shellquote(hercules || "/cckd2ckd") || " -q datasets.cckd datasets.ckd", media || "/cckd2ckd.log"
+  call runlog shellquote(installer) || " datasets.ckd pdos00.ckd pload.sys pdos.sys pcomm.exe config.sys", media || "/ipl-check.log"
+  call runlog shellquote(hercules || "/ckd2cckd") || " -q -bz2 pdos00.ckd pdos00.cckd", media || "/ckd2cckd.log"
+  call runlog shellquote(hercules || "/cckd2ckd") || " -q pdos00.cckd readback.ckd", media || "/readback.log"
+  call runlog shellquote(installer) || " --compare pdos00.ckd readback.ckd pload.sys pdos.sys pcomm.exe config.sys", media || "/compression-check.log"
+  address crexx "cd :root"
+  call runlog "crexx os/pdos/tests/check-image.crexx --args " || shellquote(installer) || " " || shellquote(media), out || "/media-controls.log"
+  inputs = .string[]
+  inputs[1] = compiler; inputs[2] = cc1; inputs[3] = cli; inputs[4] = linker
+  inputs[5] = installer; inputs[6] = "tools/classic-cc/source.sha256"
+  inputs[7] = "os/pdos/source.sha256"; inputs[8] = "os/pdos/prepared.sha256"
+  inputs[9] = "os/pdos/compile-inputs.txt"; inputs[10] = "os/pdos/assembly-inputs.txt"
+  inputs[11] = "os/pdos/build.crexx"; inputs[12] = "os/pdos/assemble.crexx"
+  inputs[13] = "os/pdos/assemble-support.crexx"; inputs[14] = "os/pdos/link.crexx"
+  inputs[15] = "os/pdos/image.crexx"; inputs[16] = "os/pdos/install-ipl.c"
+  inputs[17] = "os/pdos/tests/check-load-module.c"
+  do i = 1 to 3
+    inputs[17+i] = hercules || "/" || word("dasdload cckd2ckd ckd2cckd",i)
+  end
+  inputs[21] = "os/pdos/tests/check-image.crexx"
+  address system "shasum -a 256 " || quoted(inputs) || " > " || shellquote(out || "/inputs.sha256")
+  call require rc = 0, "source manifest and exact producer identities"
+  call runlog "git rev-parse HEAD && git status --short && uname -a && clang --version && crexx --version && " || shellquote(compiler) || " --version", out || "/versions.log"
+  outputs = .string[]
+  outputs[1] = pload; outputs[2] = pdos; outputs[3] = pcomm; outputs[4] = config
+  outputs[5] = media || "/pdos00.ckd"; outputs[6] = media || "/pdos00.cckd"
+  address system "shasum -a 256 " || quoted(outputs) || " > " || shellquote(out || "/outputs.sha256")
+  call require rc = 0, "final output identities"
+  say "Fresh PDIO1 image built and read back:" media || "/pdos00.cckd"
+  say "23 fresh objects, three real-loader checks and complete disk payload/CCW checks pass."
+  say "Boot and application qualification remain open; no guest image is changed."
+  return 0
+
+runlog: procedure = .int
+  arg command = .string, log = .string
+  say "Running:" command
+  address system "( " || command || " ) > " || shellquote(log) || " 2>&1"
+  call require rc = 0, "command; see " || log
+  return 0
+
+quoted: procedure = .string
+  arg values = .string[]
+  result = ""
+  do i = 1 to values.0
+    result = result || " " || shellquote(values[i])
+  end
+  return result
+
+shellquote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'", value, "'\''") || "'"
+
+put_binary: procedure = .int
+  arg path = .string, data = .binary
+  file_id = 0; mode = "wb"
+  assembler fopen file_id,path,mode
+  call require file_id <> 0, "open owned output " || path
+  assembler fwriteb file_id,data
+  write_status = 0; close_status = 0
+  assembler ferror write_status,file_id
+  assembler fclose close_status,file_id
+  call require write_status = 0 & close_status = 0, "complete write " || path
+  return 0
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED:" detail
+    exit 1
+  end
+  return 0
+
+usage: procedure = .int
+  say "usage: crexx os/pdos/image.crexx --args NEW-build/pdos/output /absolute/hercules/bin [normal|sanitize]"
+  return 2

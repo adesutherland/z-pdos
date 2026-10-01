@@ -37,8 +37,38 @@ units to assembly text using the recorded flags and the new Classic compiler.
 and those 17 outputs. Conditional paths and macro definitions remain unexpanded.
 `assemble.crexx` repeats compilation and independently assembles all 17 C
 units using the documented language subset and an explicit literal bound.
-The six handwritten support modules, named kernel profile, complete linking
-and bootable OS remain separate gates.
+`assemble-support.crexx` assembles all six handwritten modules with the explicit
+z900 kernel ISA ceiling and the named PDOS service configuration.
+
+Build a complete new private disk image after building both Classic tools
+with `crexx tools/build.crexx --args test`. Supply an existing Hercules
+utilities directory containing `dasdload`, `cckd2ckd` and `ckd2cckd`:
+
+```sh
+crexx os/pdos/image.crexx --args build/pdos/my-image /absolute/hercules/bin
+```
+
+The output directory must be new. The recipe checks source identities and the
+actual repaired-function controls, compiles 17 C units, assembles six support
+modules, and links PLOAD, PDOS and PCOMM without native objects. PDOS's actual
+load-module reader reconstructs each RDW module against a separately linked
+flat image at bases zero and 2 MiB; entry, AMODE31/RMODE24, final padding and
+malformed-input controls are checked. The host checks run under ASAN/UBSAN.
+
+The recipe places fresh programs and a target-encoded `CONFIG.SYS` on a
+100-cylinder 3390, installs source-described IPL1/2 CCWs, and compares every
+dataset byte and final zero padding to the linked inputs. Compression readback
+checks every guest byte; only Hercules's regenerated 12-digit container serial
+may differ. Five one-byte corruptions must fail, and existing image outputs
+are preserved. `media/pdos00.cckd` is the compressed candidate;
+`outputs.sha256`, `inputs.sha256`, logs and version receipts identify the run.
+These generated files stay outside Git. No running guest is accessed.
+
+For a sanitizer assembler/linker run, first run `crexx tools/build.crexx
+--args sanitize`, then add `sanitize` as the third recipe
+argument. The compiler source and selected OS/runtime inputs are the same.
+Disk construction establishes a built candidate; boot and application
+qualification are still separate gates.
 
 For source recovery, supply a checkout or extracted archive containing the
 pinned upstream files and a new output directory:
@@ -50,9 +80,8 @@ crexx os/pdos/recover.crexx --args /absolute/pinned-pdos build/pdos/recovered
 Every selected upstream file is hash-checked before patching. The consolidated
 patch must then reproduce the current maintained selection exactly. No mail download,
 Lab build tree, proprietary native service or as370 is required for these
-source, host-control and compile-to-text checks.
+source, host-control, compile, assembly, link and disk-build checks.
 
-The [build plan](BUILD-PLAN.md) owns the remaining independent assembly,
-runtime/name closure, link/image construction, boot and application gates.
+The [build plan](BUILD-PLAN.md) owns the separate build, boot and application gates.
 The [dependency inventory](DEPENDENCIES.md) makes the existing native build's
 IBM assembler/binder and macro interfaces explicit.

@@ -1,9 +1,9 @@
 # Repaired PDIO1 and consolidated runtime checkpoint
 
-1 October 2026. **One maintained OS/runtime selection; host controls and
-C compilation and complete selected assembly pass.** Fresh whole-module
-links also pass locally; load-image validation, disk construction, boot and
-guest qualification remain separate gates.
+2 October 2026. **One maintained OS/runtime selection; the complete Classic
+compile/assemble/link/image build passes locally.** Real load-module
+reconstruction, disk payload and IPL checks pass. Boot and guest application
+qualification remain separate gates.
 
 The original exact qualified input is preserved by commit
 [`d62b109`](https://github.com/adesutherland/z-pdos/commit/d62b109ed986bd455732484173ff4ebe0533045a).
@@ -112,3 +112,44 @@ in PDPCLIB's change record. The current 81-file selection has new hashes above.
 Clean upstream recovery and real-function pre/post-repair controls pass.
 The 53 affected assembler/runtime regressions pass in normal and sanitizer
 builds. No guest state or accepted PDIO1 image has been changed.
+
+## Complete Classic source-to-image build — 2 October 2026
+
+`image.crexx` now retains the full native macOS recipe. It starts with the
+single maintained OS/runtime selection and Classic C after the numeric
+string-escape repair in `84279f9`. All 17 C units and six handwritten support
+modules are built afresh; no earlier native object, archive or disk is used.
+`link.crexx` closes the common runtime and program-specific helpers explicitly.
+
+PDOS's actual `fixPEMode` reads each MVS RDW module under ASAN/UBSAN and
+reconstructs its complete payload against separate flat links at zero and
+2 MiB. AMODE31/RMODE24, entry offset, relocations, final alignment zeros and
+three malformed-input controls pass for each placement.
+
+| Fresh module | RDW bytes | Flat bytes | Entry offset | SHA-256 of disk payload |
+| --- | ---: | ---: | --- | --- |
+| PLOAD | 145,920 | 129,448 | `0x13fc8` | `a745ecd53d13141bfd041c8d6f4d47cb43e2803bf5587f25394ebb6e83f26424` (flat) |
+| PDOS | 180,680 | 157,432 | `0x14138` | `d1d83ab23f222cb7f1733e6d624d847a345902d6965a6b35096276d44cb5ab18` (RDW) |
+| PCOMM | 105,416 | 88,333 | `0x13a90` | `8075781324b2a4817680120dedc8ac5b547eed6429f77d755c2611a81b724c14` (RDW) |
+
+Hercules 4.9.1.0-SDL host utilities place those payloads on a new 100-cylinder
+3390. PLOAD starts at cylinder 0/head 1, the two-cylinder VTOC at cylinder 1,
+PDOS at cylinder 3, CONFIG at cylinder 4 and COMMAND at cylinder 5. Physical
+fixed 18,452-byte program blocks preserve the RDW stream and zero final
+padding. `CONFIG.SYS` contains target bytes for `0009 3270` and NEL; it is
+not inferred from the host newline or locale.
+
+The original C90 `install-ipl.c` writes the source-described IPL1/2 CCWs and
+checks separately expected vectors. Its startup PSW is the fresh PLOAD's
+`000c000080002010`. The checker validates disk geometry, IPL keys/counts,
+VTOC names/extents/attributes and every source payload/padding byte. It checks
+that installation changes only the 168 IPL payload bytes. Compression and
+decompression preserve every guest byte; Hercules may regenerate only the
+12-digit host-container serial. Five one-byte geometry/count/PSW/payload/IPL
+corruptions fail and an existing output's hash is preserved.
+
+The recipe requires a new ignored output directory and writes source/tool
+hashes, final payload/image hashes, versions and check logs there. The locally
+built image is a new candidate. PD-05 is complete; PD-06 boot and PD-07 cREXX
+application acceptance remain open. The accepted Lab image and guest state
+were not accessed or changed.

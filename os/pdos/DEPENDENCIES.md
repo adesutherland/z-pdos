@@ -1,23 +1,23 @@
 # PDIO1 build dependencies
 
-1 October 2026. This records the selected repaired OS workload. Passing the
-source checks and C-to-text build does not close its assembler, linker or
-image dependencies.
+2 October 2026. This records the selected repaired OS workload. The independent
+source-to-image build now passes locally. Its boot and application acceptance
+remain separate from assembly, linking and disk readback.
 
 | Stage | Selected input or interface | Current state |
 | --- | --- | --- |
 | OS C source | `pdos.c`, `pdosutil.c/.h`, `pload.c`, `pcomm.c` | Exact retained PDIO1 selection; all four C units compile and independently assemble with Classic C/Assembler |
 | Runtime C | START, STDIO, STDLIB, CTYPE, STRING, TIME, ERRNO, ASSERT, LOCALE, MATH, SETJMP, SIGNAL, MEMMGR | One maintained PDPCLIB with merged canonical/Lab fixes and `pdos-zarch` configuration; all 13 units compile and independently assemble with Classic C/Assembler |
-| Source macros | PDPTOP, PDPMAIN, PDPPRLG, PDPEPIL | Retained source-owned bytes; selected COPY, library lookup and conditional state pass the C consumers; raw-source forms remain open |
-| Kernel startup and support | SAPSTART, SAPSUPA, PDOSSUP | Retained source; SAPSTART/PDOSSUP assemble completely with the selected mappings; SAPSUPA I/O service closure remains open |
-| Loader support | PLOADSUP plus PLOAD and PDOSUTIL | Retained source; IPL placement and independent whole-module reconstruction remain open |
-| Command processor | MVSSTART, MVSSUPA, PCOMM and the selected common runtime | MVSSTART assembles with independently checked storage-request interfaces; MVSSUPA I/O services and whole assembly remain open |
-| External native macros | YREGS, SAVE, RETURN, CVT, IEZJSCB, IHAPSA, IHARB, IHACDE, IEFJFCBN, IEZIOB, IHASVC; OPEN/CLOSE/DCB and other reached service forms | Calls exist in retained source. Original build supplied IBM MACLIB/MODGEN. Selected sparse PSA/TCB/JSCB/RB/CDE/ASCB/ASXB/CVT/SVC-entry mappings pass independent field checks; broader mappings and service forms remain open |
+| Source macros | PDPTOP, PDPMAIN, PDPPRLG, PDPEPIL | Retained source-owned bytes; all selected C and handwritten consumers assemble with bounded COPY, library lookup and conditional state |
+| Kernel startup and support | SAPSTART, SAPSUPA, PDOSSUP | All assemble under the z900 ceiling and explicit PDOS services; freshly linked PLOAD/PDOS load reconstruction passes |
+| Loader support | PLOADSUP plus PLOAD and PDOSUTIL | Fresh PLOAD links; source-described first-record placement, startup PSW and all disk bytes pass |
+| Command processor | MVSSTART, MVSSUPA, PCOMM and the selected common runtime | Fresh PCOMM assembles/links and passes PDOS's actual loader at two bases; absent MVS/TSO services are explicitly rejected |
+| External native macro interfaces | YREGS, SAVE, RETURN, CVT and the reached control-block/service forms | Original build used IBM MACLIB/MODGEN. This route uses independently authored selected interfaces, checked offsets/bytes and source-owned service expansions; it does not import IBM macros or establish a complete replacement library |
 | Qualified C producer | Repaired GCCMVS 3.2.3 v90, binary SHA-256 `f85eb831865c7de8eb12f74d26b5607414cf7a9204a4609fcd9f1826c3fa7bec` | Historical native kernel build input; the local Classic C checkpoint is a different GCC 3.4.6 producer |
 | Qualified assembler/binder | ASMA90 and IEWL | Historical qualification route; replacing these requires independent object, relocation and load-image checks |
-| Independent tools | `mf-classic-cc`, `mf-classic-as`, `mf-classic-ld` | all C objects pass; raw support, named kernel ISA and runtime/name closure and MVS load-image construction remain open |
-| IPL source | Retained `s370/ipl3390.txt`, PLOAD startup and source-described IPL1/2 CCWs | Source is present; independently generated first-track/image checks remain open |
-| Disk producer | Hercules `dasdload`, CKD/CCKD conversion, source-described IPL installation | Lab demonstrated source-built disk construction; standalone retained producer recipe and fresh inputs remain to be implemented here |
+| Independent tools | `mf-classic-cc`, `mf-classic-as`, `mf-classic-ld` | 23 fresh objects and all three load modules pass; no reused native objects or binder |
+| IPL source | Retained `s370/ipl3390.txt`, PLOAD startup and source-described IPL1/2 CCWs | Original host byte writer/checker verifies literal CCW vectors, source PLOAD PSW, VTOC extents and complete payload readback |
+| Disk producer | Hercules `dasdload`, CKD/CCKD conversion, source-described IPL installation | `image.crexx` builds a new 100-cylinder 3390, checks compression readback, rejects corruption and preserves existing outputs; utilities are explicit external host inputs |
 | Application inputs | Pinned external cREXX TSO31/TSO64 packages from their producer | External consumers; package binaries and private disk inputs are not OS source |
 
 The accepted kernel link included the common runtime plus SAPSTART/SAPSUPA,

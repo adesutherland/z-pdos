@@ -1,0 +1,76 @@
+/* SPDX-License-Identifier: MIT; reject media corruption and preserve outputs. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i = .int
+  value = .binary
+  if args.0 <> 2 then return 2
+  installer = args.1; media = args.2
+  locations = .string[]
+  address crexx "pwd" output locations
+  root = strip(locations.1)
+  call require left(media,length(root || "/build/pdos/")) = root || "/build/pdos/" & pos("..",media) = 0, "owned test media"
+  work = media || "/controls"
+  address crexx "run test -e :work"
+  call require rc = 1, "new control output required"
+  address crexx "run cmake -E make_directory :work"
+  call require rc = 0, "create controls"
+  dataset = media || "/datasets.ckd"; boot = media || "/pdos00.ckd"
+  payloads = shellquote(media || "/pload.sys") || " " || shellquote(media || "/pdos.sys") || " " || shellquote(media || "/pcomm.exe") || " " || shellquote(media || "/config.sys")
+  before = .string[]; after = .string[]
+  address crexx "run shasum -a 256 :boot" output before
+  call require rc = 0, "existing output identity"
+  log = work || "/existing-output.log"
+  address system shellquote(installer) || " " || shellquote(dataset) || " " || shellquote(boot) || " " || payloads || " > " || shellquote(log) || " 2>&1"
+  call require rc = 2, "refuse existing output"
+  address crexx "run shasum -a 256 :boot" output after
+  call require rc = 0 & before.1 = after.1, "existing output bytes preserved"
+  bad = work || "/bad.ckd"; rejected = work || "/rejected.ckd"; patch = work || "/byte.bin"
+  do i = 1 to 5
+    source = dataset; offset = 0; value = '00'x
+    if i = 2 then do; offset = 512+28; value = '17'x; end
+    if i = 3 then do; offset = 512+56832+29; value = '01'x; end
+    if i = 4 then do; offset = 512+45*56832+29; value = 'FF'x; end
+    if i = 5 then do; source = boot; offset = 512+33; value = 'FF'x; end
+    address crexx "run cmake -E copy :source :bad"
+    call require rc = 0, "generated corruption control"
+    call put_binary patch,value
+    log = work || "/control-" || i || ".log"
+    address system "dd if=" || shellquote(patch) || " of=" || shellquote(bad) || " bs=1 seek=" || offset || " conv=notrunc > " || shellquote(work || "/dd.log") || " 2>&1"
+    call require rc = 0, "change one explicit byte"
+    command = shellquote(installer) || " " || shellquote(bad) || " " || shellquote(rejected)
+    if i = 5 then command = shellquote(installer) || " --compare " || shellquote(boot) || " " || shellquote(bad)
+    address system command || " " || payloads || " > " || shellquote(log) || " 2>&1"
+    call require rc = 1, "reject corrupted geometry/count/PSW/payload/IPL control " || i
+    address crexx "run test -e :rejected"
+    call require rc = 1, "corruption rejected before creating output"
+  end
+  address crexx "run cmake -E rm -f :bad :patch"
+  call require rc = 0, "remove large disposable controls"
+  say "Media checks reject five one-byte corruptions and preserve existing output."
+  return 0
+
+shellquote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'", value, "'\''") || "'"
+
+put_binary: procedure = .int
+  arg path = .string, data = .binary
+  file_id = 0; mode = "wb"
+  assembler fopen file_id,path,mode
+  call require file_id <> 0, "open byte control"
+  assembler fwriteb file_id,data
+  write_status = 0; close_status = 0
+  assembler ferror write_status,file_id
+  assembler fclose close_status,file_id
+  call require write_status = 0 & close_status = 0, "write byte control"
+  return 0
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED:" detail
+    exit 1
+  end
+  return 0
