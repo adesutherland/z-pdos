@@ -28,7 +28,7 @@ struct mf_macro {
     struct variable *variables; mf_octet *variable_text;
     size_t *variable_counts; size_t variable_slots;
     unsigned long invocation_index;
-    mf_octet skip_name[64]; size_t skip_length;
+    mf_octet skip_name[64]; size_t skip_length, skip_nesting;
     struct definition *definitions;
     struct parameter *parameters;
     struct mf_statement *models;
@@ -146,7 +146,12 @@ static enum mf_status raw(struct mf_macro *m, struct mf_statement *s)
             return r.bytes.length > 80 ? MF_LIMIT : MF_SOURCE;
         st = step(m); if (st != MF_OK) return st;
         st = hash_record(&m->current, &r); if (st != MF_OK) return st;
-        st = mf_macro_card(&r, records->encoding, m->card, sizeof m->card, s, &skip);
+        st = mf_macro_card(&r, records->encoding, m->card, sizeof m->card, s, &skip, m->skip_length != 0);
+        if (st == MF_OK && !skip && m->skip_length && !m->skip_nesting) {
+            struct mf_span target; target.data = m->skip_name; target.length = m->skip_length;
+            if (mf_macro_same(target,s->label))
+                st = mf_macro_card(&r, records->encoding, m->card, sizeof m->card, s, &skip, 0);
+        }
         m->last_origin = s->origin;
         if (st != MF_OK) return st;
         if (!skip) return MF_OK;
@@ -658,7 +663,11 @@ static enum mf_status provider_next(void *cookie, struct mf_statement *out)
             if (st != MF_OK) break;
             if (m->skip_length) {
                 struct mf_span target; target.data = m->skip_name; target.length = m->skip_length;
-                if (!mf_macro_same(target, s.label)) continue;
+                if (word(s.operation,0)) {
+                    if (m->skip_nesting == m->config.max_depth) { st = MF_LIMIT; break; }
+                    ++m->skip_nesting;
+                } else if (word(s.operation,1) && m->skip_nesting) { --m->skip_nesting; continue; }
+                if (m->skip_nesting || !mf_macro_same(target, s.label)) continue;
                 m->skip_length = 0;
             }
             if (word(s.operation, 0)) { st = capture(m, &s); if (st != MF_OK) break; continue; }
@@ -710,7 +719,7 @@ static enum mf_status provider_replay(void *cookie)
     if (!m->complete || m->terminal != MF_EOF) return MF_SOURCE;
     st = m->records.replay(m->records.cookie); if (st != MF_OK) return st;
     m->definition_count = m->model_count = m->definition_used = m->depth = 0;
-    m->invocation_index = 0; m->skip_length = 0;
+    m->invocation_index = 0; m->skip_length = m->skip_nesting = 0;
     memset(m->variable_counts, 0, (m->config.max_depth + 2) * sizeof(size_t));
     m->steps = 0; m->terminal = MF_OK; m->complete = 0; m->replaying = 1;
     memset(&m->last_origin, 0, sizeof m->last_origin); hash_init(&m->current);

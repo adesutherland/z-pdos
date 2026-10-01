@@ -147,3 +147,10 @@ for a macro with no formal parameters, including a label-only parameter.
 Commas in a macro with formal parameters continue to denote positional null
 arguments. Other empty prototype slots remain unsupported. This follows IBM
 HLASM [macro instruction prototype](https://www.ibm.com/docs/en/hla-and-tf/1.6?topic=definitions-macro-instruction-prototype).
+
+An open-code forward conditional branch searches labels and operation fields
+without checking inactive operands or continuation syntax. Labels inside
+skipped macro definitions cannot be open-code branch targets. The selected
+target is scanned fully. Every skipped raw record remains part of the replay
+fingerprint, so a changed inactive record invalidates output. Macro nesting
+in the search is bounded by the configured depth.

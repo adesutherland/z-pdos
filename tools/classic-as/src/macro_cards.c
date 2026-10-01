@@ -27,7 +27,7 @@ static enum mf_status decode(mf_octet c, enum mf_encoding e, mf_octet *out)
     return e == MF_CP037 ? mf_ebcdic_to_ascii(c, out) : MF_OK;
 }
 enum mf_status mf_macro_card(const struct mf_record *r, enum mf_encoding e,
-    mf_octet *b, size_t cap, struct mf_statement *s, int *skip)
+    mf_octet *b, size_t cap, struct mf_statement *s, int *skip, int prefix_only)
 {
     size_t n, i, j, start, level;
     int quoted; mf_octet c; enum mf_status status;
@@ -42,10 +42,6 @@ enum mf_status mf_macro_card(const struct mf_record *r, enum mf_encoding e,
     if (r->bytes.length > 1 && c == 0x2e) {
         status = decode(r->bytes.data[1], e, &c); if (status != MF_OK) return status;
         if (c == 0x2a) { *skip = 1; return MF_OK; }
-    }
-    if (r->bytes.length >= 72) {
-        status = decode(r->bytes.data[71], e, &c); if (status != MF_OK) return status;
-        if (c != 0x20) { s->origin.column = 72; return MF_UNSUPPORTED; }
     }
     n = r->bytes.length < 71 ? r->bytes.length : 71;
     if (n > cap) return MF_LIMIT;
@@ -70,6 +66,11 @@ enum mf_status mf_macro_card(const struct mf_record *r, enum mf_encoding e,
     start = i;
     while (i < n && b[i] != 0x20) ++i;
     s->operation.data = b + start; s->operation.length = i - start;
+    if (prefix_only) return MF_OK;
+    if (r->bytes.length >= 72) {
+        status = decode(r->bytes.data[71], e, &c); if (status != MF_OK) return status;
+        if (c != 0x20) { s->origin.column = 72; return MF_UNSUPPORTED; }
+    }
     while (i < n && b[i] == 0x20) ++i;
     start = i; level = 0; quoted = 0;
     while (i < n) {

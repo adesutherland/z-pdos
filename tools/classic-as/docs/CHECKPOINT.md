@@ -236,3 +236,10 @@ The raw kernel probe now advances into source scanning, SAPSTART reaches ORG,
 and PLOADSUP reaches missing public control-block mappings. OS service macros
 remain real dependencies. Normal and sanitizer suites pass 47 affected tests;
 no named kernel profile, full build or guest acceptance is claimed.
+
+## Inactive open-code search
+
+Forward conditional searches no longer diagnose operands in bypassed source
+records. Original tests cover malformed inactive operands, macro-scope target
+isolation, malformed active targets and changed inactive replay. The repaired
+kernel's bypassed S/370 channel-status branch now reaches subsequent source.

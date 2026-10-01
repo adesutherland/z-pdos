@@ -67,7 +67,24 @@ static void argument_attributes(void)
     bad_source(" MNOTE 8,'unsupported form'\n", MF_SOURCE);
     bad_source(" MNOTE 4,'warning'\n", MF_UNSUPPORTED);
 }
+static void inactive_source(void)
+{
+    struct fixture f; unsigned pass; unsigned long n;
+    init(&f," AGO .DONE\n BAD C'unclosed\n MACRO\n UNUSED\n.DONE BAD C'unclosed\n MEND\n.DONE LR 1,2\n");
+    CHECK(create(&f) == MF_OK);
+    for (pass = 0; pass < 2; ++pass) {
+        expected(&f,"","LR","1,2",7); CHECK(drain(&f,&n) == MF_EOF);
+        if (!pass) CHECK(f.statements.replay(f.statements.cookie) == MF_OK);
+    }
+    clean(&f);
+    init(&f," AGO .DONE\n BAD C'unclosed\n.DONE LR 1,2\n");
+    f.second = " AGO .DONE\n BAD C'changed\n.DONE LR 1,2\n";
+    CHECK(create(&f) == MF_OK); CHECK(drain(&f,&n) == MF_EOF);
+    CHECK(f.statements.replay(f.statements.cookie) == MF_OK); CHECK(drain(&f,&n) == MF_REPLAY); clean(&f);
+    bad_source(" AGO .DONE\n.DONE DC C'unclosed\n",MF_SOURCE);
+    bad_source(" AGO .DONE\n MACRO\n UNUSED\n.DONE ANOP\n MEND\n",MF_UNDEFINED);
+}
 int main(void)
 {
-    scoped(); expressions(); argument_attributes(); printf("conditional macros: %lu checks passed\n", checks); return 0;
+    inactive_source(); scoped(); expressions(); argument_attributes(); printf("conditional macros: %lu checks passed\n", checks); return 0;
 }
