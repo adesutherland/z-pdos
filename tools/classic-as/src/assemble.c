@@ -35,7 +35,7 @@ struct mf_as {
     struct symbol_state *symbol_state;
     struct literal *literals, *evaluating_literal; size_t literal_count, pool;
     struct base_state bases[16], base_stack[16][16]; size_t base_depth;
-    int pending_registers, pending_stack[16];
+    int pending_registers, pending_stack[16]; size_t print_depth;
     struct mf_statement statement;
     const struct mf_object_writer *writer;
     const struct mf_diagnostics *diagnostics;
@@ -685,7 +685,15 @@ static enum mf_status using_statement(struct mf_as *as, int drop)
 static enum mf_status using_stack(struct mf_as *as, int pop)
 {
     static const mf_octet using[] = {0x55,0x53,0x49,0x4e,0x47};
+    static const mf_octet print[] = {0x50,0x52,0x49,0x4e,0x54};
     if (as->statement.label.length) return MF_SOURCE;
+    /* There is no listing sink. Validate the independent PRINT nesting;
+     * its saved controls have no observable payload or addressability effect. */
+    if (word(as->statement.operand, print, sizeof print)) {
+        if (pop) { if (!as->print_depth) return MF_SOURCE; --as->print_depth; }
+        else { if (as->print_depth == 16) return MF_LIMIT; ++as->print_depth; }
+        return MF_OK;
+    }
     if (!word(as->statement.operand, using, sizeof using)) return MF_UNSUPPORTED;
     if (pop) {
         if (!as->base_depth) return MF_SOURCE;
@@ -1625,7 +1633,7 @@ static enum mf_status run_pass(struct mf_as *as, const struct mf_statements *sou
     for (i = 0; i < as->section_count; ++i) {
         as->section_state[i].position = as->section_state[i].high_water = as->section_state[i].relocation_end = 0;
     }
-    as->pool = 0; as->title_names = 0; as->base_depth = 0; as->pending_registers = 0;
+    as->pool = 0; as->title_names = 0; as->base_depth = 0; as->pending_registers = 0; as->print_depth = 0;
     if (as->pass == 2) for (i = 0; i < as->literal_count; ++i) as->literals[i].seen = 0;
     memset(as->bases, 0, sizeof as->bases); as->current = NIL; as->ended = 0; as->fixup_count = 0;
     fingerprint_init(fingerprint);

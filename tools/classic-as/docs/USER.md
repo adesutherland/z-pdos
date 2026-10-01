@@ -230,7 +230,9 @@ same assembler/writer contract.
 fail explicitly. `DROP` with no operand or a single comma drops every mapping.
 Absolute implicit addresses also use applicable absolute USING mappings.
 Forward USING expressions defer resolution to pass two; unresolved mappings
-never produce a successful deck. Other PUSH/POP state classes remain unsupported.
+never produce a successful deck. `PUSH PRINT`/`POP PRINT` validate an independent
+16-frame stack; listing controls have no payload effect because this component
+has no listing sink. Other PUSH/POP state classes remain unsupported.
 Forward register symbols in USING/DROP likewise defer validation to pass two;
 pending register mappings follow PUSH/POP and are cleared by DROP-all.
 

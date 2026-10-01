@@ -674,6 +674,12 @@ static void source_metadata(void)
     init(&f, "X TITLE 'hello'\n LR 1,2\n END\n"); CHECK(run(&f) == MF_UNSUPPORTED); clean(&f);
     init(&f, " PRINT UNKNOWN\n LR 1,2\n END\n"); CHECK(run(&f) == MF_UNSUPPORTED); clean(&f);
     init(&f, "X PRINT GEN\n LR 1,2\n END\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
+    init(&f,"S CSECT\n USING S,12\n PUSH USING\n PUSH PRINT\n PUSH PRINT\n PRINT NOGEN\n POP PRINT\n POP USING\n L 1,S\n POP PRINT\n END S\n");
+    successful(&f); CHECK(f.sections[0].length == 4 && f.data[0][0] == 0x58 && f.data[0][2] == 0xc0); clean(&f);
+    init(&f," POP PRINT\n END\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
+    init(&f,"X PUSH PRINT\n END\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
+    init(&f," PUSH PRINT\n PUSH USING\n POP PRINT\n POP PRINT\n END\n"); CHECK(run(&f) == MF_SOURCE); clean(&f);
+    init(&f," PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n PUSH PRINT\n END\n"); CHECK(run(&f) == MF_LIMIT); clean(&f);
 }
 static void system_instructions(void)
 {
