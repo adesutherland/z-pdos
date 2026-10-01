@@ -73,3 +73,13 @@ producer. Its [build plan](../../os/pdos/BUILD-PLAN.md) makes the OS a
 concrete consumer for source handling, instruction coverage and full pipeline
 qualification. The imported 31-bit kernel also has z/Architecture support;
 its profile is distinct from a historical integer application profile.
+
+## Selected floating literal dialect — 1 October 2026
+
+We selected exact XL4/XL8 HFP literals from the backend's existing target
+encoder, retaining its rounding and literal widths. This removes duplicated
+decimal E/D parsing and rounding from the first assembler target without
+changing the machine instructions, ABI or floating representation. The
+assembler adds only the reached historical HFP instruction subset. Integer-only
+SDK profiles still exclude this code; whole-source object success does not
+qualify a shared named profile or guest execution.

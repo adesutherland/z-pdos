@@ -20,6 +20,7 @@ does not establish that all its contents are public domain.
 | IBM z/VM [AMODE and RMODE](https://www.ibm.com/docs/en/zvm/7.2.0?topic=modes-amode-rmode-instructions) and HLASM [RMODE](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=statements-rmode-instruction) | Named association anywhere in source; blank association requires an actual unnamed section and does not create it |
 | IBM HLASM [ENTRY](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=statements-entry-instruction), Language Reference SC26-4940-09, chapter 5 page 169 | A V nominal may reference an ENTRY in the same source module; explicit EXTRN excludes local definition. Separate ER and LD/SD identities preserve linker resolution and V semantics. |
 | IBM *z/Architecture Principles of Operation*, SA22-7832-06, February 2008, [public PDF](https://www.ibm.com/docs/en/SSQ2R2_15.0.0/com.ibm.tpf.toolkit.hlasm.doc/dz9zr006.pdf), p7-78 | CLM RS opcode BD, mask 0..15 and unsigned 12-bit displacement; original encoder and independent expected vectors |
+| IBM *z/Architecture Principles of Operation*, SA22-7832-14, [public PDF](https://www.ibm.com/docs/en/module_1678991624569/pdf/SA22-7832-14.pdf?cp=HW11W), chapter 18 instruction descriptions, and the S/360/S/370 editions above | Reached HFP RR/RX opcode and operand facts. The selected historical register subset remains 0,2,4,6; no AFP register facility is enabled. |
 | [RFC 3629](https://www.rfc-editor.org/rfc/rfc3629.html) | UTF-8 text contract; ASCII is a valid subset |
 
 Character constants and external names select IBM CP037 explicitly. The

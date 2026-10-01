@@ -610,6 +610,25 @@ mvs_make_float (REAL_VALUE_TYPE r)
    return (buf);
 }
 
+/* Classic C dialect decision, 2026-10-01: publish the backend's already
+   rounded IBM hexadecimal representation instead of asking the assembler to
+   parse/round decimal E/D literals. Explicit widths preserve pool grouping. */
+static void
+mvs_output_float_literal (FILE *file, rtx x)
+{
+  REAL_VALUE_TYPE value;
+  long words[4];
+  enum machine_mode mode = GET_MODE (x);
+  REAL_VALUE_FROM_CONST_DOUBLE (value, x);
+  real_to_target (words, &value, mode);
+  if (mode == SFmode)
+    fprintf (file, "=XL4'%08lX'", (unsigned long) words[0] & 0xffffffffUL);
+  else
+    fprintf (file, "=XL8'%08lX%08lX'",
+             (unsigned long) words[0] & 0xffffffffUL,
+             (unsigned long) words[1] & 0xffffffffUL);
+}
+
 /* ===================================================== */
 /* The following three routines are used to determine whether
    a branch target is on this page, or is a far jump.  We use
@@ -2127,18 +2146,14 @@ i370_print_operand (FILE *fh, rtx XV, int CODE)
 	  {
 	    if (GET_MODE (XV) == SFmode)
 	      {
-	        REAL_VALUE_TYPE rval;
-	        REAL_VALUE_FROM_CONST_DOUBLE(rval, XV);
 		mvs_page_lit += 4;
-		fprintf (fh, "=E'%s'", mvs_make_float(rval));
+		mvs_output_float_literal (fh, XV);
 	      }
 	    else
 	    if (GET_MODE (XV) == DFmode)
 	      {
-	        REAL_VALUE_TYPE rval;
-	        REAL_VALUE_FROM_CONST_DOUBLE(rval, XV);
 		mvs_page_lit += 8;
-		fprintf (fh, "=D'%s'", mvs_make_float(rval));
+		mvs_output_float_literal (fh, XV);
 	      }
 	    else
 	      {
@@ -2403,18 +2418,14 @@ i370_print_operand (FILE *fh, rtx XV, int CODE)
 	  {
 	    if (GET_MODE (XV) == SFmode)
 	      {
-	        REAL_VALUE_TYPE rval;
-	        REAL_VALUE_FROM_CONST_DOUBLE(rval, XV);
 		mvs_page_lit += 4;
-		fprintf (fh, "=E'%s'", mvs_make_float(rval));
+		mvs_output_float_literal (fh, XV);
 	      }
 	    else
 	    if (GET_MODE (XV) == DFmode)
 	      {
-	        REAL_VALUE_TYPE rval;
-	        REAL_VALUE_FROM_CONST_DOUBLE(rval, XV);
 		mvs_page_lit += 8;
-		fprintf (fh, "=D'%s'", mvs_make_float(rval));
+		mvs_output_float_literal (fh, XV);
 	      }
 	    else /* VOIDmode !?!? strange but true ...  */
 	      {

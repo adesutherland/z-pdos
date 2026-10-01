@@ -17,7 +17,7 @@ main: procedure = .int
   if variant = "cms" then target_flag = "-DTEST_CMS"
   address crexx "run :command -fsyntax-only :target_flag tools/classic-cc/tests/target.c"
   call require rc = 0, "OS predefines and Classic C widths"
-  files = "names callee nested far-goto di-helpers long-comments oversize-comment newline store-motion store-callee fullword-bits"
+  files = "names callee nested far-goto di-helpers long-comments oversize-comment newline store-motion store-callee fullword-bits float-literals"
   modes = "-O0 -O1 -O2 -Os"
   i = .int; j = .int
   input = .string; output = .string
@@ -33,6 +33,10 @@ main: procedure = .int
       address crexx "run :command -S :mode :input -o :output"
       call require rc = 0, name || " " || mode || " compiles"
     end
+    floats = readfile(work || "/float-literals" || mode || ".asm")
+    call require pos("=XL8'4110000000000000'", floats) > 0 & pos("=XL8'4080000000000000'", floats) > 0, "exact double literal one and half"
+    call require pos("=XL8'C210000000000000'", floats) > 0 & pos("=XL4'41100000'", floats) > 0, "exact negative double and short literal"
+    call require pos("=D'", floats) = 0 & pos("=E'", floats) = 0, "compiler floating literals do not need decimal assembly conversion"
     fullwords = readfile(work || "/fullword-bits" || mode || ".asm")
     call require pos("F'2147483647'", fullwords) > 0 & pos("F'-2147483648'", fullwords) > 0 & pos("F'-1'", fullwords) > 0, "fullword signed boundaries retain exact bits"
     call require pos("F'-1467459023'", fullwords) > 0, "PDOS math raw word stays representable"

@@ -175,3 +175,15 @@ count in normal and sanitizer builds. With a selected limit of 4096, the actual
 PDOS C output assembles: 13,349 statements, 1,043 symbols and 670 fixups. The
 remaining four C units first require floating-point forms; raw support and
 complete linking remain open.
+
+## Selected HFP instructions and whole-C consumer — 1 October 2026
+
+Original HFP RR/RX descriptions cover the reached historical instruction forms
+and restrict floating registers to 0,2,4,6. Independent vectors validate 20
+instruction byte sequences, invalid register fields and displacement overflow;
+LRER is excluded from the common S/360 selection. The compiler's exact XL4/XL8
+literals reuse the existing generic hexadecimal parser/pool rules. All 17 C
+units assemble through maintained macros. Raw support, the named kernel
+profile and whole-toolchain guest evidence remain separate gates.
+Affected normal/sanitizer suites pass 42/42; all 17 C objects also pass
+through the sanitizer assembler using the retained recipe.

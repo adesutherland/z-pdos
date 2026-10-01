@@ -12,6 +12,26 @@
  * Mnemonics are numeric ASCII octets, independent of execution character set.
  */
 #include "mf_classic.h"
+static const mf_octet name_LPDR[] = { 0x4c, 0x50, 0x44, 0x52 };
+static const mf_octet name_LTDR[] = { 0x4c, 0x54, 0x44, 0x52 };
+static const mf_octet name_LCDR[] = { 0x4c, 0x43, 0x44, 0x52 };
+static const mf_octet name_LDR[] = { 0x4c, 0x44, 0x52 };
+static const mf_octet name_CDR[] = { 0x43, 0x44, 0x52 };
+static const mf_octet name_ADR[] = { 0x41, 0x44, 0x52 };
+static const mf_octet name_SDR[] = { 0x53, 0x44, 0x52 };
+static const mf_octet name_MDR[] = { 0x4d, 0x44, 0x52 };
+static const mf_octet name_DDR[] = { 0x44, 0x44, 0x52 };
+static const mf_octet name_LRER[] = { 0x4c, 0x52, 0x45, 0x52 };
+static const mf_octet name_STD[] = { 0x53, 0x54, 0x44 };
+static const mf_octet name_LD[] = { 0x4c, 0x44 };
+static const mf_octet name_CD[] = { 0x43, 0x44 };
+static const mf_octet name_AE[] = { 0x41, 0x45 };
+static const mf_octet name_AD[] = { 0x41, 0x44 };
+static const mf_octet name_SD[] = { 0x53, 0x44 };
+static const mf_octet name_MD[] = { 0x4d, 0x44 };
+static const mf_octet name_DD[] = { 0x44, 0x44 };
+static const mf_octet name_STE[] = { 0x53, 0x54, 0x45 };
+static const mf_octet name_LE[] = { 0x4c, 0x45 };
 static const mf_octet name_BALR[] = { 0x42, 0x41, 0x4c, 0x52 };
 static const mf_octet name_BCTR[] = { 0x42, 0x43, 0x54, 0x52 };
 static const mf_octet name_BCR[] = { 0x42, 0x43, 0x52 };
@@ -191,6 +211,26 @@ static const struct mf_instruction instructions[] = {
     { { name_SP, 2 }, MF_S360, MF_SS, 0xfb, 6 },
     { { name_MP, 2 }, MF_S360, MF_SS, 0xfc, 6 },
     { { name_DP, 2 }, MF_S360, MF_SS, 0xfd, 6 },
+    { { name_LPDR, 4 }, MF_S360, MF_RR, 0x20, 2 },
+    { { name_LTDR, 4 }, MF_S360, MF_RR, 0x22, 2 },
+    { { name_LCDR, 4 }, MF_S360, MF_RR, 0x23, 2 },
+    { { name_LDR, 3 }, MF_S360, MF_RR, 0x28, 2 },
+    { { name_CDR, 3 }, MF_S360, MF_RR, 0x29, 2 },
+    { { name_ADR, 3 }, MF_S360, MF_RR, 0x2a, 2 },
+    { { name_SDR, 3 }, MF_S360, MF_RR, 0x2b, 2 },
+    { { name_MDR, 3 }, MF_S360, MF_RR, 0x2c, 2 },
+    { { name_DDR, 3 }, MF_S360, MF_RR, 0x2d, 2 },
+    { { name_LRER, 4 }, MF_S370, MF_RR, 0x35, 2 },
+    { { name_STD, 3 }, MF_S360, MF_RX, 0x60, 4 },
+    { { name_LD, 2 }, MF_S360, MF_RX, 0x68, 4 },
+    { { name_CD, 2 }, MF_S360, MF_RX, 0x69, 4 },
+    { { name_AE, 2 }, MF_S360, MF_RX, 0x7a, 4 },
+    { { name_AD, 2 }, MF_S360, MF_RX, 0x6a, 4 },
+    { { name_SD, 2 }, MF_S360, MF_RX, 0x6b, 4 },
+    { { name_MD, 2 }, MF_S360, MF_RX, 0x6c, 4 },
+    { { name_DD, 2 }, MF_S360, MF_RX, 0x6d, 4 },
+    { { name_STE, 3 }, MF_S360, MF_RX, 0x70, 4 },
+    { { name_LE, 2 }, MF_S360, MF_RX, 0x78, 4 },
     { { name_BASR, 4 }, MF_S370, MF_RR, 0x0d, 2 },
     { { name_BAS, 3 }, MF_S370, MF_RX, 0x4d, 4 },
     { { name_STCM, 4 }, MF_S370, MF_RS, 0xbe, 4 },
@@ -255,6 +295,8 @@ enum mf_status mf_encode(enum mf_profile profile,
             bytes[1] = (mf_octet)op->immediate;
         } else {
             if (op->r1 > 15 || op->r2 > 15) return MF_RANGE;
+            if (code >= 0x20 && code <= 0x3f &&
+                (op->r1 > 6 || (op->r1 & 1) || op->r2 > 6 || (op->r2 & 1))) return MF_RANGE;
             if ((code == 0x1c || code == 0x1d) && (op->r1 & 1))
                 return MF_RANGE;
             if ((code == 0x0e || code == 0x0f) &&
@@ -265,6 +307,7 @@ enum mf_status mf_encode(enum mf_profile profile,
     case MF_RX:
         if (op->r1 > 15 || op->x2 > 15 || op->b2 > 15 || op->d2 > 4095)
             return MF_RANGE;
+        if (code >= 0x60 && code <= 0x7f && (op->r1 > 6 || (op->r1 & 1))) return MF_RANGE;
         if ((code == 0x5c || code == 0x5d) && (op->r1 & 1)) return MF_RANGE;
         bytes[1] = (mf_octet)((op->r1 << 4) | op->x2);
         address(bytes + 2, op->b2, op->d2);

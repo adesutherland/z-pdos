@@ -82,6 +82,10 @@ prevent the bounded available-source checkpoint.
   IBM [fixed-point constants](https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=value-fixed-point-constantsf-h)
   documents signed and explicitly unsigned ranges. No target ISA/ABI changes.
 
+- Select exact XL4/XL8 floating literal emission from GCC's existing i370 real
+  encoder. This preserves target rounding and word order and avoids a second
+  decimal floating converter in the independent assembler; see ROADMAP.md.
+
 ## Recovering the source
 
 `patches/consolidated.patch` is a normalized compiler-only diff against the

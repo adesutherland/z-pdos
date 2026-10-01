@@ -26,6 +26,7 @@ crexx os/pdos/build.crexx --args check
 crexx tools/classic-cc/build.crexx --args build mvs
 crexx os/pdos/build.crexx --args compile
 crexx os/pdos/inventory.crexx --args build/pdos/pdio1
+crexx os/pdos/assemble.crexx --args build/pdos/classic
 ```
 
 `check` verifies current source/patch hashes and tests actual source functions under
@@ -34,7 +35,10 @@ prepares the maintained source/runtime selection and compiles all 17 native C
 units to assembly text using the recorded flags and the new Classic compiler.
 `inventory` counts spelled operations in ten source assembly/macro inputs
 and those 17 outputs. Conditional paths and macro definitions remain unexpanded.
-These commands do not produce an independently assembled or bootable OS.
+`assemble.crexx` repeats compilation and independently assembles all 17 C
+units using the documented language subset and an explicit literal bound.
+The six handwritten support modules, named kernel profile, complete linking
+and bootable OS remain separate gates.
 
 For source recovery, supply a checkout or extracted archive containing the
 pinned upstream files and a new output directory:

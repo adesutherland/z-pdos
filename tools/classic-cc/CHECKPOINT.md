@@ -16,9 +16,9 @@ copy of that private source series.
 - Reproduced surviving comment-emission defects and checked later descriptions
   as recorded in [MANUAL-RECONCILIATION.md](MANUAL-RECONCILIATION.md).
 - Maintained 819-file source manifest SHA-256:
-  `b3adf1e052255307c46fcda81f8e73a04f3b95207d5897df075afccb6ad6c381`.
+  `05b5ed2f4cc7ed67650d60d26cb31521d2942fda12be517af87107396f2a7b8a`.
 - Consolidated recovery patch SHA-256:
-  `e1b6cc10e9e054458ec17f3e37eea2f067f2046949dc900488596829ce647c82`.
+  `8df5b340a74993485745d35347dc3872a4e35a7402bb2bf4686003e44a1dde40`.
 - Native host: macOS 26.6.2, build 25G83, Apple Silicon;
   Apple Clang 21.0.0 (`clang-2100.1.1.101`), GNU89 host compiler mode.
 - Targets: `i370-ibm-mvspdp` and `i370-ibm-cms`, inherited PDPCLIB macro ABI,
@@ -101,3 +101,13 @@ new fixture passes at O0/O1/O2/Os. Clean recovery again reproduces all 819 files
 A compile/assemble/link check independently validates the fixture's 28 exact
 bytes for both producers. This proves constant encoding through the flat-binary
 route, without target execution or general floating-point qualification.
+
+## Exact hexadecimal floating literals — 1 October 2026
+
+Both MVS and CMS producers now emit XL4/XL8 literals from the existing GCC
+i370 target real encoder, preserving its rounding, target word order and pool
+widths. Independent one, half and negative-sixteen vectors pass at O0/O1/O2/Os;
+all 23 inherited regression groups still pass for each producer. Clean source
+recovery reproduces all 819 files. The Classic Assembler's selected HFP subset
+now accepts all 17 compiled PDOS C units; handwritten support, named kernel
+profile, linking/loading and guest execution remain open.

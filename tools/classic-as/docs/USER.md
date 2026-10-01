@@ -95,7 +95,8 @@ attributes; it does not grant a historical CPU a new address mode.
 | SI | TM, MVI, NI, CLI, OI, XI: `d(b),immediate` |
 | SS character | MVC, NC, CLC, OC, XC, TR, TRT, ED, EDMK: `d1(length,b1),d2(b2)` |
 | SS decimal | MVO, PACK, UNPK, ZAP, CP, AP, SP, MP, DP: `d1(length1,b1),d2(length2,b2)` |
-| Selected S/370 additions | BASR, BAS, CLM, STCM, ICM, CS, CDS, MVCL, CLCL |
+| HFP subset | LPDR, LTDR, LCDR, LDR, CDR, ADR, SDR, MDR, DDR: `f1,f2`; STD, LD, CD, AD, SD, MD, DD, STE, LE, AE: `f1,d(x,b)`; historical FPRs 0,2,4,6 only |
+| Selected S/370 additions | BASR, BAS, CLM, LRER (long-to-short HFP), STCM, ICM, CS, CDS, MVCL, CLCL |
 
 Branch aliases lower to the ordinary BC/BCR encodings: B, BO, BH/BP, BL/BM,
 BNE/BNZ, BE/BZ, BNL/BNM, BNH/BNP, BNO and NOP. Each takes an address operand;

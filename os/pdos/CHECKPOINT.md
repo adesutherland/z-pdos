@@ -82,3 +82,21 @@ checks pass 21/21. The full source assembly gate remains open. Its reached
 gaps include local V references, CLM/explicit-length literals, compiler fixed
 constants and support-source directives. Accepted PDIO1 guest evidence remains
 separate from this new object proof.
+
+## All Classic C objects — 1 October 2026
+
+`assemble.crexx` prepares the single maintained source/runtime selection,
+compiles all 17 selected units, and independently assembles their unmodified
+output with the selected HFP/source subset and explicit literal limit 4096.
+The PDOS kernel object contains 13,349 statements, 1,043 symbols and 670
+fixups; STDIO contains 10,171 statements, 968 symbols and 422 fixups. No native
+objects are reused. Exact decimal floating conversion belongs to the compiler;
+it publishes XL4/XL8 target HFP bits, while the assembler encodes reached
+HFP instructions with historical FPR restrictions.
+
+This closes the C-object portion of PD-04. It does not close the six handwritten
+support modules, named z/Architecture kernel code-role ceiling, helper/name
+closure, linking, image construction or boot/application gates. The accepted
+Lab guest remains untouched.
+Affected normal/sanitizer suites pass 42/42; all 17 C objects also pass
+through the sanitizer assembler using the retained recipe.
