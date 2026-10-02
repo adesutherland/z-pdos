@@ -16,7 +16,8 @@ main: procedure = .int
   cli = args.1; checker = args.2; work = args.3
   locations = .string[]
   address crexx "pwd" output locations
-  repository = strip(locations.1)
+  repository = changestr('5C'x,strip(locations.1),"/")
+  work = changestr('5C'x,work,"/")
   if left(work,length(repository)+1) = repository || "/" then work = substr(work,length(repository)+2)
   call require left(work,6) = "build/" & pos("..",work) = 0, "owned source selection"
   selected = work || "/source"

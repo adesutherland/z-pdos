@@ -46,3 +46,12 @@ Open items require separate implementation authority.
 - Observation: Linux's predefined `__gnu_linux__` selected the inherited Linux port alongside the explicit mainframe profile, duplicating the file handle and local mode. The fixture targets now undefine the inherited Linux and Windows port selectors. Maintained target library source is unchanged.
 - Evidence: [Hosted Linux failure](https://github.com/adesutherland/z-pdos/actions/runs/37060007541), `../CMakeLists.txt`; all 92 required toolchain tests pass locally with GCC 16.1 and the Linux host selector explicitly defined.
 - Acceptance: Both stdio/string profiles run on the declared desktop hosts with their native service stubs and full suite enabled.
+
+## PCL-006: Windows source-macro fixture path ownership
+
+- Type: test portability
+- Status: In progress
+- Target: Native Windows execution of the maintained source-macro fixture
+- Observation: CMake supplied a forward-slash absolute build path while native cREXX reported its working directory with backslashes. The fixture rejected the selected owned directory before preparing or assembling source. Both paths now normalize separators before the existing repository/build ownership check; parent traversal and unowned outputs remain rejected.
+- Evidence: [Windows suite](https://github.com/adesutherland/z-pdos/actions/runs/37069466661) passed 91 of 92 tests and both compiler variants. A local backslash-path probe reproduces the old rejection and passes after normalization, including the existing independent macro-deck check.
+- Acceptance: The source-macro fixture and complete hosted Windows suite pass with the ownership restriction intact.
