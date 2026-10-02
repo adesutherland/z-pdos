@@ -25,13 +25,12 @@ main: procedure = .int
   file = "packaging/windows/update-user-path.ps1"
   address crexx "run cmake -E copy :file :directory"
   if rc <> 0 then return rc
+  file = directory || "/mf$bsam.mac"
+  call lineout file,"SYNTHETIC MACRO FILENAME FIXTURE"
+  call lineout file
   inventory = work || "/uninstall.nsh"
-  call lineout inventory,'Delete "$INSTDIR\bin\mf-classic-cc.exe"'
-  call lineout inventory,'Delete "$INSTDIR\share\z-pdos\update-user-path.ps1"'
-  call lineout inventory,'RMDir "$INSTDIR\bin"'
-  call lineout inventory,'RMDir "$INSTDIR\share\z-pdos"'
-  call lineout inventory,'RMDir "$INSTDIR\share"'
-  call lineout inventory
+  address crexx "run crexx -nokeep scripts/windows-inventory.crexx --args :payload :inventory"
+  if rc <> 0 then return rc
   address crexx "run cmake -E cat :inventory"
   if rc <> 0 then do
     say "FAILED: generated uninstall inventory is not readable:" inventory

@@ -1,0 +1,47 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Adrian Sutherland
+ * Generate NSIS uninstall instructions for the final owned payload.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 2 then return 2
+  payload = args.1; out_path = args.2
+  call require left(payload,6) = "build/" & pos("..",payload) = 0, "owned payload"
+  call require left(out_path,6) = "build/" & pos("..",out_path) = 0, "owned inventory"
+  return uninstall_list(payload,out_path)
+
+uninstall_list: procedure = .int
+  arg payload = .string, out_path = .string
+  files = .string[]; dirs = .string[]
+  i = .int
+  address shell "cd " || quote(payload) || " && find . -type f | LC_ALL=C sort" output files
+  call require rc = 0 & files.0 > 0, "installed file inventory"
+  address crexx "run cmake -E rm -f :out_path"
+  call require rc = 0, "new uninstall inventory"
+  do i = 1 to files.0
+    name = substr(files[i],3)
+    call require pos('22'x,name) = 0, "literal installer path"
+    call lineout out_path,'Delete "$INSTDIR\' || changestr("$",changestr("/",name,'5C'x),"$$") || '"'
+  end
+  address shell "cd " || quote(payload) || " && find . -mindepth 1 -type d | LC_ALL=C sort -r" output dirs
+  call require rc = 0, "installed directories"
+  do i = 1 to dirs.0
+    call lineout out_path,'RMDir "$INSTDIR\' || changestr("$",changestr("/",substr(dirs[i],3),'5C'x),"$$") || '"'
+  end
+  call lineout out_path
+  return 0
+
+quote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'",value,"'\''") || "'"
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED: " || detail
+    exit 1
+  end
+  return 0
+

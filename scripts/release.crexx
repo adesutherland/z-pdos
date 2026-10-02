@@ -199,23 +199,8 @@ make_windows_installer: procedure = .int
 
 uninstall_list: procedure = .int
   arg payload = .string, out_path = .string
-  files = .string[]; dirs = .string[]
-  i = .int
-  address shell "cd " || quote(payload) || " && find . -type f | LC_ALL=C sort" output files
-  call require rc = 0 & files.0 > 0, "installed file inventory"
-  address crexx "run cmake -E rm -f :out_path"
-  call require rc = 0, "new uninstall inventory"
-  do i = 1 to files.0
-    name = substr(files[i],3)
-    call require pos('22'x,name) = 0 & pos('$',name) = 0, "literal installer path"
-    call lineout out_path,'Delete "$INSTDIR\' || changestr("/",name,'5C'x) || '"'
-  end
-  address shell "cd " || quote(payload) || " && find . -mindepth 1 -type d | LC_ALL=C sort -r" output dirs
-  call require rc = 0, "installed directories"
-  do i = 1 to dirs.0
-    call lineout out_path,'RMDir "$INSTDIR\' || changestr("/",substr(dirs[i],3),'5C'x) || '"'
-  end
-  call lineout out_path
+  address crexx "run crexx -nokeep scripts/windows-inventory.crexx --args :payload :out_path"
+  call require rc = 0, "Windows uninstall inventory"
   return 0
 
 write_receipt: procedure = .int

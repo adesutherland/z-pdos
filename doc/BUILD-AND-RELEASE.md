@@ -137,6 +137,10 @@ cREXX. The built
 Classic tools are native Windows PE executables. MinGW host configuration and
 Windows launcher support do not imply completed hosted Windows qualification.
 
+The shared `scripts/windows-inventory.crexx` generates uninstall instructions
+for both unsigned CI and local signed packages. It escapes literal dollar signs
+in the retained `mf$*.mac` names using NSIS string syntax.
+
 The NSIS installer is per-user under `%LOCALAPPDATA%\Programs\z-pdos`.
 It adds only its own `bin` directory to the user PATH, preserves long and
 pre-existing entries, and removes only owned files/entries on uninstall.

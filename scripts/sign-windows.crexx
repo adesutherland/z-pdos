@@ -59,23 +59,8 @@ main: procedure = .int
   address crexx "run crexx -nokeep --program :helper --native scripts/sign-windows-file.crexx"
   call require rc = 0, "native NSIS signing helper"
   include_file = "build/release/windows-signed-uninstall.nsh"
-  address crexx "run cmake -E rm -f :include_file"
-  call require rc = 0, "uninstall inventory"
-  call arraydrop(files)
-  address shell "cd " || quote(work) || " && find . -type f | LC_ALL=C sort" output files
-  call require rc = 0, "signed installed files"
-  do i = 1 to files.0
-    name = substr(files[i],3)
-    call require pos('22'x,name) = 0 & pos('$',name) = 0, "literal installer filename"
-    call lineout include_file,'Delete "$INSTDIR\' || changestr("/",name,'5C'x) || '"'
-  end
-  call arraydrop(files)
-  address shell "cd " || quote(work) || " && find . -mindepth 1 -type d | LC_ALL=C sort -r" output files
-  call require rc = 0, "signed installed directories"
-  do i = 1 to files.0
-    call lineout include_file,'RMDir "$INSTDIR\' || changestr("/",substr(files[i],3),'5C'x) || '"'
-  end
-  call lineout include_file
+  address crexx "run crexx -nokeep scripts/windows-inventory.crexx --args :work :include_file"
+  call require rc = 0, "signed uninstall inventory"
   assets = "build/release/windows-local-assets"
   address crexx "run test -e :assets"
   call require rc = 1, "new signed assets directory"

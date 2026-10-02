@@ -47,6 +47,11 @@ try {
                 & crexx -nokeep (Join-Path $PSScriptRoot 'check-installed.crexx') --args $installRoot
                 if ($LASTEXITCODE -ne 0) { throw 'Installed native smoke failed.' }
             }
+            foreach ($macro in 'mf$bsam.mac', 'mf$reg.mac', 'mf$short.mac') {
+                if (!(Test-Path -LiteralPath (Join-Path $installRoot "share/z-pdos/pdpclib/source/interfaces/pdos31/$macro"))) {
+                    throw "Missing literal macro filename: $macro"
+                }
+            }
             # Uninstall must preserve user data even inside the application folder.
             Set-Content -LiteralPath (Join-Path $installRoot 'user-library.txt') -Value 'preserve me'
         } finally {
@@ -60,6 +65,11 @@ try {
         if ((Test-Path $registration) -or (Test-Path $uninstallKey)) { throw 'Registration not removed.' }
         if ($environment.GetValue('Path', $null, 1) -cne $before) { throw "$case PATH not restored." }
         if ((Get-Content -LiteralPath (Join-Path $installRoot 'user-library.txt')) -ne 'preserve me') { throw 'User data removed.' }
+        foreach ($macro in 'mf$bsam.mac', 'mf$reg.mac', 'mf$short.mac') {
+            if (Test-Path -LiteralPath (Join-Path $installRoot "share/z-pdos/pdpclib/source/interfaces/pdos31/$macro")) {
+                throw "Owned macro filename not removed: $macro"
+            }
+        }
         foreach ($owned in 'mf-classic-cc.exe', 'mf-classic-cc-cms.exe', 'mf-classic-as.exe', 'mf-classic-ld.exe') {
             if (Test-Path (Join-Path $bin $owned)) { throw 'Owned executable not removed.' }
         }
