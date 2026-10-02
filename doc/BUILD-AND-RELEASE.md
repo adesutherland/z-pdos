@@ -115,6 +115,11 @@ certificate actually exported. This avoids Common Name spacing mistakes.
 App-Specific Passwords; its format is `xxxx-xxxx-xxxx-xxxx`.
 The account procedure is documented by [Apple Support](https://support.apple.com/en-gb/102654).
 
+The signing script refreshes payload hashes and constructs the component PKG
+through `scripts/macos-payload.crexx`. These leaf operations do not call back
+into the running release orchestrator: cREXX keeps its script execution lock
+until child commands finish.
+
 Trusted branch/manual builds and version tags exercise signing. PRs receive no
 signing secrets, including PRs from the same repository. Only pushed version
 tags can publish releases. GitHub supplies the release token automatically.

@@ -1,0 +1,82 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Adrian Sutherland
+ * Leaf payload operations: never invoke the parent release orchestrator.
+ * cREXX holds a source execution lock while a script's children run.
+ */
+options levelb
+import rxfnsb
+
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 3 & args.0 <> 4 then return 2
+  action = args.1; platform = args.2; version = args.3
+  call require platform = "macos-arm64" | platform = "macos-x86_64", "macOS platform"
+  call require verify(version,"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-+") = 0 & version <> "", "safe version"
+  work = "build/release/" || platform
+  payload = work || "/payload"
+  if action = "component-pkg" & args.0 = 4 then return make_macos_pkg(payload,version,args.4)
+  if action = "refresh-signed" & args.0 = 3 then do
+    record = payload || "/release.json"
+    receipt = firstline(record)
+    call require pos('"platform":"' || platform || '"',receipt) > 0 & pos('"version":"' || version || '"',receipt) > 0, "signing preserves selected release identity"
+    receipt = changestr('"signing":"unsigned"',receipt,'"signing":"signed"')
+    address crexx "run cmake -E rm -f :record"
+    call require rc = 0, "refresh signed receipt"
+    call lineout record,receipt
+    call lineout record
+    call hashes payload
+    return 0
+  end
+  return 2
+
+make_macos_pkg: procedure = .int
+  arg payload = .string, version = .string, out_path = .string
+  root = "build/release/macos-pkg-root"
+  address crexx "run test -e :root"
+  call require rc = 1, "new installer root"
+  target = root || "/usr/local/lib/z-pdos"
+  address crexx "run cmake -E copy_directory :payload :target"
+  call require rc = 0, "installer payload"
+  target = root || "/usr/local/bin"
+  address crexx "run cmake -E make_directory :target"
+  call require rc = 0, "installer command directory"
+  do i = 1 to 4
+    name = word("mf-classic-cc mf-classic-cc-cms mf-classic-as mf-classic-ld",i)
+    source = "../lib/z-pdos/bin/" || name; link = target || "/" || name
+    address crexx "run cmake -E create_symlink :source :link"
+    call require rc = 0, "installer command symlink"
+  end
+  base = strip(firstline("VERSION"))
+  address crexx "run pkgbuild --root :root --identifier org.z-pdos.classic-tools --version :base --install-location / :out_path"
+  call require rc = 0, "unsigned macOS development package"
+  return 0
+
+hashes: procedure = .int
+  arg directory = .string
+  address shell "cd " || quote(directory) || " && find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 > SHA256SUMS"
+  call require rc = 0, "final-byte SHA-256 inventory"
+  return 0
+
+quote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'",value,"'\''") || "'"
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED: " || detail
+    exit 1
+  end
+  return 0
+
+firstline: procedure = .string
+  arg path = .string
+  handle = 0; mode = "rb"
+  assembler fopen handle,path,mode
+  call require handle <> 0, "open metadata file"
+  text = ""
+  assembler freadline text,handle
+  close_rc = 0
+  assembler fclose close_rc,handle
+  call require close_rc = 0, "close metadata file"
+  return strip(text)

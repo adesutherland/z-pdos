@@ -81,11 +81,11 @@ main: procedure = .int expose keychain secret_dir
     address crexx "run codesign --verify --strict --verbose=2 :path"
     call require rc = 0, "verify native payload signature"
   end
-  address crexx "run crexx -nokeep scripts/release.crexx --args refresh-signed :platform :version"
+  address crexx "run crexx -nokeep scripts/macos-payload.crexx --args refresh-signed :platform :version"
   call require rc = 0, "signed payload hashes"
-  address crexx "run crexx -nokeep scripts/release.crexx --args component-pkg :platform :version"
-  call require rc = 0, "component package"
   component = "build/release/" || platform || "/component.pkg"
+  address crexx "run crexx -nokeep scripts/macos-payload.crexx --args component-pkg :platform :version :component"
+  call require rc = 0, "component package"
   installer = assets || "/z-pdos-" || version || "-" || platform || "-signed.pkg"
   identity = getenv("APPLE_DEVELOPER_ID_INSTALLER_IDENTITY")
   address crexx "run productbuild --package :component --sign :identity --keychain :keychain --timestamp :installer"
