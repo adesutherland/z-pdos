@@ -3,7 +3,11 @@
  */
 #include <errno.h>
 #include <string.h>
-#include "libiberty.h"
+/* Use only the exercised declarations; unrelated legacy interfaces remain
+   outside this strict host fixture. These match src/include/libiberty.h. */
+extern int errno_max(void);
+extern const char *strerrno(int);
+extern int strtoerrno(const char *);
 
 int *mfqa_sys_nerr(void)
 {
