@@ -852,8 +852,11 @@ enum mf_status mf_macro_create(const struct mf_macro_config *c,
     st = allocate(storage, 1, sizeof *m, &p); if (st != MF_OK) return st;
     m = (struct mf_macro *)p; memset(m, 0, sizeof *m); m->config = *c; m->records = *records;
     if (observer) m->observer = *observer;
-#define ALLOC(field, n, type) do { st = allocate(storage, n, sizeof(type), &p); \
-    if (st != MF_OK) return st; m->field = (type *)p; } while (0)
+#define ALLOC(field, n, type) do { \
+    st = allocate(storage, n, sizeof(type), &p); \
+    if (st != MF_OK) { return st; } \
+    m->field = (type *)p; \
+} while (0)
     ALLOC(definitions, c->max_macros, struct definition);
     ALLOC(parameters, params, struct parameter);
     ALLOC(models, c->max_model_statements, struct mf_statement);

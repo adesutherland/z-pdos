@@ -3,3 +3,4 @@
 *.o
 *.rxas
 *.rxbin
+*-driver.lock

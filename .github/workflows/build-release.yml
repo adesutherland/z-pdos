@@ -61,12 +61,17 @@ jobs:
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-ninja
-            mingw-w64-ucrt-x86_64-nsis
+      - name: Install native Windows installer compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install nsis --no-progress --yes
+          'C:/Program Files (x86)/NSIS' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Select Windows shell for subsequent steps
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
-          echo 'CREXX_ADDRESS_SHELL=C:/msys64/usr/bin/bash.exe' >> "$GITHUB_ENV"
+          echo "CREXX_ADDRESS_SHELL=$(cygpath -w /usr/bin/bash.exe)" >> "$GITHUB_ENV"
           echo 'CREXX_ADDRESS_SHELL_ARGS=-c' >> "$GITHUB_ENV"
           echo 'CMAKE_GENERATOR=Ninja' >> "$GITHUB_ENV"
           echo 'CC=gcc' >> "$GITHUB_ENV"
@@ -211,6 +216,7 @@ jobs:
             build/compiler/*/codegen-tests.log
             build/tools/Testing/Temporary/LastTest.log
             build/pdos/ci-image/*.log
+            build/installer-fixture/uninstall.nsh
           if-no-files-found: ignore
 
   publish:

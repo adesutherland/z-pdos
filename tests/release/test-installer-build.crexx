@@ -32,6 +32,11 @@ main: procedure = .int
   call lineout inventory,'RMDir "$INSTDIR\share\z-pdos"'
   call lineout inventory,'RMDir "$INSTDIR\share"'
   call lineout inventory
+  address crexx "run cmake -E cat :inventory"
+  if rc <> 0 then do
+    say "FAILED: generated uninstall inventory is not readable:" inventory
+    return 2
+  end
   arguments = .string[]
   arguments.1 = "makensis"
   arguments.2 = "-NOCD"
