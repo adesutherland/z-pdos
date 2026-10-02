@@ -10,5 +10,9 @@ main: procedure = .int
   call linein file
   address shell "exit 7"
   if rc <> 7 then return 2
+  address shell "command -v shasum && shasum -a 256 build/windows-shell-probe.txt"
+  if rc <> 0 then return 2
+  address shell "command -v cmake && cmake --version"
+  if rc <> 0 then return 2
   say "PASS: Windows shell preserves spaces, quotes, redirection and failure status"
   return 0

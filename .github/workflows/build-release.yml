@@ -116,6 +116,11 @@ jobs:
         run: |
           crexx -nokeep tests/release/test-windows-shell.crexx
           crexx -nokeep tests/release/test-installer-build.crexx
+      - name: Check installer smoke tools from native PowerShell
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & ./tests/release/test-windows-installer.ps1 -CheckToolsOnly
       - name: Build and check both compilers and the complete toolchain (Unix)
         if: runner.os != 'Windows'
         run: crexx -nokeep scripts/build.crexx --args full-test

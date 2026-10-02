@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Adapted from cREXX-RAG disposable-runner installer acceptance.
-param([Parameter(Mandatory)][string]$Installer)
+param([string]$Installer, [switch]$CheckToolsOnly)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if ($env:GITHUB_ACTIONS -ne 'true' -or !(Test-Path $env:RUNNER_TEMP)) {
@@ -9,7 +9,14 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or !(Test-Path $env:RUNNER_TEMP)) {
 # Native PowerShell does not inherit the MSYS shell step's tool PATH.
 # The installed smoke recipe uses that shell's shasum/Perl utilities.
 if (!(Test-Path -LiteralPath $env:PDOS_WINDOWS_BASH)) { throw 'Missing configured MSYS shell.' }
-$env:PATH = "$(Split-Path -Parent $env:PDOS_WINDOWS_BASH);$env:PATH"
+$msysBin = Split-Path -Parent $env:PDOS_WINDOWS_BASH
+$corePerl = Join-Path $msysBin 'core_perl'
+if (!(Test-Path -LiteralPath (Join-Path $corePerl 'shasum'))) { throw 'Missing MSYS Perl shasum utility.' }
+$env:PATH = "$corePerl;$msysBin;$env:PATH"
+& crexx -nokeep (Join-Path $PSScriptRoot 'test-windows-shell.crexx')
+if ($LASTEXITCODE -ne 0) { throw 'Native PowerShell shell/tool preflight failed.' }
+if ($CheckToolsOnly) { return }
+if (!$Installer) { throw 'Installer path is required.' }
 $registration = 'HKCU:\Software\z-pdos'
 $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\z-pdos'
 if ((Test-Path $registration) -or (Test-Path $uninstallKey)) { throw 'Existing z-pdos install.' }
