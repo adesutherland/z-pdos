@@ -5,15 +5,14 @@ on ordinary hosts, and eventually use to rebuild itself. This repository is the
 home of z/PDOS and **Mainframe Classic Tools**, which use traditional mainframe
 assembly and object conventions.
 
-The [repaired PDIO1 OS source](os/pdos/README.md) now preserves the kernel
-used for the 1 October cREXX beta 3 HIGH qualification, with repair history
-and recovery checks. It uses our one maintained PDPCLIB, with the relevant
-canonical upstream and Lab fixes merged into that library. Its 17 C build units
-compile with Mainframe Classic C. The earlier exact qualified input is kept
-in Git history. All selected sources now independently assemble and link into
-a checked fresh 100-cylinder 3390 image. Source-built boot and application
-qualification remain open under the
-[OS build plan](os/pdos/BUILD-PLAN.md).
+[z/PDOS 0.1](os/pdos/README.md) builds from the repaired PDIO1 source and our
+one maintained PDPCLIB. Mainframe Classic C compiles its 17 C units; the
+independent assembler and linker produce a checked fresh 100-cylinder 3390
+image. It boots and passes the unchanged released cREXX TSO31, TSO64 ANY
+and TSO64 HIGH packages, including fresh compiler chains, actual input and
+complete stopped output readback. [The qualification record](os/pdos/QUALIFICATION.md)
+defines that scope; AMODE24 application loading and operator interface needs
+are in [the OS roadmap](os/pdos/ROADMAP.md). Git retains earlier checkpoints.
 
 The first component is [Mainframe Classic Assembler](tools/classic-as/README.md),
 command `mf-classic-as`. Its original portable C core has a small bootstrap
@@ -59,7 +58,7 @@ using its [component instructions](tools/classic-ld/README.md).
 now maintains the GCC 3.4.6 / cc370 compiler source with the reconciled upstream,
 Mike Beer and Mainframe Lab repairs. Native MVS and CMS cross-builds pass the
 code-generation checks. The selected PDOS compile/assemble/link/image route
-passes locally; guest execution remains open. See its
+now passes boot and application qualification for z/PDOS 0.1. See its
 [checkpoint](tools/classic-cc/CHECKPOINT.md), [roadmap](tools/classic-cc/ROADMAP.md),
 [licences](LICENSES.md) and [agent guidance](AGENTS.md).
 

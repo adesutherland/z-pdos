@@ -1,0 +1,851 @@
+{
+  "format": "z-pdos-qualification-v1",
+  "version": "0.1",
+  "date": "2026-10-02",
+  "source_commit": "f9b7b1f2ea89fd492fef205db662bbdfa4164585",
+  "source_manifest_sha256": "d164be3e35af7804f6af111ff011bffa7904c8145434d9e71ce952be942b6b8d",
+  "prepared_manifest_sha256": "9d4121d33d1700045cce1d1b6e2f631f8cb2f386f4c952dfe6d4e4080e559ca1",
+  "recovery_patch_sha256": "5c70af3bae08256005c8ced34f0d3bd213102148825590e1f79abdcde44a4bff",
+  "guest": {
+    "architecture": "standard z/Architecture",
+    "kernel_isa_ceiling": "z900",
+    "kernel": "AMODE31/RMODE24 C32",
+    "cpus": 1,
+    "real_storage_mib": 4096,
+    "disk": "100-cylinder 3390 at 01B9",
+    "console": "3278-2 IBM1047 at 0009",
+    "hercules": "4.9.1.0-SDL"
+  },
+  "toolchain": {
+    "mf-classic-cc": {
+      "sha256": "a6ae12d25ce69a867fc52f874d4c3498db02a9bd23cce579aa4054a66e944e0c"
+    },
+    "cc1": {
+      "sha256": "c59f2e34c17e4d826cf2f0f478c93bea912a47c66f769f14a83030ab48324868"
+    },
+    "mf-classic-as": {
+      "sha256": "d408f57bc75acec8da47f294d607a9c6a1b859630ee3388194e23e4ed5fc6d16"
+    },
+    "mf-classic-ld": {
+      "sha256": "d8632c96be6e16ae4debc323fbdff8919fc64348febd6c29199156b52f33d477"
+    }
+  },
+  "base_outputs": {
+    "pload.sys": {
+      "bytes": 129440,
+      "sha256": "1d56baf898cf3aaa496e74efd90d597e626bd45be1f7c1eee941aa78f5484c9b"
+    },
+    "pdos.sys": {
+      "bytes": 181320,
+      "sha256": "94ddd6d188716c3d69b1b6462662f6862e3035711593be8ce1f9f409d560da1e"
+    },
+    "pcomm.exe": {
+      "bytes": 105408,
+      "sha256": "8afd1c8ed07f095b50cf8671d8713e6ada37df2abbb09f70a5fef724536b40cd"
+    },
+    "config.sys": {
+      "bytes": 10,
+      "sha256": "cb71c77537873856995ed4e9b7d936da9cf3fcd8abea17c5ab64146330c8a19d"
+    },
+    "pdos00.ckd": {
+      "bytes": 85248512,
+      "sha256": "82e18020e9c3120de66bb0a160ca701b2e67a274ecad58ee23a4b8fca9574acf"
+    },
+    "pdos00.cckd": {
+      "bytes": 161884,
+      "sha256": "b7577800d08f91ed71f2bd0c5787f740a17bad9005291c24bb7c1a58b1e0a763"
+    }
+  },
+  "crexx": {
+    "tag": "v1.0.0-beta.3",
+    "source_commit": "ae1607b8e145174422cee7f3e73fbcc37a65226c",
+    "application_rebuilt": false,
+    "native_inputs": [
+      {
+        "name": "LAC65O",
+        "member": "LAC65O",
+        "amode": 64,
+        "rmode": "ANY",
+        "bytes": 19414,
+        "sha256": "0037a2ef67e59e0db0e1ac054c592c0feb00601a211b8882bc2b1c2e897f91ae"
+      },
+      {
+        "name": "LAU65O",
+        "member": "LAU65O",
+        "amode": 64,
+        "rmode": "ANY",
+        "bytes": 19414,
+        "sha256": "b2d7f4e0dfc070065664dceca2f003be187e309803f1f2ef5067ca57fb7ac8ba"
+      },
+      {
+        "name": "LAVM65O",
+        "member": "LAVM65O",
+        "amode": 64,
+        "rmode": "ANY",
+        "bytes": 19414,
+        "sha256": "cd87b17f540952745240462f9c847011a449996e0e08725bc0dee286c4b3e527"
+      },
+      {
+        "name": "RXASH",
+        "member": "RXASH",
+        "amode": 64,
+        "rmode": "64",
+        "bytes": 1842322,
+        "sha256": "480cb94ea1f511956ae1df8ef3b632620c4048d690b4a922bacec599025c05f9"
+      },
+      {
+        "name": "RXCH",
+        "member": "RXCH",
+        "amode": 64,
+        "rmode": "64",
+        "bytes": 4196266,
+        "sha256": "2f0d99baaaf9a6089fcaaa75de2bc945ea92eea16832f581ed9726584f43be0b"
+      },
+      {
+        "name": "RXVMH",
+        "member": "RXVMH",
+        "amode": 64,
+        "rmode": "64",
+        "bytes": 1860542,
+        "sha256": "9d45e418f1ce45253ec0a09dfb3015d856c75bda96aa55cb5bf8dae411ac438f"
+      },
+      {
+        "name": "tso24-RXVM",
+        "member": "RXVM",
+        "amode": 24,
+        "rmode": "24",
+        "bytes": 1396982,
+        "sha256": "d9ce6e48f83e0bb4096e14e6bd285d350c8f38bc19cff8671d3d9155a96fcdd0"
+      },
+      {
+        "name": "tso31-RXAS",
+        "member": "RXAS",
+        "amode": 31,
+        "rmode": "ANY",
+        "bytes": 1290918,
+        "sha256": "52fb1901572f36de0e7128b668965bd7f8686c0dee37b0c8de5dc613357393f1"
+      },
+      {
+        "name": "tso31-RXC",
+        "member": "RXC",
+        "amode": 31,
+        "rmode": "ANY",
+        "bytes": 5551326,
+        "sha256": "eba277736b4df9ca1c79170ee3b29a0299fe74c7b18568e08a8703abb720a1a0"
+      },
+      {
+        "name": "tso31-RXVM",
+        "member": "RXVM",
+        "amode": 31,
+        "rmode": "ANY",
+        "bytes": 1395270,
+        "sha256": "77b689a3c64bad63996031654dfc353d357b9c2616da01c65a9ea3e2c09c2cc9"
+      },
+      {
+        "name": "tso64-any-RXAS",
+        "member": "RXAS",
+        "amode": 64,
+        "rmode": "ANY",
+        "bytes": 803226,
+        "sha256": "b05ce7e8c2b9ab06384c71e181dc35ce1514cc5ad23981ec16987f61e6f5be56"
+      },
+      {
+        "name": "tso64-any-RXC",
+        "member": "RXC",
+        "amode": 64,
+        "rmode": "ANY",
+        "bytes": 3157162,
+        "sha256": "a302dfcacc07132bfba7b9bb14cb0797e34007fa28f6f04a7d81f6d7bfc64fdc"
+      },
+      {
+        "name": "tso64-any-RXVM",
+        "member": "RXVM",
+        "amode": 64,
+        "rmode": "ANY",
+        "bytes": 821446,
+        "sha256": "dc5210b04cabf93d22942b0955ccf9bf63f7e0d4334a88e2a04e8705484339b6"
+      }
+    ]
+  },
+  "qualified_profiles": {
+    "tso31": {
+      "status": "PASS",
+      "runtime_heap_mib": 64,
+      "applications": {
+        "VERSION": {
+          "rc": 0
+        },
+        "SUPPLIED": {
+          "rc": 0,
+          "summary": [
+            9,
+            0,
+            2
+          ]
+        },
+        "COMPILE": {
+          "rc": 0
+        },
+        "ASSEMBLE": {
+          "rc": 0
+        },
+        "FRESH": {
+          "rc": 0,
+          "summary": [
+            9,
+            0,
+            2
+          ]
+        },
+        "INTERACTIVE": {
+          "rc": 0,
+          "summary": [
+            10,
+            0,
+            1
+          ]
+        },
+        "RXC_HELP": {
+          "rc": 0
+        },
+        "RXAS_HELP": {
+          "rc": 0
+        },
+        "RXVM_HELP": {
+          "rc": 0
+        },
+        "RXC_ERROR": {
+          "rc": 2
+        },
+        "RXAS_ERROR": {
+          "rc": -1
+        },
+        "RXVM_ERROR": {
+          "rc": -1
+        }
+      },
+      "input_readback_count": 16,
+      "input_readback": [
+        {
+          "dataset": "RXC64.EXE",
+          "sha256": "eba277736b4df9ca1c79170ee3b29a0299fe74c7b18568e08a8703abb720a1a0",
+          "exact": true
+        },
+        {
+          "dataset": "RXA64.EXE",
+          "sha256": "52fb1901572f36de0e7128b668965bd7f8686c0dee37b0c8de5dc613357393f1",
+          "exact": true
+        },
+        {
+          "dataset": "RXV64.EXE",
+          "sha256": "77b689a3c64bad63996031654dfc353d357b9c2616da01c65a9ea3e2c09c2cc9",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.CF64.RXBIN/LIBRARY",
+          "sha256": "d279794bcd6fa73b4fa3537620b12e1710c52edfcee9f7c7026d10cfbbdbf67c",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.CF64.RXBIN/RXCEXITS",
+          "sha256": "f270fc763ea843748c3c0552d2558f7ead9a2639751b0330f2cdd06d23e5cc9e",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.CF64.RXBIN/IOQUAL",
+          "sha256": "9b31a42177720d9dcbf03c075c8532ee596da18226d0a4b91c35eec224b9e683",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.C64.CREXX/IOQUAL",
+          "sha256": "cdc1d111005dda9db492b137da6a6a211e87ec6f38215f8522a9b078371e4e0d",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.C64.CREXX/IOBAD",
+          "sha256": "7bb4b8c44739a0cc642fdfa691d736418c841ed5c235b46ebe9fbd3f1d0e0987",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.C64.RXAS/IOBAD",
+          "sha256": "2fc4893a814d3923dab17a5b1b8387feea234c2f7c65ed1552e6a93475a36900",
+          "exact": true
+        },
+        {
+          "dataset": "B3CHAIN.BAT",
+          "sha256": "734e6329a6f64d79160a18c6562c1b5477d165e7810271ce76dbca30abfd2742",
+          "exact": true
+        },
+        {
+          "dataset": "B3DIAG.BAT",
+          "sha256": "78727bc8cfc1747387537a370bbb8711de09bf921fbce85c664b37f5788e6cb7",
+          "exact": true
+        },
+        {
+          "dataset": "B3FRESH.BAT",
+          "sha256": "c762d0ff35c34cae94ec94edfc96c486d9e599099f2e21db730bd6c7d3ed9df0",
+          "exact": true
+        },
+        {
+          "dataset": "B3INPUT.BAT",
+          "sha256": "e919f8d0cccaf32311b232d520f38d99690d18701c7e38a9315b284f93078568",
+          "exact": true
+        },
+        {
+          "dataset": "B3SMOKE.BAT",
+          "sha256": "a21d537a4062d27609523f0a0628cd0c7d031edc225951951f75f8c29b040ef4",
+          "exact": true
+        },
+        {
+          "dataset": "B3SUP.BAT",
+          "sha256": "896eba27c765aa707059c3ca4a8817e14f17326f2953c8d532a522d7180ed709",
+          "exact": true
+        },
+        {
+          "dataset": "PDOS.SYS",
+          "sha256": "94ddd6d188716c3d69b1b6462662f6862e3035711593be8ce1f9f409d560da1e",
+          "exact": true
+        }
+      ],
+      "outputs": {
+        "LABA01.C64D.RXAS/IOGUE4": {
+          "logical_records": 3108,
+          "logical_bytes": 135184,
+          "logical_sha256": "792589aac1f17baa87438f628fd0a42866b581d2723297d23a7a40c530083bde",
+          "physical_blocks": 6,
+          "physical_sha256": "ed05e19a8a76b68a748752ea65d0ea30899c3f35664353e14cde254117cb153a",
+          "export_bytes": 138311,
+          "export_sha256": "935083d29f0339856b838748d14ffd7b39fee70d077d5e74926689bc2dd64fee",
+          "matches_reference": true
+        },
+        "LABA01.C64D.RXBIN/IOGUE4": {
+          "logical_records": 211,
+          "logical_bytes": 53787,
+          "logical_sha256": "fb2c59877b7078b9984cdc27c0e6426083f3ac5e3108d14dd001d734ca46f65f",
+          "physical_blocks": 2,
+          "physical_sha256": "81e210505ef7beb3236ffbc6fdea9a06aaf7699ff087538fc2bd44249abe9557",
+          "export_bytes": 53787,
+          "export_sha256": "fb2c59877b7078b9984cdc27c0e6426083f3ac5e3108d14dd001d734ca46f65f",
+          "matches_reference": false
+        },
+        "LABA01.C64D.RXAS/TEXT": {
+          "logical_records": 3,
+          "logical_bytes": 20,
+          "logical_sha256": "2d87caaca4d873d2c4b285b2fbb9b87e2de519888bd9cf0121f81aaf2c28b90b",
+          "physical_blocks": 1,
+          "physical_sha256": "18e46a79583434c8df25a18273cbc90fa00686a7da766d3fcb06747f6777d878",
+          "export_bytes": 24,
+          "export_sha256": "bc7e62f712231a72d81c5e14d5cb7479944f5455e53940e36a8fafc6249a43f6",
+          "matches_reference": true
+        },
+        "LABA01.C64D.RXBIN/BYTES": {
+          "logical_records": 1,
+          "logical_bytes": 256,
+          "logical_sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+          "physical_blocks": 1,
+          "physical_sha256": "58c9679f3ab878955a545a64c3c58c485acbc8b48c78d6bca792b80af7b27d44",
+          "export_bytes": 256,
+          "export_sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+          "matches_reference": true
+        },
+        "LABA01.C64D.RXAS/EMPTY": {
+          "logical_records": 0,
+          "logical_bytes": 0,
+          "logical_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "physical_blocks": 0,
+          "physical_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "export_bytes": 0,
+          "export_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "matches_reference": true
+        }
+      },
+      "missing_fixture_absent": true,
+      "package_sha256sums_sha256": "110f04ecedd52b0073f074b3a1ac2cfd0034bf9ae28ef188702729936867bbbd"
+    },
+    "tso64-any": {
+      "status": "PASS",
+      "runtime_heap_mib": 128,
+      "applications": {
+        "VERSION": {
+          "rc": 0
+        },
+        "SUPPLIED": {
+          "rc": 0,
+          "summary": [
+            9,
+            0,
+            2
+          ]
+        },
+        "COMPILE": {
+          "rc": 0
+        },
+        "ASSEMBLE": {
+          "rc": 0
+        },
+        "FRESH": {
+          "rc": 0,
+          "summary": [
+            9,
+            0,
+            2
+          ]
+        },
+        "INTERACTIVE": {
+          "rc": 0,
+          "summary": [
+            10,
+            0,
+            1
+          ]
+        },
+        "RXC_HELP": {
+          "rc": 0
+        },
+        "RXAS_HELP": {
+          "rc": 0
+        },
+        "RXVM_HELP": {
+          "rc": 0
+        },
+        "RXC_ERROR": {
+          "rc": 2
+        },
+        "RXAS_ERROR": {
+          "rc": -1
+        },
+        "RXVM_ERROR": {
+          "rc": -1
+        }
+      },
+      "input_readback_count": 16,
+      "input_readback": [
+        {
+          "dataset": "RXC64.EXE",
+          "sha256": "a302dfcacc07132bfba7b9bb14cb0797e34007fa28f6f04a7d81f6d7bfc64fdc",
+          "exact": true
+        },
+        {
+          "dataset": "RXA64.EXE",
+          "sha256": "b05ce7e8c2b9ab06384c71e181dc35ce1514cc5ad23981ec16987f61e6f5be56",
+          "exact": true
+        },
+        {
+          "dataset": "RXV64.EXE",
+          "sha256": "dc5210b04cabf93d22942b0955ccf9bf63f7e0d4334a88e2a04e8705484339b6",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.CF64.RXBIN/LIBRARY",
+          "sha256": "d279794bcd6fa73b4fa3537620b12e1710c52edfcee9f7c7026d10cfbbdbf67c",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.CF64.RXBIN/RXCEXITS",
+          "sha256": "f270fc763ea843748c3c0552d2558f7ead9a2639751b0330f2cdd06d23e5cc9e",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.CF64.RXBIN/IOQUAL",
+          "sha256": "9b31a42177720d9dcbf03c075c8532ee596da18226d0a4b91c35eec224b9e683",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.C64.CREXX/IOQUAL",
+          "sha256": "cdc1d111005dda9db492b137da6a6a211e87ec6f38215f8522a9b078371e4e0d",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.C64.CREXX/IOBAD",
+          "sha256": "7bb4b8c44739a0cc642fdfa691d736418c841ed5c235b46ebe9fbd3f1d0e0987",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.C64.RXAS/IOBAD",
+          "sha256": "2fc4893a814d3923dab17a5b1b8387feea234c2f7c65ed1552e6a93475a36900",
+          "exact": true
+        },
+        {
+          "dataset": "B3CHAIN.BAT",
+          "sha256": "734e6329a6f64d79160a18c6562c1b5477d165e7810271ce76dbca30abfd2742",
+          "exact": true
+        },
+        {
+          "dataset": "B3DIAG.BAT",
+          "sha256": "78727bc8cfc1747387537a370bbb8711de09bf921fbce85c664b37f5788e6cb7",
+          "exact": true
+        },
+        {
+          "dataset": "B3FRESH.BAT",
+          "sha256": "c762d0ff35c34cae94ec94edfc96c486d9e599099f2e21db730bd6c7d3ed9df0",
+          "exact": true
+        },
+        {
+          "dataset": "B3INPUT.BAT",
+          "sha256": "e919f8d0cccaf32311b232d520f38d99690d18701c7e38a9315b284f93078568",
+          "exact": true
+        },
+        {
+          "dataset": "B3SMOKE.BAT",
+          "sha256": "a21d537a4062d27609523f0a0628cd0c7d031edc225951951f75f8c29b040ef4",
+          "exact": true
+        },
+        {
+          "dataset": "B3SUP.BAT",
+          "sha256": "896eba27c765aa707059c3ca4a8817e14f17326f2953c8d532a522d7180ed709",
+          "exact": true
+        },
+        {
+          "dataset": "PDOS.SYS",
+          "sha256": "94ddd6d188716c3d69b1b6462662f6862e3035711593be8ce1f9f409d560da1e",
+          "exact": true
+        }
+      ],
+      "outputs": {
+        "LABA01.C64D.RXAS/IOGUE4": {
+          "logical_records": 3108,
+          "logical_bytes": 135184,
+          "logical_sha256": "792589aac1f17baa87438f628fd0a42866b581d2723297d23a7a40c530083bde",
+          "physical_blocks": 6,
+          "physical_sha256": "ed05e19a8a76b68a748752ea65d0ea30899c3f35664353e14cde254117cb153a",
+          "export_bytes": 138311,
+          "export_sha256": "935083d29f0339856b838748d14ffd7b39fee70d077d5e74926689bc2dd64fee",
+          "matches_reference": true
+        },
+        "LABA01.C64D.RXBIN/IOGUE4": {
+          "logical_records": 211,
+          "logical_bytes": 53787,
+          "logical_sha256": "e73d47250835bad471f9507024a0100207c2a5c3ba5d50ecd6836db56d638843",
+          "physical_blocks": 2,
+          "physical_sha256": "d27552a9e9174771dd0ff55b8eebf075bf151b3d0d93e8fb4d5e0b74e477131e",
+          "export_bytes": 53787,
+          "export_sha256": "e73d47250835bad471f9507024a0100207c2a5c3ba5d50ecd6836db56d638843",
+          "matches_reference": false
+        },
+        "LABA01.C64D.RXAS/TEXT": {
+          "logical_records": 3,
+          "logical_bytes": 20,
+          "logical_sha256": "2d87caaca4d873d2c4b285b2fbb9b87e2de519888bd9cf0121f81aaf2c28b90b",
+          "physical_blocks": 1,
+          "physical_sha256": "18e46a79583434c8df25a18273cbc90fa00686a7da766d3fcb06747f6777d878",
+          "export_bytes": 24,
+          "export_sha256": "bc7e62f712231a72d81c5e14d5cb7479944f5455e53940e36a8fafc6249a43f6",
+          "matches_reference": true
+        },
+        "LABA01.C64D.RXBIN/BYTES": {
+          "logical_records": 1,
+          "logical_bytes": 256,
+          "logical_sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+          "physical_blocks": 1,
+          "physical_sha256": "58c9679f3ab878955a545a64c3c58c485acbc8b48c78d6bca792b80af7b27d44",
+          "export_bytes": 256,
+          "export_sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+          "matches_reference": true
+        },
+        "LABA01.C64D.RXAS/EMPTY": {
+          "logical_records": 0,
+          "logical_bytes": 0,
+          "logical_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "physical_blocks": 0,
+          "physical_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "export_bytes": 0,
+          "export_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "matches_reference": true
+        }
+      },
+      "missing_fixture_absent": true,
+      "package_sha256sums_sha256": "4872563cc9c4cc7542929a176447e6e0c0673a4adb801ff55932b732d3d7e81e"
+    },
+    "tso64-high": {
+      "status": "PASS",
+      "runtime_heap_mib": 128,
+      "applications": {
+        "VERSION": {
+          "rc": 0
+        },
+        "SUPPLIED": {
+          "rc": 0,
+          "summary": [
+            9,
+            0,
+            2
+          ]
+        },
+        "COMPILE": {
+          "rc": 0
+        },
+        "ASSEMBLE": {
+          "rc": 0
+        },
+        "FRESH": {
+          "rc": 0,
+          "summary": [
+            9,
+            0,
+            2
+          ]
+        },
+        "INTERACTIVE": {
+          "rc": 0,
+          "summary": [
+            10,
+            0,
+            1
+          ]
+        },
+        "RXC_HELP": {
+          "rc": 0
+        },
+        "RXAS_HELP": {
+          "rc": 0
+        },
+        "RXVM_HELP": {
+          "rc": 0
+        },
+        "RXC_ERROR": {
+          "rc": 2
+        },
+        "RXAS_ERROR": {
+          "rc": -1
+        },
+        "RXVM_ERROR": {
+          "rc": -1
+        }
+      },
+      "input_readback_count": 19,
+      "input_readback": [
+        {
+          "dataset": "RXC64.EXE",
+          "sha256": "0037a2ef67e59e0db0e1ac054c592c0feb00601a211b8882bc2b1c2e897f91ae",
+          "exact": true
+        },
+        {
+          "dataset": "RXA64.EXE",
+          "sha256": "b2d7f4e0dfc070065664dceca2f003be187e309803f1f2ef5067ca57fb7ac8ba",
+          "exact": true
+        },
+        {
+          "dataset": "RXV64.EXE",
+          "sha256": "cd87b17f540952745240462f9c847011a449996e0e08725bc0dee286c4b3e527",
+          "exact": true
+        },
+        {
+          "dataset": "RXCH.EXE",
+          "sha256": "2f0d99baaaf9a6089fcaaa75de2bc945ea92eea16832f581ed9726584f43be0b",
+          "exact": true
+        },
+        {
+          "dataset": "RXASH.EXE",
+          "sha256": "480cb94ea1f511956ae1df8ef3b632620c4048d690b4a922bacec599025c05f9",
+          "exact": true
+        },
+        {
+          "dataset": "RXVMH.EXE",
+          "sha256": "9d45e418f1ce45253ec0a09dfb3015d856c75bda96aa55cb5bf8dae411ac438f",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.CF64.RXBIN/LIBRARY",
+          "sha256": "d279794bcd6fa73b4fa3537620b12e1710c52edfcee9f7c7026d10cfbbdbf67c",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.CF64.RXBIN/RXCEXITS",
+          "sha256": "f270fc763ea843748c3c0552d2558f7ead9a2639751b0330f2cdd06d23e5cc9e",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.CF64.RXBIN/IOQUAL",
+          "sha256": "9b31a42177720d9dcbf03c075c8532ee596da18226d0a4b91c35eec224b9e683",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.C64.CREXX/IOQUAL",
+          "sha256": "cdc1d111005dda9db492b137da6a6a211e87ec6f38215f8522a9b078371e4e0d",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.C64.CREXX/IOBAD",
+          "sha256": "7bb4b8c44739a0cc642fdfa691d736418c841ed5c235b46ebe9fbd3f1d0e0987",
+          "exact": true
+        },
+        {
+          "dataset": "LABA01.C64.RXAS/IOBAD",
+          "sha256": "2fc4893a814d3923dab17a5b1b8387feea234c2f7c65ed1552e6a93475a36900",
+          "exact": true
+        },
+        {
+          "dataset": "B3CHAIN.BAT",
+          "sha256": "734e6329a6f64d79160a18c6562c1b5477d165e7810271ce76dbca30abfd2742",
+          "exact": true
+        },
+        {
+          "dataset": "B3DIAG.BAT",
+          "sha256": "78727bc8cfc1747387537a370bbb8711de09bf921fbce85c664b37f5788e6cb7",
+          "exact": true
+        },
+        {
+          "dataset": "B3FRESH.BAT",
+          "sha256": "c762d0ff35c34cae94ec94edfc96c486d9e599099f2e21db730bd6c7d3ed9df0",
+          "exact": true
+        },
+        {
+          "dataset": "B3INPUT.BAT",
+          "sha256": "e919f8d0cccaf32311b232d520f38d99690d18701c7e38a9315b284f93078568",
+          "exact": true
+        },
+        {
+          "dataset": "B3SMOKE.BAT",
+          "sha256": "a21d537a4062d27609523f0a0628cd0c7d031edc225951951f75f8c29b040ef4",
+          "exact": true
+        },
+        {
+          "dataset": "B3SUP.BAT",
+          "sha256": "896eba27c765aa707059c3ca4a8817e14f17326f2953c8d532a522d7180ed709",
+          "exact": true
+        },
+        {
+          "dataset": "PDOS.SYS",
+          "sha256": "94ddd6d188716c3d69b1b6462662f6862e3035711593be8ce1f9f409d560da1e",
+          "exact": true
+        }
+      ],
+      "outputs": {
+        "LABA01.C64D.RXAS/IOGUE4": {
+          "logical_records": 3108,
+          "logical_bytes": 135184,
+          "logical_sha256": "792589aac1f17baa87438f628fd0a42866b581d2723297d23a7a40c530083bde",
+          "physical_blocks": 6,
+          "physical_sha256": "ed05e19a8a76b68a748752ea65d0ea30899c3f35664353e14cde254117cb153a",
+          "export_bytes": 138311,
+          "export_sha256": "935083d29f0339856b838748d14ffd7b39fee70d077d5e74926689bc2dd64fee",
+          "matches_reference": true
+        },
+        "LABA01.C64D.RXBIN/IOGUE4": {
+          "logical_records": 211,
+          "logical_bytes": 53787,
+          "logical_sha256": "e73d47250835bad471f9507024a0100207c2a5c3ba5d50ecd6836db56d638843",
+          "physical_blocks": 2,
+          "physical_sha256": "d27552a9e9174771dd0ff55b8eebf075bf151b3d0d93e8fb4d5e0b74e477131e",
+          "export_bytes": 53787,
+          "export_sha256": "e73d47250835bad471f9507024a0100207c2a5c3ba5d50ecd6836db56d638843",
+          "matches_reference": false
+        },
+        "LABA01.C64D.RXAS/TEXT": {
+          "logical_records": 3,
+          "logical_bytes": 20,
+          "logical_sha256": "2d87caaca4d873d2c4b285b2fbb9b87e2de519888bd9cf0121f81aaf2c28b90b",
+          "physical_blocks": 1,
+          "physical_sha256": "18e46a79583434c8df25a18273cbc90fa00686a7da766d3fcb06747f6777d878",
+          "export_bytes": 24,
+          "export_sha256": "bc7e62f712231a72d81c5e14d5cb7479944f5455e53940e36a8fafc6249a43f6",
+          "matches_reference": true
+        },
+        "LABA01.C64D.RXBIN/BYTES": {
+          "logical_records": 1,
+          "logical_bytes": 256,
+          "logical_sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+          "physical_blocks": 1,
+          "physical_sha256": "58c9679f3ab878955a545a64c3c58c485acbc8b48c78d6bca792b80af7b27d44",
+          "export_bytes": 256,
+          "export_sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+          "matches_reference": true
+        },
+        "LABA01.C64D.RXAS/EMPTY": {
+          "logical_records": 0,
+          "logical_bytes": 0,
+          "logical_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "physical_blocks": 0,
+          "physical_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "export_bytes": 0,
+          "export_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "matches_reference": true
+        }
+      },
+      "missing_fixture_absent": true,
+      "package_sha256sums_sha256": "44e571d5c3f92471535e9a2884e51ae82dea0574ca05ef742c921871c90d646c"
+    }
+  },
+  "host_checks": {
+    "normal_and_sanitizer_build": "PASS",
+    "objects_byte_identical": 23,
+    "rdw_modules_byte_identical": 3,
+    "flat_links_byte_identical": 6,
+    "guest_disk_byte_identical_except_container_serial": true,
+    "source_recovery_files": 81,
+    "focused_normal_tests_passed": 11,
+    "focused_sanitizer_tests_passed": 11,
+    "svc99_old_list_negative_controls_rejected": 2
+  },
+  "write_retry": {
+    "status": "PASS",
+    "retries": [
+      {
+        "failed": {
+          "count": 27997,
+          "address": "00088938",
+          "prefix": "002100000B006D556D550000003D0000",
+          "status": "0E00",
+          "residual": 0
+        },
+        "retry": {
+          "count": 27997,
+          "address": "00088938",
+          "prefix": "0021000101006D556D550000003D0000",
+          "status": "0C00",
+          "residual": 0
+        }
+      },
+      {
+        "failed": {
+          "count": 27994,
+          "address": "00088938",
+          "prefix": "0021000103006D526D52000000360000",
+          "status": "0E00",
+          "residual": 0
+        },
+        "retry": {
+          "count": 27994,
+          "address": "00088938",
+          "prefix": "0021000201006D526D52000000360000",
+          "status": "0C00",
+          "residual": 0
+        }
+      },
+      {
+        "failed": {
+          "count": 7755,
+          "address": "00088938",
+          "prefix": "0021000203001E431E43000000370000",
+          "status": "0E00",
+          "residual": 0
+        },
+        "retry": {
+          "count": 7755,
+          "address": "00088938",
+          "prefix": "0021000301001E431E43000000370000",
+          "status": "0C00",
+          "residual": 0
+        }
+      }
+    ],
+    "trace_disabled": true
+  },
+  "amode24_limit": {
+    "tested": true,
+    "qualified": false,
+    "directory": "AMODE24/RMODE24",
+    "result": "Rejected before dispatch: unsupported direct-load mode",
+    "attach_result": "04806004",
+    "native_sha256": "d9ce6e48f83e0bb4096e14e6bd285d350c8f38bc19cff8671d3d9155a96fcdd0"
+  },
+  "cleanup": {
+    "managed_version": "zpdos-0.1",
+    "managed_images": 1,
+    "temporary_application_installations_and_files_removed": true,
+    "canonical_released_packages_unchanged": true,
+    "task_console_and_device_leases_returned": true,
+    "standing_emulator_live": true
+  },
+  "version_tag": "z-pdos-0.1"
+}

@@ -1,5 +1,23 @@
 # Consolidated PDPCLIB changes
 
+## Classic-built z/PDOS runtime — 2 October 2026
+
+The `pdos-zarch` profile now runs its C32 kernel, IPL loader and legacy
+runtime in AMODE31. SAPSUPA's console return PSWs use the existing `AM64BIT`
+profile value rather than forcing AMODE64. Native 64-bit applications retain
+their separate full-width dispatch contexts. This fixes reached profile
+behavior without changing the real System/370 configuration.
+
+The shared MVS `filedef` and `fdclr` C helpers now terminate SVC99 text-unit
+lists by flagging the last actual pointer. The earlier null slots followed
+by a standalone high-bit sentinel did not satisfy the native list contract.
+The existing-read, new-binary, new-text and unallocation cases pass through
+the actual STDIO implementation in both MVS-control and PDOS390 host tests;
+restoring the earlier list format makes both tests fail. Focused normal and
+sanitizer suites pass 11/11. The unchanged source-owned macros retain their
+previous qualification. [z/PDOS qualification](../os/pdos/QUALIFICATION.md)
+records the separate complete guest result for the selected library.
+
 30 September 2026. The source here owns the reviewed library changes previously
 held in Lab and SDK patch sets. An inventory of the main checkout, retained
 worktrees and SDK found the six deltas below; duplicate copies did not add

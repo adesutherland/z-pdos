@@ -128,3 +128,13 @@ Repeat the byte consumer after building compiler and Classic tools:
 ```sh
 crexx tools/classic-cc/check-bytes.crexx --args mvs build/classic-as/tools/classic-as/mf-classic-as build/classic-as/tools/classic-ld/mf-classic-ld build/classic-as/tools/classic-as/test_cli_output
 ```
+
+## z/PDOS 0.1 consumer qualification — 2 October 2026
+
+The MVS producer now builds the complete maintained OS through the independent
+Classic assembler and linker. The resulting kernel boots and passes unchanged
+cREXX TSO31, TSO64 ANY and TSO64 HIGH packages, including fresh compiler chains
+and complete stopped-disk output readback. The [OS qualification record](../../os/pdos/QUALIFICATION.md)
+pins the exact source/tool identities and limits. This is the selected OS
+consumer qualification; it does not qualify the compiler's CMS variant,
+native compiler hosting or unrelated application ABI/service profiles.

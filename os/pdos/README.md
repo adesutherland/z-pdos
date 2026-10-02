@@ -1,19 +1,21 @@
-# Repaired z/PDOS — PDIO1
+# z/PDOS 0.1
 
-This component maintains the repaired OS source used for the 1 October 2026
-cREXX beta 3 HIGH qualification. PDIO1 is the 31-bit, RMODE24 kernel with
+This component maintains and builds the repaired PDIO1 OS source. Version 0.1
+boots through the Classic Tools route and passes the unchanged released cREXX
+TSO31, TSO64 ANY and TSO64 HIGH packages. PDIO1 is the 31-bit, RMODE24 kernel with
 standard z/Architecture support, native 31/64-bit application contexts,
 high application loading, checked DASD writes and bounded 3270 wrapping.
 The [source record](SOURCES.md) identifies the upstream and retained changes;
-the [checkpoint](CHECKPOINT.md) separates the accepted Lab baseline from
-the new local compiler results.
+the [checkpoint](CHECKPOINT.md) identifies the current source and build.
+[Qualification](QUALIFICATION.md) records exact guest results and limits;
+the [roadmap](ROADMAP.md) owns AMODE24 loading and operator interface needs.
 
 The OS source lives in `source/s370/`. Its 44 runtime/header/macro inputs
 come from the one maintained [PDPCLIB](../../pdpclib/README.md), using the
 explicit `pdos-zarch` configuration. [runtime-inputs.txt](runtime-inputs.txt)
 defines that selection. The original qualified input is preserved by commit
 [`d62b109`](https://github.com/adesutherland/z-pdos/commit/d62b109ed986bd455732484173ff4ebe0533045a).
-The merged runtime is a new build candidate and needs its own guest acceptance.
+The selected maintained runtime now has its own z/PDOS 0.1 guest acceptance.
 Unrelated runtime ports, the upstream saved emulator log and private native
 artifacts are outside this import. The retained upstream batch/configuration
 files describe historical routes; the active preparation recipe is cREXX.
@@ -52,7 +54,8 @@ The output directory must be new. The recipe checks source identities and the
 actual repaired-function controls, compiles 17 C units, assembles six support
 modules, and links PLOAD, PDOS and PCOMM without native objects. PDOS's actual
 load-module reader reconstructs each RDW module against a separately linked
-flat image at bases zero and 2 MiB; entry, AMODE31/RMODE24, final padding and
+flat image at bases zero and 2 MiB; entry, AMODE31/RMODE24 for PLOAD/PDOS,
+AMODE31/RMODE ANY for PCOMM, final padding and
 malformed-input controls are checked. The host checks run under ASAN/UBSAN.
 
 The recipe places fresh programs and a target-encoded `CONFIG.SYS` on a
@@ -67,8 +70,9 @@ These generated files stay outside Git. No running guest is accessed.
 For a sanitizer assembler/linker run, first run `crexx tools/build.crexx
 --args sanitize`, then add `sanitize` as the third recipe
 argument. The compiler source and selected OS/runtime inputs are the same.
-Disk construction establishes a built candidate; boot and application
-qualification are still separate gates.
+Disk construction establishes a built candidate. A changed source or tool
+input needs its own affected boot and application checks; the recorded 0.1
+qualification does not automatically apply to another candidate.
 
 For source recovery, supply a checkout or extracted archive containing the
 pinned upstream files and a new output directory:

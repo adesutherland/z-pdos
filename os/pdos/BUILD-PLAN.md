@@ -6,17 +6,17 @@ from its actual compiler, runtime and support inputs. Source preservation,
 C compilation, assembly, linking, source-built boot and application execution
 have separate acceptance results. There is one maintained PDPCLIB source;
 the exact original qualified runtime is preserved in Git. The active merged
-runtime is a new candidate for the later boot and application gates.
+runtime has passed the boot and application gates recorded for z/PDOS 0.1.
 
 | Gate | Acceptance | State |
 | --- | --- | --- |
 | PD-01: preserve source | Original qualified input preserved by commit; one maintained OS/runtime selection, notices, manifests and clean recovery; real-function old/new failure controls | Complete locally; see CHECKPOINT.md |
-| PD-02: new C producer | All 17 selected units compile with pinned Classic C and explicit source/runtime configuration | Complete locally; symbol/helper closure passes through PD-05; target execution open |
+| PD-02: new C producer | All 17 selected units compile with pinned Classic C and explicit source/runtime configuration | Complete; the resulting OS passes PD-06/07 |
 | PD-03: first Classic object | A small C function uses the retained PDPMAC convention, assembles independently and passes separately expected object/relocation checks | Complete locally; PDPROBE has independently checked bytes and two A relocations |
 | PD-04: source assembly | The selected runtime, loader and kernel source assemble under an explicit z/Architecture kernel contract, with required macro/service and instruction coverage | Complete locally: all 17 C objects and six handwritten modules, including MVSSUPA; selected original interfaces and the explicit kernel contract below |
 | PD-05: independent link/image | Fresh PLOAD, PDOS and PCOMM link without reused native objects; validate entry/mode, relocation, payload and source-described IPL records | Complete locally: real loader checks at two bases, checked fresh 100-cylinder image, compression readback and corruption controls; see CHECKPOINT.md |
-| PD-06: source-built boot | Fresh 100-cylinder 3390 image boots to a usable PCOMM prompt on the selected standard z/Architecture profile | Open for Classic-produced output |
-| PD-07: application qualification | Pinned cREXX package passes compile/assemble/fresh execution, supplied/interactive I/O, diagnostics, checked-write recovery and complete stopped output readback | Open for the rebuilt candidate; historical PDIO1 result retained separately |
+| PD-06: source-built boot | Fresh 100-cylinder 3390 image boots to a usable PCOMM prompt on the selected standard z/Architecture profile | Complete for z/PDOS 0.1 |
+| PD-07: application qualification | Pinned cREXX package passes compile/assemble/fresh execution, supplied/interactive I/O, diagnostics, checked-write recovery and complete stopped output readback | Complete for TSO31, TSO64 ANY and TSO64 HIGH; TSO24 was tested and requires the low-residence path in ROADMAP.md |
 
 ## First assembler increments
 
@@ -66,7 +66,8 @@ its support instructions to System/370. The named `pdos-zarch` kernel contract s
 Classic C currently emits the System/370 subset of that ceiling; handwritten
 support uses the assembler z900 subset, including 64-bit and channel support.
 Compiler pointer width remains 32 bits; final modules use classic objects and
-AMODE31/RMODE24. This code role does not select the SDK's integer application
+AMODE31/RMODE24 for the kernel/loader and AMODE31/RMODE ANY for PCOMM.
+This code role does not select the SDK's integer application
 ABI or claim a new instruction facility. Later selectors must use the same
 hardware ceiling in Classic and ELF tools.
 The SDK's historical integer application profiles remain separate contracts.
@@ -87,3 +88,7 @@ input/error cases. Force or observe writes crossing a full track and verify
 that the same complete record is retried. Stop normally and inspect every
 output record and binary byte against the host reference. Independent review
 then establishes acceptance of that exact source/tool/runtime/image candidate.
+
+[QUALIFICATION.md](QUALIFICATION.md) records the completed 2 October checks.
+[ROADMAP.md](ROADMAP.md) owns the next compatibility and UI work; earlier
+checkpoints remain in Git rather than separate maintained trees.
