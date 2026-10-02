@@ -21,7 +21,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - platform: macos-arm64
