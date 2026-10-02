@@ -219,6 +219,10 @@ jobs:
             build/compiler/*/configure.log
             build/compiler/*/build.log
             build/compiler/*/codegen-tests.log
+            build/compiler/*/host-*.log
+            build/compiler/*/gcc/*modes*.c
+            build/compiler/*/gcc/*modes*.h
+            build/compiler/*/gcc/Makefile
             build/tools/Testing/Temporary/LastTest.log
             build/pdos/ci-image/**/*.log
             build/installer-fixture/uninstall.nsh

@@ -68,7 +68,18 @@ main: procedure = .int
   if rc <> 0 then return rc
   say "Building compiler; log:" work || "/build.log"
   address shell environment || " make -j6 all-gcc U= " || shellquote("CFLAGS=" || flags) || " " || shellquote("CFLAGS_FOR_BUILD=" || flags) || " > build.log 2>&1"
-  if rc <> 0 then return rc
+  if rc <> 0 then do
+    build_rc = rc
+    say "Compiler build failed; last build diagnostics:"
+    address shell "tail -n 40 build.log"
+    if suffix = ".exe" then do
+      address shell "ls -l gcc/*modes* > host-file-diagnostics.log 2>&1"
+      address shell "od -An -tx1 -N64 gcc/min-insn-modes.c >> host-file-diagnostics.log 2>&1"
+      address shell "gcc -v -E gcc/min-insn-modes.c > host-preprocess.log 2>&1"
+      address shell "cat host-file-diagnostics.log"
+    end
+    return build_rc
+  end
   gccdir = work || "/gcc"
   launcher = root || "/compiler/src/driver.c"
   command = gccdir || "/mf-classic-cc" || suffix
