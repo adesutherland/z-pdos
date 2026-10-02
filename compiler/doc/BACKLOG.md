@@ -81,3 +81,12 @@ profiles. The remaining application/profile gates are recorded above.
 - Observation: MinGW exposes `sys_nerr` and `sys_errlist` through function-backed macros. The inherited libiberty declarations expanded into an invalid function returning an array. Those redundant declarations are now omitted when the CRT defines the macros; ordinary variable-backed hosts retain their declarations.
 - Evidence: [Windows failure](https://github.com/adesutherland/z-pdos/actions/runs/37062265650). A CRT-macro fixture reproduces the original compilation failure and exercises error-name lookup with the repair. All 93 required local GCC 16 checks pass.
 - Acceptance: Both native Windows compiler variants build and pass their complete required suite, including the CRT-macro regression.
+
+## CC-009: Windows CRT mode-generator output counts
+
+- Type: host portability
+- Status: In progress
+- Target: Native Windows x64 compiler generators
+- Observation: The inherited mode generator uses `printf` `%n` twice to measure comment padding. Windows UCRT disables that conversion by default, leaving the padding count unset. The hosted build failed while reading generated `min-insn-modes.c`; the runtime behavior provides a concrete generator defect to repair.
+- Evidence: [Windows run](https://github.com/adesutherland/z-pdos/actions/runs/37065961572) and [Microsoft CRT documentation](https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/set-printf-count-output?view=msvc-170). Both sites now use the return value from `printf`. Local MVS/CMS compiler and code-generation checks pass; all three generated outputs match their earlier bytes. A printf-count-disabled probe fails all three original generator paths and passes all three repaired paths with identical output.
+- Acceptance: Both native Windows compiler variants and the complete installed-toolchain suite pass on the hosted runner.
