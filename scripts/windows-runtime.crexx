@@ -1,0 +1,63 @@
+/* SPDX-License-Identifier: MIT
+ * Stage the pinned GNU libiconv runtime, notices and corresponding source.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 1 | getenv("OS") <> "Windows_NT" then return 2
+  payload = args.1
+  call require left(payload,25) = "build/release/windows-x64/" & pos("..",payload) = 0, "owned Windows payload"
+  identities = .string[]
+  address crexx "run pacman -Q mingw-w64-ucrt-x86_64-libiconv" output identities
+  call require rc = 0 & identities.0 = 1, "installed libiconv identity"
+  call require strip(identities.1) = "mingw-w64-ucrt-x86_64-libiconv 1.19-1", "pinned libiconv package version"
+  paths = .string[]
+  address shell 'cygpath -m "$MINGW_PREFIX"' output paths
+  call require rc = 0 & paths.0 = 1, "native UCRT64 package prefix"
+  prefix = strip(paths.1)
+  library = prefix || "/bin/libiconv-2.dll"
+  dll_hash = "94ec68fb8d342b6c91b6b48a8d95092819cdcd006a7166e0b68062f946afd08a"
+  call check_hash library,dll_hash
+  do i = 1 to 2
+    destination = payload || "/libexec/z-pdos/" || word("mvs cms",i)
+    address crexx "run cmake -E copy :library :destination"
+    call require rc = 0, "runtime next to private compiler"
+  end
+  notices = payload || "/share/z-pdos/host-libraries/libiconv"
+  source = prefix || "/share/licenses/libiconv"
+  address crexx "run cmake -E copy_directory :source :notices"
+  call require rc = 0, "libiconv licence and upstream notices"
+  archive = notices || "/mingw-w64-libiconv-1.19-1.src.tar.zst"
+  url = "https://mirror.msys2.org/mingw/sources/mingw-w64-libiconv-1.19-1.src.tar.zst"
+  address crexx "run curl --fail --location --retry 3 :url -o :archive"
+  call require rc = 0, "matching library source and MSYS2 build recipe"
+  source_hash = "74428280c17094da5b702c29b2e1a0abae59556ea5dfdd65705cc8ccc1e000fb"
+  call check_hash archive,source_hash
+  record = notices || "/MSYS2-PACKAGE.txt"
+  call lineout record,strip(identities.1)
+  call lineout record,"GNU libiconv: https://www.gnu.org/software/libiconv/"
+  call lineout record,"Source package: " || url
+  call lineout record,"DLL SHA256: " || dll_hash
+  call lineout record,"Source SHA256: " || source_hash
+  call lineout record,"The unmodified replaceable DLL is beside each private cc1.exe."
+  call lineout record
+  return 0
+
+check_hash: procedure = .int
+  arg path = .string, expected = .string
+  address shell "printf '%s  %s\n' " || quote(expected) || " " || quote(path) || " | shasum -a 256 -c -"
+  call require rc = 0, "pinned library bytes"
+  return 0
+
+quote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'",value,"'\''") || "'"
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED: " || detail
+    exit 1
+  end
+  return 0

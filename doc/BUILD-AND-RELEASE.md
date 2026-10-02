@@ -136,6 +136,12 @@ This adapter implements the Windows process interface; orchestration remains
 cREXX. The built
 Classic tools are native Windows PE executables. MinGW host configuration and
 Windows launcher support do not imply completed hosted Windows qualification.
+The delivery includes pinned GNU libiconv 1.19-1 from MSYS2 beside each private
+compiler. Its licence, package identity and matching source/build archive are
+under `share/z-pdos/host-libraries/libiconv`. Both runtime DLL and source archive
+are checked against pinned SHA-256 values. The native package and installer
+checks compile with a child PATH containing only Windows directories, inspect
+every PE import and reject a deliberately missing private runtime DLL.
 
 The shared `scripts/windows-inventory.crexx` generates uninstall instructions
 for both unsigned CI and local signed packages. It escapes literal dollar signs

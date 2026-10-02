@@ -114,6 +114,8 @@ stage: procedure = .int
     from = "packaging/windows/update-user-path.ps1"
     address crexx "run cmake -E copy :from :docs"
     call require rc = 0, "Windows installer registry interface"
+    address crexx "run crexx -nokeep scripts/windows-runtime.crexx --args :payload"
+    call require rc = 0, "bundled Windows compiler runtime and source"
   end
   call write_receipt payload,platform,version,"unsigned"
   call hashes payload

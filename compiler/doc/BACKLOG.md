@@ -94,3 +94,12 @@ profiles. The remaining application/profile gates are recorded above.
 - Acceptance: Both native Windows compiler variants and the complete installed-toolchain suite pass on the hosted runner.
 
 - Result: The [hosted Windows run](https://github.com/adesutherland/z-pdos/actions/runs/37070532323) built and tested MVS/CMS and passed all 92 required toolchain tests at source `8642c3543e3cce3d5a801bf300a9e2792e7574c2`. Packaging stopped later at the separate NSIS literal-dollar filename guard; it does not invalidate these component checks.
+
+## CC-010: Windows compiler runtime dependency closure
+
+- Type: packaging defect
+- Status: In progress
+- Target: Native Windows x64 portable and installed MVS/CMS compilers
+- Observation: Independent PE inspection of the initial `v0.1.0` downloads found both private `cc1.exe` files import `libiconv-2.dll`, which was not bundled. The Actions runner's MSYS2 PATH masked this defect despite its otherwise green installer run. The release was returned to draft.
+- Evidence: [tag build](https://github.com/adesutherland/z-pdos/actions/runs/37075166789), retained PE import inspection and [MSYS2 package](https://packages.msys2.org/packages/mingw-w64-ucrt-x86_64-libiconv). Packaging now includes the pinned replaceable library, its notices and matching source/build archive.
+- Acceptance: Both native compiler variants compile from extracted and installed deliveries with only Windows directories in the child PATH; every non-system PE import resolves within the delivery; removing a fixture runtime DLL makes the dependency check fail.

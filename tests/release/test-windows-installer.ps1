@@ -57,6 +57,7 @@ try {
             if ($case -eq 'normal') {
                 & crexx -nokeep (Join-Path $PSScriptRoot 'check-installed.crexx') --args $installRoot
                 if ($LASTEXITCODE -ne 0) { throw 'Installed native smoke failed.' }
+                & (Join-Path $PSScriptRoot 'test-windows-runtime.ps1') -Payload $installRoot
             }
             foreach ($macro in 'mf$bsam.mac', 'mf$reg.mac', 'mf$short.mac') {
                 if (!(Test-Path -LiteralPath (Join-Path $installRoot "share/z-pdos/pdpclib/source/interfaces/pdos31/$macro"))) {

@@ -144,6 +144,11 @@ jobs:
         run: |
           crexx -nokeep scripts/release.crexx --args stage windows-x64 "$RELEASE_VERSION"
           crexx -nokeep scripts/release.crexx --args package windows-x64 "$RELEASE_VERSION"
+      - name: Check Windows compiler runtime closure
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & ./tests/release/test-windows-runtime.ps1 -Payload 'build/release/windows-x64/payload'
       - name: Package macOS and Linux tools
         if: runner.os != 'Windows'
         env:
