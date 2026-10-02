@@ -17,8 +17,13 @@ The check exercises all nine repository Actions secrets:
 
 It creates, locks and unlocks a private temporary keychain. Certificates,
 stored login credentials and synthetic probes are removed afterwards, with
-an always-run cleanup step as a fallback. Only setting names and stage results
-are written to the log and Actions summary. No product is built or installed,
+an always-run cleanup step as a fallback. Setting names and stage results
+are written to the log and Actions summary. Signing failures also print the
+native tool's error with all nine secret values and the temporary keychain
+password redacted. Before Application signing it reports the number of valid
+code-signing identities and exact name/fingerprint matches for the selector.
+Successful PKCS12 import alone does not establish that the
+selected signing identity has a usable private key. No product is built or installed,
 no installer is submitted for notarization, and no artifact or release is
 uploaded. Account validation and signing timestamps require Apple services;
 a service outage can fail those stages even when the secrets are correct.
