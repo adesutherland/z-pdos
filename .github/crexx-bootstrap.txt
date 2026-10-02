@@ -1,0 +1,6 @@
+# cREXX v1.0.0-beta.3, source ae1607b8e145174422cee7f3e73fbcc37a65226c
+# platform filename SHA-256 (public release assets, verified 2 October 2026)
+macos-arm64 CREXX-v1.0.0-beta.3-macos-arm64.zip 2b865862f75c07ee94b0d84b77d58c39f5f418c0b24f88a86e1a612fe195fa43
+macos-x86_64 CREXX-v1.0.0-beta.3-macos-x86_64.zip 653f98cd24a28720ef6c7d074649afd5306dbafb25eb8ce316a176856799d974
+linux-x64 CREXX-v1.0.0-beta.3-linux-x64.zip 3a293348623d9aaef7299e5aaa0eb8904b98bc27e8726457100a4d6d515ae649
+windows-x64 CREXX-v1.0.0-beta.3-windows-x64-signed.zip bb83bda9545c7506592a1d1c71d1f1110b6da65b7431255afd64722aaebab539

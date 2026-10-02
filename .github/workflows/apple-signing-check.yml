@@ -1,0 +1,92 @@
+name: Check Apple signing secrets
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: macOS runner
+        type: choice
+        options: [macos-15, macos-15-intel]
+        default: macos-15
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        default: macos-15
+      check_revision:
+        description: Exact z-pdos commit supplying the check and bootstrap manifest
+        type: string
+        required: true
+    secrets:
+      APPLE_DEVELOPER_ID_CERTIFICATE_BASE64:
+        required: false
+      APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD:
+        required: false
+      APPLE_DEVELOPER_ID_IDENTITY:
+        required: false
+      APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_BASE64:
+        required: false
+      APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_PASSWORD:
+        required: false
+      APPLE_DEVELOPER_ID_INSTALLER_IDENTITY:
+        required: false
+      APPLE_ID:
+        required: false
+      APPLE_APP_SPECIFIC_PASSWORD:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apple-signing-secrets-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: adesutherland/z-pdos
+          ref: ${{ inputs.check_revision || github.sha }}
+          persist-credentials: false
+      - id: bootstrap
+        name: Load the pinned cREXX check runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          platform=macos-x86_64
+          if test "$(uname -m)" = arm64; then platform=macos-arm64; fi
+          read -r asset expected < <(awk -v platform="$platform" '$1 == platform {print $2, $3}' .github/crexx-bootstrap.txt)
+          test -n "$asset" && test -n "$expected"
+          mkdir -p "$RUNNER_TEMP/apple-check-runtime"
+          curl --fail --location --retry 3 "https://github.com/adesutherland/CREXX/releases/download/v1.0.0-beta.3/$asset" -o "$RUNNER_TEMP/apple-check-runtime.zip"
+          printf '%s  %s\n' "$expected" "$RUNNER_TEMP/apple-check-runtime.zip" | shasum -a 256 -c -
+          cmake -E chdir "$RUNNER_TEMP/apple-check-runtime" cmake -E tar xf "$RUNNER_TEMP/apple-check-runtime.zip"
+          entry=$(find "$RUNNER_TEMP/apple-check-runtime" -type f -path '*/bin/crexx')
+          test -n "$entry" && test "$(printf '%s\n' "$entry" | wc -l | tr -d ' ')" = 1
+          chmod +x "$(dirname "$entry")"/*
+          dirname "$entry" >> "$GITHUB_PATH"
+          echo "CREXX_HOME=$(dirname "$(dirname "$entry")")" >> "$GITHUB_ENV"
+      - name: Check typo diagnostics without credentials
+        run: crexx -nokeep scripts/check-apple-secrets.crexx --args test
+      - name: Exercise all nine repository Apple secrets
+        env:
+          APPLE_DEVELOPER_ID_CERTIFICATE_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+          APPLE_DEVELOPER_ID_IDENTITY: ${{ secrets.APPLE_DEVELOPER_ID_IDENTITY }}
+          APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_BASE64 }}
+          APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_PASSWORD }}
+          APPLE_DEVELOPER_ID_INSTALLER_IDENTITY: ${{ secrets.APPLE_DEVELOPER_ID_INSTALLER_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: crexx -nokeep scripts/check-apple-secrets.crexx
+      - name: Remove private keychain, credentials and synthetic probes
+        if: always() && steps.bootstrap.outcome == 'success'
+        run: crexx -nokeep scripts/check-apple-secrets.crexx --args cleanup
