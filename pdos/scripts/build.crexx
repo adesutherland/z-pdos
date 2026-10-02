@@ -1,0 +1,153 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Adrian Sutherland
+ * PDIO1 source/host controls and Classic C assembly-text preparation.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i = .int; output = .string; file = .string; from = .string; fixture_target = .string
+  if args.0 < 1 | args.0 > 2 then return usage()
+  action = args.1
+  if action <> "check" & action <> "compile" then return usage()
+  work = "build/pdos/pdio1"
+  if args.0 = 2 then work = args.2
+  call require left(work,11) = "build/pdos/" & length(work) > 11 & pos("..",work) = 0, "owned build/pdos output"
+  locations = .string[]
+  address crexx "pwd" output locations
+  root = strip(locations.1)
+  out = root || "/" || work
+  source = out || "/source"
+  temporary = out || "/tmp"
+  runtime = source || "/pdpclib"
+  address crexx "run cmake -E make_directory :out :temporary"
+  call require rc = 0, "create output"
+  os_stage = source || "/os"
+  address crexx "run cmake -E copy_directory pdos/src :os_stage"
+  call require rc = 0, "prepare maintained OS source"
+  selected = out || "/runtime-selection"
+  address crexx "run cmake -E rm -rf :selected"
+  call require rc = 0, "clear owned runtime selection"
+  selection_work = work || "/runtime-selection"
+  address crexx "run crexx -nokeep pdpclib/scripts/prepare.crexx --args pdos-zarch :selection_work"
+  call require rc = 0, "select maintained runtime modules"
+  address crexx "run cmake -E make_directory :runtime"
+  call require rc = 0, "create selected runtime directory"
+  runtime_inputs = readlines(root || "/pdos/scripts/runtime-inputs.txt")
+  do i = 1 to runtime_inputs.0
+    file = strip(runtime_inputs[i])
+    call require words(file) = 1 & pos("/",file) = 0 & pos("..",file) = 0, "runtime input filename"
+    from = selected || "/pdpclib/" || file
+    target = runtime || "/" || file
+    address crexx "run cmake -E copy :from :target"
+    call require rc = 0, "prepare maintained runtime " || file
+  end
+  os_manifest = work || "/os-source.sha256"
+  address crexx "run crexx -nokeep scripts/source-manifest.crexx --args pdos :os_manifest"
+  call require rc = 0, "record current OS source identities"
+  runtime_manifest = work || "/runtime-source.sha256"
+  address crexx "run crexx -nokeep scripts/source-manifest.crexx --args pdpclib :runtime_manifest"
+  call require rc = 0, "record current library source identities"
+  if action = "check" then do
+    do version = 1 to 2
+      qa = out || "/qa-" || version
+      address crexx "run cmake -E make_directory :qa"
+      call require rc = 0, "create fault-control output"
+      if version = 1 then do
+        from = "pdos/tests/fixtures/pre-repair/record.inc"; fixture_target = qa || "/record.inc"
+        address crexx "run cmake -E copy :from :fixture_target"
+        call require rc = 0, "prepare pre-repair record control"
+        from = "pdos/tests/fixtures/pre-repair/console.inc"; fixture_target = qa || "/console.inc"
+        address crexx "run cmake -E copy :from :fixture_target"
+        call require rc = 0, "prepare pre-repair console control"
+      end
+      else call extract root || "/pdos/src/pdos.c", qa
+      fixture = root || "/pdos/tests/io-repair.c"
+      program = qa || "/check"
+      address crexx "run clang -std=c11 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I :qa :fixture -o :program"
+      call require rc = 0, "compile real-function fault controls"
+      do mode = 1 to 2
+        check = word("record console",mode)
+        address system shellquote(program) || " " || check || " > " || shellquote(qa || "/" || check || ".log") || " 2>&1"
+        if version = 1 then call require rc = 1, "pre-repair " || check || " control fails"
+        else call require rc = 0, "repaired " || check || " passes ASAN/UBSAN"
+      end
+    end
+    say "Current OS/runtime source identities recorded; old fault controls fail; repaired functions pass ASAN/UBSAN."
+    return 0
+  end
+  compiler = root || "/build/compiler/mvs/gcc/mf-classic-cc"
+  address crexx "run test -x :compiler"
+  call require rc = 0, "build Classic C MVS compiler first"
+  compiled = out || "/compiled"
+  address crexx "run cmake -E make_directory :compiled"
+  call require rc = 0, "create compiler output"
+  flags = "-Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. -I../pdpclib -DUSE_MEMMGR"
+  inputs = readlines(root || "/pdos/scripts/compile-inputs.txt")
+  outputs = .string[]
+  do i = 1 to inputs.0
+    member = word(inputs[i],1)
+    relative = word(inputs[i],2)
+    call require words(inputs[i]) = 2, "compile input manifest row"
+    directory = source || "/" || left(relative,pos("/",relative)-1)
+    file = substr(relative,pos("/",relative)+1)
+    output = compiled || "/" || member || ".asm"
+    address crexx "cd :directory"
+    address system shellquote(compiler) || " " || flags || " " || shellquote(file) || " -o " || shellquote(output) || " > " || shellquote(compiled || "/" || member || ".log") || " 2>&1"
+    call require rc = 0, member || " C-to-assembly-text compile"
+    outputs[i] = output
+    say member "C-to-assembly-text pass"
+  end
+  address crexx "cd :root"
+  hashes = .string[]
+  address crexx "run shasum -a 256 :outputs[]" output hashes
+  call require rc = 0, "compiler output identities"
+  manifest = out || "/compiled.sha256"
+  address crexx "run cmake -E rm -f :manifest"
+  do i = 1 to hashes.0
+    call lineout manifest,hashes[i]
+  end
+  call lineout manifest
+  say inputs.0 "Classic C compile units pass; assembly, link, IPL and guest acceptance remain open."
+  return 0
+
+extract: procedure = .int
+  arg source = .string, out = .string
+  lines = readlines(source)
+  record = out || "/record.inc"; console = out || "/console.inc"
+  address crexx "run cmake -E rm -f :record :console"
+  call require rc = 0, "reset extracted controls"
+  active = 0; records = 0; consoles = 0
+  do i = 1 to lines.0
+    if pos("static int pdos64PdsRecord(P",lines[i]) = 1 then active = 1
+    if pos("static int pdos64PdsCloseWrite",lines[i]) = 1 then active = 0
+    if lines[i] = "static void write3270(char *buf, size_t lenbuf, int cr)" then active = 2
+    if lines[i] = "static int cprintf(char *format, ...)" then active = 0
+    if active = 1 then do
+      call lineout record,lines[i]
+      records = records + 1
+    end
+    if active = 2 then do
+      call lineout console,lines[i]
+      consoles = consoles + 1
+    end
+  end
+  call lineout record; call lineout console
+  call require records > 20 & consoles > 20, "extract real repaired functions"
+  return 0
+
+shellquote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'", value, "'\''") || "'"
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED:" detail
+    exit 1
+  end
+  return 0
+
+usage: procedure = .int
+  say "usage: crexx -nokeep pdos/scripts/build.crexx --args check|compile [build/pdos/output]"
+  return 2

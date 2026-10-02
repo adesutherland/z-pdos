@@ -1,0 +1,37 @@
+cmake_minimum_required(VERSION 3.16)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  project(tso31_bridge C)
+  set(CMAKE_C_STANDARD 90)
+  set(CMAKE_C_STANDARD_REQUIRED ON)
+  set(CMAKE_C_EXTENSIONS OFF)
+  option(MF_TRADITIONAL_MACROS "Build assembler macro provider" ON)
+  option(MF_SANITIZERS "Enable address/undefined-behaviour checks" OFF)
+  enable_testing()
+  if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+    add_compile_options(-Wall -Wextra -Werror -pedantic-errors)
+    if(MF_SANITIZERS)
+      add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+      add_link_options(-fsanitize=address,undefined)
+    endif()
+  endif()
+  get_filename_component(PROJECT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+  add_subdirectory(../assembler assembler)
+endif()
+add_executable(test_tso31_source tests/test_source.c)
+add_test(NAME tso31_source_variant COMMAND test_tso31_source
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/reference-statements.txt
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/entry31.asm)
+add_executable(test_tso31_abi tests/test_abi.c src/caller.c)
+add_test(NAME tso31_caller_contract COMMAND test_tso31_abi)
+add_executable(test_tso31_deck tests/test_deck.c)
+set(entry_deck ${CMAKE_CURRENT_BINARY_DIR}/entry31.obj)
+add_test(NAME tso31_deck_prepare
+  COMMAND ${CMAKE_COMMAND} -E rm -f ${entry_deck})
+set_tests_properties(tso31_deck_prepare PROPERTIES FIXTURES_SETUP tso31_path)
+add_test(NAME tso31_assemble
+  COMMAND mf-classic-as --profile s370
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/entry31.asm ${entry_deck})
+set_tests_properties(tso31_assemble PROPERTIES
+  FIXTURES_REQUIRED tso31_path FIXTURES_SETUP tso31_deck)
+add_test(NAME tso31_deck_semantics COMMAND test_tso31_deck ${entry_deck})
+set_tests_properties(tso31_deck_semantics PROPERTIES FIXTURES_REQUIRED tso31_deck)

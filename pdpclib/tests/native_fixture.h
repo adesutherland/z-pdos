@@ -1,10 +1,10 @@
 #ifndef PDPCLIB_QA_NATIVE_FIXTURE_H
 #define PDPCLIB_QA_NATIVE_FIXTURE_H
 #include "stdio_namespace.h"
-#include "../stdio.h"
-#include "../stdlib.h"
-#include "../string.h"
-#include "../errno.h"
+#include "../src/stdio.h"
+#include "../src/stdlib.h"
+#include "../src/string.h"
+#include "../src/errno.h"
 struct pdpqa_counts {
     int opens;
     int closes;

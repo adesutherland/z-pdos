@@ -1,0 +1,21 @@
+/* SPDX-License-Identifier: MIT; Classic Assembler host build. */
+options levelb
+main: procedure = .int
+  arg args = .string[]
+  action = "test"
+  if args.0 > 1 then return 2
+  if args.0 = 1 then action = args.1
+  if action <> "build" & action <> "test" & action <> "sanitize" then return 2
+  work = "build/assembler"
+  sanitize = "-DMF_SANITIZERS=OFF"
+  if action = "sanitize" then do
+    work = "build/assembler-sanitize"
+    sanitize = "-DMF_SANITIZERS=ON"
+  end
+  address crexx "run cmake -S assembler -B :work :sanitize"
+  if rc <> 0 then return rc
+  address crexx "run cmake --build :work"
+  if rc <> 0 then return rc
+  if action = "build" then return 0
+  address crexx "run ctest --test-dir :work --output-on-failure"
+  return rc

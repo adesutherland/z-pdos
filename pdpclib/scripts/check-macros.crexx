@@ -1,0 +1,111 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Adrian Sutherland
+ * Gate 1 consumer of the maintained PDPCLIB source, not a source rewrite.
+ * The supplied file's public-domain notice and contributor header are retained
+ * in the test-owned subset. No IBM macro library or expansion is consumed.
+ */
+options levelb
+import rxfnsb
+
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 3 then do
+    say "usage: crexx -nokeep pdpclib/scripts/check-macros.crexx --args assembler checker owned-build-directory"
+    return 2
+  end
+  cli = args.1; checker = args.2; work = args.3
+  locations = .string[]
+  address crexx "pwd" output locations
+  repository = strip(locations.1)
+  if left(work,length(repository)+1) = repository || "/" then work = substr(work,length(repository)+2)
+  call require left(work,6) = "build/" & pos("..",work) = 0, "owned source selection"
+  selected = work || "/source"
+  address system "cmake -E rm -rf " || shellquote(selected)
+  call require rc = 0, "clear owned selection"
+  address crexx "run crexx -nokeep pdpclib/scripts/prepare.crexx --args pdos-zarch :selected"
+  call require rc = 0, "prepare source-owned macro input"
+  original = selected || "/pdpclib/mvssupa.asm"
+  call require work <> "" & work <> "/" & work <> ".", "owned build directory"
+  address system "cmake -E make_directory " || shellquote(work)
+  call require rc = 0, "create build directory"
+  hashfile = work || "/source.sha256"
+  address system "shasum -a 256 " || shellquote(original) || " > " || shellquote(hashfile)
+  call require rc = 0, "hash supplied source"
+  hash = word(readfile(hashfile), 1)
+  call require hash = "8327b212648224f25dc0d0268b8d32fffb69ca36cce5cd304c08f75852f3c3d0", "reviewed maintained source identity"
+  source = readfile(original)
+  subset = extract_lines(source, 2, 59) || extract_lines(source, 298, 302) || extract_lines(source, 306, 309) || extract_lines(source, 455, 459)
+  subset = subset || "MACREF   CSECT" || '0A'x || "R14      EQU   14" || '0A'x
+  subset = subset || "FIRST    LDVAL 4,16(1)" || '0A'x || "         LDADD 5,20(1)" || '0A'x
+  subset = subset || "         STVAL 6,24(1)" || '0A'x || "         STVAL 6,28(1),S=7" || '0A'x
+  subset = subset || "         END FIRST" || '0A'x
+  input = work || "/source-owned-macros.asm"; deck = work || "/source-owned-macros.obj"
+  call writefile input, subset
+  address system "cmake -E rm -f " || shellquote(deck)
+  call require rc = 0, "clear test-owned output"
+  address crexx "run :cli --macros :input :deck"
+  call require rc = 0, "assemble unchanged source-owned definitions"
+  address crexx "run :checker :deck"
+  call require rc = 0, "independent instruction and deck meaning"
+  address system "shasum -a 256 " || shellquote(input) || " " || shellquote(deck)
+  call require rc = 0, "consumer identities"
+  say "Only these three source-owned macro definitions are qualified; whole MVSSUPA assembly and services remain open."
+  return 0
+
+shellquote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'", value, "'\''") || "'"
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED: " || detail
+    exit 1
+  end
+  return 0
+
+extract_lines: procedure = .string
+  arg text = .string, first = .int, last = .int
+  at = 1; result = ""
+  do line = 1 to last
+    endline = pos('0A'x, text, at)
+    call require endline >= at, "complete reference source line"
+    if line >= first then result = result || substr(text, at, endline - at + 1)
+    at = endline + 1
+  end
+  return result
+
+readfile: procedure = .string
+  arg path = .string
+  file_id = 0; mode = "rb"
+  assembler fopen file_id,path,mode
+  call require file_id <> 0, "open reference input"
+  result = ""; eof = 0; read_status = 0
+  do forever
+    data = ""
+    assembler freadline data,file_id
+    read_status = 0
+    assembler ferror read_status,file_id
+    call require read_status = 0, "reference read without I/O failure"
+    assembler feof eof,file_id
+    if length(data) = 0 & eof <> 0 then leave
+    result = result || data || '0A'x
+    call require length(result) <= 1048576, "reference input size limit"
+  end
+  read_status = 0; close_status = 0
+  assembler ferror read_status,file_id
+  assembler fclose close_status,file_id
+  call require read_status = 0 & close_status = 0, "complete reference read"
+  return result
+
+writefile: procedure = .int
+  arg path = .string, text = .string
+  file_id = 0; mode = "wb"; data = text as .binary
+  assembler fopen file_id,path,mode
+  call require file_id <> 0, "open owned output"
+  assembler fwriteb file_id,data
+  write_status = 0; close_status = 0
+  assembler ferror write_status,file_id
+  assembler fclose close_status,file_id
+  call require write_status = 0 & close_status = 0, "complete owned write"
+  return 0

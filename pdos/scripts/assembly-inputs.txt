@@ -1,0 +1,10 @@
+kernel os/pdossup.asm
+loader os/ploadsup.asm
+kernel-start pdpclib/sapstart.asm
+kernel-runtime pdpclib/sapsupa.asm
+command-start pdpclib/mvsstart.asm
+command-runtime pdpclib/mvssupa.asm
+configuration pdpclib/pdptop.mac
+configuration pdpclib/pdpmain.mac
+call-macro pdpclib/pdpprlg.mac
+call-macro pdpclib/pdpepil.mac

@@ -1,0 +1,26 @@
+/* SPDX-License-Identifier: MIT
+ * Record current component source identities; run from repository root.
+ * This records build inputs rather than enforcing a frozen source checkpoint.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 2 then return 2
+  component = args.1; manifest = args.2
+  if component <> "assembler" & component <> "compiler" & component <> "linker" & component <> "pdpclib" & component <> "pdos" & component <> "tso31-bridge" then return 2
+  if left(manifest,6) <> "build/" | length(manifest) <= 6 | pos("..",manifest) > 0 then return 2
+  source = component || "/src"
+  files = .string[]; hashes = .string[]
+  address crexx "run find :source -type f" output files
+  if rc <> 0 | files.0 = 0 then return 1
+  address crexx "run shasum -a 256 :files[]" output hashes
+  if rc <> 0 | hashes.0 <> files.0 then return 1
+  address crexx "run cmake -E rm -f :manifest"
+  if rc <> 0 then return rc
+  do i = 1 to hashes.0
+    call lineout manifest,hashes[i]
+  end
+  call lineout manifest
+  say files.0 "Current" component "source inputs recorded in" manifest
+  return 0

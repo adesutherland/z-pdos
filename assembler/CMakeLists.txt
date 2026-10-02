@@ -1,0 +1,126 @@
+cmake_minimum_required(VERSION 3.16)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  project(mainframe_classic_assembler C)
+  set(CMAKE_C_STANDARD 90)
+  set(CMAKE_C_STANDARD_REQUIRED ON)
+  set(CMAKE_C_EXTENSIONS OFF)
+  option(MF_TRADITIONAL_MACROS "Build traditional macro provider" ON)
+  option(MF_SANITIZERS "Enable address/undefined-behaviour checks" OFF)
+  enable_testing()
+  if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+    add_compile_options(-Wall -Wextra -Werror -pedantic-errors)
+    if(MF_SANITIZERS)
+      add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+      add_link_options(-fsanitize=address,undefined)
+    endif()
+  endif()
+  get_filename_component(PROJECT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+endif()
+add_library(mf_classic STATIC
+  src/values.c src/reader.c src/machine.c src/assemble.c src/object.c)
+target_include_directories(mf_classic PUBLIC src/include)
+add_executable(mf-classic-as src/main.c)
+if(MF_TRADITIONAL_MACROS)
+  add_library(mf_classic_macro STATIC src/macro_cards.c src/macro_expr.c src/macro_provider.c)
+  target_include_directories(mf_classic_macro PUBLIC src/include)
+  target_link_libraries(mf_classic_macro PUBLIC mf_classic)
+  target_compile_definitions(mf-classic-as PRIVATE MF_WITH_TRADITIONAL_MACROS)
+  target_link_libraries(mf-classic-as PRIVATE mf_classic_macro)
+  add_executable(test_macro_deck tests/test_macro_deck.c)
+  foreach(component macro macro_assemble macro_library macro_conditional)
+    add_executable(test_${component} tests/test_${component}.c)
+    target_link_libraries(test_${component} PRIVATE mf_classic_macro)
+    add_test(NAME classic_${component} COMMAND test_${component})
+  endforeach()
+else()
+  target_link_libraries(mf-classic-as PRIVATE mf_classic)
+endif()
+
+foreach(component values reader machine machine_float machine_system object assemble contracts consumer_engine pdpclib_engine)
+  add_executable(test_${component} tests/test_${component}.c)
+  target_link_libraries(test_${component} PRIVATE mf_classic)
+  add_test(NAME classic_${component} COMMAND test_${component})
+endforeach()
+
+add_executable(test_deck tests/test_deck.c)
+add_executable(test_cli_output tests/test_cli_output.c)
+add_executable(test_classic_call_deck tests/test_classic_call_deck.c)
+add_test(NAME classic_cli_prepare
+  COMMAND ${CMAKE_COMMAND} -E rm -f ${CMAKE_CURRENT_BINARY_DIR}/bootstrap.obj)
+set_tests_properties(classic_cli_prepare PROPERTIES FIXTURES_SETUP bootstrap_path)
+add_test(NAME classic_cli_bootstrap
+  COMMAND mf-classic-as ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/bootstrap.asm
+    ${CMAKE_CURRENT_BINARY_DIR}/bootstrap.obj)
+set_tests_properties(classic_cli_bootstrap PROPERTIES
+  FIXTURES_REQUIRED bootstrap_path FIXTURES_SETUP bootstrap_deck)
+add_test(NAME classic_deck_semantics COMMAND test_deck
+  ${CMAKE_CURRENT_BINARY_DIR}/bootstrap.obj)
+set_tests_properties(classic_deck_semantics PROPERTIES FIXTURES_REQUIRED bootstrap_deck)
+
+function(classic_cli_fixture name source)
+  set(output ${CMAKE_CURRENT_BINARY_DIR}/${name}.obj)
+  add_test(NAME classic_cli_${name}_prepare
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${output})
+  set_tests_properties(classic_cli_${name}_prepare PROPERTIES
+    FIXTURES_SETUP ${name}_path)
+  add_test(NAME classic_cli_${name}
+    COMMAND mf-classic-as ${ARGN}
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/${source} ${output})
+  set_tests_properties(classic_cli_${name} PROPERTIES
+    FIXTURES_REQUIRED ${name}_path FIXTURES_SETUP ${name}_deck)
+  add_test(NAME classic_cli_${name}_semantics
+    COMMAND test_cli_output ${name} ${output})
+  set_tests_properties(classic_cli_${name}_semantics PROPERTIES
+    FIXTURES_REQUIRED ${name}_deck)
+endfunction()
+classic_cli_fixture(constants constants.asm)
+classic_cli_fixture(forms forms.asm)
+classic_cli_fixture(profile cli-profile.asm --profile s370)
+
+if(MF_TRADITIONAL_MACROS)
+  classic_cli_fixture(registers registers.asm --profile s370 --macros
+    -I ${PROJECT_SOURCE_DIR}/pdpclib/src/interfaces/classic-linkage)
+  set(library_deck ${CMAKE_CURRENT_BINARY_DIR}/library.obj)
+  add_test(NAME classic_library_cli_prepare
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${library_deck})
+  set_tests_properties(classic_library_cli_prepare PROPERTIES FIXTURES_SETUP library_path)
+  add_test(NAME classic_library_cli COMMAND mf-classic-as --profile s370 --macros
+    -I ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/library
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/library-client.asm ${library_deck})
+  set_tests_properties(classic_library_cli PROPERTIES
+    FIXTURES_REQUIRED library_path FIXTURES_SETUP library_deck)
+  add_test(NAME classic_library_cli_semantics COMMAND test_cli_output profile ${library_deck})
+  set_tests_properties(classic_library_cli_semantics PROPERTIES FIXTURES_REQUIRED library_deck)
+  set(macro_deck ${CMAKE_CURRENT_BINARY_DIR}/macros.obj)
+  add_test(NAME classic_macro_cli_prepare
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${macro_deck})
+  set_tests_properties(classic_macro_cli_prepare PROPERTIES FIXTURES_SETUP macro_path)
+  add_test(NAME classic_macro_cli
+    COMMAND mf-classic-as --macros
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/macros.asm ${macro_deck})
+  set_tests_properties(classic_macro_cli PROPERTIES
+    FIXTURES_REQUIRED macro_path FIXTURES_SETUP macro_deck)
+  add_test(NAME classic_macro_cli_semantics COMMAND test_macro_deck ${macro_deck})
+  set_tests_properties(classic_macro_cli_semantics PROPERTIES FIXTURES_REQUIRED macro_deck)
+endif()
+
+# Rich desktop CLI failure/path checks use the optional development runtime.
+# Pure C unit tests and independent positive deck checks do not depend on it.
+find_program(CREXX_EXECUTABLE crexx)
+if(CREXX_EXECUTABLE)
+  set(classic_compiler ${PROJECT_SOURCE_DIR}/build/compiler/mvs/gcc/mf-classic-cc)
+  if(MF_TRADITIONAL_MACROS AND EXISTS ${classic_compiler})
+    add_test(NAME classic_compiler_object
+      COMMAND ${CREXX_EXECUTABLE} -nokeep ${PROJECT_SOURCE_DIR}/tests/integration/check-classic-call.crexx
+        --args ${classic_compiler} $<TARGET_FILE:mf-classic-as>
+        $<TARGET_FILE:test_classic_call_deck> ${CMAKE_CURRENT_BINARY_DIR}/classic-call)
+    set_tests_properties(classic_compiler_object PROPERTIES WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+  endif()
+  add_test(NAME classic_cli_contracts
+    COMMAND ${CREXX_EXECUTABLE} -nokeep ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cli.crexx
+      --args $<TARGET_FILE:mf-classic-as> $<TARGET_FILE:test_cli_output>
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures
+      ${CMAKE_CURRENT_BINARY_DIR}/cli-contracts)
+  set_tests_properties(classic_cli_contracts PROPERTIES
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+endif()

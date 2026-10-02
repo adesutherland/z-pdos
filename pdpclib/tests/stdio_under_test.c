@@ -1,6 +1,6 @@
 /* Compile the maintained source; these adapters exist only for host QA. */
 #include "stdio_namespace.h"
-#include "../stdio.h"
+#include "../src/stdio.h"
 /* stdio.c undefines these macro names before defining the helper functions.
    Compiler symbol labels preserve the host namespace without editing it. */
 int (getc)(FILE *stream) __asm__("pdpqa_getc");
@@ -14,7 +14,7 @@ int (ferror)(FILE *stream) __asm__("pdpqa_ferror");
 /* These historical services have no declaration in upstream mvssupa.h. */
 void __adcba(void *handle, unsigned int *parm, unsigned int *data);
 void __apoint(void *handle, unsigned int *ttr);
-#include "../stdio.c"
+#include "../src/stdio.c"
 
 int pdpqa_seeded_open(FILE *stream, int requested_mode)
 {

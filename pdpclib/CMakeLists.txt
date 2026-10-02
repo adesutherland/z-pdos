@@ -34,7 +34,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
       tests/stdio_under_test.c tests/native_fixture.c tests/test_stdio.c
       $<TARGET_OBJECTS:pdpclib_qa_report>)
     target_include_directories(test_pdpclib_stdio_${profile} PRIVATE
-      ${CMAKE_CURRENT_SOURCE_DIR})
+      ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_compile_definitions(test_pdpclib_stdio_${profile} PRIVATE
       __MVS__ __USEBIVA__)
     target_compile_options(test_pdpclib_stdio_${profile} PRIVATE -fno-builtin)
@@ -50,4 +50,15 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
   endforeach()
 else()
   message(STATUS "PDPCLIB native-stub host QA requires GCC or Clang")
+endif()
+
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  find_program(CREXX_EXECUTABLE crexx)
+  if(CREXX_EXECUTABLE)
+    add_test(NAME pdpclib_profile_sources
+      COMMAND ${CREXX_EXECUTABLE} -nokeep ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-profiles.crexx
+        --args build/pdpclib-standalone-profile)
+    get_filename_component(repository "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+    set_tests_properties(pdpclib_profile_sources PROPERTIES WORKING_DIRECTORY ${repository})
+  endif()
 endif()

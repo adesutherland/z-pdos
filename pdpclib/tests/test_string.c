@@ -1,4 +1,4 @@
-#include "../string.h"
+#include "../src/string.h"
 #if defined(__PDOS390__)
 #ifdef memcpy
 #error PDOS390 must use the library memcpy declaration

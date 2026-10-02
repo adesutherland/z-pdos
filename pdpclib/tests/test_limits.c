@@ -3,7 +3,7 @@
  * Check the retained LP64 limit against host-width arithmetic.
  */
 #define __LONG64__
-#include "../limits.h"
+#include "../src/limits.h"
 
 int main(void)
 {

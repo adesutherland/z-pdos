@@ -1,0 +1,1 @@
+*COMP*   AIF   ('&ZSYS' NE 'S390').COMSWA

@@ -1,0 +1,13 @@
+native/mvssupa/common-01.asm
+native/mvssupa/section-modes-default.asm
+native/mvssupa/common-02.asm
+native/mvssupa/swa-lookup-default.asm
+native/mvssupa/common-03.asm
+native/mvssupa/prefix-parser-default.asm
+native/mvssupa/common-04.asm
+native/mvssupa/parser-mode-switch-default.asm
+native/mvssupa/common-05.asm
+native/mvssupa/swa-workspace-default.asm
+native/mvssupa/common-06.asm
+native/mvssupa/variant-06-default.asm
+native/mvssupa/common-final.asm

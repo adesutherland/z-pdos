@@ -1,0 +1,31 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Adrian Sutherland
+ * Development-host orchestration. Run from the repository root.
+ */
+options levelb
+main: procedure = .int
+  arg args = .string[]
+  action = "test"
+  if args.0 > 1 then do
+    say "usage: crexx -nokeep scripts/build.crexx --args build|test|sanitize"
+    return 2
+  end
+  if args.0 = 1 then action = args.1
+  if action <> "build" & action <> "test" & action <> "sanitize" then do
+    say "usage: crexx -nokeep scripts/build.crexx --args build|test|sanitize"
+    return 2
+  end
+  build_dir = "build/tools"
+  sanitize = "OFF"
+  if action = "sanitize" then do
+    build_dir = "build/tools-sanitize"
+    sanitize = "ON"
+  end
+  sanitize_option = "-DMF_SANITIZERS=" || sanitize
+  address crexx "run cmake -S . -B :build_dir :sanitize_option"
+  if rc <> 0 then return rc
+  address crexx "run cmake --build :build_dir"
+  if rc <> 0 then return rc
+  if action = "build" then return 0
+  address crexx "run ctest --test-dir :build_dir --output-on-failure"
+  return rc

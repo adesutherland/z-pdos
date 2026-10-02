@@ -1,0 +1,25 @@
+/* SPDX-License-Identifier: MIT */
+options levelb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 4 then return 2
+  cli = args.1; linker = args.2; checker = args.3; work = args.4
+  if work = "" | work = "." | work = "/" then return 2
+  address crexx "run cmake -E make_directory :work"
+  if rc <> 0 then return rc
+  deck = work || "/pdos31-maps.obj"; binary = work || "/pdos31-maps.bin"
+  address crexx "run cmake -E rm -f :deck :binary"
+  if rc <> 0 then return rc
+  address crexx "run :cli --macros -I pdpclib/src/interfaces/pdos31 assembler/tests/fixtures/pdos31-maps.asm :deck"
+  if rc <> 0 then return rc
+  address crexx "run :linker --oformat binary --image-base 4096 -e MAPTEST -o :binary :deck"
+  if rc <> 0 then return rc
+  address crexx "run :checker pdos31-maps :binary"
+  if rc <> 0 then return rc
+  failed = work || "/maps-failed.obj"
+  address crexx "run cmake -E rm -f :failed"
+  if rc <> 0 then return rc
+  address crexx "run :cli --macros -I pdpclib/src/interfaces/pdos31 assembler/tests/fixtures/pdos31-maps-unsupported.asm :failed"
+  if rc = 0 then return 1
+  address crexx "run :checker absent :failed"
+  return rc

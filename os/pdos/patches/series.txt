@@ -1,7 +1,0 @@
-original/pdos390/0001-multi-csect-pdld-loader.patch
-original/pdos390/0002-standard-s390-native-build.patch
-original/pdos64/0001-restore-zarch-native-configuration.patch
-original/pdos64/0002-native-amode64-context.patch
-original/pdos64/0003-crexx-native-pds-applications.patch
-original/pdos64/0004-rmode64-high-load-applications.patch
-original/pdos64/0005-checked-dasd-writes-and-console-wrap.patch
