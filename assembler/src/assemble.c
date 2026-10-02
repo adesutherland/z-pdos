@@ -372,7 +372,8 @@ static enum mf_status product(struct parser *p, struct value *out)
         ++p->at; st = atom(p,&b);
         if (st == MF_OK && !p->syntax_only) st = absolute_product(a,b,c == 0x2f,&a);
     }
-    if (st == MF_OK) *out = a; return st;
+    if (st == MF_OK) *out = a;
+    return st;
 }
 static enum mf_status expression(struct parser *p, struct value *out)
 {

@@ -195,15 +195,19 @@ make_macos_pkg: procedure = .int
 
 make_windows_installer: procedure = .int
   arg payload = .string, version = .string, out_path = .string, helper = .string
+  locations = .string[]
+  address crexx "pwd" output locations
+  call require rc = 0 & locations.0 = 1, "installer source directory"
+  root = changestr('5C'x,strip(locations.1),"/")
   includes = "build/release/windows-uninstall.nsh"
   call uninstall_list payload,includes
   arguments = .string[]
   arguments.1 = "makensis"
   arguments.2 = "-NOCD"
-  arguments.3 = "-DZPDOS_PAYLOAD=" || payload
+  arguments.3 = "-DZPDOS_PAYLOAD=" || root || "/" || payload
   arguments.4 = "-DZPDOS_VERSION=" || version
-  arguments.5 = "-DZPDOS_OUTPUT=" || out_path
-  arguments.6 = "-DZPDOS_UNINSTALL_FILES=" || includes
+  arguments.5 = "-DZPDOS_OUTPUT=" || root || "/" || out_path
+  arguments.6 = "-DZPDOS_UNINSTALL_FILES=" || root || "/" || includes
   if getenv("OS") = "Windows_NT" then do
     do i = 2 to 6
       arguments[i] = "/" || substr(arguments[i],2)
