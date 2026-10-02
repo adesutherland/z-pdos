@@ -543,7 +543,7 @@ EXTRA_HEADERS =@extra_headers_list@
 
 # It is convenient for configure to add the assignment at the beginning,
 # so don't override it here.
-USE_COLLECT2 = collect2$(exeext)
+USE_COLLECT2 ?= collect2$(exeext)
 
 # List of extra C and assembler files to add to static and shared libgcc2.
 # Assembler files should have names ending in `.asm'.
