@@ -13,6 +13,9 @@
 #include <process.h>
 #include <io.h>
 #define access _access
+#ifdef X_OK
+#undef X_OK
+#endif
 #define X_OK 0
 #define EXE ".exe"
 #else

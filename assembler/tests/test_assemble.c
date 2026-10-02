@@ -494,9 +494,12 @@ static void writer_failures(void)
     struct fixture f; int i;
     for (i = 0; i < 6; ++i) {
         init(&f, "S CSECT\n LR 1,2\n DS 0F\n DC A(S)\n END S\n");
-        if (i == 0) f.fail_begin = 1; if (i == 1) f.fail_text = 1;
-        if (i == 2) f.fail_gap = 1; if (i == 3) f.fail_fixup = 1;
-        if (i == 4) f.fail_entry = 1; if (i == 5) f.fail_finish = 1;
+        if (i == 0) f.fail_begin = 1;
+        if (i == 1) f.fail_text = 1;
+        if (i == 2) f.fail_gap = 1;
+        if (i == 3) f.fail_fixup = 1;
+        if (i == 4) f.fail_entry = 1;
+        if (i == 5) f.fail_finish = 1;
         failed(&f, MF_IO); CHECK(f.begins == 1 && f.finishes == 1);
         CHECK(i == 5 ? f.invalids == 0 : f.invalids == 1); clean(&f);
     }

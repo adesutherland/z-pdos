@@ -123,7 +123,12 @@ tags can publish releases. GitHub supplies the release token automatically.
 
 The hosted build uses the MSYS2 UCRT64 toolchain, Unix tools for the inherited
 configure/make interface, and native Windows cREXX. The configured ADDRESS SHELL
-is MSYS2 Bash, rather than the native SYSTEM command processor. The built
+is MSYS2 Bash through the small native `scripts/windows-shell.c` adapter. The
+pinned cREXX runtime's Windows shell interface passes raw command text; the
+adapter preserves that text as one Bash `-c` argument, including quotes and
+redirection. The workflow checks these controls before building dependencies.
+This adapter implements the Windows process interface; orchestration remains
+cREXX. The built
 Classic tools are native Windows PE executables. MinGW host configuration and
 Windows launcher support do not imply completed hosted Windows qualification.
 

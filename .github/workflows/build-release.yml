@@ -71,8 +71,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
-          echo "CREXX_ADDRESS_SHELL=$(cygpath -w /usr/bin/bash.exe)" >> "$GITHUB_ENV"
-          echo 'CREXX_ADDRESS_SHELL_ARGS=-c' >> "$GITHUB_ENV"
+          mkdir -p build/bootstrap
+          gcc -std=c89 -Wall -Wextra -pedantic scripts/windows-shell.c -o build/bootstrap/windows-shell.exe
+          echo "PDOS_WINDOWS_BASH=$(cygpath -w /usr/bin/bash.exe)" >> "$GITHUB_ENV"
+          echo "CREXX_ADDRESS_SHELL=$(cygpath -w "$PWD/build/bootstrap/windows-shell.exe")" >> "$GITHUB_ENV"
+          echo 'CREXX_ADDRESS_SHELL_ARGS=--' >> "$GITHUB_ENV"
           echo 'CMAKE_GENERATOR=Ninja' >> "$GITHUB_ENV"
           echo 'CC=gcc' >> "$GITHUB_ENV"
       - name: Bootstrap pinned cREXX on Unix hosts
@@ -110,7 +113,9 @@ jobs:
       - name: Check Windows installer construction before compiling dependencies
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: crexx -nokeep tests/release/test-installer-build.crexx
+        run: |
+          crexx -nokeep tests/release/test-windows-shell.crexx
+          crexx -nokeep tests/release/test-installer-build.crexx
       - name: Build and check both compilers and the complete toolchain (Unix)
         if: runner.os != 'Windows'
         run: crexx -nokeep scripts/build.crexx --args full-test

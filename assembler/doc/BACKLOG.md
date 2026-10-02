@@ -42,5 +42,5 @@ passed the recorded 0.1 source-to-image and guest route.
 - Status: In progress
 - Target: Linux and Windows desktop release hosts
 - Observation: GCC's warning-as-error build rejects the single-line conditional assignment and unconditional return in `product()`, and the allocation macro's conditional return followed by an unconditional field assignment. The statements are now separated, with explicit braces in the macro, without changing their control flow.
-- Evidence: Linux job in [the first hosted release build](https://github.com/adesutherland/z-pdos/actions/runs/37057263103); all 92 local toolchain checks pass after the formatting fix.
+- Evidence: Linux job in [the first hosted release build](https://github.com/adesutherland/z-pdos/actions/runs/37057263103); the subsequent GCC build also identified three test-fixture lines containing adjacent conditional statements, now separated. All 92 local toolchain checks pass after the formatting fixes.
 - Acceptance: The GCC host build passes with the existing strict warnings and the unchanged assembler fixtures.

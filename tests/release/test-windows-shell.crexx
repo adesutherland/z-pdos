@@ -1,0 +1,14 @@
+/* SPDX-License-Identifier: MIT */
+options levelb
+import rxfnsb
+main: procedure = .int
+  address shell "printf '%s\n' 'space argument' 'embedded " || '22'x || "quote' > build/windows-shell-probe.txt"
+  if rc <> 0 then return 2
+  file = "build/windows-shell-probe.txt"
+  if linein(file) <> "space argument" then return 2
+  if linein(file) <> "embedded " || '22'x || "quote" then return 2
+  call linein file
+  address shell "exit 7"
+  if rc <> 7 then return 2
+  say "PASS: Windows shell preserves spaces, quotes, redirection and failure status"
+  return 0

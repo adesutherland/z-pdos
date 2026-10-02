@@ -64,7 +64,7 @@ Open items require separate implementation authority.
 - Type: qualification
 - Status: In progress
 - Target: macOS ARM64/Intel, Linux x64 and native Windows x64 host tools
-- Observation: Relocatable launchers and the MinGW host configuration are prepared. Local Apple Silicon build, installed MVS/CMS compile/assemble/link and Windows argument-quoting checks pass. Native Windows execution and the other hosted builds remain unrun.
+- Observation: Relocatable launchers and the MinGW host configuration are prepared. Local Apple Silicon build, installed MVS/CMS compile/assemble/link and Windows argument-quoting checks pass. Hosted Windows installer construction now passes. The first native compiler build exposed the pinned runtime's raw shell-command interface, which passed only the first word to Bash `-c`; a native adapter and pre-build quote/redirection/status probe are prepared. Complete hosted Windows qualification remains pending.
 - Evidence: `src/driver.c`, `src/gcc/config/host-mingw.h`, root `tests/release/`, and `../../doc/BUILD-AND-RELEASE.md`.
 - Acceptance: Both variants build and pass the complete required suite on each declared host; extracted and installed commands produce independently expected bytes from a path containing spaces; missing private tools fail; the hosted Windows installer passes install/reinstall/PATH/uninstall controls.
 
