@@ -15,7 +15,9 @@ The check exercises all nine repository Actions secrets:
 | `APPLE_TEAM_ID` | Match both signing-certificate teams and validate account access |
 | `APPLE_ID` and `APPLE_APP_SPECIFIC_PASSWORD` | `notarytool store-credentials --validate` checks the Apple login and team access |
 
-It creates, locks and unlocks a private temporary keychain. Certificates,
+It creates, locks and unlocks a private temporary keychain, then registers it
+in the disposable runner's user search list and selects it as the default,
+following the established cREXX signing workflow. Certificates,
 stored login credentials and synthetic probes are removed afterwards, with
 an always-run cleanup step as a fallback. Setting names and stage results
 are written to the log and Actions summary. Signing failures also print the
