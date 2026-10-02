@@ -58,6 +58,7 @@ main: procedure = .int
     host_options = " --build=" || host_triple || " --host=" || host_triple
   end
   environment = "env " || shellquote("CC=" || host_cc) || " " || shellquote("CFLAGS=" || flags) || " " || shellquote("LDFLAGS=" || link_flags)
+  if suffix = ".exe" then environment = environment || " " || shellquote("GENGTYPE_PATH=cygpath -m")
   address crexx "mkdir -p :work"
   if rc <> 0 then return rc
   address crexx "cd :work"

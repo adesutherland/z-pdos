@@ -2108,6 +2108,9 @@ GTFILES_FILES_LANGS = @all_gtfiles_files_langs@
 GTFILES_FILES_FILES = @all_gtfiles_files_files@
 GTFILES_LANG_DIR_NAMES = @subdirs@
 GTFILES_SRCDIR = @srcdir@
+# Native generators open these embedded strings without MSYS argv conversion.
+# The host recipe selects cygpath -m on Windows; Unix keeps the same paths.
+GENGTYPE_PATH ?= echo
 
 gt-cgraph.h gt-coverage.h gtype-desc.h gtype-desc.c gt-except.h \
 gt-function.h gt-integrate.h gt-stmt.h gt-tree.h gt-varasm.h \
@@ -2122,12 +2125,12 @@ gt-stringpool.h gt-langhooks.h : s-gtype ; @true
 gtyp-gen.h: Makefile
 	echo "/* This file is machine generated.  Do not edit.  */" > tmp-gtyp.h
 	echo "static const char *const srcdir = "  >> tmp-gtyp.h
-	echo "\"$(GTFILES_SRCDIR)\"" >> tmp-gtyp.h
+	p=`$(GENGTYPE_PATH) "$(GTFILES_SRCDIR)"`; echo "\"$$p\"" >> tmp-gtyp.h
 	echo ";" >> tmp-gtyp.h
 	echo "static const char *const lang_files[] = {" >> tmp-gtyp.h
 	ll="$(GTFILES_FILES_FILES)"; \
 	for f in $$ll; do \
-	echo "\"$$f\", "; done >> tmp-gtyp.h
+	p=`$(GENGTYPE_PATH) "$$f"`; echo "\"$$p\", "; done >> tmp-gtyp.h
 	echo "NULL};" >> tmp-gtyp.h
 	echo "static const char *const langs_for_lang_files[] = {" >> tmp-gtyp.h
 	ff="$(GTFILES_FILES_LANGS)"; \
@@ -2137,7 +2140,7 @@ gtyp-gen.h: Makefile
 	echo "static const char *const all_files[] = {" >> tmp-gtyp.h
 	gf="$(GTFILES)"; \
 	for f in $$gf; do \
-	echo "\"$$f\", "; done >> tmp-gtyp.h
+	p=`$(GENGTYPE_PATH) "$$f"`; echo "\"$$p\", "; done >> tmp-gtyp.h
 	echo " NULL};" >> tmp-gtyp.h
 	echo "static const char *const lang_dir_names[] = { \"c\", " >> tmp-gtyp.h
 	gf="$(GTFILES_LANG_DIR_NAMES)"; \
