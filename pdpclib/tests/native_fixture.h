@@ -18,10 +18,17 @@ struct pdpqa_counts {
     int fail_open;
     int fail_malloc;
     int allocations;
+    int svc99_allowed;
+    int svc99_calls;
+    int svc99_fail_first;
 };
 extern FILE *__stderr_ptr;
 extern struct pdpqa_counts pdpqa_calls;
 void pdpqa_reset(void);
 int pdpqa_seeded_open(FILE *stream, int requested_mode);
+int pdpqa_allocate(int output, int format);
+void pdpqa_deallocate(void);
+void *pdpqa_text_unit(int index);
+int pdpqa_text_pointer(void *encoded, int index, int last);
 int pdpqa_failure(const char *condition, int line);
 #endif

@@ -522,6 +522,8 @@ GOTRET   DS    0H
 *
          ENTRY DREAD
 DREAD    DS    0H
+* The callback restores ADISP's R12 after the separate PC-entry scope.
+         USING ADISP,R12
          STM   R0,R15,FLCGRSAV        Save application registers
          AIF   ('&XSYS' EQ 'ZARCH').ZRDA
          ST    R14,SVCOPSW+4
@@ -535,7 +537,8 @@ DREAD    DS    0H
          OI    FLCESOPW+4,X'80'
          AGO   .STAY24B
 .STAY24A ANOP
-         NI    FLCESOPW+4,X'00'
+* The C32 z/Architecture profile resumes the callback in AM31.
+         OI    FLCESOPW+4,X'80'
 .STAY24B ANOP
 *         NI    FLCESOPW+3,X'FE'
 .ZRDB    ANOP
@@ -574,7 +577,7 @@ DWRITE   DS    0H
          OI    FLCESOPW+4,X'80'
          AGO   .STAY24D
 .STAY24C ANOP
-         NI    FLCESOPW+4,X'00'
+         OI    FLCESOPW+4,X'80'
 .STAY24D ANOP
 *         NI    FLCESOPW+3,X'FE'
 .ZWRB    ANOP

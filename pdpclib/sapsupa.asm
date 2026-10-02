@@ -993,13 +993,13 @@ CUNEWIO  DC    X'000C0000'  machine check, EC, DAT off
          DC    A(AMBIT+CUCONT)  continuation after I/O request
          AGO   .ZCCCB
 .ZCCCA   ANOP
-C3RWTNER DC    X'060E0001'  I/O, machine check, EC, wait, DAT on
+C3RWTNER DC    A(X'060E0000'+AM64BIT)  I/O, wait, selected AM
          DC    A(AMBIT)     no error
-C3NEWIO  DC    X'00040001'  machine check, EC, DAT off
+C3NEWIO  DC    A(X'00040000'+AM64BIT)  machine check, selected AM
          DC    A(AMBIT)
          DC    A(0)
          DC    A(C3RCONT)  continuation after I/O request
-CUNEWIO  DC    X'00040001'  machine check, EC, DAT off
+CUNEWIO  DC    A(X'00040000'+AM64BIT)  machine check, selected AM
          DC    A(AMBIT)
          DC    A(0)
          DC    A(CUCONT)  continuation after I/O request

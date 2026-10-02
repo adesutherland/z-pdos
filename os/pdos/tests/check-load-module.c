@@ -27,8 +27,10 @@ static int read_image(const char *path, char *bytes)
 int main(int argc, char **argv)
 {
     char *original, *image, *expected; int raw, want, length, entry, amode, rmode;
-    unsigned long base, offset, expected_entry; unsigned control; int i;
-    if (argc != 5) return 2;
+    unsigned long base, offset, expected_entry; unsigned control; int i, expected_rmode;
+    if (argc != 6) return 2;
+    REQUIRE(!strcmp(argv[5],"0") || !strcmp(argv[5],"1"));
+    expected_rmode = atoi(argv[5]);
     base = strtoul(argv[3],NULL,0); expected_entry = strtoul(argv[4],NULL,0);
     REQUIRE(base <= 0x7fffffffUL && expected_entry < CAPACITY);
     original = (char *)malloc(CAPACITY+1);
@@ -40,7 +42,7 @@ int main(int argc, char **argv)
     REQUIRE(fixPEMode(image,&length,&entry,(int)base,CAPACITY,&amode,&rmode) == 0);
     offset = ((unsigned long)(unsigned int)entry-(unsigned long)image) & 0xffffffffUL;
     /* MVS CESD lengths round the final section to eight bytes. */
-    REQUIRE(length == (want+7)/8*8 && amode == 2 && rmode == 0);
+    REQUIRE(length == (want+7)/8*8 && amode == 2 && rmode == expected_rmode);
     for (i = want; i < length; ++i) REQUIRE(image[i] == 0);
     REQUIRE(offset == expected_entry && offset < (unsigned long)length);
     REQUIRE(!memcmp(image,expected,(size_t)want));
@@ -51,6 +53,6 @@ int main(int argc, char **argv)
         REQUIRE(fixPEMode(image,&length,&entry,(int)base,
             control == 2 ? raw-1 : CAPACITY,&amode,&rmode) != 0);
     }
-    printf("PDOS loader: %d payload bytes, entry 0x%lx, AMODE31/RMODE24; malformed controls rejected\n",want,offset);
+    printf("PDOS loader: %d payload bytes, entry 0x%lx, AMODE31/RMODE%s; malformed controls rejected\n",want,offset,expected_rmode ? "ANY" : "24");
     free(original); free(image); free(expected); return 0;
 }

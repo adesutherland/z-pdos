@@ -48,9 +48,12 @@ link_one: procedure = .int
   end
   rdw = work || "/" || name || ".mvs"
   map = work || "/" || name || ".map"
+  residence = "24"; rmode = "0"
+  /* PCOMM is an AM31 application; the kernel loads it above 16 MiB. */
+  if name = "PCOMM" then do; residence = "ANY"; rmode = "1"; end
   address crexx "run cmake -E rm -f :rdw :map"
   if rc <> 0 then return rc
-  address crexx "run :linker --oformat mvs --image-base 0 --amode 31 --rmode 24 -e @@MAIN -Map :map -o :rdw :objects[]"
+  address crexx "run :linker --oformat mvs --image-base 0 --amode 31 --rmode :residence -e @@MAIN -Map :map -o :rdw :objects[]"
   if rc <> 0 then return rc
   entry = ""
   lines = readlines(map)
@@ -65,7 +68,7 @@ link_one: procedure = .int
     if rc <> 0 then return rc
     address crexx "run :linker --oformat binary --image-base :base -e @@MAIN -o :binary :objects[]"
     if rc <> 0 then return rc
-    address crexx "run :checker :rdw :binary :base :entry"
+    address crexx "run :checker :rdw :binary :base :entry :rmode"
     if rc <> 0 then return rc
   end
   say name "fresh link and real-loader reconstruction pass at both bases"

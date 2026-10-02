@@ -8420,15 +8420,12 @@ static void filedef(char *fdddname, char *fnm, int mymode)
     tu[1].parm1_len = strlen(fnm);
     strcpy(tu[1].parm1, fnm);
 
-    tu_list[2] = &tu[2];
+    /* SVC99 terminates the list on the last actual text-unit pointer. */
+    tu_list[2] = (void *)((unsigned long)&tu[2] | 0x80000000UL);
     tu[2].key = 0x0004; /* disp */
     tu[2].numparms = 1;
     tu[2].parm1_len = 1;
     tu[2].parm1[0] = 0x08; /* SHR */
-
-    tu_list[3] = 0;
-    tu_list[4] = 0;
-    tu_list[5] = (void *)0x80000000;
 
     errno = __svc99(&rb);
 
@@ -8458,13 +8455,14 @@ static void filedef(char *fdddname, char *fnm, int mymode)
             else
             {
                 /* V255 */
+                tu_list[2] = &tu[2];
                 tu_list[3] = &tu[3];
                 tu[3].key = 0x49; /* RECFM */
                 tu[3].numparms = 1;
                 tu[3].parm1_len = 1;
                 tu[3].parm1[0] = 0x40; /* V */
 
-                tu_list[4] = &tu[4];
+                tu_list[4] = (void *)((unsigned long)&tu[4] | 0x80000000UL);
                 tu[4].key = 0x42; /* LRECL */
                 tu[4].numparms = 1;
                 tu[4].parm1_len = 2;
@@ -8492,13 +8490,11 @@ static void fdclr(char *ddname)
     rb.verb = 0x02; /* unallocate */
     rb.tu_list = tu_list;
 
-    tu_list[0] = &tu[0];
+    tu_list[0] = (void *)((unsigned long)&tu[0] | 0x80000000UL);
     tu[0].key = 0x0001; /* ddname */
     tu[0].numparms = 1;
     tu[0].parm1_len = strlen(ddname);
     strcpy(tu[0].parm1, ddname);
-
-    tu_list[1] = (void *)0x80000000;
 
     __svc99(&rb);
     return;

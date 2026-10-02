@@ -124,7 +124,50 @@ char *__getepf(char *dsn)
 
 int __svc99(void *request)
 {
-    (void)request;
-    ++pdpqa_calls.unexpected;
-    return 1;
+    struct request_block {
+        char length, verb, flags[2];
+        short error, information;
+        void **list;
+    };
+    struct text_unit {
+        short key, count, length;
+        unsigned char bytes[98];
+    };
+    struct request_block *rb = (struct request_block *)request;
+    struct text_unit *unit;
+    static const short keys[5] = {1, 2, 4, 0x49, 0x42};
+    int i, count;
+    if (!pdpqa_calls.svc99_allowed) {
+        ++pdpqa_calls.unexpected;
+        return 1;
+    }
+    ++pdpqa_calls.svc99_calls;
+    if (rb->length != 20 || (rb->verb != 1 && rb->verb != 2))
+        ++pdpqa_calls.unexpected;
+    count = rb->verb == 2 ? 1 : 3;
+    if (rb->verb == 1) {
+        unit = (struct text_unit *)pdpqa_text_unit(2);
+        if (unit->bytes[0] == 4 && pdpqa_calls.svc99_allowed == 2)
+            count = 5;
+        if (unit->bytes[0] != (pdpqa_calls.svc99_calls == 1 ? 8 : 4))
+            ++pdpqa_calls.unexpected;
+    }
+    for (i = 0; i < count; ++i) {
+        if (!pdpqa_text_pointer(rb->list[i], i, i == count - 1))
+            ++pdpqa_calls.unexpected;
+        unit = (struct text_unit *)pdpqa_text_unit(i);
+        if (unit->key != keys[i] || unit->count != 1)
+            ++pdpqa_calls.unexpected;
+        if (i == 0 && (unit->length != 8
+            || memcmp(unit->bytes, "INPUT   ", 8)))
+            ++pdpqa_calls.unexpected;
+        if (i == 1 && (unit->length != 9
+            || memcmp(unit->bytes, "INPUT.DAT", 9)))
+            ++pdpqa_calls.unexpected;
+        if (i == 3 && (unit->length != 1 || unit->bytes[0] != 0x40))
+            ++pdpqa_calls.unexpected;
+        if (i == 4 && (unit->length != 2 || unit->bytes[0] != 0
+            || unit->bytes[1] != 255)) ++pdpqa_calls.unexpected;
+    }
+    return pdpqa_calls.svc99_fail_first && pdpqa_calls.svc99_calls == 1;
 }

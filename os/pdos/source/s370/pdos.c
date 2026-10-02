@@ -74,6 +74,8 @@
 
 #include "pdosutil.h"
 
+#define ZPDOS_VERSION "0.1"
+
 #include "__memmgr.h"
 
 /* force the use of EBCDIC ANSI even on a 3270 terminal,
@@ -1900,7 +1902,7 @@ int pdosInit(PDOS *pdos)
             }
         }
     }
-    printf("Welcome to PDOS!!!\n");
+    printf("Welcome to z/PDOS %s\n", ZPDOS_VERSION);
 #if 0
     printf("IPL string is %s\n", pdos->iplregs);
     printf("IPL device is %x\n", pdos->ipldev);
@@ -3148,6 +3150,10 @@ static void pdosProcessSVC(PDOS *pdos)
                 memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
                            (char *)pdos->context->regs[1]);
             }
+            /* Conditional FREEMAIN returns success in R15. Its incoming
+               request bits are not a completion code. Native callers use
+               this result to detect failed heap cleanup. */
+            if (svc == 120) pdos->context->regs[15] = 0;
         }
     }
 #ifdef ZARCH
@@ -3295,7 +3301,11 @@ static void pdosProcessSVC(PDOS *pdos)
                    (char *)pdos->context->regs[1],
                    pdos64BoundDd(pdos, (char *)pdos->context->regs[1]) != NULL);
         if (pdos->context->module_rmode_any == 1
-            && pdos64BoundDd(pdos, (char *)pdos->context->regs[1]) == NULL)
+            && pdos64BoundDd(pdos, (char *)pdos->context->regs[1]) == NULL
+            /* Standard streams are implicit terminal allocations. */
+            && memcmp((char *)pdos->context->regs[1], "SYSIN   ", 8) != 0
+            && memcmp((char *)pdos->context->regs[1], "SYSPRINT", 8) != 0
+            && memcmp((char *)pdos->context->regs[1], "SYSTERM ", 8) != 0)
         {
             memset((void *)pdos->context->regs[0], 0, 8);
             pdos->context->regs[15] = 8; /* unallocated DD */
@@ -5587,12 +5597,11 @@ static int pdosRamDisk(PDOS *pdos, char *parm)
 }
 
 
-/* load executable into memory, on a predictable 1 MB boundary,
-   by requesting 5 MB */
+/* Load a bounded native executable; wider tools need more than 5 MiB. */
 
 static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
 {
-    enum { EXE_CAPACITY = 5 * 1024 * 1024 };
+    enum { EXE_CAPACITY = 8 * 1024 * 1024 };
     char *raw;
     char *initial;
     char *load;
@@ -5855,9 +5864,23 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
 #endif
             return (-1);
         }
+#ifdef ZARCH
+        /* This loader allocates above 16 MiB. Reject a directory that
+           requires low residence or AMODE24 before creating its context.
+           RMODE64 code uses the separate high LOAD/DELETE path. */
+        if (loadAmode == 0 || loadRmodeAny != 1)
+        {
+            printf("unsupported direct-load mode: AMODE%d RMODE%s\n",
+                   loadAmode == 0 ? 24 : loadAmode == 1 ? 64 : 31,
+                   loadRmodeAny == 0 ? "24" :
+                   loadRmodeAny == 1 ? "ANY" : "64");
+            memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem, raw);
+            return (-1);
+        }
+#endif
         if (exeLen <= EXE_CAPACITY - 0x1000)
             exeLen += 0x1000; /* give some buffer if it fits */
-        /* unconditionally reduce the 5 MB to something reasonable */
+        /* Reduce the serialized-input allocation to the loaded image size. */
 #if defined(ZARCH)
         memmgrRealloc(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
                       raw, exeLen);

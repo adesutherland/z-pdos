@@ -51,6 +51,24 @@ int main(void)
     trace = fopen("dd:trace", "wb");
     CHECK(trace != NULL);
     __stderr_ptr = trace;
+    pdpqa_reset();
+    pdpqa_calls.svc99_allowed = 1;
+    CHECK(pdpqa_allocate(0, 5) == 0);
+    CHECK(pdpqa_calls.svc99_calls == 1 && pdpqa_calls.unexpected == 0);
+    pdpqa_reset();
+    pdpqa_calls.svc99_allowed = 1;
+    pdpqa_calls.svc99_fail_first = 1;
+    CHECK(pdpqa_allocate(1, 5) == 0);
+    CHECK(pdpqa_calls.svc99_calls == 2 && pdpqa_calls.unexpected == 0);
+    pdpqa_reset();
+    pdpqa_calls.svc99_allowed = 2;
+    pdpqa_calls.svc99_fail_first = 1;
+    CHECK(pdpqa_allocate(1, 1) == 0);
+    CHECK(pdpqa_calls.svc99_calls == 2 && pdpqa_calls.unexpected == 0);
+    pdpqa_reset();
+    pdpqa_calls.svc99_allowed = 1;
+    pdpqa_deallocate();
+    CHECK(pdpqa_calls.svc99_calls == 1 && pdpqa_calls.unexpected == 0);
     for (i = 0; i < sizeof ordinary / sizeof *ordinary; ++i) {
         result = supports(ordinary[i], i < 2 ? 0 : 1);
         if (result != 0) return result;

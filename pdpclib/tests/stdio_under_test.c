@@ -26,3 +26,28 @@ int pdpqa_seeded_open(FILE *stream, int requested_mode)
     osfopen();
     return err;
 }
+
+int pdpqa_allocate(int output, int format)
+{
+    err = 0;
+    modeType = format;
+    filedef("INPUT   ", "INPUT.DAT", output);
+    return err;
+}
+
+void pdpqa_deallocate(void)
+{
+    fdclr("INPUT   ");
+}
+
+void *pdpqa_text_unit(int index)
+{
+    return &tu[index];
+}
+
+int pdpqa_text_pointer(void *encoded, int index, int last)
+{
+    unsigned long expected = (unsigned long)&tu[index];
+    if (last) expected |= 0x80000000UL;
+    return (unsigned long)encoded == expected;
+}
