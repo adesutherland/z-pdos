@@ -6,6 +6,10 @@ Set-StrictMode -Version Latest
 if ($env:GITHUB_ACTIONS -ne 'true' -or !(Test-Path $env:RUNNER_TEMP)) {
     throw 'Installer execution requires a disposable GitHub Actions runner.'
 }
+# Native PowerShell does not inherit the MSYS shell step's tool PATH.
+# The installed smoke recipe uses that shell's shasum/Perl utilities.
+if (!(Test-Path -LiteralPath $env:PDOS_WINDOWS_BASH)) { throw 'Missing configured MSYS shell.' }
+$env:PATH = "$(Split-Path -Parent $env:PDOS_WINDOWS_BASH);$env:PATH"
 $registration = 'HKCU:\Software\z-pdos'
 $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\z-pdos'
 if ((Test-Path $registration) -or (Test-Path $uninstallKey)) { throw 'Existing z-pdos install.' }
