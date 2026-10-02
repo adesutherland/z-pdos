@@ -109,7 +109,9 @@ runlog: procedure = .int
   arg command = .string, log = .string
   say "Running:" command
   address system "( " || command || " ) > " || shellquote(log) || " 2>&1"
-  call require rc = 0, "command; see " || log
+  result = rc
+  if result <> 0 then address crexx "run tail -n 40 :log"
+  call require result = 0, "command; see " || log
   return 0
 
 quoted: procedure = .string

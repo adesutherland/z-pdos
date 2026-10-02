@@ -91,6 +91,6 @@ Open items require separate implementation authority.
 - Type: qualification
 - Status: In progress
 - Target: Fresh base-OS CCKD delivery built on the Linux GitHub runner
-- Observation: The existing image recipe and new archive packaging pass locally with the documented SDL Hercules utilities. The distro Hercules utility route and tag-release delivery remain unrun; packaged host checks do not establish fresh guest execution.
+- Observation: The existing image recipe and new archive packaging pass locally with the documented SDL Hercules utilities. The first distro Hercules route builds and links all OS inputs but fails the IPL disk check. Nested media logs are now retained and failing commands print their diagnostic tail. Distro utility qualification remains pending; packaged host checks do not establish fresh guest execution.
 - Evidence: `scripts/package-image.crexx`, `../../.github/workflows/build-release.yml`, and `../../doc/BUILD-AND-RELEASE.md`.
 - Acceptance: Linux builds the fresh disk from source, passes loader/dataset/compression controls, records its actual utility identities and delivers an archive whose extracted files match their inventory. Keep any new guest qualification explicitly separate.

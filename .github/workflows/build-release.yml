@@ -220,7 +220,7 @@ jobs:
             build/compiler/*/build.log
             build/compiler/*/codegen-tests.log
             build/tools/Testing/Temporary/LastTest.log
-            build/pdos/ci-image/*.log
+            build/pdos/ci-image/**/*.log
             build/installer-fixture/uninstall.nsh
           if-no-files-found: ignore
 
