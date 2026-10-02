@@ -249,9 +249,15 @@ write_receipt: procedure = .int
   call require length(commit) = 40 & verify(commit,"0123456789abcdef") = 0, "full source commit"
   address crexx "run git status --porcelain" output changes
   call require rc = 0, "working tree status"
-  if getenv("GITHUB_ACTIONS") = "true" then call require changes.0 = 0, "hosted packages require an unchanged source tree"
   dirty = "false"
-  if changes.0 > 0 then dirty = "true"
+  i = .int
+  do i = 1 to changes.0
+    if strip(changes[i]) <> "" then do
+      dirty = "true"
+      if getenv("GITHUB_ACTIONS") = "true" then say "Working-tree change: " || changes[i]
+    end
+  end
+  if getenv("GITHUB_ACTIONS") = "true" then call require dirty = "false", "hosted packages require an unchanged source tree"
   record = payload || "/release.json"
   address crexx "run cmake -E rm -f :record"
   call require rc = 0, "new release receipt"
