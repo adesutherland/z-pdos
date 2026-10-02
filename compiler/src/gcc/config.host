@@ -78,6 +78,10 @@ esac
 
 # Machine-specific settings.
 case ${host} in
+  x86_64-*-mingw32*)
+    host_xm_file=host-mingw.h
+    host_exeext=.exe
+    ;;
   alpha*-dec-*vms*)
     host_xm_file=alpha/xm-vms.h
     host_xmake_file=alpha/x-vms

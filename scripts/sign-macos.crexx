@@ -1,0 +1,140 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Adrian Sutherland
+ * Developer ID payload/PKG signing, Apple notarization and ticket stapling.
+ * Credentials are read from the environment, never written into the recipe.
+ */
+options levelb
+import rxfnsb
+
+main: procedure = .int expose keychain secret_dir
+  arg args = .string[]
+  keychain = ""; secret_dir = ""
+  if args.0 <> 4 then do
+    say "usage: crexx -nokeep scripts/sign-macos.crexx --args PLATFORM VERSION PAYLOAD ASSETS"
+    return 2
+  end
+  platform = args.1; version = args.2; payload = args.3; assets = args.4
+  call require platform = "macos-arm64" | platform = "macos-x86_64", "macOS platform"
+  call require verify(version,"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-+") = 0 & version <> "", "safe version"
+  call require payload = "build/release/" || platform || "/payload" & assets = "build/release/" || platform || "/assets", "owned release paths"
+  i = .int
+  names = "APPLE_DEVELOPER_ID_CERTIFICATE_BASE64 APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD APPLE_DEVELOPER_ID_IDENTITY APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_BASE64 APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_PASSWORD APPLE_DEVELOPER_ID_INSTALLER_IDENTITY APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID"
+  missing = ""
+  do i = 1 to words(names)
+    name = word(names,i)
+    if getenv(name) = "" then missing = missing || " " || name
+  end
+  call require missing = "", "missing Apple setting names:" || missing
+  candidate_dir = "build/release/" || platform || "/apple-private"
+  address crexx "run test -e :candidate_dir"
+  call require rc = 1, "new private signing directory"
+  secret_dir = candidate_dir
+  address crexx "run cmake -E make_directory :secret_dir"
+  call require rc = 0, "create private signing directory"
+  address crexx "run chmod 700 :secret_dir"
+  call require rc = 0, "restrict signing directory"
+  random_lines = .string[]
+  address crexx "run openssl rand -hex 32" output random_lines
+  call require rc = 0 & random_lines.0 = 1, "temporary keychain password"
+  password = strip(random_lines.1)
+  keychain = secret_dir || "/signing.keychain-db"
+  address crexx "run security create-keychain -p :password :keychain"
+  call require rc = 0, "create temporary keychain"
+  address crexx "run security set-keychain-settings -lut 21600 :keychain"
+  call require rc = 0, "keychain lifetime"
+  address crexx "run security unlock-keychain -p :password :keychain"
+  call require rc = 0, "unlock temporary keychain"
+  address crexx "run security list-keychains -d user -s :keychain"
+  call require rc = 0, "register temporary keychain for certificate-chain lookup"
+  address crexx "run security default-keychain -d user -s :keychain"
+  call require rc = 0, "select temporary signing keychain"
+  do i = 1 to 2
+    kind = ""
+    if i = 2 then kind = "INSTALLER_"
+    cert = secret_dir || "/certificate-" || i || ".p12"
+    certificate_variable = "APPLE_DEVELOPER_ID_" || kind || "CERTIFICATE_BASE64"
+    password_variable = "APPLE_DEVELOPER_ID_" || kind || "CERTIFICATE_PASSWORD"
+    address shell "printf '%s' " || '"$' || certificate_variable || '"' || " | base64 -D > " || quote(cert)
+    call require rc = 0, "decode " || certificate_variable
+    address shell "security import " || quote(cert) || " -k " || quote(keychain) || " -P " || '"$' || password_variable || '"' || " -T /usr/bin/codesign -T /usr/bin/productbuild"
+    call require rc = 0, "import " || certificate_variable || " and its private key"
+  end
+  quiet = .string[]
+  address crexx "run security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k :password :keychain" output quiet
+  call require rc = 0, "noninteractive Apple tool access"
+  identities = .string[]
+  address crexx "run security find-identity -v -p codesigning :keychain" output identities
+  call require rc = 0, "list imported Application signing identities"
+  identity = getenv("APPLE_DEVELOPER_ID_IDENTITY")
+  available = ""
+  do i = 1 to identities.0
+    available = available || identities[i]
+  end
+  call require pos(identity,available) > 0, "APPLE_DEVELOPER_ID_IDENTITY does not match an imported valid Application identity; check exact Common Name or SHA-1 and the Application p12 export"
+  files = .string[]
+  address shell "find " || quote(payload || "/bin") || " " || quote(payload || "/libexec") || " -type f" output files
+  call require rc = 0 & files.0 = 8, "all eight native compiler/assembler/linker files"
+  do i = 1 to files.0
+    path = files[i]
+    address crexx "run codesign --force --timestamp --options runtime --keychain :keychain --sign :identity :path"
+    call require rc = 0, "sign native payload"
+    address crexx "run codesign --verify --strict --verbose=2 :path"
+    call require rc = 0, "verify native payload signature"
+  end
+  address crexx "run crexx -nokeep scripts/release.crexx --args refresh-signed :platform :version"
+  call require rc = 0, "signed payload hashes"
+  address crexx "run crexx -nokeep scripts/release.crexx --args component-pkg :platform :version"
+  call require rc = 0, "component package"
+  component = "build/release/" || platform || "/component.pkg"
+  installer = assets || "/z-pdos-" || version || "-" || platform || "-signed.pkg"
+  identity = getenv("APPLE_DEVELOPER_ID_INSTALLER_IDENTITY")
+  address crexx "run productbuild --package :component --sign :identity --keychain :keychain --timestamp :installer"
+  call require rc = 0, "Developer ID Installer package signature"
+  address crexx "run pkgutil --check-signature :installer"
+  call require rc = 0, "verify installer signature"
+  call arraydrop(quiet)
+  address shell "xcrun notarytool submit " || quote(installer) || ' --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait --timeout 30m --output-format json' output quiet
+  call require rc = 0, "Apple notarization submission"
+  response = ""
+  do i = 1 to quiet.0
+    response = response || quiet[i]
+  end
+  call require pos('"Accepted"',response) > 0, "Apple notarization must be Accepted"
+  record = installer || ".notarization.json"
+  do i = 1 to quiet.0
+    call lineout record,quiet[i]
+  end
+  call lineout record
+  address crexx "run xcrun stapler staple :installer"
+  call require rc = 0, "staple notarization ticket"
+  address crexx "run xcrun stapler validate :installer"
+  call require rc = 0, "validate stapled ticket"
+  address crexx "run spctl --assess --type install --verbose=4 :installer"
+  call require rc = 0, "Gatekeeper installation assessment"
+  call cleanup
+  say "Signed, notarized and stapled: " || installer
+  return 0
+
+cleanup: procedure = .int expose keychain secret_dir
+  if keychain <> "" then do
+    address crexx "run security delete-keychain :keychain"
+    keychain = ""
+  end
+  if secret_dir <> "" then do
+    address crexx "run cmake -E rm -rf :secret_dir"
+    secret_dir = ""
+  end
+  return 0
+
+require: procedure = .int expose keychain secret_dir
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED: " || detail
+    call cleanup
+    exit 1
+  end
+  return 0
+
+quote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'",value,"'\''") || "'"

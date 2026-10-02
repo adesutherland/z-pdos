@@ -1,0 +1,250 @@
+name: Build and package z-pdos
+
+on:
+  push:
+    branches: [develop, main, master]
+    tags: ['v*']
+  pull_request:
+    branches: [develop, main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: z-pdos-build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-arm64
+            os: macos-15
+          - platform: macos-x86_64
+            os: macos-15-intel
+          - platform: linux-x64
+            os: ubuntu-24.04
+          - platform: windows-x64
+            os: windows-2025
+    defaults:
+      run:
+        shell: bash
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      commit: ${{ steps.identity.outputs.commit }}
+    steps:
+      - name: Keep source text identical across hosts
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Install Linux host and disk utilities
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes build-essential cmake ninja-build clang perl hercules
+      - name: Prepare native Windows build environment
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          path-type: inherit
+          update: true
+          install: >-
+            git make perl curl unzip diffutils
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-nsis
+      - name: Select Windows shell for subsequent steps
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          echo 'CREXX_ADDRESS_SHELL=C:/msys64/usr/bin/bash.exe' >> "$GITHUB_ENV"
+          echo 'CREXX_ADDRESS_SHELL_ARGS=-c' >> "$GITHUB_ENV"
+          echo 'CMAKE_GENERATOR=Ninja' >> "$GITHUB_ENV"
+          echo 'CC=gcc' >> "$GITHUB_ENV"
+      - name: Bootstrap pinned cREXX on Unix hosts
+        if: runner.os != 'Windows'
+        run: |
+          set -euo pipefail
+          read -r asset expected < <(awk '$1 == "${{ matrix.platform }}" {print $2, $3}' .github/crexx-bootstrap.txt)
+          test -n "$asset" && test -n "$expected"
+          mkdir -p build/bootstrap/runtime
+          curl --fail --location --retry 3 "https://github.com/adesutherland/CREXX/releases/download/v1.0.0-beta.3/$asset" -o build/bootstrap/runtime.zip
+          printf '%s  %s\n' "$expected" build/bootstrap/runtime.zip | shasum -a 256 -c -
+          cmake -E chdir build/bootstrap/runtime cmake -E tar xf ../runtime.zip
+          entry=$(find "$PWD/build/bootstrap/runtime" -type f -path '*/bin/crexx')
+          test -n "$entry" && test "$(printf '%s\n' "$entry" | wc -l | tr -d ' ')" = 1
+          chmod +x "$(dirname "$entry")"/*
+          dirname "$entry" >> "$GITHUB_PATH"
+          echo "CREXX_HOME=$(dirname "$(dirname "$entry")")" >> "$GITHUB_ENV"
+      - name: Bootstrap pinned native Windows cREXX
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          read -r asset expected < <(awk '$1 == "windows-x64" {print $2, $3}' .github/crexx-bootstrap.txt)
+          mkdir -p build/bootstrap/runtime
+          curl --fail --location --retry 3 "https://github.com/adesutherland/CREXX/releases/download/v1.0.0-beta.3/$asset" -o build/bootstrap/runtime.zip
+          printf '%s  %s\n' "$expected" build/bootstrap/runtime.zip | shasum -a 256 -c -
+          cmake -E chdir build/bootstrap/runtime cmake -E tar xf ../runtime.zip
+          entry=$(find "$PWD/build/bootstrap/runtime" -type f -path '*/bin/crexx.exe')
+          test -n "$entry" && test "$(printf '%s\n' "$entry" | wc -l | tr -d ' ')" = 1
+          echo "$(cygpath -w "$(dirname "$entry")")" >> "$GITHUB_PATH"
+          echo "CREXX_HOME=$(cygpath -w "$(dirname "$(dirname "$entry")")")" >> "$GITHUB_ENV"
+      - id: identity
+        name: Freeze source and release version
+        run: crexx -nokeep scripts/release.crexx --args metadata
+      - name: Check Windows installer construction before compiling dependencies
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: crexx -nokeep tests/release/test-installer-build.crexx
+      - name: Build and check both compilers and the complete toolchain (Unix)
+        if: runner.os != 'Windows'
+        run: crexx -nokeep scripts/build.crexx --args full-test
+      - name: Build and check both compilers and the complete toolchain (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: crexx -nokeep scripts/build.crexx --args full-test
+      - name: Stage and verify relocated installed tools (Unix)
+        if: runner.os != 'Windows'
+        env:
+          RELEASE_VERSION: ${{ steps.identity.outputs.version }}
+          RELEASE_PLATFORM: ${{ matrix.platform }}
+        run: |
+          crexx -nokeep scripts/release.crexx --args stage "$RELEASE_PLATFORM" "$RELEASE_VERSION"
+          crexx -nokeep scripts/release.crexx --args verify "$RELEASE_PLATFORM" "$RELEASE_VERSION"
+      - name: Stage, verify and package Windows tools
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          RELEASE_VERSION: ${{ steps.identity.outputs.version }}
+        run: |
+          crexx -nokeep scripts/release.crexx --args stage windows-x64 "$RELEASE_VERSION"
+          crexx -nokeep scripts/release.crexx --args package windows-x64 "$RELEASE_VERSION"
+      - name: Package macOS and Linux tools
+        if: runner.os != 'Windows'
+        env:
+          RELEASE_VERSION: ${{ steps.identity.outputs.version }}
+          RELEASE_PLATFORM: ${{ matrix.platform }}
+          PDOS_APPLE_SIGNING: ${{ runner.os == 'macOS' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) && 'required' || 'unsigned' }}
+          APPLE_DEVELOPER_ID_CERTIFICATE_BASE64: ${{ runner.os == 'macOS' && github.event_name != 'pull_request' && secrets.APPLE_DEVELOPER_ID_CERTIFICATE_BASE64 || '' }}
+          APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ runner.os == 'macOS' && github.event_name != 'pull_request' && secrets.APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD || '' }}
+          APPLE_DEVELOPER_ID_IDENTITY: ${{ runner.os == 'macOS' && github.event_name != 'pull_request' && secrets.APPLE_DEVELOPER_ID_IDENTITY || '' }}
+          APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_BASE64: ${{ runner.os == 'macOS' && github.event_name != 'pull_request' && secrets.APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_BASE64 || '' }}
+          APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_PASSWORD: ${{ runner.os == 'macOS' && github.event_name != 'pull_request' && secrets.APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_PASSWORD || '' }}
+          APPLE_DEVELOPER_ID_INSTALLER_IDENTITY: ${{ runner.os == 'macOS' && github.event_name != 'pull_request' && secrets.APPLE_DEVELOPER_ID_INSTALLER_IDENTITY || '' }}
+          APPLE_ID: ${{ runner.os == 'macOS' && github.event_name != 'pull_request' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ runner.os == 'macOS' && github.event_name != 'pull_request' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && github.event_name != 'pull_request' && secrets.APPLE_TEAM_ID || '' }}
+        run: crexx -nokeep scripts/release.crexx --args package "$RELEASE_PLATFORM" "$RELEASE_VERSION"
+      - name: Verify extracted portable delivery
+        if: runner.os != 'Windows'
+        env:
+          RELEASE_PLATFORM: ${{ matrix.platform }}
+        run: |
+          mkdir -p build/extracted
+          archive=$(find "build/release/$RELEASE_PLATFORM/assets" -maxdepth 1 -name '*.zip')
+          cmake -E chdir build/extracted cmake -E tar xf "$PWD/$archive"
+          crexx -nokeep tests/release/check-installed.crexx --args build/extracted
+      - name: Test macOS installer on the disposable runner
+        if: runner.os == 'macOS'
+        env:
+          RELEASE_PLATFORM: ${{ matrix.platform }}
+        run: |
+          installer=$(find "build/release/$RELEASE_PLATFORM/assets" -maxdepth 1 -name '*.pkg')
+          sudo installer -pkg "$installer" -target /
+          crexx -nokeep tests/release/check-installed.crexx --args /usr/local/lib/z-pdos
+          /usr/local/bin/mf-classic-cc --version
+      - name: Test Windows install, reinstall, PATH and uninstall
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = @(Get-ChildItem 'build/release/windows-x64/assets/*-setup.exe')
+          if ($installer.Count -ne 1) { throw 'Expected one Windows installer' }
+          & ./tests/release/test-windows-installer.ps1 -Installer $installer[0].FullName
+      - name: Build and check fresh PDOS disk
+        if: runner.os == 'Linux'
+        env:
+          RELEASE_VERSION: ${{ steps.identity.outputs.version }}
+        run: |
+          crexx -nokeep pdos/scripts/image.crexx --args build/pdos/ci-image "$(dirname "$(command -v dasdload)")"
+          crexx -nokeep pdos/scripts/package-image.crexx --args build/pdos/ci-image "$RELEASE_VERSION"
+      - name: Retain checked host installers and archives
+        uses: actions/upload-artifact@v7
+        with:
+          name: z-pdos-${{ matrix.platform }}-${{ steps.identity.outputs.commit }}
+          path: build/release/${{ matrix.platform }}/assets/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain checked fresh base disk image
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7
+        with:
+          name: z-pdos-image-${{ steps.identity.outputs.commit }}
+          path: build/release/pdos-image/assets/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove temporary Apple keychains and certificates
+        if: always() && runner.os == 'macOS'
+        env:
+          RELEASE_PLATFORM: ${{ matrix.platform }}
+        run: |
+          private="build/release/$RELEASE_PLATFORM/apple-private"
+          if test -e "$private/signing.keychain-db"; then security delete-keychain "$private/signing.keychain-db"; fi
+          rm -rf "$private"
+      - name: Retain failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: diagnostics-${{ matrix.platform }}-${{ github.sha }}
+          path: |
+            build/compiler/*/configure.log
+            build/compiler/*/build.log
+            build/compiler/*/codegen-tests.log
+            build/tools/Testing/Temporary/LastTest.log
+            build/pdos/ci-image/*.log
+          if-no-files-found: ignore
+
+  publish:
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: z-pdos-*-${{ needs.build.outputs.commit }}
+          path: build/downloaded
+      - name: Bootstrap the checked Linux cREXX runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          read -r asset expected < <(awk '$1 == "linux-x64" {print $2, $3}' .github/crexx-bootstrap.txt)
+          mkdir -p build/bootstrap/runtime
+          curl --fail --location --retry 3 "https://github.com/adesutherland/CREXX/releases/download/v1.0.0-beta.3/$asset" -o build/bootstrap/runtime.zip
+          printf '%s  %s\n' "$expected" build/bootstrap/runtime.zip | shasum -a 256 -c -
+          cmake -E chdir build/bootstrap/runtime cmake -E tar xf ../runtime.zip
+          entry=$(find "$PWD/build/bootstrap/runtime" -type f -path '*/bin/crexx')
+          test -n "$entry"
+          chmod +x "$(dirname "$entry")"/*
+          dirname "$entry" >> "$GITHUB_PATH"
+          echo "CREXX_HOME=$(dirname "$(dirname "$entry")")" >> "$GITHUB_ENV"
+      - name: Publish the verified tag artifacts and corresponding source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+          SOURCE_COMMIT: ${{ needs.build.outputs.commit }}
+        run: crexx -nokeep scripts/publish-release.crexx --args "$RELEASE_VERSION" "$SOURCE_COMMIT"

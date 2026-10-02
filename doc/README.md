@@ -7,4 +7,6 @@ material. [WORKFLOW.md](WORKFLOW.md) defines the single-backlog process;
 
 - [Machine contracts](../machines/README.md)
 - [Component licence map](../LICENSES.md)
+- [Builds, installers, signing and version-tag releases](BUILD-AND-RELEASE.md)
+- [2 October release preparation and local checks](RELEASE-PREPARATION-20261002.md)
 - [2 October reorganisation record](REORGANISATION-20261002.md)

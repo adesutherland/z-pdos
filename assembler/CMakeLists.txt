@@ -20,6 +20,7 @@ add_library(mf_classic STATIC
   src/values.c src/reader.c src/machine.c src/assemble.c src/object.c)
 target_include_directories(mf_classic PUBLIC src/include)
 add_executable(mf-classic-as src/main.c)
+install(TARGETS mf-classic-as RUNTIME DESTINATION bin)
 if(MF_TRADITIONAL_MACROS)
   add_library(mf_classic_macro STATIC src/macro_cards.c src/macro_expr.c src/macro_provider.c)
   target_include_directories(mf_classic_macro PUBLIC src/include)
@@ -108,7 +109,7 @@ endif()
 # Pure C unit tests and independent positive deck checks do not depend on it.
 find_program(CREXX_EXECUTABLE crexx)
 if(CREXX_EXECUTABLE)
-  set(classic_compiler ${PROJECT_SOURCE_DIR}/build/compiler/mvs/gcc/mf-classic-cc)
+  set(classic_compiler ${PROJECT_SOURCE_DIR}/build/compiler/mvs/gcc/mf-classic-cc${CMAKE_EXECUTABLE_SUFFIX})
   if(MF_TRADITIONAL_MACROS AND EXISTS ${classic_compiler})
     add_test(NAME classic_compiler_object
       COMMAND ${CREXX_EXECUTABLE} -nokeep ${PROJECT_SOURCE_DIR}/tests/integration/check-classic-call.crexx

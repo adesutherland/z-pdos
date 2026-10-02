@@ -59,6 +59,15 @@ Open items require separate implementation authority.
 - Evidence: doc/qualification/MANUAL-RECONCILIATION.md and UPSTREAM.md.
 - Acceptance: Compare an exact attributable source bundle if it becomes available; retain current available-source limits.
 
+## CC-007: Installed toolchain and native Windows host qualification
+
+- Type: qualification
+- Status: In progress
+- Target: macOS ARM64/Intel, Linux x64 and native Windows x64 host tools
+- Observation: Relocatable launchers and the MinGW host configuration are prepared. Local Apple Silicon build, installed MVS/CMS compile/assemble/link and Windows argument-quoting checks pass. Native Windows execution and the other hosted builds remain unrun.
+- Evidence: `src/driver.c`, `src/gcc/config/host-mingw.h`, root `tests/release/`, and `../../doc/BUILD-AND-RELEASE.md`.
+- Acceptance: Both variants build and pass the complete required suite on each declared host; extracted and installed commands produce independently expected bytes from a path containing spaces; missing private tools fail; the hosted Windows installer passes install/reinstall/PATH/uninstall controls.
+
 The earlier first-COPY gap is closed for the selected z/PDOS workload. Exact
 XL4/XL8 HFP emission was selected before this migration; it retains target
 rounding and widths and does not change the ABI or admit HFP into integer-only

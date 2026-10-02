@@ -1,0 +1,81 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Adrian Sutherland
+ * Exercise the relocated public commands and reject missing private tools.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 1 then return 2
+  input = changestr('5C'x,args.1,"/")
+  address shell "cd " || quote(input) || " && shasum -a 256 -c SHA256SUMS"
+  call require rc = 0, "installed or extracted final-byte inventory"
+  extension = ""
+  if getenv("OS") = "Windows_NT" then extension = ".exe"
+  work = "build/release-check"
+  address crexx "run cmake -E make_directory :work"
+  call require rc = 0, "test output directory"
+  ids = .string[]
+  address crexx "run cmake -E capabilities" output ids
+  call require rc = 0, "CMake available"
+  moved = work || "/moved tools"
+  address crexx "run cmake -E rm -rf :moved"
+  call require rc = 0, "clear owned moved fixture"
+  address crexx "run cmake -E copy_directory :input :moved"
+  call require rc = 0, "move payload into a directory containing spaces"
+  query_lines = .string[]
+  i = .int
+  do i = 1 to 2
+    variant = word("mvs cms",i)
+    command = moved || "/bin/mf-classic-cc"
+    if i = 2 then command = command || "-cms"
+    command = command || extension
+    call arraydrop(query_lines)
+    address crexx "run :command -print-prog-name=cc1" output query_lines
+    call require rc = 0 & query_lines.0 = 1, "private compiler query"
+    selected = changestr('5C'x,strip(query_lines.1),"/")
+    call require pos("/moved tools/",selected) > 0 & pos("/libexec/z-pdos/" || variant || "/cc1",selected) > 0, "use relocated private compiler, not original checkout"
+    source = "compiler/tests/fullword-bits.c"
+    assembly = work || "/" || variant || ".asm"
+    object = work || "/" || variant || ".obj"
+    binary = work || "/" || variant || ".bin"
+    address crexx "run cmake -E rm -f :assembly :object :binary"
+    call require rc = 0, "clear owned chain outputs"
+    address crexx "run :command -S -Os :source -o :assembly"
+    call require rc = 0, "installed compiler code generation"
+    cli = moved || "/bin/mf-classic-as" || extension
+    profile = moved || "/share/z-pdos/pdpclib/source/profiles/pdos-zarch"
+    runtime = moved || "/share/z-pdos/pdpclib/source"
+    address crexx "run :cli --macros -I :profile -I :runtime :assembly :object"
+    call require rc = 0, "installed assembler and target macros"
+    linker = moved || "/bin/mf-classic-ld" || extension
+    address crexx "run :linker --oformat binary --image-base 0 -e WORDS -o :binary :object"
+    call require rc = 0, "installed linker"
+    checker = "build/tools/assembler/test_cli_output" || extension
+    address crexx "run :checker fullword-bits :binary"
+    call require rc = 0, "independently expected complete fullword bytes"
+    address crexx "run :command -c :source -o :object"
+    call require rc = 2, "unsupported object generation still rejected"
+    private = moved || "/libexec/z-pdos/" || variant || "/cc1" || extension
+    saved = private || ".saved"
+    address crexx "run cmake -E rename :private :saved"
+    call require rc = 0, "remove only fixture private compiler"
+    address crexx "run :command -S :source -o :assembly"
+    call require rc = 2, "missing private compiler cannot borrow checkout or PATH"
+    address crexx "run cmake -E rename :saved :private"
+    call require rc = 0, "restore fixture"
+  end
+  say "PASS: relocated MVS/CMS compile, assemble, link, exact bytes and missing-tool controls"
+  return 0
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED: " || detail
+    exit 1
+  end
+  return 0
+
+quote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'",value,"'\''") || "'"

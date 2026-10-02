@@ -3,17 +3,24 @@
  * Development-host orchestration. Run from the repository root.
  */
 options levelb
+import rxfnsb
 main: procedure = .int
   arg args = .string[]
   action = "test"
   if args.0 > 1 then do
-    say "usage: crexx -nokeep scripts/build.crexx --args build|test|sanitize"
+    say "usage: crexx -nokeep scripts/build.crexx --args build|test|sanitize|full-test"
     return 2
   end
   if args.0 = 1 then action = args.1
-  if action <> "build" & action <> "test" & action <> "sanitize" then do
-    say "usage: crexx -nokeep scripts/build.crexx --args build|test|sanitize"
+  if action <> "build" & action <> "test" & action <> "sanitize" & action <> "full-test" then do
+    say "usage: crexx -nokeep scripts/build.crexx --args build|test|sanitize|full-test"
     return 2
+  end
+  if action = "full-test" then do
+    address crexx "run crexx -nokeep compiler/scripts/build.crexx --args test mvs"
+    if rc <> 0 then return rc
+    address crexx "run crexx -nokeep compiler/scripts/build.crexx --args test cms"
+    if rc <> 0 then return rc
   end
   build_dir = "build/tools"
   sanitize = "OFF"
@@ -22,10 +29,18 @@ main: procedure = .int
     sanitize = "ON"
   end
   sanitize_option = "-DMF_SANITIZERS=" || sanitize
-  address crexx "run cmake -S . -B :build_dir :sanitize_option"
+  full_option = "-DMF_REQUIRE_FULL_CHECKS=OFF"
+  if action = "full-test" then full_option = "-DMF_REQUIRE_FULL_CHECKS=ON"
+  link_option = "-DCMAKE_EXE_LINKER_FLAGS="
+  compiler_option = "-DCMAKE_C_COMPILER=cc"
+  if getenv("OS") = "Windows_NT" then do
+    link_option = "-DCMAKE_EXE_LINKER_FLAGS=-static-libgcc"
+    compiler_option = "-DCMAKE_C_COMPILER=gcc"
+  end
+  address crexx "run cmake -S . -B :build_dir :sanitize_option :full_option :link_option :compiler_option -DCMAKE_BUILD_TYPE=Release"
   if rc <> 0 then return rc
-  address crexx "run cmake --build :build_dir"
+  address crexx "run cmake --build :build_dir --config Release"
   if rc <> 0 then return rc
   if action = "build" then return 0
-  address crexx "run ctest --test-dir :build_dir --output-on-failure"
+  address crexx "run ctest --test-dir :build_dir -C Release --output-on-failure"
   return rc

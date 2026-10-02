@@ -14,7 +14,7 @@ main: procedure = .int
   if variant <> "mvs" & variant <> "cms" then return usage()
   location = .string[]
   address crexx "pwd" output location
-  root = strip(location.1)
+  root = changestr('5C'x,strip(location.1),"/")
   address crexx "run test -f compiler/src/gcc/config/i370/i370.c"
   if rc <> 0 then return 2
   work = root || "/build/compiler/" || variant
@@ -22,31 +22,47 @@ main: procedure = .int
   target = "i370-ibm-mvspdp"
   if variant = "cms" then target = "i370-ibm-cms"
   flags = "-g -O0 -fcommon -std=gnu89 -w -Wno-implicit-int -Wno-implicit-function-declaration -Wno-int-conversion -Wno-error -Wno-return-type -Wno-deprecated-non-prototype"
-  environment = "env " || shellquote("CC=cc") || " " || shellquote("CFLAGS=" || flags) || " " || shellquote("LDFLAGS=")
+  host_cc = "cc"
+  suffix = ""
+  if getenv("OS") = "Windows_NT" then do
+    host_cc = "gcc"; suffix = ".exe"
+  end
+  link_flags = ""
+  host_options = ""
+  if suffix = ".exe" then do
+    link_flags = "-static-libgcc"
+    host_identity = .string[]
+    address crexx "run gcc -dumpmachine" output host_identity
+    if rc <> 0 | host_identity.0 <> 1 then return 2
+    host_triple = strip(host_identity.1)
+    if host_triple <> "x86_64-w64-mingw32" then return 2
+    host_options = " --build=" || host_triple || " --host=" || host_triple
+  end
+  environment = "env " || shellquote("CC=" || host_cc) || " " || shellquote("CFLAGS=" || flags) || " " || shellquote("LDFLAGS=" || link_flags)
   address crexx "mkdir -p :work"
   if rc <> 0 then return rc
   address crexx "cd :work"
   if rc <> 0 then return rc
-  configure = environment || " /bin/sh " || shellquote(source) || " --target=" || target || " --enable-languages=c --disable-threads --disable-nls --disable-shared --without-headers " || shellquote("--prefix=" || work || "/install") || " " || shellquote("--with-gcc-version-trigger=" || root || "/compiler/src/gcc/version.c")
+  configure = environment || " /bin/sh " || shellquote(source) || " --target=" || target || host_options || " --enable-languages=c --disable-threads --disable-nls --disable-shared --without-headers " || shellquote("--prefix=" || work || "/install") || " " || shellquote("--with-gcc-version-trigger=" || root || "/compiler/src/gcc/version.c")
   say "Configuring" variant "; log:" work || "/configure.log"
-  address system configure || " > configure.log 2>&1"
+  address shell configure || " > configure.log 2>&1"
   if rc <> 0 then return rc
   say "Building compiler; log:" work || "/build.log"
-  address system environment || " make -j6 all-gcc U= " || shellquote("CFLAGS=" || flags) || " " || shellquote("CFLAGS_FOR_BUILD=" || flags) || " > build.log 2>&1"
+  address shell environment || " make -j6 all-gcc U= " || shellquote("CFLAGS=" || flags) || " " || shellquote("CFLAGS_FOR_BUILD=" || flags) || " > build.log 2>&1"
   if rc <> 0 then return rc
   gccdir = work || "/gcc"
   launcher = root || "/compiler/src/driver.c"
-  command = gccdir || "/mf-classic-cc"
-  define = '-DMF_CC_DIR="' || gccdir || '"'
-  address crexx "run cc -std=c89 -Wall -Wextra -pedantic :define :launcher -o :command"
+  command = gccdir || "/mf-classic-cc" || suffix
+  define = '-DMF_CC_VARIANT="' || variant || '"'
+  address crexx "run :host_cc -std=c89 -Wall -Wextra -pedantic :define :launcher -o :command"
   if rc <> 0 then return rc
   address crexx "cd :root"
   if rc <> 0 then return rc
   address crexx "run :command --version"
   if rc <> 0 then return rc
   if action = "build" then return 0
-  cc1env = "CC1=" || gccdir || "/cc1"
-  address system "env " || shellquote(cc1env) || " sh compiler/src/tests/run.sh > " || shellquote(work || "/codegen-tests.log") || " 2>&1"
+  cc1env = "CC1=" || gccdir || "/cc1" || suffix
+  address shell "env " || shellquote(cc1env) || " sh compiler/src/tests/run.sh > " || shellquote(work || "/codegen-tests.log") || " 2>&1"
   if rc <> 0 then do
     say "Code-generation tests failed; see" work || "/codegen-tests.log"
     return rc

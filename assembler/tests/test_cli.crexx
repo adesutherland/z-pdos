@@ -17,7 +17,7 @@ main: procedure = .int
   cli = args.1; checker = args.2; fixtures = args.3; work = args.4
   call require work <> "" & work <> "/" & work <> ".", "owned work directory is required"
   command = "cmake -E make_directory " || shellquote(work)
-  address system command
+  address shell command
   call require rc = 0, "create test working directory"
   stdout_path = work || "/stdout.txt"; stderr_path = work || "/stderr.txt"
   forms = fixtures || "/forms.asm"
@@ -148,7 +148,7 @@ require: procedure = .int
 run_case: procedure = .int
   arg executable = .string, arguments = .string, expected = .int, stdout_path = .string, stderr_path = .string, description = .string
   command = shellquote(executable) || " " || arguments || " > " || shellquote(stdout_path) || " 2> " || shellquote(stderr_path)
-  address system command
+  address shell command
   actual = rc
   if actual <> expected then do
     say "FAILED: " || description || " returned " || actual || " expected " || expected
@@ -160,7 +160,7 @@ run_case: procedure = .int
 erase: procedure = .int
   arg path = .string
   command = "cmake -E rm -f " || shellquote(path)
-  address system command
+  address shell command
   call require rc = 0, "remove test-owned output " || path
   return 0
 

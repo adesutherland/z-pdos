@@ -51,6 +51,10 @@ build_install_headers_dir=install-headers-tar
 
 # System-specific settings.
 case $build in
+  x86_64-*-mingw32*)
+    build_xm_file=host-mingw.h
+    build_exeext=.exe
+    ;;
   alpha*-dec-osf4*)
     # Some versions of OSF4 (specifically X4.0-9 296.7) have
     # a broken tar, so we use cpio instead.

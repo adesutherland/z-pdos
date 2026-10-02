@@ -16,11 +16,11 @@ main: procedure = .int
   valid = profile = "mvs38-s370-24" | profile = "tso31-lean" | profile = "tso-zos15-24" | profile = "pdos390-esa" | profile = "pdos-zarch"
   call require valid, "known explicit profile"
   call require left(work, 6) = "build/" & length(work) > 6 & pos("..", work) = 0, "new owned directory under build/"
-  address system "test ! -e " || shellquote(work)
+  address shell "test ! -e " || shellquote(work)
   call require rc = 0, "output does not already exist"
-  address system "cmake -E make_directory " || shellquote(work)
+  address shell "cmake -E make_directory " || shellquote(work)
   call require rc = 0, "create owned directory"
-  address system "cmake -E copy_directory pdpclib/src " || shellquote(work || "/pdpclib")
+  address shell "cmake -E copy_directory pdpclib/src " || shellquote(work || "/pdpclib")
   call require rc = 0, "copy maintained library source"
   selection = readfile("pdpclib/src/profiles/" || profile || "/mvssupa.inputs")
   fragments = ""
@@ -29,12 +29,12 @@ main: procedure = .int
     call require left(part,15) = "native/mvssupa/" & pos("..",part) = 0, "maintained native fragment"
     fragments = fragments || " " || shellquote("pdpclib/src/" || part)
   end
-  address system "cat" || fragments || " > " || shellquote(work || "/pdpclib/mvssupa.asm")
+  address shell "cat" || fragments || " > " || shellquote(work || "/pdpclib/mvssupa.asm")
   call require rc = 0, "join selected native source modules without patches"
-  address system "cmake -E copy " || shellquote("pdpclib/src/profiles/" || profile || "/pdptop.mac") || " " || shellquote(work || "/pdpclib/pdptop.mac")
+  address shell "cmake -E copy " || shellquote("pdpclib/src/profiles/" || profile || "/pdptop.mac") || " " || shellquote(work || "/pdpclib/pdptop.mac")
   call require rc = 0, "select explicit configuration member"
   manifest = work || "/profile-source.sha256"
-  address system "shasum -a 256 " || shellquote(work || "/pdpclib/mvssupa.asm") || " " || shellquote(work || "/pdpclib/pdptop.mac") || " " || shellquote(work || "/pdpclib/string.h") || " " || shellquote(work || "/pdpclib/stdio.c") || " > " || shellquote(manifest)
+  address shell "shasum -a 256 " || shellquote(work || "/pdpclib/mvssupa.asm") || " " || shellquote(work || "/pdpclib/pdptop.mac") || " " || shellquote(work || "/pdpclib/string.h") || " " || shellquote(work || "/pdpclib/stdio.c") || " > " || shellquote(manifest)
   call require rc = 0, "record prepared source identities"
   say "Prepared " || profile || " in " || work || "; no assembly, link or guest run."
   return 0

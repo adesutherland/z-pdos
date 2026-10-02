@@ -20,16 +20,16 @@ main: procedure = .int
   if left(work,length(repository)+1) = repository || "/" then work = substr(work,length(repository)+2)
   call require left(work,6) = "build/" & pos("..",work) = 0, "owned source selection"
   selected = work || "/source"
-  address system "cmake -E rm -rf " || shellquote(selected)
+  address shell "cmake -E rm -rf " || shellquote(selected)
   call require rc = 0, "clear owned selection"
   address crexx "run crexx -nokeep pdpclib/scripts/prepare.crexx --args pdos-zarch :selected"
   call require rc = 0, "prepare source-owned macro input"
   original = selected || "/pdpclib/mvssupa.asm"
   call require work <> "" & work <> "/" & work <> ".", "owned build directory"
-  address system "cmake -E make_directory " || shellquote(work)
+  address shell "cmake -E make_directory " || shellquote(work)
   call require rc = 0, "create build directory"
   hashfile = work || "/source.sha256"
-  address system "shasum -a 256 " || shellquote(original) || " > " || shellquote(hashfile)
+  address shell "shasum -a 256 " || shellquote(original) || " > " || shellquote(hashfile)
   call require rc = 0, "hash supplied source"
   hash = word(readfile(hashfile), 1)
   call require hash = "8327b212648224f25dc0d0268b8d32fffb69ca36cce5cd304c08f75852f3c3d0", "reviewed maintained source identity"
@@ -41,13 +41,13 @@ main: procedure = .int
   subset = subset || "         END FIRST" || '0A'x
   input = work || "/source-owned-macros.asm"; deck = work || "/source-owned-macros.obj"
   call writefile input, subset
-  address system "cmake -E rm -f " || shellquote(deck)
+  address shell "cmake -E rm -f " || shellquote(deck)
   call require rc = 0, "clear test-owned output"
   address crexx "run :cli --macros :input :deck"
   call require rc = 0, "assemble unchanged source-owned definitions"
   address crexx "run :checker :deck"
   call require rc = 0, "independent instruction and deck meaning"
-  address system "shasum -a 256 " || shellquote(input) || " " || shellquote(deck)
+  address shell "shasum -a 256 " || shellquote(input) || " " || shellquote(deck)
   call require rc = 0, "consumer identities"
   say "Only these three source-owned macro definitions are qualified; whole MVSSUPA assembly and services remain open."
   return 0

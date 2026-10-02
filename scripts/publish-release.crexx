@@ -1,0 +1,87 @@
+/* SPDX-License-Identifier: MIT
+ * Tag-only Actions publication after all required build jobs pass.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 2 then return 2
+  version = args.1; commit = args.2
+  call require verify(version,"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-") = 0 & version <> "", "safe release version"
+  call require length(commit) = 40 & verify(commit,"0123456789abcdef") = 0, "full release commit"
+  tag = "v" || version
+  call require getenv("GITHUB_ACTIONS") = "true" & getenv("GITHUB_EVENT_NAME") = "push" & getenv("GITHUB_REF") = "refs/tags/" || tag, "pushed version tag only"
+  identities = .string[]
+  address crexx "run git rev-parse HEAD" output identities
+  call require rc = 0 & strip(identities.1) = commit, "exact source revision"
+  directories = .string[]
+  address shell "find build/downloaded -mindepth 1 -maxdepth 1 -type d | LC_ALL=C sort" output directories
+  call require rc = 0 & directories.0 = 5, "four host artifacts and one disk-image artifact"
+  output_dir = "build/release/publish"
+  address crexx "run test -e :output_dir"
+  call require rc = 1, "new publication output"
+  address crexx "run cmake -E make_directory :output_dir"
+  call require rc = 0, "publication staging"
+  i = .int; j = .int
+  files = .string[]; deliver = .string[]
+  do i = 1 to directories.0
+    directory = directories[i]
+    address shell "cd " || quote(directory) || " && shasum -a 256 -c SHA256SUMS"
+    call require rc = 0, "downloaded final-byte artifact inventory"
+    call arraydrop(files)
+    address shell "find " || quote(directory) || " -maxdepth 1 -type f ! -name SHA256SUMS" output files
+    call require rc = 0 & files.0 > 0, "artifact files"
+    do j = 1 to files.0
+      source = files[j]
+      name = substr(source,lastpos("/",source)+1)
+      call require left(name,length("z-pdos-" || version || "-")) = "z-pdos-" || version || "-", "versioned release filenames"
+      target = output_dir || "/" || name
+      address crexx "run test -e :target"
+      call require rc = 1, "unique artifact filename"
+      address crexx "run cmake -E copy :source :target"
+      call require rc = 0, "copy final release bytes"
+      deliver[deliver.0+1] = target
+    end
+  end
+  source_archive = output_dir || "/z-pdos-" || version || "-source.tar.gz"
+  address crexx "run git archive --format=tar.gz -o :source_archive :commit"
+  call require rc = 0, "corresponding source archive"
+  deliver[deliver.0+1] = source_archive
+  address shell "cd " || quote(output_dir) || " && shasum -a 256 * > SHA256SUMS"
+  call require rc = 0, "combined final release hashes"
+  deliver[deliver.0+1] = output_dir || "/SHA256SUMS"
+  notes = "build/release/release-notes.md"
+  call lineout notes,"z/PDOS " || version || " provides Classic C (MVS and CMS), the independent Classic Assembler, the Classic Linker and a freshly built base operating-system disk image."
+  call lineout notes,""
+  call lineout notes,"Paul Edwards created PDOS and PDPCLIB. Component notices and compiler/linker lineage accompany the downloads."
+  call lineout notes,""
+  call lineout notes,"macOS downloads include Developer ID signed, notarized and stapled PKG installers. Windows ZIP and per-user NSIS installer downloads are labelled unsigned pending the separate local signing operation. Linux tools are supplied as a portable ZIP."
+  call lineout notes,""
+  call lineout notes,"All four host builds and relocated compile/assemble/link checks passed for source " || commit || ". The PDOS image passed loader/dataset/compression host checks; no new guest/application qualification is claimed. The image contains the base OS only. Read the bundled instructions and existing exact guest qualification record."
+  call lineout notes,""
+  call lineout notes,"SHA256SUMS records the final download bytes. The source archive contains the corresponding maintained source and build recipes."
+  call lineout notes
+  command = .string[]
+  command.1 = "gh"; command.2 = "release"; command.3 = "create"; command.4 = tag
+  do i = 1 to deliver.0
+    command[command.0+1] = deliver[i]
+  end
+  command[command.0+1] = "--repo"; command[command.0+1] = getenv("GITHUB_REPOSITORY")
+  command[command.0+1] = "--verify-tag"
+  command[command.0+1] = "--title"; command[command.0+1] = "z/PDOS " || version
+  command[command.0+1] = "--notes-file"; command[command.0+1] = notes
+  if pos("-",version) > 0 then command[command.0+1] = "--prerelease"
+  address crexx "run :command[]"
+  return rc
+
+quote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'",value,"'\''") || "'"
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED: " || detail
+    exit 1
+  end
+  return 0

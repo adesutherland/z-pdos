@@ -1,0 +1,112 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Adrian Sutherland
+ * Local Windows payload/installer signing on macOS; no download or upload.
+ * Run after staging windows-x64 from the selected exact source revision.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 2 then do
+    say "usage: crexx -nokeep scripts/sign-windows.crexx --args UNSIGNED-ZIP VERSION"
+    return 2
+  end
+  archive = args.1; version = args.2
+  call require verify(version,"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-+") = 0 & version <> "", "safe version"
+  call require getenv("PROVIDER") <> "" & getenv("CERTUM_ALIAS") <> "", "set PROVIDER and CERTUM_ALIAS"
+  work = "build/release/windows-local-sign"
+  address crexx "run test -e :work"
+  call require rc = 1, "new local signing output directory"
+  address crexx "run cmake -E make_directory :work"
+  call require rc = 0, "local signing output"
+  locations = .string[]
+  address crexx "pwd" output locations
+  root = strip(locations.1)
+  destination = root || "/" || work
+  address shell "cd " || quote(work) || " && cmake -E tar xf " || quote(archive)
+  call require rc = 0, "extract selected unsigned Windows ZIP"
+  /* Host-built releases contain only these generated paths, not arbitrary files. */
+  address shell "cd " || quote(work) || " && shasum -a 256 -c SHA256SUMS"
+  call require rc = 0, "unsigned payload SHA-256 inventory"
+  record = work || "/release.json"
+  handle = 0; mode = "rb"
+  assembler fopen handle,record,mode
+  call require handle <> 0, "open unsigned receipt"
+  receipt = ""
+  assembler freadline receipt,handle
+  close_rc = 0
+  assembler fclose close_rc,handle
+  call require close_rc = 0, "close unsigned receipt"
+  call require pos('"platform":"windows-x64"',receipt) > 0 & pos('"version":"' || version || '"',receipt) > 0 & pos('"signing":"unsigned"',receipt) > 0, "selected unsigned Windows release identity"
+  files = .string[]
+  address shell "find " || quote(work) || " -type f \( -name '*.exe' -o -name '*.dll' -o -name '*.ps1' \)" output files
+  call require rc = 0 & files.0 >= 8, "Windows payload signing inventory"
+  i = .int
+  do i = 1 to files.0
+    file = files[i]
+    address crexx "run crexx -nokeep scripts/sign-windows-file.crexx --args :file"
+    call require rc = 0, "payload Authenticode signature"
+  end
+  receipt = changestr('"signing":"unsigned"',receipt,'"signing":"signed"')
+  address crexx "run cmake -E rm -f :record"
+  call require rc = 0, "signed receipt"
+  call lineout record,receipt
+  call lineout record
+  address shell "cd " || quote(work) || " && find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 > SHA256SUMS"
+  call require rc = 0, "final signed payload hashes"
+  /* NSIS invokes the compiled helper for plugin DLLs and the uninstaller. */
+  helper = root || "/build/release/sign-windows-file"
+  address crexx "run crexx -nokeep --program :helper --native scripts/sign-windows-file.crexx"
+  call require rc = 0, "native NSIS signing helper"
+  include_file = "build/release/windows-signed-uninstall.nsh"
+  address crexx "run cmake -E rm -f :include_file"
+  call require rc = 0, "uninstall inventory"
+  call arraydrop(files)
+  address shell "cd " || quote(work) || " && find . -type f | LC_ALL=C sort" output files
+  call require rc = 0, "signed installed files"
+  do i = 1 to files.0
+    name = substr(files[i],3)
+    call require pos('22'x,name) = 0 & pos('$',name) = 0, "literal installer filename"
+    call lineout include_file,'Delete "$INSTDIR\' || changestr("/",name,'5C'x) || '"'
+  end
+  call arraydrop(files)
+  address shell "cd " || quote(work) || " && find . -mindepth 1 -type d | LC_ALL=C sort -r" output files
+  call require rc = 0, "signed installed directories"
+  do i = 1 to files.0
+    call lineout include_file,'RMDir "$INSTDIR\' || changestr("/",substr(files[i],3),'5C'x) || '"'
+  end
+  call lineout include_file
+  assets = "build/release/windows-local-assets"
+  address crexx "run test -e :assets"
+  call require rc = 1, "new signed assets directory"
+  address crexx "run cmake -E make_directory :assets"
+  call require rc = 0, "signed assets directory"
+  setup = root || "/" || assets || "/z-pdos-" || version || "-windows-x64-signed-setup.exe"
+  define_payload = "-DZPDOS_PAYLOAD=" || destination
+  define_output = "-DZPDOS_OUTPUT=" || setup
+  define_version = "-DZPDOS_VERSION=" || version
+  define_helper = "-DZPDOS_SIGN_HELPER=" || helper
+  define_inventory = "-DZPDOS_UNINSTALL_FILES=" || root || "/" || include_file
+  address crexx "run makensis -NOCD :define_payload :define_output :define_version :define_helper :define_inventory packaging/windows/z-pdos.nsi"
+  call require rc = 0, "signed-plugin and signed-uninstaller NSIS build"
+  address crexx "run crexx -nokeep scripts/sign-windows-file.crexx --args :setup"
+  call require rc = 0, "final installer signature"
+  output_zip = root || "/" || assets || "/z-pdos-" || version || "-windows-x64-signed.zip"
+  address shell "cd " || quote(work) || " && cmake -E tar cf " || quote(output_zip) || " --format=zip ."
+  call require rc = 0, "signed portable ZIP"
+  address shell "cd " || quote(assets) || " && shasum -a 256 *.exe *.zip > SHA256SUMS"
+  call require rc = 0, "signed asset checksums"
+  say "Signed assets retained in " || assets || "; no upload was performed."
+  return 0
+
+quote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'",value,"'\''") || "'"
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED: " || detail
+    exit 1
+  end
+  return 0

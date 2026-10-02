@@ -10,6 +10,7 @@ main: procedure = .int
   variant = args.1
   if variant <> "mvs" & variant <> "cms" then return 2
   command = "build/compiler/" || variant || "/gcc/mf-classic-cc"
+  if getenv("OS") = "Windows_NT" then command = command || ".exe"
   work = "build/compiler/" || variant || "/checks"
   address crexx "mkdir -p :work"
   call require rc = 0, "create checks directory"

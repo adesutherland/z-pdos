@@ -1,0 +1,48 @@
+/* SPDX-License-Identifier: MIT
+ * Compile the real NSIS interface using an explicitly synthetic payload.
+ * This proves installer construction, not Windows execution or signing.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  work = "build/installer-fixture"
+  address crexx "run test -e :work"
+  if rc <> 1 then return 2
+  payload = work || "/payload"
+  directory = payload || "/bin"
+  address crexx "run cmake -E make_directory :directory"
+  if rc <> 0 then return rc
+  file = directory || "/mf-classic-cc.exe"
+  call lineout file,"SYNTHETIC INSTALLER COMPILE FIXTURE; NOT AN EXECUTABLE"
+  call lineout file
+  directory = payload || "/share/z-pdos"
+  address crexx "run cmake -E make_directory :directory"
+  if rc <> 0 then return rc
+  file = "packaging/windows/update-user-path.ps1"
+  address crexx "run cmake -E copy :file :directory"
+  if rc <> 0 then return rc
+  inventory = work || "/uninstall.nsh"
+  call lineout inventory,'Delete "$INSTDIR\bin\mf-classic-cc.exe"'
+  call lineout inventory,'Delete "$INSTDIR\share\z-pdos\update-user-path.ps1"'
+  call lineout inventory,'RMDir "$INSTDIR\bin"'
+  call lineout inventory,'RMDir "$INSTDIR\share\z-pdos"'
+  call lineout inventory,'RMDir "$INSTDIR\share"'
+  call lineout inventory
+  arguments = .string[]
+  arguments.1 = "makensis"
+  arguments.2 = "-NOCD"
+  arguments.3 = "-DZPDOS_PAYLOAD=" || payload
+  arguments.4 = "-DZPDOS_VERSION=0.1.0-fixture"
+  arguments.5 = "-DZPDOS_OUTPUT=" || work || "/synthetic-setup.exe"
+  arguments.6 = "-DZPDOS_UNINSTALL_FILES=" || inventory
+  i = .int
+  if getenv("OS") = "Windows_NT" then do
+    do i = 2 to 6
+      arguments[i] = "/" || substr(arguments[i],2)
+    end
+  end
+  arguments.7 = "packaging/windows/z-pdos.nsi"
+  address crexx "run :arguments[]"
+  if rc <> 0 then return rc
+  say "PASS: real NSIS interface compiled with synthetic fixture"
+  return 0

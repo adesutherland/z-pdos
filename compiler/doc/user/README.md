@@ -9,10 +9,17 @@ build/compiler/mvs/gcc/mf-classic-cc -S -O1 hello.c -o build/hello.asm
 ```
 
 The inherited configure/Makefile system builds directly from compiler/src/
-into separate ignored MVS and CMS directories. The original launcher uses
-its sibling xgcc/cc1; rebuild it after moving the checkout. It supports -S,
+into separate ignored MVS and CMS directories. The launcher locates its own
+executable and uses its sibling xgcc/cc1 in a build tree, or the installed
+private tools under `../libexec/z-pdos/<variant>`. The complete tree can move,
+including into a path containing spaces. Both private programs must exist;
+the launcher refuses to borrow a compiler from PATH. It supports -S,
 -E, -fsyntax-only and compiler queries. It still rejects object generation,
 implicit assembly/linking and unqualified --profile selections.
+
+Installed packages provide `mf-classic-cc` for MVS and `mf-classic-cc-cms`
+for CMS, plus the assembler and linker. Windows commands have an `.exe`
+suffix. See the [shared installation and signing guide](../../../doc/BUILD-AND-RELEASE.md).
 
 The MVS target is i370-ibm-mvspdp; CMS is i370-ibm-cms. Both use the retained
 PDPCLIB macro convention, HLASM-style assembly text and EBCDIC characters.

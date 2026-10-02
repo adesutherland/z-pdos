@@ -85,3 +85,12 @@ Open items require separate implementation authority.
 - Observation: Package replacement/testing/removal needs a clear repeatable operator route.
 - Evidence: Existing stopped-disk qualification and Lab lease process.
 - Acceptance: Preserve the base OS, leave one working image and remove duplicate temporary installations.
+
+## PD-010: Hosted fresh-image delivery
+
+- Type: qualification
+- Status: In progress
+- Target: Fresh base-OS CCKD delivery built on the Linux GitHub runner
+- Observation: The existing image recipe and new archive packaging pass locally with the documented SDL Hercules utilities. The distro Hercules utility route and tag-release delivery remain unrun; packaged host checks do not establish fresh guest execution.
+- Evidence: `scripts/package-image.crexx`, `../../.github/workflows/build-release.yml`, and `../../doc/BUILD-AND-RELEASE.md`.
+- Acceptance: Linux builds the fresh disk from source, passes loader/dataset/compression controls, records its actual utility identities and delivers an archive whose extracted files match their inventory. Keep any new guest qualification explicitly separate.

@@ -111,6 +111,11 @@ image checks. The [compiler guide](compiler/doc/user/README.md) and other
 component guides describe individual tool use. Generated outputs go into
 ignored `build/`; `-nokeep` removes cREXX's temporary compiler files.
 
+The [build and release guide](doc/BUILD-AND-RELEASE.md) describes the prepared
+GitHub runner matrix, macOS PKG and Windows installers, local Windows signing,
+and tag-driven releases. The recipes have local Apple Silicon checks;
+hosted platform and signing qualification still require their first run.
+
 ## Working on the project
 
 Each component has one current `src/` tree and its own user, architecture,

@@ -1,0 +1,290 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Adrian Sutherland
+ * Host release orchestration. Run from the repository root with -nokeep.
+ * Outputs are owned build/release directories; no publication operation.
+ */
+options levelb
+import rxfnsb
+
+main: procedure = .int
+  arg args = .string[]
+  if args.0 = 1 then do
+    if args.1 = "metadata" then return metadata()
+  end
+  if args.0 <> 3 then return usage()
+  action = args.1; platform = args.2; version = args.3
+  call require verify(version,"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-+") = 0 & left(version,1) <> "-" & length(version) > 0, "safe version"
+  valid = platform = "macos-arm64" | platform = "macos-x86_64" | platform = "linux-x64" | platform = "windows-x64"
+  call require valid, "supported host platform"
+  work = "build/release/" || platform
+  payload = work || "/payload"
+  if action = "stage" then return stage(platform,version,payload)
+  if action = "verify" then return verify_payload(payload)
+  if action = "package" then return package(platform,version,payload,work)
+  if action = "component-pkg" then return make_macos_pkg(payload,version,work || "/component.pkg")
+  if action = "refresh-signed" then do
+    record = payload || "/release.json"
+    receipt = firstline(record)
+    call require pos('"platform":"' || platform || '"',receipt) > 0 & pos('"version":"' || version || '"',receipt) > 0, "signing preserves selected release identity"
+    receipt = changestr('"signing":"unsigned"',receipt,'"signing":"signed"')
+    address crexx "run cmake -E rm -f :record"
+    call require rc = 0, "refresh signed receipt"
+    call lineout record,receipt
+    call lineout record
+    call hashes payload
+    return 0
+  end
+  return usage()
+
+metadata: procedure = .int
+  base = strip(firstline("VERSION"))
+  ref = getenv("GITHUB_REF")
+  version = base || "-dev." || getenv("GITHUB_RUN_NUMBER")
+  if left(ref,11) = "refs/tags/v" then do
+    version = substr(ref,12)
+    call require version = base | left(version,length(base)+1) = base || "-", "tag must match VERSION with optional prerelease suffix"
+  end
+  call require verify(version,"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-") = 0, "safe version tag"
+  identities = .string[]
+  address crexx "run git rev-parse HEAD" output identities
+  call require rc = 0 & identities.0 = 1, "source commit"
+  out_path = getenv("GITHUB_OUTPUT")
+  call require out_path <> "", "GitHub out_path file"
+  call lineout out_path,"version=" || version
+  call lineout out_path,"commit=" || strip(identities.1)
+  call lineout out_path
+  return 0
+
+stage: procedure = .int
+  arg platform = .string, version = .string, payload = .string
+  i = .int; j = .int
+  from = .string; target = .string; destination = .string
+  address crexx "run test -e :payload"
+  call require rc = 1, "new staging directory"
+  address crexx "run cmake --install build/tools --config Release --prefix :payload"
+  call require rc = 0, "install assembler and linker"
+  extension = ""
+  if platform = "windows-x64" then extension = ".exe"
+  do i = 1 to 2
+    variant = word("mvs cms",i)
+    source = "build/compiler/" || variant || "/gcc"
+    private = payload || "/libexec/z-pdos/" || variant
+    address crexx "run cmake -E make_directory :private"
+    call require rc = 0, "private compiler directory"
+    do j = 1 to 2
+      name = word("xgcc cc1",j) || extension
+      from = source || "/" || name
+      address crexx "run cmake -E copy :from :private"
+      call require rc = 0, "copy private compiler"
+    end
+    from = source || "/mf-classic-cc" || extension
+    name = "mf-classic-cc"
+    if variant = "cms" then name = name || "-cms"
+    target = payload || "/bin/" || name || extension
+    address crexx "run cmake -E copy :from :target"
+    call require rc = 0, "copy relocatable compiler launcher"
+  end
+  docs = payload || "/share/z-pdos"
+  address crexx "run cmake -E make_directory :docs"
+  call require rc = 0, "package documentation directory"
+  do i = 1 to 4
+    from = word("README.md LICENSE LICENSES.md VERSION",i)
+    address crexx "run cmake -E copy :from :docs"
+    call require rc = 0, "root notice and version"
+  end
+  do i = 1 to 6
+    component = word("compiler assembler linker pdpclib pdos tso31-bridge",i)
+    target = docs || "/" || component
+    address crexx "run cmake -E make_directory :target"
+    call require rc = 0, "component notices"
+    do j = 1 to 3
+      from = component || "/" || word("README.md LICENSE UPSTREAM.md",j)
+      address crexx "run cmake -E copy :from :target"
+      call require rc = 0, "component licence and attribution"
+    end
+    from = component || "/doc"; destination = target || "/doc"
+    address crexx "run cmake -E copy_directory :from :destination"
+    call require rc = 0, "component user and qualification documentation"
+  end
+  from = "compiler/COPYING"; target = docs || "/compiler"
+  address crexx "run cmake -E copy :from :target"
+  call require rc = 0, "GCC licence"
+  from = "compiler/src/COPYING.LIB"
+  address crexx "run cmake -E copy :from :target"
+  call require rc = 0, "GCC library licence"
+  from = "pdpclib/src"; target = payload || "/share/z-pdos/pdpclib/source"
+  address crexx "run cmake -E copy_directory :from :target"
+  call require rc = 0, "target runtime headers, macros, sources and notices"
+  from = "doc/BUILD-AND-RELEASE.md"
+  address crexx "run cmake -E copy :from :docs"
+  call require rc = 0, "delivery instructions"
+  if extension <> "" then do
+    from = "packaging/windows/update-user-path.ps1"
+    address crexx "run cmake -E copy :from :docs"
+    call require rc = 0, "Windows installer registry interface"
+  end
+  call write_receipt payload,platform,version,"unsigned"
+  call hashes payload
+  say "Staged " || platform || " in " || payload
+  return 0
+
+verify_payload: procedure = .int
+  arg payload = .string
+  address shell "cd " || quote(payload) || " && shasum -a 256 -c SHA256SUMS"
+  call require rc = 0, "complete payload hashes"
+  address crexx "run crexx -nokeep tests/release/check-installed.crexx --args :payload"
+  call require rc = 0, "installed compiler/assembler/linker chain"
+  return 0
+
+package: procedure = .int
+  arg platform = .string, version = .string, payload = .string, work = .string
+  call verify_payload payload
+  assets = work || "/assets"
+  address crexx "run test -e :assets"
+  call require rc = 1, "new asset directory"
+  address crexx "run cmake -E make_directory :assets"
+  call require rc = 0, "create assets"
+  status = "unsigned"
+  if left(platform,6) = "macos-" then do
+    policy = getenv("PDOS_APPLE_SIGNING")
+    if policy = "required" then do
+      address crexx "run crexx -nokeep scripts/sign-macos.crexx --args :platform :version :payload :assets"
+      call require rc = 0, "macOS signed and notarized installer"
+      status = "signed"
+    end
+    else do
+      call require policy = "unsigned", "set PDOS_APPLE_SIGNING to required or unsigned"
+      call make_macos_pkg payload,version,assets || "/z-pdos-" || version || "-" || platform || "-unsigned.pkg"
+    end
+  end
+  if platform = "windows-x64" then call make_windows_installer payload,version,assets || "/z-pdos-" || version || "-windows-x64-unsigned-setup.exe",""
+  call verify_payload payload
+  locations = .string[]
+  address crexx "pwd" output locations
+  root = changestr('5C'x,strip(locations.1),"/")
+  archive = root || "/" || assets || "/z-pdos-" || version || "-" || platform
+  if platform <> "linux-x64" then archive = archive || "-" || status
+  archive = archive || ".zip"
+  address shell "cd " || quote(payload) || " && cmake -E tar cf " || quote(archive) || " --format=zip ."
+  call require rc = 0, "portable archive"
+  call hashes assets
+  say "Release assets: " || assets
+  return 0
+
+make_macos_pkg: procedure = .int
+  arg payload = .string, version = .string, out_path = .string
+  root = "build/release/macos-pkg-root"
+  address crexx "run test -e :root"
+  call require rc = 1, "new installer root"
+  target = root || "/usr/local/lib/z-pdos"
+  address crexx "run cmake -E copy_directory :payload :target"
+  call require rc = 0, "installer payload"
+  target = root || "/usr/local/bin"
+  address crexx "run cmake -E make_directory :target"
+  call require rc = 0, "installer command directory"
+  do i = 1 to 4
+    name = word("mf-classic-cc mf-classic-cc-cms mf-classic-as mf-classic-ld",i)
+    source = "../lib/z-pdos/bin/" || name; link = target || "/" || name
+    address crexx "run cmake -E create_symlink :source :link"
+    call require rc = 0, "installer command symlink"
+  end
+  base = strip(firstline("VERSION"))
+  address crexx "run pkgbuild --root :root --identifier org.z-pdos.classic-tools --version :base --install-location / :out_path"
+  call require rc = 0, "unsigned macOS development package"
+  return 0
+
+make_windows_installer: procedure = .int
+  arg payload = .string, version = .string, out_path = .string, helper = .string
+  includes = "build/release/windows-uninstall.nsh"
+  call uninstall_list payload,includes
+  arguments = .string[]
+  arguments.1 = "makensis"
+  arguments.2 = "-NOCD"
+  arguments.3 = "-DZPDOS_PAYLOAD=" || payload
+  arguments.4 = "-DZPDOS_VERSION=" || version
+  arguments.5 = "-DZPDOS_OUTPUT=" || out_path
+  arguments.6 = "-DZPDOS_UNINSTALL_FILES=" || includes
+  if getenv("OS") = "Windows_NT" then do
+    do i = 2 to 6
+      arguments[i] = "/" || substr(arguments[i],2)
+    end
+  end
+  if helper <> "" then arguments[arguments.0+1] = "-DZPDOS_SIGN_HELPER=" || helper
+  arguments[arguments.0+1] = "packaging/windows/z-pdos.nsi"
+  address crexx "run :arguments[]"
+  call require rc = 0, "Windows installer"
+  return 0
+
+uninstall_list: procedure = .int
+  arg payload = .string, out_path = .string
+  files = .string[]; dirs = .string[]
+  i = .int
+  address shell "cd " || quote(payload) || " && find . -type f | LC_ALL=C sort" output files
+  call require rc = 0 & files.0 > 0, "installed file inventory"
+  address crexx "run cmake -E rm -f :out_path"
+  call require rc = 0, "new uninstall inventory"
+  do i = 1 to files.0
+    name = substr(files[i],3)
+    call require pos('22'x,name) = 0 & pos('$',name) = 0, "literal installer path"
+    call lineout out_path,'Delete "$INSTDIR\' || changestr("/",name,'5C'x) || '"'
+  end
+  address shell "cd " || quote(payload) || " && find . -mindepth 1 -type d | LC_ALL=C sort -r" output dirs
+  call require rc = 0, "installed directories"
+  do i = 1 to dirs.0
+    call lineout out_path,'RMDir "$INSTDIR\' || changestr("/",substr(dirs[i],3),'5C'x) || '"'
+  end
+  call lineout out_path
+  return 0
+
+write_receipt: procedure = .int
+  arg payload = .string, platform = .string, version = .string, status = .string
+  identities = .string[]; changes = .string[]
+  address crexx "run git rev-parse HEAD" output identities
+  call require rc = 0 & identities.0 = 1, "source commit"
+  commit = strip(identities.1)
+  call require length(commit) = 40 & verify(commit,"0123456789abcdef") = 0, "full source commit"
+  address crexx "run git status --porcelain" output changes
+  call require rc = 0, "working tree status"
+  if getenv("GITHUB_ACTIONS") = "true" then call require changes.0 = 0, "hosted packages require an unchanged source tree"
+  dirty = "false"
+  if changes.0 > 0 then dirty = "true"
+  record = payload || "/release.json"
+  address crexx "run cmake -E rm -f :record"
+  call require rc = 0, "new release receipt"
+  call lineout record,'{"format":"z-pdos-release-v1","product":"z-pdos","version":"' || version || '","platform":"' || platform || '","source_commit":"' || commit || '","source_dirty":' || dirty || ',"signing":"' || status || '","qualification":"host-tools; image and guest qualification are separate"}'
+  call lineout record
+  return 0
+
+hashes: procedure = .int
+  arg directory = .string
+  address shell "cd " || quote(directory) || " && find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 > SHA256SUMS"
+  call require rc = 0, "final-byte SHA-256 inventory"
+  return 0
+
+quote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'",value,"'\''") || "'"
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED: " || detail
+    exit 1
+  end
+  return 0
+
+usage: procedure = .int
+  say "usage: crexx -nokeep scripts/release.crexx --args metadata | stage|verify|package PLATFORM VERSION"
+  return 2
+
+firstline: procedure = .string
+  arg path = .string
+  handle = 0; mode = "rb"
+  assembler fopen handle,path,mode
+  call require handle <> 0, "open metadata file"
+  text = ""
+  assembler freadline text,handle
+  close_rc = 0
+  assembler fclose close_rc,handle
+  call require close_rc = 0, "close metadata file"
+  return strip(text)

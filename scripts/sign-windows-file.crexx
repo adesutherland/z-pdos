@@ -1,0 +1,41 @@
+/* SPDX-License-Identifier: MIT
+ * Local Certum/SimplySign operation, also used by NSIS !uninstfinalize.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 = 3 then do
+    if args.1 <> "--nsis-plugins" then return 2
+    source = args.2; destination = args.3
+    address crexx "run cmake -E make_directory :destination"
+    if rc <> 0 then return rc
+    do i = 1 to 3
+      name = word("System.dll nsDialogs.dll nsExec.dll",i)
+      from = source || "/" || name; target = destination || "/" || name
+      address crexx "run cmake -E copy :from :target"
+      if rc <> 0 then return rc
+      result = sign_file(target)
+      if result <> 0 then return result
+    end
+    return 0
+  end
+  if args.0 <> 1 then return 2
+  return sign_file(args.1)
+
+sign_file: procedure = .int
+  arg path = .string
+  provider = getenv("PROVIDER"); alias = getenv("CERTUM_ALIAS")
+  if provider = "" | alias = "" then do
+    say "Set PROVIDER and CERTUM_ALIAS for local SimplySign signing."
+    return 2
+  end
+  timestamp = getenv("TSA_URL")
+  if timestamp = "" then timestamp = "http://time.certum.pl"
+  discarded = .string[]
+  address crexx "run osslsigncode verify -in :path" output discarded error discarded
+  if rc = 0 then return 0
+  address crexx "run jsign --storetype PKCS11 --keystore :provider --alias :alias --alg SHA-256 --tsaurl :timestamp :path"
+  if rc <> 0 then return rc
+  address crexx "run osslsigncode verify -in :path"
+  return rc
