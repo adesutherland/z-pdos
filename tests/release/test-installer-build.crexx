@@ -47,7 +47,7 @@ main: procedure = .int
   i = .int
   if getenv("OS") = "Windows_NT" then do
     do i = 2 to 6
-      arguments[i] = "/" || substr(arguments[i],2)
+      arguments[i] = "/" || changestr("/",substr(arguments[i],2),'5C'x)
     end
   end
   arguments.7 = "packaging/windows/z-pdos.nsi"
