@@ -72,3 +72,12 @@ The earlier first-COPY gap is closed for the selected z/PDOS workload. Exact
 XL4/XL8 HFP emission was selected before this migration; it retains target
 rounding and widths and does not change the ABI or admit HFP into integer-only
 profiles. The remaining application/profile gates are recorded above.
+
+## CC-008: Modern MinGW error-table macros
+
+- Type: host portability
+- Status: In progress
+- Target: Native Windows x64 compiler hosting
+- Observation: MinGW exposes `sys_nerr` and `sys_errlist` through function-backed macros. The inherited libiberty declarations expanded into an invalid function returning an array. Those redundant declarations are now omitted when the CRT defines the macros; ordinary variable-backed hosts retain their declarations.
+- Evidence: [Windows failure](https://github.com/adesutherland/z-pdos/actions/runs/37062265650). A CRT-macro fixture reproduces the original compilation failure and exercises error-name lookup with the repair. All 93 required local GCC 16 checks pass.
+- Acceptance: Both native Windows compiler variants build and pass their complete required suite, including the CRT-macro regression.

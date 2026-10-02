@@ -469,8 +469,13 @@ static const char **sys_errlist;
 
 #else
 
+/* Modern MinGW exposes these through function-backed CRT macros. */
+#ifndef sys_nerr
 extern int sys_nerr;
+#endif
+#ifndef sys_errlist
 extern char *sys_errlist[];
+#endif
 
 #endif
 

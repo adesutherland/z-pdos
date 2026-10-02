@@ -17,6 +17,14 @@ endif()
 enable_testing()
 add_executable(test_classic_driver_quoting compiler/tests/test_driver_quoting.c)
 add_test(NAME classic_driver_windows_quoting COMMAND test_classic_driver_quoting)
+add_executable(test_classic_error_macros
+  compiler/tests/test_host_error_macros.c compiler/src/libiberty/strerror.c)
+target_include_directories(test_classic_error_macros PRIVATE
+  compiler/tests/host-error-macros compiler/src/include)
+# The inherited source and include_next CRT shim require GCC extensions.
+set_source_files_properties(compiler/src/libiberty/strerror.c PROPERTIES
+  COMPILE_OPTIONS "-Wno-pedantic;-Wno-error")
+add_test(NAME classic_host_error_macros COMMAND test_classic_error_macros)
 add_subdirectory(assembler)
 add_subdirectory(tso31-bridge)
 add_subdirectory(pdpclib)
