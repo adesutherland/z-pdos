@@ -147,7 +147,7 @@ static void unchanged(FILE *input, FILE *output, int transport)
         got = fread(compare,1,n,output); REQUIRE(got == n);
         for (i = 0; i < n; ++i) {
             pos = at+(unsigned long)i;
-            if (transport && pos >= 20 && pos < 32) {
+            if (transport && pos >= 20 && pos < 32 && track[i] != compare[i]) {
                 /* Hercules regenerates only this host-container serial. */
                 REQUIRE(track[i] >= 0x30 && track[i] <= 0x39);
                 REQUIRE(compare[i] >= 0x30 && compare[i] <= 0x39);

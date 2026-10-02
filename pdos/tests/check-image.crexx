@@ -26,6 +26,26 @@ main: procedure = .int
   call require rc = 2, "refuse existing output"
   address crexx "run shasum -a 256 :boot" output after
   call require rc = 0 & before.1 = after.1, "existing output bytes preserved"
+  /* Hercules 3.13 leaves the container serial reserved bytes all zero.
+     Identical containers must pass; non-digit changes must still fail. */
+  zero_serial = work || "/zero-serial.ckd"
+  serial = work || "/serial.bin"
+  address crexx "run cmake -E copy :boot :zero_serial"
+  call require rc = 0, "zero-serial container fixture"
+  call put_binary serial,'000000000000000000000000'x
+  address system "dd if=" || shellquote(serial) || " of=" || shellquote(zero_serial) || " bs=1 seek=20 conv=notrunc > " || shellquote(work || "/serial-dd.log") || " 2>&1"
+  call require rc = 0, "legacy container serial fixture"
+  log = work || "/zero-serial.log"
+  address system shellquote(installer) || " --compare " || shellquote(zero_serial) || " " || shellquote(zero_serial) || " " || payloads || " > " || shellquote(log) || " 2>&1"
+  call require rc = 0, "identical zero-serial containers preserve every byte"
+  call put_binary serial,'FF'x
+  address system "dd if=" || shellquote(serial) || " of=" || shellquote(zero_serial) || " bs=1 seek=20 conv=notrunc > " || shellquote(work || "/serial-dd.log") || " 2>&1"
+  call require rc = 0, "non-digit serial corruption"
+  log = work || "/invalid-serial.log"
+  address system shellquote(installer) || " --compare " || shellquote(boot) || " " || shellquote(zero_serial) || " " || payloads || " > " || shellquote(log) || " 2>&1"
+  call require rc = 1, "changed non-digit serial bytes rejected"
+  address crexx "run cmake -E rm -f :zero_serial :serial"
+  call require rc = 0, "remove disposable serial fixtures"
   bad = work || "/bad.ckd"; rejected = work || "/rejected.ckd"; patch = work || "/byte.bin"
   do i = 1 to 5
     source = dataset; offset = 0; value = '00'x
@@ -48,7 +68,7 @@ main: procedure = .int
   end
   address crexx "run cmake -E rm -f :bad :patch"
   call require rc = 0, "remove large disposable controls"
-  say "Media checks reject five one-byte corruptions and preserve existing output."
+  say "Media checks preserve identical zero serials, reject invalid serial changes and five guest-byte corruptions, and preserve existing output."
   return 0
 
 shellquote: procedure = .string

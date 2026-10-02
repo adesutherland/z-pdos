@@ -72,10 +72,10 @@ main: procedure = .int
   /* SEQ uses physical fixed blocks. The PDOS/PCOMM payload is an RDW stream. */
   address crexx "cd :media"
   call runlog shellquote(hercules || "/dasdload") || " -bz2 ctl.txt datasets.cckd", media || "/dasdload.log"
-  call runlog shellquote(hercules || "/cckd2ckd") || " -q datasets.cckd datasets.ckd", media || "/cckd2ckd.log"
+  call runlog shellquote(hercules || "/cckd2ckd") || " -q -cyls 100 datasets.cckd datasets.ckd", media || "/cckd2ckd.log"
   call runlog shellquote(installer) || " datasets.ckd pdos00.ckd pload.sys pdos.sys pcomm.exe config.sys", media || "/ipl-check.log"
-  call runlog shellquote(hercules || "/ckd2cckd") || " -q -bz2 pdos00.ckd pdos00.cckd", media || "/ckd2cckd.log"
-  call runlog shellquote(hercules || "/cckd2ckd") || " -q pdos00.cckd readback.ckd", media || "/readback.log"
+  call runlog shellquote(hercules || "/ckd2cckd") || " -q -bz2 -cyls 100 pdos00.ckd pdos00.cckd", media || "/ckd2cckd.log"
+  call runlog shellquote(hercules || "/cckd2ckd") || " -q -cyls 100 pdos00.cckd readback.ckd", media || "/readback.log"
   call runlog shellquote(installer) || " --compare pdos00.ckd readback.ckd pload.sys pdos.sys pcomm.exe config.sys", media || "/compression-check.log"
   address crexx "cd :root"
   call runlog "crexx -nokeep pdos/tests/check-image.crexx --args " || shellquote(installer) || " " || shellquote(media), out || "/media-controls.log"
