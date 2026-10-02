@@ -12,6 +12,17 @@ main: procedure = .int
   if args.0 = 2 then variant = args.2
   if action <> "build" & action <> "test" then return usage()
   if variant <> "mvs" & variant <> "cms" then return usage()
+  tool_versions = .string[]
+  do tool_index = 1 to 2
+    tool = word("bison flex",tool_index)
+    call arraydrop(tool_versions)
+    address crexx "run :tool --version" output tool_versions
+    if rc <> 0 | tool_versions.0 = 0 then do
+      say "Missing required parser generator:" tool
+      return 2
+    end
+    say "Parser generator:" tool_versions.1
+  end
   location = .string[]
   address crexx "pwd" output location
   root = changestr('5C'x,strip(location.1),"/")

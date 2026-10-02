@@ -48,7 +48,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install --yes build-essential cmake ninja-build clang perl hercules
+          sudo apt-get install --yes build-essential cmake ninja-build clang perl bison flex hercules
       - name: Prepare native Windows build environment
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
@@ -57,7 +57,7 @@ jobs:
           path-type: inherit
           update: true
           install: >-
-            git make perl curl unzip diffutils
+            git make perl curl unzip diffutils bison flex
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-ninja

@@ -20,7 +20,7 @@ runtime dependencies of the Classic commands.
 
 ## Local build and packages
 
-Run from the repository root, with cREXX, CMake, native C tools and make:
+Run from the repository root, with cREXX, CMake, native C tools, make, Bison and Flex:
 
 ```sh
 crexx -nokeep scripts/build.crexx --args full-test

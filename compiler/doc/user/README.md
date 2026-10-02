@@ -1,6 +1,8 @@
 # Classic C user guide
 
-Run from the repository root with native C development tools, make and cREXX:
+Run from the repository root with native C development tools, make, Bison,
+Flex and cREXX. The maintained source regenerates its parser and lexer;
+the build checks both generators before configuring:
 
 ```sh
 crexx -nokeep compiler/scripts/build.crexx --args test mvs
