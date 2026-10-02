@@ -15,10 +15,18 @@ main: procedure = .int
   location = .string[]
   address crexx "pwd" output location
   root = changestr('5C'x,strip(location.1),"/")
+  shell_root = root
+  if getenv("OS") = "Windows_NT" then do
+    unix_location = .string[]
+    address crexx "run cygpath -u :root" output unix_location
+    if rc <> 0 | unix_location.0 <> 1 then return 2
+    shell_root = strip(unix_location.1)
+  end
   address crexx "run test -f compiler/src/gcc/config/i370/i370.c"
   if rc <> 0 then return 2
   work = root || "/build/compiler/" || variant
-  source = root || "/compiler/src/configure"
+  source = shell_root || "/compiler/src/configure"
+  shell_work = shell_root || "/build/compiler/" || variant
   target = "i370-ibm-mvspdp"
   if variant = "cms" then target = "i370-ibm-cms"
   flags = "-g -O0 -fcommon -std=gnu89 -w -Wno-implicit-int -Wno-implicit-function-declaration -Wno-int-conversion -Wno-error -Wno-return-type -Wno-deprecated-non-prototype"
@@ -43,7 +51,7 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "cd :work"
   if rc <> 0 then return rc
-  configure = environment || " /bin/sh " || shellquote(source) || " --target=" || target || host_options || " --enable-languages=c --disable-threads --disable-nls --disable-shared --without-headers " || shellquote("--prefix=" || work || "/install") || " " || shellquote("--with-gcc-version-trigger=" || root || "/compiler/src/gcc/version.c")
+  configure = environment || " /bin/sh " || shellquote(source) || " --target=" || target || host_options || " --enable-languages=c --disable-threads --disable-nls --disable-shared --without-headers " || shellquote("--prefix=" || shell_work || "/install") || " " || shellquote("--with-gcc-version-trigger=" || shell_root || "/compiler/src/gcc/version.c")
   say "Configuring" variant "; log:" work || "/configure.log"
   address shell configure || " > configure.log 2>&1"
   if rc <> 0 then return rc
@@ -61,7 +69,7 @@ main: procedure = .int
   address crexx "run :command --version"
   if rc <> 0 then return rc
   if action = "build" then return 0
-  cc1env = "CC1=" || gccdir || "/cc1" || suffix
+  cc1env = "CC1=" || shell_work || "/gcc/cc1" || suffix
   address shell "env " || shellquote(cc1env) || " sh compiler/src/tests/run.sh > " || shellquote(work || "/codegen-tests.log") || " 2>&1"
   if rc <> 0 then do
     say "Code-generation tests failed; see" work || "/codegen-tests.log"

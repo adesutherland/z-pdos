@@ -37,3 +37,12 @@ Open items require separate implementation authority.
 - Type: defect
 - Status: Done before this reorganisation
 - Result: The canonical initialization fix and the w+b write-handle guard were already integrated. Existing host fixtures retain failing guard-removal and stale-allocation controls. Full guest update semantics remain PCL-001.
+
+## PCL-005: Mainframe host-fixture profile isolation
+
+- Type: test portability
+- Status: In progress
+- Target: Linux and Windows host execution of the PDOS390/MVS native-stub fixtures
+- Observation: Linux's predefined `__gnu_linux__` selected the inherited Linux port alongside the explicit mainframe profile, duplicating the file handle and local mode. The fixture targets now undefine the inherited Linux and Windows port selectors. Maintained target library source is unchanged.
+- Evidence: [Hosted Linux failure](https://github.com/adesutherland/z-pdos/actions/runs/37060007541), `../CMakeLists.txt`; all 92 required toolchain tests pass locally with GCC 16.1 and the Linux host selector explicitly defined.
+- Acceptance: Both stdio/string profiles run on the declared desktop hosts with their native service stubs and full suite enabled.

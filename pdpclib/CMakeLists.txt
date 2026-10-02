@@ -37,10 +37,14 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
       ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_compile_definitions(test_pdpclib_stdio_${profile} PRIVATE
       __MVS__ __USEBIVA__)
-    target_compile_options(test_pdpclib_stdio_${profile} PRIVATE -fno-builtin)
+    # These fixtures simulate mainframe services with host-native stubs.
+    # Do not select inherited Linux/Windows library ports from host macros.
+    target_compile_options(test_pdpclib_stdio_${profile} PRIVATE
+      -fno-builtin -U__gnu_linux__ -U__WIN32__)
     add_executable(test_pdpclib_string_${profile} tests/test_string.c)
     target_compile_definitions(test_pdpclib_string_${profile} PRIVATE __MVS__)
-    target_compile_options(test_pdpclib_string_${profile} PRIVATE -fno-builtin)
+    target_compile_options(test_pdpclib_string_${profile} PRIVATE
+      -fno-builtin -U__gnu_linux__ -U__WIN32__)
     if(profile STREQUAL "pdos390")
       target_compile_definitions(test_pdpclib_stdio_${profile} PRIVATE __PDOS390__)
       target_compile_definitions(test_pdpclib_string_${profile} PRIVATE __PDOS390__)
