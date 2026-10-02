@@ -116,6 +116,7 @@ jobs:
         run: |
           crexx -nokeep tests/release/test-windows-shell.crexx
           crexx -nokeep tests/release/test-installer-build.crexx
+          crexx -nokeep scripts/windows-runtime.crexx --args check build/release/windows-x64/payload
       - name: Check installer smoke tools from native PowerShell
         if: runner.os == 'Windows'
         shell: pwsh

@@ -5,9 +5,14 @@ options levelb
 import rxfnsb
 main: procedure = .int
   arg args = .string[]
-  if args.0 <> 1 | getenv("OS") <> "Windows_NT" then return 2
-  payload = args.1
-  call require left(payload,25) = "build/release/windows-x64/" & pos("..",payload) = 0, "owned Windows payload"
+  if (args.0 <> 1 & args.0 <> 2) | getenv("OS") <> "Windows_NT" then return 2
+  payload = changestr('5C'x,args[args.0],"/")
+  prefix = "build/release/windows-x64/"
+  call require left(payload,length(prefix)) = prefix & pos("..",payload) = 0, "owned Windows payload: " || payload
+  if args.0 = 2 then do
+    call require args.1 = "check", "runtime preflight action"
+    return 0
+  end
   identities = .string[]
   address crexx "run pacman -Q mingw-w64-ucrt-x86_64-libiconv" output identities
   call require rc = 0 & identities.0 = 1, "installed libiconv identity"
