@@ -26,13 +26,18 @@ selected declarations are deliberately minimal. The existing selected PDOS31
 These implementations are restricted to the exact operand forms in MVSSUPA.
 Unsupported forms cause assembly errors. The independent host fixture checks
 PTPB/GTPB fields, both LINK names, two SVC 6 instructions, and the SVC 40
-list and instruction. No TSO terminal call or control-block traversal has
-been qualified with the new object.
+list and instruction. Basic TSO24/31/64 entry transports executed on z/OS
+1.5, and TSO31/64 sequential/PDS file operations passed there.
 
 `tso31-sdk-files` keeps sequential and partitioned dataset paths. VSAM
 dataset organization and `@@IDCAMS` return unsupported status before a
 VSAM handle or utility invocation. `@@GOSUP` and `@@GOPROB` return
 unsupported because privileged mode switching is outside this profile.
+Its selected SAM/BPAM DCB macro now supplies the unopened access-method
+sentinels and DCBOFLGS initialization required by OPEN. The file profile
+does not call the inherited NOTE/TRKCALC path after OPEN; FBS extend and
+positioning need separate work. TSO24 dataset I/O still faults in above-line
+SWA lookup, and is outside the 0.1.0 file profile.
 The inherited `TCBFA` test is not an intended IBM programming interface and
 needs replacement or bounded guest evidence before a release claim.
 
@@ -48,4 +53,5 @@ Field coordinates follow IBM's [CPPL](https://www.ibm.com/docs/en/zos/2.5.0?topi
 [PSCB](https://www.ibm.com/docs/en/zos/2.5.0?topic=information-pscb-mapping)
 and [UPT](https://www.ibm.com/docs/en/zos/2.5.0?topic=information-upt-mapping)
 maps. These later editions are source facts, not a z/OS 1.5 run.
-The target guest is z/OS 1.5; its behavior remains the acceptance gate.
+The guest evidence above is from z/OS 1.5. Other interface paths still need
+their own guest checks.

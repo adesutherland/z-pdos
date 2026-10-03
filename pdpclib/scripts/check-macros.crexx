@@ -34,7 +34,7 @@ main: procedure = .int
   address shell "cmake -E sha256sum " || shellquote(original) || " > " || shellquote(hashfile)
   call require rc = 0, "hash supplied source"
   hash = word(readfile(hashfile), 1)
-  call require hash = "efa7d848806c3b7619b0b60b75309220d120d34c4844b6884cf194a21cabcebe", "reviewed maintained source identity"
+  call require hash = "8cfcd65f10cb26d082ac2dd2ab1492fd8c295217c038a982b9040189003b7496", "reviewed maintained source identity"
   source = readfile(original)
   subset = extract_lines(source, 2, 59) || extract_lines(source, 298, 302) || extract_lines(source, 306, 309) || extract_lines(source, 455, 459)
   subset = subset || "MACREF   CSECT" || '0A'x || "R14      EQU   14" || '0A'x

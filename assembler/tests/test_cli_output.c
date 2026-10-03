@@ -231,13 +231,21 @@ int main(int argc, char **argv)
             0xc5,0xe7,0xc3,0xd7,0x40,0x40,0x40,0x40,
             0xe2,0xe8,0xe2,0xe3,0xc5,0xd9,0xd4,0x40};
         unsigned char actual[337], expected[336];
+        size_t i, j;
+        static const size_t sentinel[] = {23,31,55,59,71,75,79,87};
         memset(expected,0,sizeof expected);
-        expected[26] = 0x40; expected[50] = expected[51] = 0x24; expected[72] = 1;
-        expected[114] = 2; expected[138] = expected[139] = 0x20; expected[160] = 1;
+        for (i = 0; i < 3; ++i) {
+            size_t base = i == 0 ? 0 : i == 1 ? 88 : 248;
+            for (j = 0; j < sizeof sentinel / sizeof sentinel[0]; ++j)
+                expected[base + sentinel[j]] = 1;
+            expected[base + 48] = 2;
+        }
+        expected[26] = 0x40; expected[50] = expected[51] = 0x24;
+        expected[114] = 2; expected[138] = expected[139] = 0x20;
         expected[202] = 0x40; expected[212] = 0xc0; expected[226] = 0xd4; expected[227] = 8;
         memcpy(expected+40,names,8); memcpy(expected+128,names+8,8); memcpy(expected+216,names+16,8);
         expected[274] = 0x40; expected[284] = 0x54; expected[299] = 0x20;
-        expected[310] = 6; expected[311] = 0x60; expected[320] = 1; expected[331] = 125;
+        expected[310] = 6; expected[311] = 0x60; expected[331] = 125;
         memcpy(expected+288,names+24,8);
         input = fopen(argv[2],"rb"); CHECK(input != NULL); got = fread(actual,1,sizeof actual,input);
         CHECK(got == sizeof expected && !memcmp(actual,expected,sizeof expected));

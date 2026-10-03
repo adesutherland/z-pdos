@@ -67,6 +67,7 @@
 .EXITS   AIF   ('&EXITS' NE '').EMIT
 &EXITS   SETC  '0'
 .EMIT    DS    0F
+         AIF   (&KIND EQ 1).BSAMDCB
 &N       DC    26X'00',AL2(&ORG),4X'00'
          DC    A(&EOF),A(&EXITS+&FORMAT*16777216),CL8'&DDNAME'
          DC    XL2'0000',AL2(&REFERENCE)
@@ -90,6 +91,23 @@
          MEXIT
 .EXTEND  AIF   ('&LRECL' NE '').BAD
          DC    20X'00'
+         MEXIT
+.BSAMDCB ANOP
+* The SAM/BPAM DCB macro's unopened template contains one-valued
+* placeholders for access-method entry fields and X'02' in DCBOFLGS.
+* OPEN uses these fields before it installs the real entry addresses.
+&N       DC    20X'00',X'00',AL3(1),AL2(0),AL2(&ORG),A(1)
+         DC    A(&EOF),A(&EXITS+&FORMAT*16777216),CL8'&DDNAME'
+         DC    X'0200',AL2(&REFERENCE),X'00',AL3(1),A(1),AL2(0)
+         AIF   ('&BLKSIZE' EQ '').BASNOBLK
+         DC    AL2(&BLKSIZE)
+         AGO   .BASREST
+.BASNOBLK DC    AL2(0)
+.BASREST DC    F'0',A(1),X'00',AL3(1),A(1),H'0'
+         AIF   ('&LRECL' EQ '').BASNOREC
+         DC    AL2(&LRECL),A(1)
+         MEXIT
+.BASNOREC DC    AL2(0),A(1)
          MEXIT
 .BAD     MNOTE 8,'unsupported selected DCB template'
          MEND

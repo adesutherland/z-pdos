@@ -866,6 +866,9 @@ OPUPPLUP STC   R1,0(R1,R2)        start at the end
          BNM   RETURNOP                    neither; skip rest
          TM    DDWFLAG2,CWFDD     Concatenation ?
          BNZ   RETURNOP             Yes, can't support FBS
+         AIF   ('&OS' NE 'MVSF').MVSFNOTE
+         B     RETURNOP           No FBS positioning in file subset
+.MVSFNOTE ANOP
          GAMOS ,                  (OLD note; TRKCALC)
          NOTE  (R7)
          STCM  R1,14,ZPTTR        Save initial TTR or tape blk

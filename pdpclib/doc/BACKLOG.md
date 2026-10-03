@@ -65,6 +65,6 @@ Open items require separate implementation authority.
 - Type: qualification
 - Status: In progress
 - Target: `tso31-sdk-files` service object and its TSO24/31/64 consumers
-- Observation: The selected terminal, EXTRACT and TSO control-block forms have only independent host deck and link checks. The service still consumes selected PDOS31 mappings for other MVS fields, and inherited code reads `TCBFA`, which IBM does not designate as a programming interface. Exact z/OS 1.5 guest behavior is unknown.
+- Observation: Basic TSO24/31/64 entry transports and TSO31/64 sequential/PDS file operations ran on z/OS 1.5. TSO24 dataset I/O faults in above-line SWA lookup. The selected service skips inherited NOTE/TRKCALC positioning, so FBS extend remains outside the file subset. Dynamic allocation, command and prefix routes and explicit VSAM failure still need guest checks. The service still consumes selected PDOS31 mappings for other MVS fields, and inherited code reads `TCBFA`, which IBM does not designate as a programming interface.
 - Evidence: `doc/architecture/TSO31-INTERFACES.md`, the 3 October host source build and 93/93 host suite.
 - Acceptance: Exercise sequential and partitioned dataset open/read/write/close, terminal I/O, dynamic allocation, command and prefix routes, explicit VSAM failure, and the two TSO64 entry modes on the leased z/OS 1.5 guest. Resolve offset or linkage mismatches in maintained source and repeat affected checks.
