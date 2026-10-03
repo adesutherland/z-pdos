@@ -9,6 +9,11 @@
  * support is not a claim that every historical S370 machine provides it.
  * EPSW RRE format and B98D opcode: IBM z/Architecture Principles of
  * Operation, SA22-7832-14, Basic Instruction Formats and EXTRACT PSW.
+ * PC S format and B218 opcode: same volume, PROGRAM CALL.
+ * Selected z900 register, RXY, RSY, RI and E opcodes and formats: the same
+ * Principles of Operation and IBM HLASM's supported-instruction table,
+ * https://www.ibm.com/docs/en/hla-and-tf/1.6.0?topic=instructions-table-all-supported.
+ * An RXY signed 20-bit displacement spans DL2 and DH2.
  * IBM bit positions count from the most significant bit, numbered zero.
  * Profile S360 is the common architecture, excluding Model 67 extensions.
  * Mnemonics are numeric ASCII octets, independent of execution character set.
@@ -134,6 +139,7 @@ static const mf_octet name_LCTL[] = { 0x4c, 0x43, 0x54, 0x4c };
 static const mf_octet name_STCTL[] = { 0x53, 0x54, 0x43, 0x54, 0x4c };
 static const mf_octet name_SIGP[] = { 0x53, 0x49, 0x47, 0x50 };
 static const mf_octet name_STCK[] = { 0x53, 0x54, 0x43, 0x4b };
+static const mf_octet name_PC[] = { 0x50, 0x43 };
 static const mf_octet name_STNSM[] = { 0x53, 0x54, 0x4e, 0x53, 0x4d };
 static const mf_octet name_STOSM[] = { 0x53, 0x54, 0x4f, 0x53, 0x4d };
 static const mf_octet name_BSM[] = { 0x42, 0x53, 0x4d };
@@ -148,6 +154,17 @@ static const mf_octet name_LMG[] = { 0x4c, 0x4d, 0x47 };
 static const mf_octet name_BRCL[] = { 0x42, 0x52, 0x43, 0x4c };
 static const mf_octet name_LARL[] = { 0x4c, 0x41, 0x52, 0x4c };
 static const mf_octet name_EPSW[] = { 0x45, 0x50, 0x53, 0x57 };
+static const mf_octet name_STG[] = { 0x53, 0x54, 0x47 };
+static const mf_octet name_LG[] = { 0x4c, 0x47 };
+static const mf_octet name_LLGF[] = { 0x4c, 0x4c, 0x47, 0x46 };
+static const mf_octet name_AG[] = { 0x41, 0x47 };
+static const mf_octet name_LGR[] = { 0x4c, 0x47, 0x52 };
+static const mf_octet name_LGFR[] = { 0x4c, 0x47, 0x46, 0x52 };
+static const mf_octet name_LLGFR[] = { 0x4c, 0x4c, 0x47, 0x46, 0x52 };
+static const mf_octet name_LGHI[] = { 0x4c, 0x47, 0x48, 0x49 };
+static const mf_octet name_SRLG[] = { 0x53, 0x52, 0x4c, 0x47 };
+static const mf_octet name_SAM31[] = { 0x53, 0x41, 0x4d, 0x33, 0x31 };
+static const mf_octet name_SAM64[] = { 0x53, 0x41, 0x4d, 0x36, 0x34 };
 
 static const struct mf_instruction instructions[] = {
     { { name_LPSW, 4 }, MF_S360, MF_S, 0x8200, 4 },
@@ -156,6 +173,7 @@ static const struct mf_instruction instructions[] = {
     { { name_STCTL, 5 }, MF_S370, MF_RS, 0xb6, 4 },
     { { name_SIGP, 4 }, MF_S370, MF_RS, 0xae, 4 },
     { { name_STCK, 4 }, MF_S370, MF_S, 0xb205, 4 },
+    { { name_PC, 2 }, MF_S370, MF_S, 0xb218, 4 },
     { { name_STNSM, 5 }, MF_S370, MF_SI, 0xac, 4 },
     { { name_STOSM, 5 }, MF_S370, MF_SI, 0xad, 4 },
     { { name_BSM, 3 }, MF_ESA390, MF_RR, 0x0b, 2 },
@@ -170,6 +188,17 @@ static const struct mf_instruction instructions[] = {
     { { name_BRCL, 4 }, MF_Z900, MF_RIL, 0xc04, 6 },
     { { name_LARL, 4 }, MF_Z900, MF_RIL, 0xc00, 6 },
     { { name_EPSW, 4 }, MF_Z900, MF_RRE, 0xb98d, 4 },
+    { { name_STG, 3 }, MF_Z900, MF_RXY, 0xe324, 6 },
+    { { name_LG, 2 }, MF_Z900, MF_RXY, 0xe304, 6 },
+    { { name_LLGF, 4 }, MF_Z900, MF_RXY, 0xe316, 6 },
+    { { name_AG, 2 }, MF_Z900, MF_RXY, 0xe308, 6 },
+    { { name_LGR, 3 }, MF_Z900, MF_RRE, 0xb904, 4 },
+    { { name_LGFR, 4 }, MF_Z900, MF_RRE, 0xb914, 4 },
+    { { name_LLGFR, 5 }, MF_Z900, MF_RRE, 0xb916, 4 },
+    { { name_LGHI, 4 }, MF_Z900, MF_RI, 0xa709, 4 },
+    { { name_SRLG, 4 }, MF_Z900, MF_RSY, 0xeb0c, 6 },
+    { { name_SAM31, 5 }, MF_ESA390, MF_E, 0x010d, 2 },
+    { { name_SAM64, 5 }, MF_Z900, MF_E, 0x010e, 2 },
 
     { { name_BALR, 4 }, MF_S360, MF_RR, 0x05, 2 },
     { { name_BCTR, 4 }, MF_S360, MF_RR, 0x06, 2 },
@@ -387,11 +416,26 @@ enum mf_status mf_encode(enum mf_profile profile,
         bytes[0] = (mf_octet)(code >> 8); bytes[1] = (mf_octet)((op->r1 << 4) | op->r3);
         address(bytes + 2,op->b2,op->d2 & 0xfffUL);
         bytes[4] = (mf_octet)(op->d2 >> 12); bytes[5] = (mf_octet)code; break;
+    case MF_RXY:
+        if (op->r1 > 15 || op->x2 > 15 || op->b2 > 15 || op->d2 > 0xfffffUL)
+            return MF_RANGE;
+        bytes[0] = (mf_octet)(code >> 8);
+        bytes[1] = (mf_octet)((op->r1 << 4) | op->x2);
+        address(bytes + 2, op->b2, op->d2 & 0xfffUL);
+        bytes[4] = (mf_octet)(op->d2 >> 12);
+        bytes[5] = (mf_octet)code; break;
     case MF_RIL:
         if (op->r1 > 15 || op->immediate > 0xffffffffUL) return MF_RANGE;
         bytes[0] = (mf_octet)(code >> 4); bytes[1] = (mf_octet)((op->r1 << 4) | (code & 15));
         bytes[2] = (mf_octet)(op->immediate >> 24); bytes[3] = (mf_octet)(op->immediate >> 16);
         bytes[4] = (mf_octet)(op->immediate >> 8); bytes[5] = (mf_octet)op->immediate; break;
+    case MF_RI:
+        if (op->r1 > 15 || op->immediate > 65535UL || op->r2 || op->r3 ||
+            op->x2 || op->b1 || op->b2 || op->d1 || op->d2) return MF_RANGE;
+        bytes[0] = (mf_octet)(code >> 8);
+        bytes[1] = (mf_octet)((op->r1 << 4) | (code & 15));
+        bytes[2] = (mf_octet)(op->immediate >> 8);
+        bytes[3] = (mf_octet)op->immediate; break;
     case MF_SI:
         if (op->immediate > 255 || op->b1 > 15 || op->d1 > 4095)
             return MF_RANGE;

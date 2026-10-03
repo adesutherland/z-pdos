@@ -1,0 +1,40 @@
+* SPDX-License-Identifier: MIT
+* Selected TSO/E PUTLINE forms used by the maintained lean service profile.
+* PTPB/IOPL fields: IBM TSO/E Programming Services, PUTLINE and IOPL.
+* SVC 6 LINK interface: IBM MVS Diagnosis Reference, z/OS V1R11.
+         MACRO
+&N       PUTLINE &PARM=,&ECT=,&UPT=,&ECB=,&OUTPUT=,&TERMPUT=,&MF=
+         AIF   ('&MF' EQ 'L').LIST
+         AIF   (N'&MF NE 2).BAD
+         AIF   ('&MF(1)' NE 'E' OR '&MF(2)' NE 'ZIOPL').BAD
+         AIF   ('&PARM' NE 'ZPUTLINE' OR '&ECT' NE '(R6)').BAD
+         AIF   ('&UPT' NE '(R7)' OR '&ECB' NE 'ZIOECB').BAD
+         AIF   ('&OUTPUT' NE '((R4),DATA)').BAD
+         AIF   ('&TERMPUT' NE 'EDIT').BAD
+&N       DS    0H
+         MVI   ZPUTLINE,X'30'
+         ST    R4,ZPUTLINE+4
+         LA    R15,ZIOPL
+         ST    R7,0(R15)
+         ST    R6,4(R15)
+         LA    R0,ZIOECB
+         ST    R0,8(R15)
+         LA    R0,ZPUTLINE
+         ST    R0,12(R15)
+         LR    R1,R15
+         L     R15,=A(MF$P&SYSNDX.L)
+         SVC   6
+         B     MF$P&SYSNDX.E
+         DS    0F
+MF$P&SYSNDX.L DC A(MF$P&SYSNDX.N),2F'0'
+MF$P&SYSNDX.N DC CL8'IKJPUTL'
+MF$P&SYSNDX.E DS 0H
+         MEXIT
+.LIST    AIF   ('&PARM' NE '' OR '&ECT' NE '').BAD
+         AIF   ('&UPT' NE '' OR '&ECB' NE '').BAD
+         AIF   ('&OUTPUT' NE '' OR '&TERMPUT' NE '').BAD
+         DS    0F
+&N       DC    X'12000000',A(0,0)
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected TSO PUTLINE form'
+         MEND

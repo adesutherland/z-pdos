@@ -1,0 +1,15 @@
+* SPDX-License-Identifier: MIT
+* Selected ECT fields from IBM TSO/E ECT mapping; z/OS 1.5 unqualified.
+         MACRO
+&N       IKJECT
+         AIF   ('&N' NE '').BAD
+ECT      DSECT
+         ORG   ECT+12
+ECTPCMD  DS    CL8
+         ORG   ECT+28
+ECTSWS   DS    X
+ECTNOPD  EQU   X'80'
+         ORG   ECT+56
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IKJECT form'
+         MEND

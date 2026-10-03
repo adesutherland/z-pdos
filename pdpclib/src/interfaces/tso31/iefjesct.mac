@@ -1,0 +1,10 @@
+* SPDX-License-Identifier: MIT
+* MVSSUPA declares JESCT but accesses no symbolic JESCT fields.
+         MACRO
+&N       IEFJESCT
+         AIF   ('&N' NE '').BAD
+JESCT    DSECT
+         ORG   JESCT+128
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IEFJESCT form'
+         MEND

@@ -103,6 +103,7 @@ if(CREXX_EXECUTABLE)
       COMMAND ${CREXX_EXECUTABLE} -nokeep ${PROJECT_SOURCE_DIR}/pdpclib/scripts/check-macros.crexx
         --args $<TARGET_FILE:mf-classic-as> $<TARGET_FILE:test_macro_deck>
         $<TARGET_FILE:test_funhead_deck>
+        $<TARGET_FILE:test_tso_terminal_deck>
         ${PROJECT_BINARY_DIR}/pdpclib-source-macros)
     set_tests_properties(pdpclib_source_macros PROPERTIES
       WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

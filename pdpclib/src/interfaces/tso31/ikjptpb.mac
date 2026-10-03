@@ -1,0 +1,10 @@
+* SPDX-License-Identifier: MIT
+* MVSSUPA declares but does not reference PTPB mapping fields.
+         MACRO
+&N       IKJPTPB
+         AIF   ('&N' NE '').BAD
+PTPB     DSECT
+         ORG   PTPB+12
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IKJPTPB form'
+         MEND

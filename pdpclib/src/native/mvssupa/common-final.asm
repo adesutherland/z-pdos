@@ -64,7 +64,7 @@ ZDCBAREA DS    0H
          ORG   IHADCB             Only using one DCB
          DS    CL(BSAMDCBL)
          ORG   IHADCB             Only using one DCB
-         AIF   ('&OS' EQ 'PDOS').PDVAREA
+         AIF   ('&OS' EQ 'PDOS' OR '&OS' EQ 'MVSF').PDVAREA
 ZAACB    DS    CL(VSAMDCBL)       VSAM ACB
 ZARPL    RPL   ACB=ZAACB,OPTCD=(SEQ,SYN,LOC)
 ZAMODCB  DS    XL(ZAMODCBL)  MODCB WORK AREA
@@ -210,7 +210,7 @@ MYTIOT   DSECT ,
          IEZDEB ,
          IHAPDS PDSBLDL=YES
          SPACE 1
-         AIF   ('&OS' EQ 'PDOS').PDVSMAP
+         AIF   ('&OS' EQ 'PDOS' OR '&OS' EQ 'MVSF').PDVSMAP
          IFGACB ,
          SPACE 1
          IFGRPL ,

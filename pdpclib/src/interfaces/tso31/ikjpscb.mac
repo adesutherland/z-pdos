@@ -1,0 +1,12 @@
+* SPDX-License-Identifier: MIT
+* Selected pointer from IBM TSO/E PSCB mapping; z/OS 1.5 unqualified.
+         MACRO
+&N       IKJPSCB
+         AIF   ('&N' NE '').BAD
+PSCB     DSECT
+         ORG   PSCB+52
+PSCBUPT  DS    A
+         ORG   PSCB+108
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IKJPSCB form'
+         MEND

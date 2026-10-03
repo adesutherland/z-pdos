@@ -43,8 +43,8 @@ publication semantics.
 
 | Addressability | USING with up to 15 registers at successive 4096-byte bases, register-zero mappings at offset zero, DROP lists or all; symbolic addresses need a matching USING |
 | Visibility and entry | ENTRY, EXTRN, implicit externals for a single-name V constant, and END with an optional section-relative entry |
-| Literals | Selected `=H'number'`, `=F'number'`, `=X'hex'`/`=XLn'hex'`, `=C'text'`/`=CLn'text'`, `=A(expression)` and `=V(name)`, explicit LTORG and implicit END pool |
-| Modes | AMODE 24/31/ANY; RMODE 24/31/ANY; name associates the declaration with its section, including a later section |
+| Literals | Selected `=H'number'`, `=F'number'`, `=X'hex'`/`=XLn'hex'`, `=C'text'`/`=CLn'text'`, `=A(expression)`, absolute `=AD(expression)` and `=V(name)`, explicit LTORG and implicit END pool |
+| Modes | AMODE 24/31/64/ANY; RMODE 24/31/ANY; name associates the declaration with its section, including a later section |
 
 CNOP's two operands are previously defined absolute expressions. Its label
 names the first halfword after any leading odd-byte fill, before the no-ops.
@@ -63,11 +63,15 @@ Mode declarations do not create a section. A blank name selects the unnamed
 section, which must exist by END; it does not select the current named section.
 Each mode may be declared once per section. ANY addressing is represented
 separately from AMODE31 and emits the classic ANY flag.
+AMODE64 emits the classic 64-bit section flag; this is object metadata and
+does not by itself establish a supported loader or guest route.
 
 H and F are signed 16- and 32-bit constants. Positive A values can use all 32
 bits; absolute AD uses two 32-bit parts, including sign-extended negative values.
 Eight-byte relocatable AD is unsupported. C/CL constants are sized after CP037
 conversion and padded with target spaces; X constants preserve explicit bytes.
+An `=AD(...)` literal likewise requires an absolute expression; it is emitted
+as eight bytes and has no eight-byte relocation.
 
 A zero-duplication DC aligns and defines its label without emitting a value,
 creating an implicit external or recording a fixup. H/F/A/AD/V may omit their
@@ -130,7 +134,7 @@ attributes; it does not grant a historical CPU a new address mode.
 | Selected S/370 additions | BASR, BAS, CLM, LRER (long-to-short HFP), STCM, ICM, CS, CDS, MVCL, CLCL; LCTL/STCTL/SIGP `r1,r3,d(b)`; STCK `d(b)`; STNSM/STOSM `d(b),byte` |
 | System S format | LPSW `d(b)`; SIO `d(b)` only in s360/s370, excluded from ESA/390 and z900 |
 | ESA/390 subset | BSM `r1,r2`; MSCH/SSCH/STSCH/TSCH `d(b)`; PR with no operand |
-| z900 subset | LPSWE `d(b)`; EPSW `r1,r2`; STMG/LMG `r1,r3,d(b)` with signed 20-bit displacement; BRCL/LARL `mask-or-register,same-section-target` |
+| z900 subset | LPSWE and PC `d(b)`; EPSW `r1,r2`; STMG/LMG and STG/LG/LLGF/AG `r1,d(x,b)` with signed 20-bit displacement; LGR/LGFR/LLGFR `r1,r2`; LGHI `r1,signed-16-bit`; SRLG `r1,r3,d(b)` with signed 20-bit displacement; SAM31/SAM64 with no operand; BRCL/LARL `mask-or-register,same-section-target` |
 
 Branch aliases lower to the ordinary BC/BCR encodings: B, BO, BH/BP, BL/BM,
 BNE/BNZ, BE/BZ, BNL/BNM, BNH/BNP, BNO and NOP. Each takes an address operand;

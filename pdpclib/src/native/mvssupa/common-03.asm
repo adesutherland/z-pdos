@@ -121,8 +121,8 @@ DDCUJBLK TM    DS1DSORG+1,DS1ACBM VSAM ?
 *DEFER*  BNZ   DDCPMEM              No; sequential
 DDCPPDS  OI    DDWFLAG2,CWFPDS    SET PDS ONLY
          B     DDCKPDS              Test LSTAR & SMS
-* PDOS has no VSAM service. Reject before constructing a VSAM handle.
-         AIF   ('&OS' NE 'PDOS').PDVDD
+* Selected PDOS and SDK file profiles reject VSAM before handle setup.
+         AIF   ('&OS' NE 'PDOS' AND '&OS' NE 'MVSF').PDVDD
 DDCVSAM  B     BADDSORG
          AGO   .PDVDDE
 .PDVDD   ANOP
@@ -1204,8 +1204,8 @@ OPENVTOC OSUBHEAD ,          Define extended entry
 *   VSAM OPEN support                                                 *
 ***********************************************************************
 OPENVSAM OSUBHEAD ,          Define extended entry
-         AIF   ('&OS' NE 'PDOS').PDVOPEN
-         LA    R0,ORFBADSO        PDOS has no VSAM access method
+         AIF   ('&OS' NE 'PDOS' AND '&OS' NE 'MVSF').PDVOPEN
+         LA    R0,ORFBADSO        VSAM UNSUPPORTED IN THIS PROFILE
          OBRAN OPRERR
          AGO   .PDVORET
 .PDVOPEN ANOP
@@ -1256,7 +1256,7 @@ OPDOVMOD TM    WWORK,1            Output?
 .PDVORET ANOP
 VECTOR   OSUBRET ROUTE=(14)  Return from extended entry
          SPACE 1
-         AIF   ('&OS' EQ 'PDOS').PDVPEND
+         AIF   ('&OS' EQ 'PDOS' OR '&OS' EQ 'MVSF').PDVPEND
 VSAMDCB  ACB   DDNAME=VSAMDCB,EXLST=EXLSTACB,                          *
                MACRF=(SEQ)
 VSAMDCBL EQU   *-VSAMDCB
@@ -1672,10 +1672,10 @@ TGETREAD B     EXRDBAD            Invalid unavailable-service handle
 TGETREAD L     R6,ZIOECT          RESTORE ECT ADDRESS
          L     R7,ZIOUPT          RESTORE UPT ADDRESS
          MVI   ZGETLINE+2,X'80'   EXPECTED FLAG
-         GAMOS                    S380 AM24
+         GAMOS ,                  S380 AM24
          GETLINE PARM=ZGETLINE,ECT=(R6),UPT=(R7),ECB=ZIOECB,           *
                MF=(E,ZIOPL)
-         GAMAPP                   S380 SWITCH TO AM31
+         GAMAPP ,                 S380 SWITCH TO AM31
          LR    R6,R15             COPY RETURN CODE
          CH    R6,=H'16'          HIT BARRIER ?
          BE    READEOD2           YES; EOF, BUT ALLOW READS
@@ -1729,7 +1729,7 @@ READEXIT DS    0H
 *---------------------------------------------------------------------*
 *   VSAM read
 *---------------------------------------------------------------------*
-         AIF   ('&OS' NE 'PDOS').PDVRD
+         AIF   ('&OS' NE 'PDOS' AND '&OS' NE 'MVSF').PDVRD
 VSAMREAD B     EXRDBAD            Invalid unavailable-service handle
          AGO   .PDVRDE
 .PDVRD   ANOP
@@ -2005,7 +2005,7 @@ WRITBLK  AR    R5,R4              Set start and end of write
          BZ    WRITEEX              No; just return
          LM    R4,R5,KEPTREC      Residual text & length
          B     WRITENEW             Finish record
-         AIF   ('&OS' NE 'PDOS').PDVWR
+         AIF   ('&OS' NE 'PDOS' AND '&OS' NE 'MVSF').PDVWR
 VSAMWRIT B     WRITBAD            Invalid unavailable-service handle
          AGO   .PDVWRE
 .PDVWR   ANOP
@@ -2843,8 +2843,8 @@ SYSATDLN EQU   *-SYSATWRK     LENGTH OF DYNAMIC STORAGE
          PUSH  USING
          DROP  ,
 @@IDCAMS FUNHEAD SAVE=IDCSAVE,US=NO  EXECUTE IDCAMS REQUEST
-         AIF   ('&OS' NE 'PDOS').PDIDC
-         LA    R15,12             IDCAMS IS NOT A PDOS SERVICE
+         AIF   ('&OS' NE 'PDOS' AND '&OS' NE 'MVSF').PDIDC
+         LA    R15,12             IDCAMS UNSUPPORTED
          FUNEXIT RC=(15)
          POP   USING
 IDCSAVE  DC    18F'0'

@@ -612,8 +612,9 @@ static enum mf_status mode(struct mf_as *as, int address)
     struct mode_declaration *mode;
     if (word(as->statement.operand, any, sizeof any)) n = address ? 0 : 31;
     else {
-        status = number(as, as->statement.operand, 31, &n); if (status != MF_OK) return status;
-        if (n != 24 && n != 31) return MF_UNSUPPORTED;
+        status = number(as, as->statement.operand, address ? 64 : 31, &n);
+        if (status != MF_OK) return status;
+        if (n != 24 && n != 31 && (!address || n != 64)) return MF_UNSUPPORTED;
     }
     for (i = 0; i < as->mode_count; ++i)
         if (same_name(as->modes[i].name, as->statement.label)) break;
@@ -846,10 +847,11 @@ static enum mf_status instruction(struct mf_as *as, const struct mf_instruction 
             status = instruction_number(as, parts[0], 15, &n); operands.r1 = (unsigned)n;
             if (status == MF_OK) { status = instruction_number(as, parts[1], 15, &n); operands.r2 = (unsigned)n; }
         }
-    } else if (ins->format == MF_RX) {
+    } else if (ins->format == MF_RX || ins->format == MF_RXY) {
         if (count != 2) return MF_SOURCE;
         status = instruction_number(as, parts[0], 15, &n); operands.r1 = (unsigned)n;
-        if (status == MF_OK) status = address(as, parts[1], 1, 0, 0, 0, &operands.d2, &operands.b2, &operands.x2);
+        if (status == MF_OK) status = address(as, parts[1], 1, 0, 0,
+            ins->format == MF_RXY, &operands.d2, &operands.b2, &operands.x2);
     } else if (ins->format == MF_RS || ins->format == MF_RSY) {
         if (ins->opcode >= 0x88 && ins->opcode <= 0x8f) {
             if (count != 2) return MF_SOURCE;
@@ -882,6 +884,21 @@ static enum mf_status instruction(struct mf_as *as, const struct mf_instruction 
                 if (delta & 1) return MF_RANGE;
                 delta /= 2;
                 operands.immediate = target.magnitude.lo >= position ? delta : ((~delta)+1) & U32MAX;
+            }
+        }
+    } else if (ins->format == MF_RI) {
+        struct value immediate;
+        if (count != 2) return MF_SOURCE;
+        status = instruction_number(as,parts[0],15,&n); operands.r1 = (unsigned)n;
+        if (status == MF_OK) {
+            status = evaluate(as,parts[1],&immediate);
+            if (status == MF_UNDEFINED && as->pass == 1) status = MF_OK;
+            else if (status == MF_OK) {
+                if (immediate.coefficient || immediate.magnitude.hi ||
+                    immediate.magnitude.lo > (immediate.negative ? 32768UL : 32767UL))
+                    return MF_RANGE;
+                operands.immediate = immediate.negative ?
+                    ((~immediate.magnitude.lo) + 1) & 0xffffUL : immediate.magnitude.lo;
             }
         }
     } else if (ins->format == MF_SI) {
@@ -1217,7 +1234,7 @@ static enum mf_status emit_constant(struct mf_as *as, const struct constant *c)
     }
     return MF_OK;
 }
-/* Selected H/F signed decimal, X/XL octets, A and V(single-name) literals.
+/* Selected H/F signed decimal, X/XL octets, A/AD and V(single-name) literals.
  * The table owns identities, not source statements or complete pool images. */
 static enum mf_status literal_constant(struct mf_as *as, struct mf_span text,
     struct constant *c)
@@ -1227,7 +1244,14 @@ static enum mf_status literal_constant(struct mf_as *as, struct mf_span text,
     status = constant_parse(as, subspan(text, 1, text.length - 1), 0, c);
     if (status != MF_OK) return status;
     if (c->repeat != 1 || (c->explicit_length && c->type != 0x58 && c->type != 0x43 && c->type != 0x41) ||
-        (c->type != 0x48 && c->type != 0x46 && c->type != 0x58 && c->type != 0x43 && c->type != 0x56 && c->type != 0x41)) return MF_UNSUPPORTED;
+        (c->type != 0x48 && c->type != 0x46 && c->type != 0x58 && c->type != 0x43 && c->type != 0x56 && c->type != 0x41 && c->type != 0x44)) return MF_UNSUPPORTED;
+    if (c->type == 0x44) {
+        status = evaluate(as, c->value, &v);
+        if (status == MF_UNDEFINED && as->pass == 1) return MF_OK;
+        if (status != MF_OK) return status;
+        if (v.coefficient) return MF_UNSUPPORTED;
+        return numeric_bytes(v, 8, 0, bytes);
+    }
     if (c->type == 0x48 || c->type == 0x46) {
         v = zero_value();
         at = 0;

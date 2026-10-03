@@ -17,6 +17,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 endif()
 
 add_executable(test_funhead_deck tests/test_funhead_deck.c)
+add_executable(test_tso_terminal_deck tests/test_tso_terminal_deck.c)
 
 # The fixture depends on GCC-compatible native varargs and symbol labels.
 if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")

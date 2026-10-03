@@ -1,0 +1,12 @@
+* SPDX-License-Identifier: MIT
+* Selected user prefix from IBM TSO/E UPT mapping; z/OS 1.5 unqualified.
+         MACRO
+&N       IKJUPT
+         AIF   ('&N' NE '').BAD
+UPT      DSECT
+         ORG   UPT+16
+UPTPREFX DS    CL7
+         ORG   UPT+56
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IKJUPT form'
+         MEND

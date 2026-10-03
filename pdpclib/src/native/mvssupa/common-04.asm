@@ -165,8 +165,8 @@ CODE386  DS    0D
          SAVE  (14,12),,@@GOSUP
          LR    R12,R15
          USING @@GOSUP,R12
-         AIF   ('&OS' NE 'PDOS').PDGOSUP
-         LA    R15,12             MODESET IS NOT A PDOS SERVICE
+         AIF   ('&OS' NE 'PDOS' AND '&OS' NE 'MVSF').PDGOSUP
+         LA    R15,12             MODESET UNSUPPORTED
          AGO   .PDGOSEND
 .PDGOSUP ANOP
          MODESET MODE=SUP
@@ -190,8 +190,8 @@ CODE386  DS    0D
          SAVE  (14,12),,@@GOPROB
          LR    R12,R15
          USING @@GOPROB,R12
-         AIF   ('&OS' NE 'PDOS').PDGOPRB
-         LA    R15,12             MODESET IS NOT A PDOS SERVICE
+         AIF   ('&OS' NE 'PDOS' AND '&OS' NE 'MVSF').PDGOPRB
+         LA    R15,12             MODESET UNSUPPORTED
          AGO   .PDGOPEND
 .PDGOPRB ANOP
          MODESET MODE=PROB

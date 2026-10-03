@@ -147,6 +147,10 @@ static void any_mode(void)
     CHECK(f.writer.begin(f.writer.cookie, &s, 1, NULL, 0) == MF_OK);
     CHECK(f.bytes[28] == 7);
     CHECK(f.writer.finish(f.writer.cookie, 1) == MF_OK && f.valid); clean(&f);
+    init(&f); s = sec(1, 0); s.amode = 64; s.rmode = 31;
+    CHECK(f.writer.begin(f.writer.cookie, &s, 1, NULL, 0) == MF_OK);
+    CHECK(f.bytes[28] == 0x14);
+    CHECK(f.writer.finish(f.writer.cookie, 1) == MF_OK && f.valid); clean(&f);
 }
 static void failure(unsigned which, enum mf_status expected)
 {
@@ -158,7 +162,7 @@ static void failure(unsigned which, enum mf_status expected)
     memset(&y,0,sizeof(y)); y.id=11; y.kind=MF_EXTERNAL;
     y.name=s[0].name;
     memset(bytes,0,sizeof(bytes)); st=MF_OK;
-    if(which==0) s[0].amode=64;
+    if(which==0) s[0].amode=32;
     if(which==1) s[0].length=0x1000000UL;
     if(which==2) s[0].name=span(longname,sizeof(longname));
     if(which==3) s[0].name=span(badname,sizeof(badname));

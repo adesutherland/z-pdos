@@ -340,6 +340,9 @@ static void deferred_modes(void)
     CHECK(f.sections[0].amode == 0 && f.sections[0].rmode == 31);
     CHECK(f.sections[1].amode == 31 && f.sections[1].rmode == 24);
     CHECK(f.sections[0].length == 2 && f.sections[1].length == 2); clean(&f);
+    init(&f, "S CSECT\nS AMODE 64\nS RMODE ANY\n LR 1,2\n END S\n");
+    successful(&f); CHECK(f.sections[0].amode == 64 && f.sections[0].rmode == 31);
+    CHECK(f.sections[0].length == 2); clean(&f);
 }
 static void relocations_and_sections(void)
 {
@@ -408,7 +411,7 @@ static void bad_sources(void)
         {"S CSECT\n USING S,12\n L 1,S(,11)\n END\n", MF_RANGE},
         {"S CSECT\n USING S,12\n DS 4096C\n L 1,*\n END\n", MF_RANGE},
         {"S CSECT\n USING S,12\nT CSECT\n L 1,T\n END\n", MF_RANGE},
-        {"S CSECT\n AMODE 64\n LR 1,2\n END\n", MF_RANGE},
+        {"S CSECT\n AMODE 32\n LR 1,2\n END\n", MF_UNSUPPORTED},
         {"S CSECT\n RMODE 31\n LR 1,2\n END\n", MF_UNDEFINED},
         {" MACRO\n END\n", MF_UNSUPPORTED},
         {" COPY MEMBER\n END\n", MF_UNSUPPORTED},
@@ -697,12 +700,13 @@ static void system_instructions(void)
 {
     static const mf_octet expected[] = {
         0xb7,0x66,0x01,0x20, 0xae,0x10,0,0x12, 0xb2,0x33,0xa0,0,
+        0xb2,0x18,0xe0,0,
         0xb2,0xb2,0x01,0x80, 0xeb,0x0f,0xd0,0x80,0,0x24,
         0xeb,0x0f,0xd0,0,0x80,4, 0xc0,0xf4,0,0,0,7,
-        0xc0,0xc0,0xff,0xff,0xff,0xef, 1,1
+        0xc0,0xc0,0xff,0xff,0xff,0xed, 1,1
     };
     struct fixture f;
-    init(&f,"S CSECT\n LCTL 6,6,288\n SIGP 1,0,18\n SSCH 0(10)\n LPSWE 384\n STMG 0,15,128(13)\n LMG 0,15,-524288(13)\n BRCL 15,DONE\n LARL 12,S\n PR\nDONE DS 0H\n END S\n"); f.config.profile = MF_Z900;
+    init(&f,"S CSECT\n LCTL 6,6,288\n SIGP 1,0,18\n SSCH 0(10)\n PC 0(14)\n LPSWE 384\n STMG 0,15,128(13)\n LMG 0,15,-524288(13)\n BRCL 15,DONE\n LARL 12,S\n PR\nDONE DS 0H\n END S\n"); f.config.profile = MF_Z900;
     successful(&f); CHECK(f.sections[0].length == sizeof expected);
     CHECK(!memcmp(f.data[0],expected,sizeof expected)); clean(&f);
     init(&f,"S CSECT\n BRCL 15,ODD\nODD EQU S+1\n END S\n"); f.config.profile = MF_Z900; CHECK(run(&f) == MF_RANGE); clean(&f);
@@ -754,6 +758,14 @@ static void character_and_location_literals(void)
     init(&f,"S CSECT\n USING S,12\n L 1,=A(*)\n L 2,=A(*)\n END S\n"); f.config.max_literals = 4;
     successful(&f); CHECK(f.sections[0].length == sizeof addresses && !memcmp(f.data[0],addresses,sizeof addresses));
     CHECK(f.fixup_count == 2 && f.fixups[0].offset == 8 && f.fixups[1].offset == 12); clean(&f);
+    init(&f,"S CSECT\n USING S,12\n AG 0,=AD(1048575)\n END S\n"); f.config.profile = MF_Z900; f.config.max_literals = 2;
+    successful(&f); CHECK(f.sections[0].length == 16);
+    CHECK(f.data[0][0] == 0xe3 && f.data[0][2] == 0xc0 && f.data[0][3] == 8 && f.data[0][5] == 8);
+    CHECK(f.data[0][8] == 0 && f.data[0][12] == 0 && f.data[0][13] == 0x0f &&
+          f.data[0][14] == 0xff && f.data[0][15] == 0xff);
+    CHECK(f.fixup_count == 0); clean(&f);
+    init(&f,"S CSECT\n USING S,12\n AG 0,=AD(S)\n END S\n"); f.config.profile = MF_Z900; f.config.max_literals = 2;
+    failed(&f,MF_UNSUPPORTED); clean(&f);
     init(&f,"S CSECT\n USING S,12\n L 1,=CL2'ABC'\n END S\n"); f.config.max_literals = 4;
     CHECK(run(&f) == MF_RANGE); clean(&f);
 }

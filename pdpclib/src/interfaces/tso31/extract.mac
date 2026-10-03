@@ -1,0 +1,17 @@
+* SPDX-License-Identifier: MIT
+* Selected EXTRACT FIELDS=PSB form for the maintained TSO file profile.
+* SVC 40 12-byte parameter list: IBM MVS Diagnosis Reference, SVC 40.
+         MACRO
+&N       EXTRACT &WHERE,&FIELDS=
+         AIF   ('&WHERE' NE '(R2)' OR '&FIELDS' NE 'PSB').BAD
+&N       DS    0H
+         STCM  R2,7,MF$E&SYSNDX.P+1
+         LA    R1,MF$E&SYSNDX.P
+         SVC   40
+         B     MF$E&SYSNDX.E
+         DS    0F
+MF$E&SYSNDX.P DC X'000000000000000000400000'
+MF$E&SYSNDX.E DS 0H
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected TSO EXTRACT form'
+         MEND

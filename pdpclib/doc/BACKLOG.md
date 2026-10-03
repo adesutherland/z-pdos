@@ -19,8 +19,8 @@ Open items require separate implementation authority.
 - Type: qualification
 - Status: In progress
 - Target: Named OS/application service profiles and retained ports
-- Observation: The complete `pdos-zarch` MVSSUPA source now assembles with the source-built Classic Assembler and the maintained PDOS31 service definitions. This does not qualify complete MVS 3.8, lean TSO or z/OS service paths. The `tso31-lean` source stops at its TSO `PUTLINE MF=L` list form. The PDOS31 macros have selected PDOS service semantics and cannot be reused as proof of MVS/TSO semantics.
-- Evidence: On Apple Silicon macOS, 3 October 2026, `crexx -nokeep pdpclib/scripts/build-native.crexx --args pdos-zarch build/tools/assembler/mf-classic-as build/pdpclib-native-final-20261003` assembled 3981 statements, 20 sections, 908 symbols and 50 fixups. Source SHA-256 `8327b212648224f25dc0d0268b8d32fffb69ca36cce5cd304c08f75852f3c3d0`; object SHA-256 `9a7a69a5501edd1dbba0b60dd371c16636ce577d2cb1a41f59fade04f8f3fb58`. The corresponding `tso31-lean` run stops at prepared line 1917. The 93/93 local host checks include an independent FUNHEAD deck check and full PDOS source assembly. Earlier z/PDOS guest scope remains in doc/qualification/CHECKPOINT.md and ../pdos/doc/qualification/QUALIFICATION.md.
+- Observation: The complete `pdos-zarch` MVSSUPA source assembles with maintained PDOS31 service definitions. The new `tso31-sdk-files` selection assembles a TSO service object with sequential/partitioned dataset paths; VSAM, IDCAMS and supervisor-mode switching return unsupported status. The broader `tso31-lean` selection still reaches a VSAM `SHOWCB` barrier. No new z/OS service behavior is guest qualified. Selected PDOS31 macro semantics cannot be reused as proof of MVS/TSO semantics.
+- Evidence: On Apple Silicon macOS, 3 October 2026, the SDK file selection assembled 4331 statements, 25 sections, 971 symbols and 55 fixups with the source-built Classic Assembler. Its object linked with four TSO24/31/64 entry variants and source-built C decks to XMIT transports. The independent TSO fixture checks PUTLINE, GETLINE and EXTRACT service bytes. The local host suite passed 93/93 with `-j 4`. Earlier z/PDOS guest scope remains in doc/qualification/CHECKPOINT.md and ../pdos/doc/qualification/QUALIFICATION.md.
 - Acceptance: Run each named compile, assemble, link and guest path with exact service/profile inputs.
 
 ## PCL-003: Retained ports and file-level notices
@@ -59,3 +59,12 @@ Open items require separate implementation authority.
 - Acceptance: The source-macro fixture and complete hosted Windows suite pass with the ownership restriction intact.
 
 - Result: The [hosted Windows run](https://github.com/adesutherland/z-pdos/actions/runs/37070532323) built and tested MVS/CMS and passed all 92 required toolchain tests at source `8642c3543e3cce3d5a801bf300a9e2792e7574c2`. Packaging stopped later at the separate NSIS literal-dollar filename guard; it does not invalidate these component checks.
+
+## PCL-007: Qualify selected TSO service interfaces on z/OS 1.5
+
+- Type: qualification
+- Status: In progress
+- Target: `tso31-sdk-files` service object and its TSO24/31/64 consumers
+- Observation: The selected terminal, EXTRACT and TSO control-block forms have only independent host deck and link checks. The service still consumes selected PDOS31 mappings for other MVS fields, and inherited code reads `TCBFA`, which IBM does not designate as a programming interface. Exact z/OS 1.5 guest behavior is unknown.
+- Evidence: `doc/architecture/TSO31-INTERFACES.md`, the 3 October host source build and 93/93 host suite.
+- Acceptance: Exercise sequential and partitioned dataset open/read/write/close, terminal I/O, dynamic allocation, command and prefix routes, explicit VSAM failure, and the two TSO64 entry modes on the leased z/OS 1.5 guest. Resolve offset or linkage mismatches in maintained source and repeat affected checks.

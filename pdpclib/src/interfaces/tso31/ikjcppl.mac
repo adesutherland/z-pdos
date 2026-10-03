@@ -1,0 +1,13 @@
+* SPDX-License-Identifier: MIT
+* Four-word command processor parameter list, IBM TSO/E Programming Guide.
+         MACRO
+&N       IKJCPPL
+         AIF   ('&N' NE '').BAD
+CPPL     DSECT
+CPPLCBUF DS    A
+CPPLUPT  DS    A
+CPPLPSCB DS    A
+CPPLECT  DS    A
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IKJCPPL form'
+         MEND

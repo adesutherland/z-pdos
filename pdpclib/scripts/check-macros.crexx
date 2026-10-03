@@ -9,11 +9,12 @@ import rxfnsb
 
 main: procedure = .int
   arg args = .string[]
-  if args.0 <> 4 then do
-    say "usage: crexx -nokeep pdpclib/scripts/check-macros.crexx --args assembler checker funhead-checker owned-build-directory"
+  if args.0 <> 5 then do
+    say "usage: crexx -nokeep pdpclib/scripts/check-macros.crexx --args assembler checker funhead-checker terminal-checker owned-build-directory"
     return 2
   end
-  cli = args.1; checker = args.2; head_checker = args.3; work = args.4
+  cli = args.1; checker = args.2; head_checker = args.3
+  terminal_checker = args.4; work = args.5
   locations = .string[]
   address crexx "pwd" output locations
   repository = changestr('5C'x,strip(locations.1),"/")
@@ -33,7 +34,7 @@ main: procedure = .int
   address shell "cmake -E sha256sum " || shellquote(original) || " > " || shellquote(hashfile)
   call require rc = 0, "hash supplied source"
   hash = word(readfile(hashfile), 1)
-  call require hash = "8327b212648224f25dc0d0268b8d32fffb69ca36cce5cd304c08f75852f3c3d0", "reviewed maintained source identity"
+  call require hash = "efa7d848806c3b7619b0b60b75309220d120d34c4844b6884cf194a21cabcebe", "reviewed maintained source identity"
   source = readfile(original)
   subset = extract_lines(source, 2, 59) || extract_lines(source, 298, 302) || extract_lines(source, 306, 309) || extract_lines(source, 455, 459)
   subset = subset || "MACREF   CSECT" || '0A'x || "R14      EQU   14" || '0A'x
@@ -63,6 +64,13 @@ main: procedure = .int
   call require rc = 0, "assemble maintained FUNHEAD without external services"
   address crexx "run :head_checker :head_deck"
   call require rc = 0, "independent FUNHEAD object meaning"
+  terminal_deck = work || "/tso31-terminal.obj"
+  address shell "cmake -E rm -f " || shellquote(terminal_deck)
+  call require rc = 0, "clear TSO terminal fixture output"
+  address crexx "run :cli --profile z900 --macros --macro-model-limit 4096 --macro-limit 128 -I pdpclib/src/interfaces/tso31 pdpclib/tests/tso31_terminal.asm :terminal_deck"
+  call require rc = 0, "assemble selected source-owned TSO terminal forms"
+  address crexx "run :terminal_checker :terminal_deck"
+  call require rc = 0, "independent TSO terminal parameter and linkage bytes"
   full_deck = work || "/pdos-zarch-mvssupa.obj"
   members = selected || "/pdpclib"
   address shell "cmake -E rm -f " || shellquote(full_deck)
@@ -71,7 +79,7 @@ main: procedure = .int
   call require rc = 0, "assemble complete maintained pdos-zarch service source"
   address shell "cmake -E sha256sum " || shellquote(input) || " " || shellquote(deck)
   call require rc = 0, "consumer identities"
-  say "Source-owned FUNHEAD deck checked independently; complete pdos-zarch MVSSUPA source assembled."
+  say "Source-owned FUNHEAD and selected TSO terminal decks checked; complete pdos-zarch MVSSUPA source assembled."
   return 0
 
 shellquote: procedure = .string

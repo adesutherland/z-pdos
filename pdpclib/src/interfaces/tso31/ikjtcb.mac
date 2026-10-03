@@ -1,0 +1,27 @@
+* SPDX-License-Identifier: MIT
+* Selected TCB offsets from IBM TCB mapping; z/OS 1.5 unqualified.
+         MACRO
+&N       IKJTCB
+         AIF   ('&N' NE '').BAD
+TCB      DSECT
+         ORG   TCB+0
+TCBRBP   DS    A
+         ORG   TCB+8
+TCBDEB   DS    A
+TCBTIO   DS    A
+TCBCMP   DS    F
+         ORG   TCB+29
+TCBFLGS  DS    X
+TCBFA    EQU   X'80'
+         ORG   TCB+112
+TCBFSA   DS    A
+         ORG   TCB+124
+TCBJSTCB DS    A
+         ORG   TCB+132
+TCBOTC   DS    A
+         ORG   TCB+180
+TCBJSCB  DS    A
+         ORG   TCB+184
+         MEXIT
+.BAD     MNOTE 8,'unsupported selected IKJTCB form'
+         MEND

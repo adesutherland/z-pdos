@@ -37,3 +37,9 @@ the runtime merge; retain each actual imported file's notices and review them
 before a replacement or new port. External IBM macro calls do not include or
 license those macro implementations. No native expansions or private assets
 were imported. The source version text 4.xx is not a new release 4.00.
+
+The selected `src/interfaces/tso31/` terminal, EXTRACT and mapping macros
+are original MIT implementations using published IBM TSO/E parameter-block,
+SVC and control-block facts; they are not copies of IBM macro expansions.
+The interface references and unqualified guest boundary are recorded in
+[the TSO31 architecture note](doc/architecture/TSO31-INTERFACES.md).

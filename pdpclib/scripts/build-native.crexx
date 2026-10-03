@@ -9,18 +9,20 @@ import rxfnsb
 main: procedure = .int
   arg args = .string[]
   if args.0 <> 3 then do
-    say "usage: crexx -nokeep pdpclib/scripts/build-native.crexx --args pdos-zarch|tso31-lean assembler new-build-directory"
+    say "usage: crexx -nokeep pdpclib/scripts/build-native.crexx --args pdos-zarch|tso31-lean|tso31-sdk-files assembler new-build-directory"
     return 2
   end
   profile = args.1; cli = args.2; work = args.3
-  call require profile = "pdos-zarch" | profile = "tso31-lean", "selected z/Architecture profile"
+  call require profile = "pdos-zarch" | profile = "tso31-lean" | profile = "tso31-sdk-files", "selected z/Architecture profile"
   call require left(work,6) = "build/" & length(work) > 6 & pos("..",work) = 0, "new owned directory under build/"
   address crexx "run crexx -nokeep pdpclib/scripts/prepare.crexx --args :profile :work"
   call require rc = 0, "prepare maintained PDPCLIB source"
   source = work || "/pdpclib/mvssupa.asm"
   members = work || "/pdpclib"
   deck = work || "/mvssupa.obj"
-  address crexx "run :cli --profile z900 --macros --macro-model-limit 4096 --macro-limit 128 -I :members -I pdpclib/src/interfaces/pdos31 -I pdpclib/src/interfaces/classic-linkage :source :deck"
+  service_dir = "pdpclib/src/interfaces/pdos31"
+  if profile = "tso31-lean" | profile = "tso31-sdk-files" then service_dir = "pdpclib/src/interfaces/tso31"
+  address crexx "run :cli --profile z900 --macros --macro-model-limit 4096 --macro-limit 128 -I :members -I :service_dir -I pdpclib/src/interfaces/pdos31 -I pdpclib/src/interfaces/classic-linkage :source :deck"
   call require rc = 0, "assemble selected native service source"
   receipt = work || "/native.sha256"
   address shell "cmake -E sha256sum " || shellquote(source) || " " || shellquote(deck) || " > " || shellquote(receipt)
