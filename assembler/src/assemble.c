@@ -1239,7 +1239,7 @@ static enum mf_status emit_constant(struct mf_as *as, const struct constant *c)
 static enum mf_status literal_constant(struct mf_as *as, struct mf_span text,
     struct constant *c)
 {
-    struct value v; enum mf_status status; mf_octet bytes[4]; size_t at; struct mf_span value;
+    struct value v; enum mf_status status; mf_octet bytes[8]; size_t at; struct mf_span value;
     if (!text.length || text.data[0] != 0x3d) return MF_SOURCE;
     status = constant_parse(as, subspan(text, 1, text.length - 1), 0, c);
     if (status != MF_OK) return status;
