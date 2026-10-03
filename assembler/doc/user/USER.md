@@ -130,7 +130,7 @@ attributes; it does not grant a historical CPU a new address mode.
 | Selected S/370 additions | BASR, BAS, CLM, LRER (long-to-short HFP), STCM, ICM, CS, CDS, MVCL, CLCL; LCTL/STCTL/SIGP `r1,r3,d(b)`; STCK `d(b)`; STNSM/STOSM `d(b),byte` |
 | System S format | LPSW `d(b)`; SIO `d(b)` only in s360/s370, excluded from ESA/390 and z900 |
 | ESA/390 subset | BSM `r1,r2`; MSCH/SSCH/STSCH/TSCH `d(b)`; PR with no operand |
-| z900 subset | LPSWE `d(b)`; STMG/LMG `r1,r3,d(b)` with signed 20-bit displacement; BRCL/LARL `mask-or-register,same-section-target` |
+| z900 subset | LPSWE `d(b)`; EPSW `r1,r2`; STMG/LMG `r1,r3,d(b)` with signed 20-bit displacement; BRCL/LARL `mask-or-register,same-section-target` |
 
 Branch aliases lower to the ordinary BC/BCR encodings: B, BO, BH/BP, BL/BM,
 BNE/BNZ, BE/BZ, BNL/BNM, BNH/BNP, BNO and NOP. Each takes an address operand;

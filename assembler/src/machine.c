@@ -7,6 +7,8 @@
  * BAS/BASR: GA22-7000-7 (March 1981), Branch and Save facility and instruction
  * descriptions. Our selected S370 subset includes this optional facility;
  * support is not a claim that every historical S370 machine provides it.
+ * EPSW RRE format and B98D opcode: IBM z/Architecture Principles of
+ * Operation, SA22-7832-14, Basic Instruction Formats and EXTRACT PSW.
  * IBM bit positions count from the most significant bit, numbered zero.
  * Profile S360 is the common architecture, excluding Model 67 extensions.
  * Mnemonics are numeric ASCII octets, independent of execution character set.
@@ -145,6 +147,7 @@ static const mf_octet name_STMG[] = { 0x53, 0x54, 0x4d, 0x47 };
 static const mf_octet name_LMG[] = { 0x4c, 0x4d, 0x47 };
 static const mf_octet name_BRCL[] = { 0x42, 0x52, 0x43, 0x4c };
 static const mf_octet name_LARL[] = { 0x4c, 0x41, 0x52, 0x4c };
+static const mf_octet name_EPSW[] = { 0x45, 0x50, 0x53, 0x57 };
 
 static const struct mf_instruction instructions[] = {
     { { name_LPSW, 4 }, MF_S360, MF_S, 0x8200, 4 },
@@ -166,6 +169,7 @@ static const struct mf_instruction instructions[] = {
     { { name_LMG, 3 }, MF_Z900, MF_RSY, 0xeb04, 6 },
     { { name_BRCL, 4 }, MF_Z900, MF_RIL, 0xc04, 6 },
     { { name_LARL, 4 }, MF_Z900, MF_RIL, 0xc00, 6 },
+    { { name_EPSW, 4 }, MF_Z900, MF_RRE, 0xb98d, 4 },
 
     { { name_BALR, 4 }, MF_S360, MF_RR, 0x05, 2 },
     { { name_BCTR, 4 }, MF_S360, MF_RR, 0x06, 2 },
@@ -343,6 +347,13 @@ enum mf_status mf_encode(enum mf_profile profile,
                 ((op->r1 & 1) || (op->r2 & 1))) return MF_RANGE;
             bytes[1] = (mf_octet)((op->r1 << 4) | op->r2);
         }
+        break;
+    case MF_RRE:
+        if (op->r1 > 15 || op->r2 > 15 || op->r3 || op->x2 ||
+            op->b1 || op->b2 || op->d1 || op->d2 || op->immediate) return MF_RANGE;
+        bytes[0] = (mf_octet)(code >> 8);
+        bytes[1] = (mf_octet)code;
+        bytes[3] = (mf_octet)((op->r1 << 4) | op->r2);
         break;
     case MF_RX:
         if (op->r1 > 15 || op->x2 > 15 || op->b2 > 15 || op->d2 > 4095)

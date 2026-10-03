@@ -837,7 +837,7 @@ static enum mf_status instruction(struct mf_as *as, const struct mf_instruction 
     status = define(as, as->statement.label, current_value(as)); if (status != MF_OK) return status;
     status = split(as->statement.operand, parts, 3, &count); if (status != MF_OK) return status;
     memset(&operands, 0, sizeof operands);
-    if (ins->format == MF_RR) {
+    if (ins->format == MF_RR || ins->format == MF_RRE) {
         if (ins->opcode == 0x0a) {
             if (count != 1) return MF_SOURCE;
             status = instruction_number(as, parts[0], 255, &operands.immediate);
