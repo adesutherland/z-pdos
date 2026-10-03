@@ -8,6 +8,20 @@ relevant user/architecture documentation before editing. Check Git status and
 preserve unrelated changes. Do not commit, push or publish without explicit
 session authority.
 
+## Branches and checkouts
+
+All work in this repository must happen on `develop` or `hotfix`. These are
+the only permitted branch names. Do not create or use feature, release,
+temporary or other branches, including in additional worktrees.
+
+Before starting, check the current branch, working-tree status and published
+branch tip. Keep the primary checkout current with `origin/develop` after work
+is published. Preserve unrelated local changes before updating it.
+
+Remove other branches and their worktrees after preserving any unpublished
+work and required generated artifacts. Do not discard unique changes during
+cleanup. Release tags are retained; they are not development branches.
+
 ## Repository structure and ownership
 
 Each product is a root component: pdos/, pdpclib/, assembler/, compiler/,
