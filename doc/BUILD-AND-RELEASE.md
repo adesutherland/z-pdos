@@ -158,7 +158,8 @@ CI packages Windows downloads as unsigned. After installing SimplySign and
 logging in locally on the Mac, set `PROVIDER` to its PKCS11 configuration file,
 `CERTUM_ALIAS` to your certificate alias and optionally `TSA_URL` to the
 timestamp service. Requirements: cREXX with native packaging tools, `jsign`,
-`osslsigncode`, NSIS and CMake. No Windows key is uploaded to GitHub.
+`osslsigncode`, NSIS, CMake and authenticated `gh`. No Windows key is uploaded
+to GitHub.
 
 ```sh
 export PROVIDER=/absolute/path/provider.macos.cfg
@@ -186,7 +187,16 @@ Signing verifies the unsigned payload inventory, signs its PE files and helper,
 refreshes hashes, signs private NSIS plugins and the generated uninstaller,
 then signs/verifies the final installer. The original ZIP remains unchanged.
 Final assets and checksums are under `build/release/windows-local-assets`.
-There is no upload operation in this local signing script.
+The script uploads the signed installer and ZIP to the existing version tag,
+updates the shared `SHA256SUMS`, checks that both signed files are present,
+then deletes the matching unsigned downloads and confirms they are gone.
+It defaults to `adesutherland/z-pdos`; an optional third argument selects a
+different repository. It does not change the version, tag or release notes.
+If upload is interrupted, reuse the completed signed files without signing again:
+
+```sh
+crexx -nokeep scripts/sign-windows.crexx --args --upload-only 0.1.0
+```
 
 ## PDOS disk image and release tags
 

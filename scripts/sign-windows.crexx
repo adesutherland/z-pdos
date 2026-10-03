@@ -1,18 +1,25 @@
 /* SPDX-License-Identifier: MIT
  * Copyright (c) 2026 Adrian Sutherland
- * Local Windows payload/installer signing on macOS; no download or upload.
+ * Local Windows signing, upload and removal of unsigned release downloads.
  * Run after staging windows-x64 from the selected exact source revision.
  */
 options levelb
 import rxfnsb
 main: procedure = .int
   arg args = .string[]
-  if args.0 <> 2 then do
-    say "usage: crexx -nokeep scripts/sign-windows.crexx --args UNSIGNED-ZIP VERSION"
+  if args.0 < 2 | args.0 > 3 then do
+    say "usage: crexx -nokeep scripts/sign-windows.crexx --args UNSIGNED-ZIP|--upload-only VERSION [REPOSITORY]"
     return 2
   end
   archive = args.1; version = args.2
   call require verify(version,"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-+") = 0 & version <> "", "safe version"
+  repository = "adesutherland/z-pdos"
+  if args.0 = 3 then repository = args.3
+  assets = "build/release/windows-local-assets"
+  if archive = "--upload-only" then do
+    address crexx "run crexx -nokeep scripts/upload-windows.crexx --args :version :repository"
+    return rc
+  end
   call require getenv("PROVIDER") <> "" & getenv("CERTUM_ALIAS") <> "", "set PROVIDER and CERTUM_ALIAS"
   work = "build/release/windows-local-sign"
   address crexx "run test -e :work"
@@ -61,7 +68,6 @@ main: procedure = .int
   include_file = "build/release/windows-signed-uninstall.nsh"
   address crexx "run crexx -nokeep scripts/windows-inventory.crexx --args :work :include_file"
   call require rc = 0, "signed uninstall inventory"
-  assets = "build/release/windows-local-assets"
   address crexx "run test -e :assets"
   call require rc = 1, "new signed assets directory"
   address crexx "run cmake -E make_directory :assets"
@@ -81,8 +87,8 @@ main: procedure = .int
   call require rc = 0, "signed portable ZIP"
   address shell "cd " || quote(assets) || " && shasum -a 256 *.exe *.zip > SHA256SUMS"
   call require rc = 0, "signed asset checksums"
-  say "Signed assets retained in " || assets || "; no upload was performed."
-  return 0
+  address crexx "run crexx -nokeep scripts/upload-windows.crexx --args :version :repository"
+  return rc
 
 quote: procedure = .string
   arg value = .string

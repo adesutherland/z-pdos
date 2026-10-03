@@ -1,0 +1,96 @@
+/* SPDX-License-Identifier: MIT
+ * Upload signed Windows downloads, refresh checksums, remove unsigned files.
+ * Separate entry point permits upload retry without signing again.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 2 then return 2
+  version = args.1; repository = args.2
+  call require version <> "" & verify(version,"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-+") = 0, "safe version"
+  call require words(changestr("/",repository," ")) = 2 & verify(repository,"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-_/") = 0, "owner/repository"
+  tag = "v" || version
+  prefix = "z-pdos-" || version || "-windows-x64-"
+  assets = "build/release/windows-local-assets"
+  i = .int; file = .string; name = .string
+  signed = .string[]; old = .string[]
+  signed[1] = prefix || "signed-setup.exe"; signed[2] = prefix || "signed.zip"
+  old[1] = prefix || "unsigned-setup.exe"; old[2] = prefix || "unsigned.zip"
+  names = release_names(tag,repository)
+  do i = 1 to signed.0
+    file = assets || "/" || signed[i]
+    address crexx "run test -f :file"
+    call require rc = 0, "completed signed asset " || signed[i]
+  end
+  staging = "build/release/windows-local-upload"
+  address crexx "run cmake -E make_directory :staging"
+  call require rc = 0, "checksum staging"
+  address crexx "run gh release download :tag --repo :repository --pattern SHA256SUMS --dir :staging --clobber"
+  call require rc = 0, "existing release checksums"
+  previous = .string[]
+  manifest = staging || "/SHA256SUMS"
+  address crexx "run cat :manifest" output previous
+  call require rc = 0 & previous.0 > 0, "read shared checksum inventory"
+  address crexx "run cmake -E rm -f :manifest"
+  call require rc = 0, "refresh checksum inventory"
+  do i = 1 to previous.0
+    name = word(previous[i],2)
+    if name <> old[1] & name <> old[2] & name <> signed[1] & name <> signed[2] then call lineout manifest,previous[i]
+  end
+  hashes = .string[]
+  address shell "cd " || quote(assets) || " && shasum -a 256 " || quote(signed[1]) || " " || quote(signed[2]) output hashes
+  call require rc = 0 & hashes.0 = 2, "signed download checksums"
+  do i = 1 to hashes.0
+    call lineout manifest,hashes[i]
+  end
+  call lineout manifest
+  do i = 1 to signed.0
+    if has_name(names,signed[i]) = 0 then do
+      file = assets || "/" || signed[i]
+      address crexx "run gh release upload :tag :file --repo :repository"
+      call require rc = 0, "upload " || signed[i]
+    end
+  end
+  names = release_names(tag,repository)
+  call require has_name(names,signed[1]) & has_name(names,signed[2]), "both signed files present before unsigned cleanup"
+  address crexx "run gh release upload :tag :manifest --repo :repository --clobber"
+  call require rc = 0, "publish updated shared checksums"
+  do i = 1 to old.0
+    if has_name(names,old[i]) then do
+      name = old[i]
+      address crexx "run gh release delete-asset :tag :name --repo :repository --yes"
+      call require rc = 0, "remove " || name
+    end
+  end
+  names = release_names(tag,repository)
+  call require has_name(names,signed[1]) & has_name(names,signed[2]) & has_name(names,"SHA256SUMS"), "signed downloads and checksums present"
+  call require has_name(names,old[1]) = 0 & has_name(names,old[2]) = 0, "unsigned downloads gone"
+  say "Signed Windows downloads uploaded; checksums updated; unsigned downloads removed."
+  return 0
+
+release_names: procedure = .string[]
+  arg tag = .string, repository = .string
+  names = .string[]
+  address crexx "run gh release view :tag --repo :repository --json assets --jq .assets[].name" output names
+  call require rc = 0, "read release asset names"
+  return names
+
+has_name: procedure = .int
+  arg names = .string[], name = .string
+  do i = 1 to names.0
+    if names[i] = name then return 1
+  end
+  return 0
+
+quote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'",value,"'\''") || "'"
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED: " || detail
+    exit 1
+  end
+  return 0
