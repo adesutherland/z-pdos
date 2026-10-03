@@ -16,6 +16,8 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   endif()
 endif()
 
+add_executable(test_funhead_deck tests/test_funhead_deck.c)
+
 # The fixture depends on GCC-compatible native varargs and symbol labels.
 if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
   include(CheckTypeSize)

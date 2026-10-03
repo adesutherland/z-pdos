@@ -6,12 +6,21 @@ Focused host checks use CMake, Clang/GCC and cREXX:
 ```sh
 crexx -nokeep pdpclib/scripts/build.crexx --args test
 crexx -nokeep pdpclib/scripts/prepare.crexx --args pdos-zarch build/my-runtime
+crexx -nokeep pdpclib/scripts/build-native.crexx --args pdos-zarch build/tools/assembler/mf-classic-as build/my-native-runtime
 ```
 
 Preparation refuses an existing output and writes a source-identity receipt.
 It copies maintained source, selects the profile's PDPTOP member and joins its
 MVSSUPA source modules; it does not apply patches. Source generation is not
 assembly, linking or guest qualification.
+
+The native recipe uses the source-built Classic Assembler and the maintained
+PDOS31 service and linkage macros. It requires a new output directory and
+writes a source/object SHA-256 receipt. The `pdos-zarch` source now assembles
+as a classic object deck; that result has not been linked or newly run in a
+guest. The same recipe accepts `tso31-lean` to expose its current assembly
+boundary, but that selection stops at the TSO `PUTLINE MF=L` list form. The
+PDOS31 macro interfaces are not a substitute for z/OS TSO service contracts.
 
 | Profile | Service/configuration scope |
 | --- | --- |

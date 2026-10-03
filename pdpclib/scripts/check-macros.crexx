@@ -9,11 +9,11 @@ import rxfnsb
 
 main: procedure = .int
   arg args = .string[]
-  if args.0 <> 3 then do
-    say "usage: crexx -nokeep pdpclib/scripts/check-macros.crexx --args assembler checker owned-build-directory"
+  if args.0 <> 4 then do
+    say "usage: crexx -nokeep pdpclib/scripts/check-macros.crexx --args assembler checker funhead-checker owned-build-directory"
     return 2
   end
-  cli = args.1; checker = args.2; work = args.3
+  cli = args.1; checker = args.2; head_checker = args.3; work = args.4
   locations = .string[]
   address crexx "pwd" output locations
   repository = changestr('5C'x,strip(locations.1),"/")
@@ -30,7 +30,7 @@ main: procedure = .int
   address shell "cmake -E make_directory " || shellquote(work)
   call require rc = 0, "create build directory"
   hashfile = work || "/source.sha256"
-  address shell "shasum -a 256 " || shellquote(original) || " > " || shellquote(hashfile)
+  address shell "cmake -E sha256sum " || shellquote(original) || " > " || shellquote(hashfile)
   call require rc = 0, "hash supplied source"
   hash = word(readfile(hashfile), 1)
   call require hash = "8327b212648224f25dc0d0268b8d32fffb69ca36cce5cd304c08f75852f3c3d0", "reviewed maintained source identity"
@@ -48,9 +48,30 @@ main: procedure = .int
   call require rc = 0, "assemble unchanged source-owned definitions"
   address crexx "run :checker :deck"
   call require rc = 0, "independent instruction and deck meaning"
-  address shell "shasum -a 256 " || shellquote(input) || " " || shellquote(deck)
+  head_source = extract_lines(source, 2, 59) || extract_lines(source, 184, 259)
+  head_source = head_source || "         CSECT" || '0A'x
+  do i = 0 to 15
+    head_source = head_source || "R" || i || "       EQU   " || i || '0A'x
+  end
+  head_source = head_source || "MYSVC    FUNHEAD US=NO" || '0A'x
+  head_source = head_source || "         BR    R14" || '0A'x || "         END   MYSVC" || '0A'x
+  head_input = work || "/funhead-isolation.asm"; head_deck = work || "/funhead-isolation.obj"
+  call writefile head_input, head_source
+  address shell "cmake -E rm -f " || shellquote(head_deck)
+  call require rc = 0, "clear FUNHEAD output"
+  address crexx "run :cli --profile z900 --macros :head_input :head_deck"
+  call require rc = 0, "assemble maintained FUNHEAD without external services"
+  address crexx "run :head_checker :head_deck"
+  call require rc = 0, "independent FUNHEAD object meaning"
+  full_deck = work || "/pdos-zarch-mvssupa.obj"
+  members = selected || "/pdpclib"
+  address shell "cmake -E rm -f " || shellquote(full_deck)
+  call require rc = 0, "clear whole-source output"
+  address crexx "run :cli --profile z900 --macros --macro-model-limit 4096 --macro-limit 128 -I :members -I pdpclib/src/interfaces/pdos31 -I pdpclib/src/interfaces/classic-linkage :original :full_deck"
+  call require rc = 0, "assemble complete maintained pdos-zarch service source"
+  address shell "cmake -E sha256sum " || shellquote(input) || " " || shellquote(deck)
   call require rc = 0, "consumer identities"
-  say "Only these three source-owned macro definitions are qualified; whole MVSSUPA assembly and services remain open."
+  say "Source-owned FUNHEAD deck checked independently; complete pdos-zarch MVSSUPA source assembled."
   return 0
 
 shellquote: procedure = .string

@@ -69,6 +69,12 @@ main: procedure = .int
     call run_case cli, "--macros --macro-model-limit 1 " || shellquote(macros_source) || " " || shellquote(macros_deck), 1, stdout_path, stderr_path, "macro model capacity enforced"
     call absent macros_deck
     call run_case cli, "--macros --macro-limit 2 --macro-model-limit 2 " || shellquote(macros_source) || " " || shellquote(macros_deck), 0, stdout_path, stderr_path, "sufficient explicit macro capacities"
+    macro_error = work || "/macro-error.asm"; macro_error_deck = work || "/macro-error.obj"
+    call writefile macro_error, changestr("|", " MACRO|&N SERVICE|&N NO_SUCH_SERVICE ,| MEND| CSECT|TEST SERVICE| END TEST|", '0a'x)
+    call erase macro_error_deck
+    call run_case cli, "--macros " || shellquote(macro_error) || " " || shellquote(macro_error_deck), 1, stdout_path, stderr_path, "expanded operation diagnostic"
+    call absent macro_error_deck
+    call require pos("expanded NO_SUCH_SERVICE from", readfile(stderr_path)) > 0, "name failed expanded operation"
   end
   output = work || "/extra.obj"; call erase output
   call run_case cli, shellquote(forms) || " " || shellquote(output) || " extra", 2, stdout_path, stderr_path, "extra argument"

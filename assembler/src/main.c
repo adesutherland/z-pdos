@@ -75,6 +75,8 @@ struct host_library {
     const char *directories[LIB_DIRS]; size_t directory_count, known;
     char paths[LIB_MEMBERS][LIB_PATH];
     struct host_source handles[16];
+    struct mf_origin last_invocation, last_model;
+    char last_operation[64];
 };
 static enum mf_status library_open(void *cookie, struct mf_span name,
     struct mf_records *records, unsigned *identity)
@@ -165,6 +167,15 @@ static void report(void *cookie, const struct mf_diagnostic *diagnostic)
         struct host_library *library; library = (struct host_library *)cookie;
         path = diagnostic->origin.source && diagnostic->origin.source <= library->known ?
             library->paths[diagnostic->origin.source - 1] : library->paths[0];
+        if (library->last_operation[0] &&
+            diagnostic->origin.source == library->last_invocation.source &&
+            diagnostic->origin.line == library->last_invocation.line) {
+            const char *model_path;
+            model_path = library->last_model.source && library->last_model.source <= library->known ?
+                library->paths[library->last_model.source - 1] : library->paths[0];
+            fprintf(stderr, "expanded %s from %s:%lu:%u\n", library->last_operation,
+                model_path, library->last_model.line, library->last_model.column);
+        }
     }
 #else
     path = (const char *)cookie;
@@ -177,8 +188,17 @@ static void report(void *cookie, const struct mf_diagnostic *diagnostic)
 static void macro_report(void *cookie, const struct mf_macro_event *event)
 {
     struct host_library *library; size_t i; const char *path;
-    if (event->status == MF_OK) return;
     library = (struct host_library *)cookie;
+    if (event->status == MF_OK) {
+        library->last_operation[0] = 0;
+        if (event->depth && event->detail.length < sizeof library->last_operation) {
+            memcpy(library->last_operation, event->detail.data, event->detail.length);
+            library->last_operation[event->detail.length] = 0;
+            library->last_invocation = event->origin;
+            library->last_model = event->frames[event->depth - 1].model;
+        }
+        return;
+    }
     for (i = 0; i < event->depth; ++i) {
         const struct mf_macro_frame_info *f; f = event->frames+i;
         path = f->model.source && f->model.source <= library->known ?

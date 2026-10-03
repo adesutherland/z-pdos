@@ -17,10 +17,10 @@ Open items require separate implementation authority.
 ## PCL-002: Other whole-library profiles
 
 - Type: qualification
-- Status: Open
+- Status: In progress
 - Target: Named OS/application service profiles and retained ports
-- Observation: The pdos-zarch selection has z/PDOS 0.1 acceptance; that does not qualify complete MVS 3.8, lean TSO or z/OS service paths.
-- Evidence: doc/qualification/CHECKPOINT.md and ../pdos/doc/qualification/QUALIFICATION.md.
+- Observation: The complete `pdos-zarch` MVSSUPA source now assembles with the source-built Classic Assembler and the maintained PDOS31 service definitions. This does not qualify complete MVS 3.8, lean TSO or z/OS service paths. The `tso31-lean` source stops at its TSO `PUTLINE MF=L` list form. The PDOS31 macros have selected PDOS service semantics and cannot be reused as proof of MVS/TSO semantics.
+- Evidence: On Apple Silicon macOS, 3 October 2026, `crexx -nokeep pdpclib/scripts/build-native.crexx --args pdos-zarch build/tools/assembler/mf-classic-as build/pdpclib-native-final-20261003` assembled 3981 statements, 20 sections, 908 symbols and 50 fixups. Source SHA-256 `8327b212648224f25dc0d0268b8d32fffb69ca36cce5cd304c08f75852f3c3d0`; object SHA-256 `9a7a69a5501edd1dbba0b60dd371c16636ce577d2cb1a41f59fade04f8f3fb58`. The corresponding `tso31-lean` run stops at prepared line 1917. The 93/93 local host checks include an independent FUNHEAD deck check and full PDOS source assembly. Earlier z/PDOS guest scope remains in doc/qualification/CHECKPOINT.md and ../pdos/doc/qualification/QUALIFICATION.md.
 - Acceptance: Run each named compile, assemble, link and guest path with exact service/profile inputs.
 
 ## PCL-003: Retained ports and file-level notices
