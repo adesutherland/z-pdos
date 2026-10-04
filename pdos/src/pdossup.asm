@@ -987,6 +987,100 @@ WTNEWIO  DC    A(X'00040000'+AM64BIT)
 *
 **********************************************************************
 *                                                                    *
+*  TAPECTL - rewind (07) or write tape mark (1F)                     *
+*  parameter 1 = subchannel/device; parameter 2 = command code       *
+*  return = 0 on completed CCW chain, -1 otherwise                   *
+*                                                                    *
+**********************************************************************
+         ENTRY TAPECTL
+TAPECTL  DS    0H
+         SAVE  (14,12),,TAPECTL
+         LR    R12,R15
+         USING TAPECTL,R12
+         USING PSA,R0
+         L     R10,0(R1)
+         L     R2,4(R1)
+         CLI   7(R1),X'07'
+         BE    TCVALID
+         CLI   7(R1),X'1F'
+         BNE   TCBAD
+TCVALID  STC   R2,TCLDCCW
+         AIF   ('&XSYS' EQ 'ZARCH').ZTCNIO
+         MVC   FLCINPSW(8),TCNEWIO
+         STOSM FLCINPSW,X'00'
+         AGO   .ZTCNIOA
+.ZTCNIO  ANOP
+         MVC   FLCEINPW(16),TCNEWIO
+         STOSM FLCEINPW,X'00'
+.ZTCNIOA ANOP
+         LA    R3,TCLDCCW
+         ST    R3,FLCCAW
+         AIF   ('&XSYS' EQ 'S390' OR '&XSYS' EQ 'ZARCH').TCSIO3B
+         SIO   0(R10)
+         AGO   .TCSIO2B
+.TCSIO3B ANOP
+         LR    R1,R10
+         LA    R9,TCIRB
+         LA    R10,TCORB
+         MSCH  0(R10)
+         TSCH  0(R9)
+         SSCH  0(R10)
+.TCSIO2B ANOP
+         LPSW  TCWTNOER
+         DC    H'0'
+TCCONT   DS    0H
+         AIF   ('&XSYS' EQ 'S390' OR '&XSYS' EQ 'ZARCH').TCSIO3H
+         CLC   FLCCSW(4),=A(TCFINCHN)
+         BE    TCGOOD
+         AGO   .TCSIO2H
+.TCSIO3H ANOP
+         TSCH  0(R9)
+         CLC   4(4,R9),=A(TCFINCHN)
+         BE    TCGOOD
+.TCSIO2H ANOP
+TCBAD    L     R15,=F'-1'
+         B     TCRETURN
+TCGOOD   SR    R15,R15
+TCRETURN DS    0H
+         RETURN (14,12),RC=(15)
+         LTORG
+         AIF   ('&XSYS' NE 'S390' AND '&XSYS' NE 'ZARCH').TCNOT3B
+         DS    0F
+TCIRB    DS    24F
+TCORB    DS    0F
+         DC    F'0'
+         DC    X'0080FF00'
+         DC    A(TCLDCCW)
+         DC    5F'0'
+.TCNOT3B ANOP
+         DS    0D
+         AIF   ('&XSYS' EQ 'S390' OR '&XSYS' EQ 'ZARCH').TCC390
+TCLDCCW CCW   X'07',TCDUMMY,X'20',1
+         AGO   .TCC390F
+.TCC390 ANOP
+TCLDCCW CCW1  X'07',TCDUMMY,X'20',1
+.TCC390F ANOP
+TCFINCHN EQU   *
+TCDUMMY  DC    X'00'
+         DS    0D
+TCWTNOER DC    A(X'060E0000')
+         DC    A(AMBIT)
+         AIF   ('&XSYS' EQ 'ZARCH').TCZNIO
+TCNEWIO  DC    A(X'000C0000')
+         DC    A(AMBIT+TCCONT)
+         AGO   .TCNZIOA
+.TCZNIO  ANOP
+TCNEWIO  DC    A(X'00040000'+AM64BIT)
+         DC    A(AMBIT)
+         DC    A(0)
+         DC    A(TCCONT)
+.TCNZIOA ANOP
+         DROP  ,
+*
+*
+*
+**********************************************************************
+*                                                                    *
 *  WRFBA - write a block to an FBA disk                              *
 *                                                                    *
 *  parameter 1 = device                                              *

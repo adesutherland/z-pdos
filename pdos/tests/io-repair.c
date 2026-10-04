@@ -8,7 +8,7 @@
 #define MAXBLKSZ 32767
 #define CHECK(x) do { if (!(x)) { fprintf(stderr, "FAIL line %d: %s\n", __LINE__, #x); exit(1); } } while (0)
 typedef struct { int ipldev; } PDOS;
-typedef struct { int failed, basecyl, basehead, endcyl, endhead, records; unsigned char first_ttr[3]; } PDOS64PDSWRITE;
+typedef struct { int failed, basecyl, basehead, endcyl, endhead, records, device; unsigned char first_ttr[3]; } PDOS64PDSWRITE;
 typedef struct { char dcbfdad[8]; } DCB;
 static int results[8], calls, saved_len, saved_cyl, saved_head, saved_rec;
 static unsigned char saved_data[MAXBLKSZ + 8];
@@ -20,7 +20,7 @@ static void join_cchhr(char *p, int c, int h, int r) {
     p[0] = c >> 8; p[1] = c; p[2] = h >> 8; p[3] = h; p[4] = r;
 }
 static int wrblock(int dev, int c, int h, int r, void *data, int len, int op) {
-    CHECK(dev == 0x1b9 && op == 0x1d && calls < 8);
+    CHECK(dev == 0x1ba && op == 0x1d && calls < 8);
     saved_len = len; saved_cyl = c; saved_head = h; saved_rec = r;
     memcpy(saved_data, data, len);
     return results[calls++] == 0 ? len : results[calls - 1];
@@ -39,7 +39,7 @@ static void __conswr(size_t len, void *data, int mode) {
 #include "console.inc"
 static void record_tests(void) {
     PDOS os = {0x1b9}; DCB dcb = {{0}};
-    PDOS64PDSWRITE state = {0, 38, 4, 38, 6, 0, {0}};
+    PDOS64PDSWRITE state = {0, 38, 4, 38, 6, 0, 0x1ba, {0}};
     unsigned char payload[16]; memset(payload, 0x93, sizeof payload);
     join_cchhr(dcb.dcbfdad + 3, 38, 4, 3);
     results[0] = 8; results[1] = 0; calls = 0;

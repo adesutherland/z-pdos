@@ -492,6 +492,8 @@ typedef struct {
     unsigned char recfm[PDOS64_DD_LIMIT];
     unsigned short blksize[PDOS64_DD_LIMIT];
     unsigned short lrecl[PDOS64_DD_LIMIT];
+    int device[PDOS64_DD_LIMIT];
+    unsigned char open_count[PDOS64_DD_LIMIT];
     unsigned char count;
 #else
     TIOENTRY tioentry;
@@ -514,6 +516,7 @@ typedef struct {
     int system_table; /* V1R5 system-function table at CVT+772 */
 } CVT;
 
+#define PDOS_MAX_VOLUMES 4
 #ifdef ZARCH
 /* Single synchronous IARV64 PC. These tables must be real-addressable:
    the selected z/PDOS image places its static data below the first 5 MB,
@@ -524,10 +527,8 @@ static unsigned int pdos64_link_space[64];
 static unsigned int pdos64_entry_space[256];
 static unsigned int pdos64_sft[64];
 static unsigned char pdos64_stack_space[4112];
-/* One read-only synthetic UCB for the one private IPL DASD. Its volume
-   serial names the actual staged disk; TIOT entries point here only for
-   data sets whose VTOC says DSORG=PO. */
-static unsigned char pdos64_dasd_ucb[64];
+/* TIOT addresses are 24-bit; keep one synthetic UCB per mounted DASD. */
+static unsigned char pdos64_dasd_ucb[PDOS_MAX_VOLUMES][64];
 
 extern void p64pc(void);
 
@@ -877,6 +878,12 @@ TASK *task;
 #define MAXBLKSZ 32767 /* maximum size a disk block can be */
 
 typedef struct {
+    int device;                 /* subchannel ID, not the CSS device number */
+    int address;                /* operator-facing hexadecimal device number */
+    char volser[7];
+} PDOS_VOLUME;
+
+typedef struct {
     ASPACE aspaces[MAXANUM]; /* needs to be 8-byte aligned because
          the segment points to a page table, using an address
          with 3 binary 0s appended. Due to the implied 6 binary 0s
@@ -888,6 +895,11 @@ typedef struct {
     int ipldev;
     int iplregs[17]; /* 16 registers plus an extra for NUL-terminator */
     int curdev;
+    PDOS_VOLUME volumes[PDOS_MAX_VOLUMES];
+    int volume_count;
+    int tape_device;
+    int tape_address;
+    int tape_writable;
     int curr_aspace; /* current address space */
 } PDOS;
 
@@ -976,6 +988,7 @@ extern int __iscard;
 extern int __ismem;
 int wrblock(int dev, int cyl, int head, int rec, void *buf, int len, int cmd);
 int rdblock(int dev, int cyl, int head, int rec, void *buf, int len, int cmd);
+int tapectl(int dev, int command);
 
 int pdosRun(PDOS *pdos);
 void pdosDefaults(PDOS *pdos);
@@ -987,6 +1000,12 @@ static void pdosInitAspaces(PDOS *pdos);
 static void pdosProcessSVC(PDOS *pdos);
 static void pdosSVC99(PDOS *pdos);
 static int pdosDoDIR(PDOS *pdos, char *parm);
+static int pdosMediaCommand(PDOS *pdos, const char *verb, char *parm);
+static int pdosAllocateDataset(PDOS *pdos, const char *input);
+static int pdosRecordCopy(PDOS *pdos, const char *input);
+static int pdosReadVolumeLabel(int device, char serial[7]);
+static int pdosVolumeIndex(PDOS *pdos, int device);
+static int pdos64DcbDevice(PDOS *pdos, DCB *dcb);
 static void brkyd(int *year, int *month, int *day);
 static int pdosDiskInit(PDOS *pdos, char *parm);
 static int pdosFil2Dsk(PDOS *pdos, char *parm);
@@ -1133,7 +1152,7 @@ void pdosDefaults(PDOS *pdos)
 /* Offsets are from IEFTIOT1 and IEFJFCBN in the retained MVUZ1 listing.
    The private disk's VTOC, rather than the caller's namespace, decides
    whether a data set can be bound. */
-static int pdos64ReadDscbLoc(PDOS *pdos, const char *dsn, DSCB1 *result,
+static int pdos64ReadDscbLoc(int device, const char *dsn, DSCB1 *result,
                              int *outcyl, int *outhead, int *outrec)
 {
     unsigned char key[44];
@@ -1144,14 +1163,14 @@ static int pdos64ReadDscbLoc(PDOS *pdos, const char *dsn, DSCB1 *result,
     if (!length || length > sizeof key) return 0;
     memset(key, ' ', sizeof key);
     memcpy(key, dsn, length);
-    cnt = rdblock(pdos->ipldev, 0, 0, 3, label, sizeof label, 0x0e);
+    cnt = rdblock(device, 0, 0, 3, label, sizeof label, 0x0e);
     if (cnt < 20) return 0;
     split_cchhr(label + 15, &cyl, &head, &rec);
     rec += 2;
     errors = 0;
     for (n = 0; n < 1500 && errors < 4; n++)
     {
-        cnt = rdblock(pdos->ipldev, cyl, head, rec, result,
+        cnt = rdblock(device, cyl, head, rec, result,
                       sizeof *result, 0x0e);
         if (cnt < sizeof *result)
         {
@@ -1178,7 +1197,8 @@ static int pdos64ReadDscbLoc(PDOS *pdos, const char *dsn, DSCB1 *result,
 
 static int pdos64ReadDscb(PDOS *pdos, const char *dsn, DSCB1 *result)
 {
-    return pdos64ReadDscbLoc(pdos, dsn, result, NULL, NULL, NULL);
+    return pdos64ReadDscbLoc(pdos->curdev, dsn, result,
+                             NULL, NULL, NULL);
 }
 
 #ifndef ZAM31
@@ -1247,7 +1267,7 @@ static int pdos64HighRead(PDOS *pdos, const char *dsn,
     while (tracks < 256 && (cyl < endcyl
                             || (cyl == endcyl && head <= endhead)))
     {
-        count = rdblock(pdos->ipldev, cyl, head, rec,
+        count = rdblock(pdos->curdev, cyl, head, rec,
                         block, sizeof block, 0x0e);
         if (count == 0)
         {
@@ -1337,7 +1357,7 @@ static void pdos64HighService(PDOS *pdos, int svc)
 /* Read the real IBM PDS directory imported by dasdload. The supported
    private-disk profile is one contiguous extent; aliases and arbitrary
    member names use the directory's own TTR, never a name mapping. */
-static int pdos64PdsMember(PDOS *pdos, const char *dsn,
+static int pdos64PdsMember(int device, const char *dsn,
                            const char member[8], unsigned char ttr[3],
                            int *cyl, int *head, int *rec)
 {
@@ -1345,7 +1365,7 @@ static int pdos64PdsMember(PDOS *pdos, const char *dsn,
     unsigned char block[256];
     int basecyl, basehead, tt, rr, at, used, size;
 
-    if (!pdos64ReadDscb(pdos, dsn, &dscb)
+    if (!pdos64ReadDscbLoc(device, dsn, &dscb, NULL, NULL, NULL)
         || dscb.ds1dsorg != 0x0200 || dscb.ds1noepv != 1)
         return -1;
     basecyl = ((unsigned char)dscb.startcchh[0] << 8)
@@ -1360,7 +1380,7 @@ static int pdos64PdsMember(PDOS *pdos, const char *dsn,
         {
             /* PDS directory records have an eight-byte CKD key. MVS
                BSAM presents only the 256-byte data field to the caller. */
-            size = rdblock(pdos->ipldev, dcyl, dhead, rr,
+            size = rdblock(device, dcyl, dhead, rr,
                            block, sizeof block, 0x06);
             if (size < 0) break;
             if (size != sizeof block) return -1;
@@ -1400,6 +1420,7 @@ static int pdos64PdsMember(PDOS *pdos, const char *dsn,
 typedef struct {
     DCB *dcb;
     RB *owner;
+    int device;
     char dsn[45];
     unsigned char member[8];
     DSCB1 dscb;
@@ -1432,7 +1453,7 @@ static int pdos64PdsDirSlot(PDOS *pdos, PDOS64PDSWRITE *state)
             || (cyl == state->endcyl && head > state->endhead)) break;
         for (rr = 1; rr < 100; rr++)
         {
-            size = rdblock(pdos->ipldev, cyl, head, rr,
+            size = rdblock(state->device, cyl, head, rr,
                            raw, sizeof raw, 0x06);
             if (size < 0) break;
             if (size != sizeof raw)
@@ -1505,7 +1526,9 @@ static int pdos64PdsOpenWrite(PDOS *pdos, DCB *dcb,
         { state = &pdos64_pds_writes[i]; break; }
     if (state == NULL || strlen(dsn) > 44) return 0;
     memset(state, 0, sizeof *state);
-    if (!pdos64ReadDscb(pdos, dsn, &state->dscb)
+    state->device = pdos64DcbDevice(pdos, dcb);
+    if (!pdos64ReadDscbLoc(state->device, dsn, &state->dscb,
+                            NULL, NULL, NULL)
         || state->dscb.ds1dsorg != 0x0200
         || state->dscb.ds1noepv != 1)
     {
@@ -1571,7 +1594,7 @@ static int pdos64PdsRecord(PDOS *pdos, PDOS64PDSWRITE *state,
         tbuf[5] = 0;
         *(short *)(tbuf + 6) = len;
         if (len) memcpy(tbuf + 8, data, len);
-        count = wrblock(pdos->ipldev, cyl, head, rec - 1,
+        count = wrblock(state->device, cyl, head, rec - 1,
                         tbuf, len + 8, 0x1d);
         /* A short or failed write must retry this complete record. */
         if (count == len + 8) break;
@@ -1597,14 +1620,14 @@ static int pdos64PdsCloseWrite(PDOS *pdos, PDOS64PDSWRITE *state, DCB *dcb)
     int vcyl, vhead, vrec, cyl, head, rec, track, used, at;
     if (state->failed || !pdos64PdsRecord(pdos, state, dcb, NULL, 0))
         return 0;
-    if (!pdos64ReadDscbLoc(pdos, state->dsn, &dscb,
+    if (!pdos64ReadDscbLoc(state->device, state->dsn, &dscb,
                             &vcyl, &vhead, &vrec)) return 0;
     split_cchhr(dcb->dcbfdad + 3, &cyl, &head, &rec);
     track = (cyl - state->basecyl) * 15 + head - state->basehead;
     dscb.ds1lstar[0] = track >> 8;
     dscb.ds1lstar[1] = track;
     dscb.ds1lstar[2] = rec;
-    if (wrblock(pdos->ipldev, vcyl, vhead, vrec,
+    if (wrblock(state->device, vcyl, vhead, vrec,
                 ((char *)&dscb) + 44, sizeof dscb - 44, 0x05)
         != sizeof dscb - 44) return 0;
     memcpy(block, state->dirblock, sizeof block);
@@ -1621,7 +1644,7 @@ static int pdos64PdsCloseWrite(PDOS *pdos, PDOS64PDSWRITE *state, DCB *dcb)
         block[at + 11] = 0;
     }
     memcpy(block + at + 8, state->first_ttr, 3);
-    if (wrblock(pdos->ipldev, state->dircyl, state->dirhead,
+    if (wrblock(state->device, state->dircyl, state->dirhead,
                 state->dirrec, block, sizeof block, 0x05)
         != sizeof block) return 0;
     printf("P64 PDS CLOSE %.8s %s ttr=%02x%02x%02x eof=%04x%02x\n",
@@ -1630,7 +1653,7 @@ static int pdos64PdsCloseWrite(PDOS *pdos, PDOS64PDSWRITE *state, DCB *dcb)
     return 1;
 }
 
-static void pdos64WriteDd(TIOT *tiot, int slot, const char *ddname,
+static void pdos64WriteDd(PDOS *pdos, TIOT *tiot, int slot, const char *ddname,
                           const char *dsn)
 {
     unsigned char *entry;
@@ -1648,7 +1671,10 @@ static void pdos64WriteDd(TIOT *tiot, int slot, const char *ddname,
     entry[14] = (unsigned char)queue; /* TIOEJFCB */
     if (tiot->dsorg[slot][0] == 0x02)
     {
-        unsigned int ucb = (unsigned int)pdos64_dasd_ucb;
+        int volume = pdosVolumeIndex(pdos, tiot->device[slot]);
+        unsigned int ucb;
+        if (volume < 0) volume = 0;
+        ucb = (unsigned int)pdos64_dasd_ucb[volume];
         entry[17] = (unsigned char)(ucb >> 16);
         entry[18] = (unsigned char)(ucb >> 8);
         entry[19] = (unsigned char)ucb; /* TIOEFSRT */
@@ -1671,13 +1697,30 @@ static int pdos64BindDd(PDOS *pdos, TIOT *tiot,
                         const char *ddname, const char *dsn)
 {
     int cyl, head, rec;
+    unsigned int tape_address;
     unsigned int queue;
     DSCB1 dscb;
     int slot;
 
     if (tiot->count >= PDOS64_DD_LIMIT || strlen(dsn) > 44)
         return -1;
-    if (findFile(pdos->ipldev, (char *)dsn, &cyl, &head, &rec) != 0)
+    if (ins_strncmp((char *)dsn, "TAP:", 4) == 0 && pdos->tape_device)
+    {
+        char *end;
+        tape_address = strtoul(dsn + 4, &end, 16);
+        if (*end != '\0' || tape_address != (unsigned int)pdos->tape_address)
+            return 0;
+        slot = tiot->count;
+        memset(tiot->dsorg[slot], 0, 2);
+        tiot->recfm[slot] = 0xc0;
+        tiot->blksize[slot] = MAXBLKSZ;
+        tiot->lrecl[slot] = 0;
+        tiot->device[slot] = pdos->tape_device;
+        pdos64WriteDd(pdos, tiot, slot, ddname, dsn);
+        tiot->count++;
+        return 1;
+    }
+    if (findFile(pdos->curdev, (char *)dsn, &cyl, &head, &rec) != 0)
         return 0;
     if (!pdos64ReadDscb(pdos, dsn, &dscb)) return 0;
     slot = tiot->count;
@@ -1688,7 +1731,8 @@ static int pdos64BindDd(PDOS *pdos, TIOT *tiot,
     tiot->recfm[slot] = dscb.ds1recfm;
     tiot->blksize[slot] = dscb.ds1blkl;
     tiot->lrecl[slot] = dscb.ds1lrecl;
-    pdos64WriteDd(tiot, slot, ddname, dsn);
+    tiot->device[slot] = pdos->curdev;
+    pdos64WriteDd(pdos, tiot, slot, ddname, dsn);
     tiot->count++;
     return 1;
 }
@@ -1726,11 +1770,19 @@ static const char *pdos64BoundDd(PDOS *pdos, const char *ddname)
     return NULL;
 }
 
-static int pdos64FreeDd(TIOT *tiot, const char *ddname)
+static int pdos64DcbDevice(PDOS *pdos, DCB *dcb)
+{
+    TIOT *tiot = pdos->psa->psatold->tcbtio;
+    int slot = pdos64DdSlot(tiot, dcb->dcbddnam);
+    return slot >= 0 ? tiot->device[slot] : pdos->curdev;
+}
+
+static int pdos64FreeDd(PDOS *pdos, TIOT *tiot, const char *ddname)
 {
     int slot = pdos64DdSlot(tiot, ddname);
     int i;
     if (slot < 0) return 0;
+    if (tiot->open_count[slot] != 0) return 0;
     for (i = slot; i + 1 < tiot->count; i++)
     {
         char nextdd[8];
@@ -1741,15 +1793,26 @@ static int pdos64FreeDd(TIOT *tiot, const char *ddname)
         tiot->recfm[i] = tiot->recfm[i + 1];
         tiot->blksize[i] = tiot->blksize[i + 1];
         tiot->lrecl[i] = tiot->lrecl[i + 1];
-        pdos64WriteDd(tiot, i, nextdd, nextdsn);
+        tiot->device[i] = tiot->device[i + 1];
+        tiot->open_count[i] = tiot->open_count[i + 1];
+        pdos64WriteDd(pdos, tiot, i, nextdd, nextdsn);
     }
     tiot->count--;
     memset(tiot->ddentry[tiot->count], 0, 20);
     tiot->dsname[tiot->count][0] = '\0';
+    tiot->device[tiot->count] = 0;
+    tiot->open_count[tiot->count] = 0;
     return 1;
 }
 #endif
 
+#ifndef ZARCH
+static int pdos64DcbDevice(PDOS *pdos, DCB *dcb)
+{
+    (void)dcb;
+    return pdos->curdev;
+}
+#endif
 
 /* initialize PDOS */
 /* zero return = error */
@@ -1794,6 +1857,19 @@ int pdosInit(PDOS *pdos)
         ramdisk = (char *)(3UL * 1024 * 1024 * 1024);
     }
     pdos->curdev = pdos->ipldev;
+    pdos->volume_count = 0;
+    pdos->tape_device = pdos->tape_address = pdos->tape_writable = 0;
+    if (!__istape && !__iscard && !__ismem)
+    {
+        if (!pdosReadVolumeLabel(pdos->ipldev, pdos->volumes[0].volser))
+        {
+            printf("IPL disk has no readable VOL1 label\n");
+            return 0;
+        }
+        pdos->volumes[0].device = pdos->ipldev;
+        pdos->volumes[0].address = getdevn(pdos->ipldev);
+        pdos->volume_count = 1;
+    }
 #ifndef ZARCH
     lcreg0(cr0);
 #endif
@@ -1928,8 +2004,10 @@ int pdosInit(PDOS *pdos)
     pdos->psa->cvt = &pdos64_cvt;
     pdos64_cvt.self = (int)&pdos64_cvt;
     memset(pdos64_dasd_ucb, 0, sizeof pdos64_dasd_ucb);
-    pdos64_dasd_ucb[0x12] = 0x20; /* UCBTBYT3: DASD */
-    memcpy(pdos64_dasd_ucb + 0x1c, "PDOS00", 6); /* UCBVOLI */
+    pdos64_dasd_ucb[0][0x12] = 0x20; /* UCBTBYT3: DASD */
+    if (pdos->volume_count)
+        memcpy(pdos64_dasd_ucb[0] + 0x1c,
+               pdos->volumes[0].volser, 6); /* UCBVOLI */
     if ((unsigned int)pdos64_dasd_ucb >= 0x1000000U)
         return 0; /* TIOT's 24-bit UCB address cannot represent it */
 #else
@@ -2136,7 +2214,13 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
             {
                 int cnt;
 
-                if (len > 8)
+                if ((dcb->vtape != pdos->tape_device)
+                    || !pdos->tape_writable)
+                {
+                    printf("TAPE: write refused (not mounted writable)\n");
+                    pdos->context->regs[15] = 12;
+                }
+                else if (len > 8)
                 {
                     cnt = wrtape(dcb->vtape, buf + 8, len - 8);
                     printf("wrote %d bytes to %x\n", cnt, dcb->vtape);
@@ -2146,8 +2230,18 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
             {
                 int cnt;
 
-                cnt = wrtape(dcb->gendev, buf, len);
-                printf("wrote %d bytes to %x\n", cnt, dcb->gendev);
+                if (dcb->gendev == pdos->tape_device
+                    && !pdos->tape_writable)
+                {
+                    printf("TAPE: write refused (not mounted writable)\n");
+                    pdos->context->regs[15] = 12;
+                }
+                else
+                {
+                    cnt = wrtape(dcb->gendev, buf, len);
+                    printf("wrote %d bytes to %x\n", cnt, dcb->gendev);
+                    if (cnt != len) pdos->context->regs[15] = 12;
+                }
             }
             /* not a disk, must be terminal */
             else if (memcmp(dcb->dcbfdad,
@@ -2183,7 +2277,7 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
 
                 /* record number must be one less when using 0x1d
                    destructive (of track) write (to set block size) */
-                cnt = wrblock(pdos->ipldev, cyl, head, rec - 1,
+                cnt = wrblock(pdos64DcbDevice(pdos, dcb), cyl, head, rec - 1,
                               tbuf, len + 8, 0x1d);
 #if DSKDEBUG
                 printf("cnt is %d\n", cnt);
@@ -2195,7 +2289,7 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
                     head++;
                     *(short *)(tbuf + 2) = head;
                     tbuf[4] = rec;
-                    cnt = wrblock(pdos->ipldev, cyl, head, rec - 1,
+                    cnt = wrblock(pdos64DcbDevice(pdos, dcb), cyl, head, rec - 1,
                                   tbuf, len + 8, 0x1d);
 #if DSKDEBUG
                     printf("cnt is %d\n", cnt);
@@ -2206,7 +2300,7 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
                         cyl++;
                         *(short *)tbuf = cyl;
                         *(short *)(tbuf + 2) = head;
-                        cnt = wrblock(pdos->ipldev, cyl, head, rec - 1,
+                        cnt = wrblock(pdos64DcbDevice(pdos, dcb), cyl, head, rec - 1,
                                       tbuf, len + 8, 0x1d);
                     }
                 }
@@ -2373,7 +2467,7 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
                        buf,
                        cyl, head, rec);
 #endif
-                cnt = rdblock(pdos->ipldev, cyl, head, rec,
+                cnt = rdblock(pdos64DcbDevice(pdos, dcb), cyl, head, rec,
                               tbuf, len, diskcmd);
 #if DSKDEBUG
                 printf("cnt is %d\n", cnt);
@@ -2382,7 +2476,7 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
                 {
                     rec = 1;
                     head++;
-                    cnt = rdblock(pdos->ipldev, cyl, head, rec,
+                    cnt = rdblock(pdos64DcbDevice(pdos, dcb), cyl, head, rec,
                                   tbuf, len, diskcmd);
 #if DSKDEBUG
                     printf("cnt is %d\n", cnt);
@@ -2391,7 +2485,7 @@ static int pdosDispatchUntilInterrupt(PDOS *pdos)
                     {
                         head = 0;
                         cyl++;
-                        cnt = rdblock(pdos->ipldev, cyl, head, rec,
+                        cnt = rdblock(pdos64DcbDevice(pdos, dcb), cyl, head, rec,
                                       tbuf, len, diskcmd);
                     }
                 }
@@ -3235,7 +3329,8 @@ static void pdosProcessSVC(PDOS *pdos)
 
         if (dsn != NULL && (type_d || (arg[0] == 0 && arg[1] == 1
                                   && (arg[2] * 256 + arg[3]) >= 16)))
-            found = pdos64PdsMember(pdos, dsn, member, ttr,
+            found = pdos64PdsMember(pdos64DcbDevice(pdos, dcb),
+                                     dsn, member, ttr,
                                      &cyl, &head, &rec);
         if (found == 1)
         {
@@ -3272,13 +3367,21 @@ static void pdosProcessSVC(PDOS *pdos)
         char *output = (char *)(cam[3] & 0x7fffffffU);
         DSCB1 dscb;
         int n = 44;
+        int volume_index = -1;
+        int volume_cursor;
 
         while (n > 0 && name[n - 1] == ' ') n--;
         memcpy(dsn, name, n);
         dsn[n] = '\0';
-        if (cam[0] == 0xc1000000U && volume != NULL && output != NULL
-            && memcmp(volume, "PDOS00", 6) == 0
-            && pdos64ReadDscb(pdos, dsn, &dscb))
+        if (volume != NULL)
+            for (volume_cursor = 0; volume_cursor < pdos->volume_count;
+                 volume_cursor++)
+                if (memcmp(volume, pdos->volumes[volume_cursor].volser, 6) == 0)
+                    volume_index = volume_cursor;
+        if (cam[0] == 0xc1000000U && output != NULL
+            && volume_index >= 0
+            && pdos64ReadDscbLoc(pdos->volumes[volume_index].device,
+                                  dsn, &dscb, NULL, NULL, NULL))
         {
             memcpy(output, ((char *)&dscb) + 44, sizeof dscb - 44);
             pdos->context->regs[15] = 0;
@@ -3395,7 +3498,7 @@ static void pdosProcessSVC(PDOS *pdos)
             if ((strchr(lastds, ':') != NULL)
                 && (ins_strncmp(lastds, "tav", 3) == 0))
             {
-                gendcb->vtape = strtoul(lastds + 3, NULL, 16);
+                gendcb->vtape = strtoul(lastds + 4, NULL, 16);
 #if defined(S390) || defined(ZARCH)
                 if ((gendcb->vtape != 0) && (gendcb->vtape < 0x10000))
                 {
@@ -3406,24 +3509,25 @@ static void pdosProcessSVC(PDOS *pdos)
             else if ((strchr(lastds, ':') != NULL)
                 && (ins_strncmp(lastds, "dev", 3) == 0))
             {
-                gendcb->gendev = strtoul(lastds + 3, NULL, 16);
+                gendcb->gendev = strtoul(lastds + 4, NULL, 16);
             }
             else if ((strchr(lastds, ':') != NULL)
                 && (ins_strncmp(lastds, "crd", 3) == 0))
             {
-                gendcb->gendev = strtoul(lastds + 3, NULL, 16);
+                gendcb->gendev = strtoul(lastds + 4, NULL, 16);
             }
             else if ((strchr(lastds, ':') != NULL)
                 && (ins_strncmp(lastds, "tap", 3) == 0))
             {
-                gendcb->gendev = strtoul(lastds + 3, NULL, 16);
+                gendcb->gendev = strtoul(lastds + 4, NULL, 16);
             }
             else if ((strchr(lastds, ':') != NULL)
                 && (ins_strncmp(lastds, "fba", 3) == 0))
             {
-                gendcb->fbadev = strtoul(lastds + 3, NULL, 16);
+                gendcb->fbadev = strtoul(lastds + 4, NULL, 16);
             }
-            else if (findFile(pdos->ipldev, lastds, &cyl, &head, &rec) == 0)
+            else if (findFile(pdos64DcbDevice(pdos, gendcb), lastds,
+                              &cyl, &head, &rec) == 0)
             {
                 rec = 0; /* so that we can do increments */
                 join_cchhr(gendcb->dcbfdad + 3, cyl, head, rec);
@@ -3588,6 +3692,14 @@ static void pdosProcessSVC(PDOS *pdos)
         if (pdos->context->regs[15] == 0)
         {
             gendcb->u1.dcboflgs |= DCBOFOPN;
+#ifdef ZARCH
+            {
+                TIOT *tiot = pdos->psa->psatold->tcbtio;
+                int slot = pdos64DdSlot(tiot, gendcb->dcbddnam);
+                if (slot >= 0 && tiot->open_count[slot] < 255)
+                    tiot->open_count[slot]++;
+            }
+#endif
         }
     }
     else if (svc == 35) /* WTO */
@@ -3703,6 +3815,28 @@ static void pdosProcessSVC(PDOS *pdos)
             *pdos->context->postecb = 0;
             pdos->context->regs[15] = 0;
         }
+        else if (memcmp(prog, "DEVICES ", 8) == 0
+                 || memcmp(prog, "VOLUMES ", 8) == 0
+                 || memcmp(prog, "MOUNT   ", 8) == 0
+                 || memcmp(prog, "SELECT  ", 8) == 0
+                 || memcmp(prog, "UNMOUNT ", 8) == 0
+                 || memcmp(prog, "ALLOC   ", 8) == 0
+                 || memcmp(prog, "RCOPY   ", 8) == 0
+                 || memcmp(prog, "TAPE    ", 8) == 0)
+        {
+            char verb[9];
+            int rc;
+            memcpy(verb, prog, 8);
+            verb[8] = '\0';
+            *strchr(verb, ' ') = '\0';
+            parm = (char *)((unsigned int)parm & 0x7FFFFFFFUL);
+            rc = pdosMediaCommand(pdos, verb, parm);
+            *pdos->context->postecb =
+                pdos->aspaces[pdos->curr_aspace].o.tcb.tcbcmp = rc;
+            pdos->context->regs[15] = 0; /* ATTACH accepted; WAIT reads TCBCMP */
+            pdos->context->regs[1] =
+                (int)&pdos->aspaces[pdos->curr_aspace].o.tcb;
+        }
         else if (memcmp(prog, "DISKINIT", 8) == 0)
         {
             parm = (char *)((unsigned int)parm & 0x7FFFFFFFUL);
@@ -3773,6 +3907,14 @@ static void pdosProcessSVC(PDOS *pdos)
         /* DCB is pointed to by first parameter */
         /* needs validation */
         dcb = (DCB *)(p[0] & 0xffffff);
+#ifdef ZARCH
+        {
+            TIOT *tiot = pdos->psa->psatold->tcbtio;
+            int slot = pdos64DdSlot(tiot, dcb->dcbddnam);
+            if (slot >= 0 && tiot->open_count[slot] > 0)
+                tiot->open_count[slot]--;
+        }
+#endif
 #if 0
         printf("in close, DCB is %p\n", dcb);
         printf("ddname to close is %.8s\n", dcb->dcbddnam);
@@ -3828,7 +3970,7 @@ static void pdosProcessSVC(PDOS *pdos)
 
             /* record number must be one less when using 0x1d
                destructive (of track) write (to set block size) */
-            cnt = wrblock(pdos->ipldev, cyl, head, rec - 1,
+            cnt = wrblock(pdos64DcbDevice(pdos, dcb), cyl, head, rec - 1,
                           tbuf, len + 8, 0x1d);
 #if 0
             printf("destructing write %d %d %d gave %d\n",
@@ -3841,7 +3983,7 @@ static void pdosProcessSVC(PDOS *pdos)
                 head++;
                 *(short *)(tbuf + 2) = head;
                 tbuf[4] = rec;
-                cnt = wrblock(pdos->ipldev, cyl, head, rec - 1,
+                cnt = wrblock(pdos64DcbDevice(pdos, dcb), cyl, head, rec - 1,
                               tbuf, len + 8, 0x1d);
                 if (cnt <= 0)
                 {
@@ -3849,7 +3991,7 @@ static void pdosProcessSVC(PDOS *pdos)
                     cyl++;
                     *(short *)tbuf = cyl;
                     *(short *)(tbuf + 2) = head;
-                    cnt = wrblock(pdos->ipldev, cyl, head, rec - 1,
+                    cnt = wrblock(pdos64DcbDevice(pdos, dcb), cyl, head, rec - 1,
                                   tbuf, len + 8, 0x1d);
                 }
             }
@@ -3951,7 +4093,7 @@ static void pdos64SVC99(PDOS *pdos, SVC99RB *rb)
         goto fail;
     if (rb->verb == 2 && have_dd)
     {
-        if (!pdos64FreeDd(tiot, (char *)ddname))
+        if (!pdos64FreeDd(pdos, tiot, (char *)ddname))
         {
             /* PDPCLIB closes its transient PCOMM DD before each OPEN.
                An unbound slot at this point is normal cleanup. */
@@ -3986,7 +4128,7 @@ static void pdos64SVC99(PDOS *pdos, SVC99RB *rb)
         /* PCOMM tests NAME.BAT before trying the executable. Hide only
            the missing-name probe; a present but invalid dataset still logs. */
         if (rc == 0 && n >= 4 && strcmp(dsn + n - 4, ".BAT") == 0
-            && findFile(pdos->ipldev, dsn, &cyl, &head, &rec) != 0)
+            && findFile(pdos->curdev, dsn, &cyl, &head, &rec) != 0)
             expected_probe = 1;
         goto fail;
     }
@@ -4138,7 +4280,7 @@ static void pdosSVC99(PDOS *pdos)
         }
         else
         {
-            if (findFile(pdos->ipldev, lastds, &cyl, &head, &rec) != 0)
+            if (findFile(pdos->curdev, lastds, &cyl, &head, &rec) != 0)
             {
                 if (new == 1)
                 {
@@ -4180,6 +4322,668 @@ static void pdosSVC99(PDOS *pdos)
 #define DS1RECFV 0x40
 #define DS1RECFU 0xc0
 #define DS1RECFB 0x10
+
+static int pdosVolumeIndex(PDOS *pdos, int device)
+{
+    int i;
+    for (i = 0; i < pdos->volume_count; i++)
+        if (pdos->volumes[i].device == device) return i;
+    return -1;
+}
+
+/* Read the real VOL1 label. Never infer a volume serial from a Hercules
+   device address. Dataset operations validate the VTOC when used. */
+static int pdosReadVolumeLabel(int device, char serial[7])
+{
+    char label[80];
+    int count = rdblock(device, 0, 0, 3, label, sizeof label, 0x0e);
+    if (count < 24 || memcmp(label + 4, "VOL1", 4) != 0)
+        return 0;
+    memcpy(serial, label + 8, 6);
+    serial[6] = '\0';
+    return 1;
+}
+
+/* The first guest allocator is deliberately confined to dasdload's
+   100-cylinder 3390 exchange layout: VOL1 at 0/0/3, a two-cylinder VTOC,
+   one contiguous format-1 extent per dataset, and no format-5 free map.
+   Data are initialized before the new DSCB is made discoverable. */
+static int pdosAllocateDataset(PDOS *pdos, const char *input)
+{
+#ifndef ZARCH
+    (void)pdos;
+    (void)input;
+    printf("ALLOC: unsupported on this build\n");
+    return 8;
+#else
+    char name[48], format[8], extra;
+    unsigned char wanted[44], label[80], f4[140], f5[140];
+    unsigned char raw[140], check[140], blank[140], used[100], eof[8];
+    DSCB1 dscb;
+    int lrecl, blksize, cylinders, volume, device;
+    int c, h, r, n, x, start, freec, freeh, freer, saw_blank;
+    int low, high, lowhead, highhead, count, count4, count5;
+    time_t now;
+    struct tm *today;
+
+    if (sscanf(input, "%47s %7s %d %d %d %c", name, format,
+               &lrecl, &blksize, &cylinders, &extra) != 5)
+    {
+        printf("usage: ALLOC name FB|VB|U lrecl blksize cylinders\n");
+        return 8;
+    }
+    for (n = 0; name[n]; n++) name[n] = toupper((unsigned char)name[n]);
+    for (n = 0; format[n]; n++)
+        format[n] = toupper((unsigned char)format[n]);
+    n = strlen(name);
+    if (n < 1 || n > 44 || cylinders < 1 || cylinders > 16
+        || blksize < 1 || blksize > 32760
+        || !(isalpha((unsigned char)name[0]) || name[0] == '#'
+             || name[0] == '$' || name[0] == '@'))
+    {
+        printf("ALLOC: invalid name, cylinder count or block length\n");
+        return 8;
+    }
+    for (x = 0; x < n; x++)
+        if (!(isalnum((unsigned char)name[x]) || name[x] == '.'
+              || name[x] == '#' || name[x] == '$' || name[x] == '@'))
+        {
+            printf("ALLOC: invalid dataset name\n");
+            return 8;
+        }
+    if (strcmp(format, "FB") == 0)
+    {
+        if (lrecl < 1 || lrecl > blksize || blksize % lrecl)
+        {
+            printf("ALLOC: FB requires whole fixed records per block\n");
+            return 8;
+        }
+    }
+    else if (strcmp(format, "VB") == 0)
+    {
+        if (lrecl < 5 || lrecl + 4 > blksize)
+        {
+            printf("ALLOC: VB needs RDW and BDW space\n");
+            return 8;
+        }
+    }
+    else if (strcmp(format, "U") == 0)
+    {
+        if (lrecl != 0)
+        {
+            printf("ALLOC: U requires lrecl 0\n");
+            return 8;
+        }
+    }
+    else
+    {
+        printf("ALLOC: supported formats are FB, VB and U\n");
+        return 8;
+    }
+    volume = pdosVolumeIndex(pdos, pdos->curdev);
+    if (volume <= 0)
+    {
+        printf("ALLOC: select an exchange volume first\n");
+        return 8;
+    }
+    device = pdos->curdev;
+    memset(wanted, ' ', sizeof wanted);
+    memcpy(wanted, name, n);
+    count = rdblock(device, 0, 0, 3, label, sizeof label, 0x0e);
+    count4 = rdblock(device, 1, 0, 1, f4, sizeof f4, 0x0e);
+    count5 = rdblock(device, 1, 0, 2, f5, sizeof f5, 0x0e);
+    if (count < 20 || memcmp(label + 4, "VOL1", 4) != 0
+        || memcmp(label + 8, pdos->volumes[volume].volser, 6) != 0
+        || memcmp(label + 15, "\0\1\0\0\1", 5) != 0
+        || count4 != 140 || f4[44] != '4'
+        || f4[62] != 0 || (unsigned char)f4[63] != 100
+        || f4[107] != 0 || f4[108] != 1 || f4[109] != 0
+        || f4[110] != 0 || f4[111] != 0 || f4[112] != 2
+        || f4[113] != 0 || f4[114] != 14
+        || count5 != 140 || f5[44] != '5')
+    {
+        printf("ALLOC: unsupported or damaged VTOC layout\n");
+        return 8;
+    }
+    for (x = 45; x < 140; x++)
+        if (f5[x] != 0)
+        {
+            printf("ALLOC: free-space map needs another allocator\n");
+            return 8;
+        }
+    memset(used, 0, sizeof used);
+    used[0] = used[1] = used[2] = 1;
+    freec = freeh = freer = -1;
+    saw_blank = 0;
+    for (c = 1; c <= 2; c++)
+        for (h = 0; h < 15; h++)
+            for (r = (c == 1 && h == 0) ? 3 : 1; r <= 100; r++)
+            {
+                count = rdblock(device, c, h, r, raw, sizeof raw, 0x0e);
+                if (count < 0) break;
+                if (count != 140)
+                {
+                    printf("ALLOC: malformed VTOC record\n");
+                    return 8;
+                }
+                if (raw[44] == 0)
+                {
+                    for (x = 0; x < 140; x++)
+                        if (raw[x] != 0) return 8;
+                    if (!saw_blank)
+                    {
+                        freec = c; freeh = h; freer = r;
+                        saw_blank = 1;
+                    }
+                    continue;
+                }
+                if (saw_blank || raw[44] != '1' || raw[59] != 1
+                    || raw[105] != 0x81)
+                {
+                    printf("ALLOC: unsupported VTOC entry order or extent\n");
+                    return 8;
+                }
+                if (memcmp(raw, wanted, 44) == 0)
+                {
+                    printf("ALLOC: dataset already exists: %s\n", name);
+                    return 8;
+                }
+                low = ((unsigned char)raw[107] << 8) | (unsigned char)raw[108];
+                lowhead = ((unsigned char)raw[109] << 8) | (unsigned char)raw[110];
+                high = ((unsigned char)raw[111] << 8) | (unsigned char)raw[112];
+                highhead = ((unsigned char)raw[113] << 8) | (unsigned char)raw[114];
+                if (low < 3 || high >= 100 || low > high
+                    || lowhead >= 15 || highhead >= 15
+                    || (low == high && lowhead > highhead)) return 8;
+                for (x = low; x <= high; x++) used[x] = 1;
+            }
+    if (freec < 0)
+    {
+        printf("ALLOC: VTOC has no free DSCB\n");
+        return 8;
+    }
+    for (start = 3; start + cylinders <= 100; start++)
+    {
+        for (x = start; x < start + cylinders && !used[x]; x++) ;
+        if (x == start + cylinders) break;
+    }
+    if (start + cylinders > 100)
+    {
+        printf("ALLOC: insufficient free cylinders\n");
+        return 8;
+    }
+    for (c = start; c < start + cylinders; c++)
+        for (h = 0; h < 15; h++)
+            if (rdblock(device, c, h, 1, check, sizeof check, 0x0e) >= 0)
+            {
+                printf("ALLOC: selected extent is not empty\n");
+                return 8;
+            }
+    memset(eof, 0, sizeof eof);
+    eof[0] = (unsigned char)(start >> 8);
+    eof[1] = (unsigned char)start;
+    eof[4] = 1;
+    if (wrblock(device, start, 0, 0, eof, sizeof eof, 0x1d)
+        != sizeof eof)
+    {
+        printf("ALLOC: could not initialize data extent\n");
+        return 12;
+    }
+    memset(&dscb, 0, sizeof dscb);
+    memset(dscb.ds1dsnam, ' ', sizeof dscb.ds1dsnam);
+    memcpy(dscb.ds1dsnam, name, n);
+    dscb.ds1fmtid = '1';
+    memcpy(dscb.ds1dssn, pdos->volumes[volume].volser, 6);
+    dscb.ds1volsq[1] = 1;
+    now = time(NULL);
+    today = gmtime(&now);
+    if (today != NULL)
+    {
+        int day = today->tm_yday + 1;
+        dscb.ds1credt[0] = (unsigned char)today->tm_year;
+        dscb.ds1credt[1] = (unsigned char)(day >> 8);
+        dscb.ds1credt[2] = (unsigned char)day;
+    }
+    dscb.ds1noepv = 1;
+    memset(dscb.ds1syscd, ' ', sizeof dscb.ds1syscd);
+    memcpy(dscb.ds1syscd, "PDOS", 4);
+    dscb.ds1dsorg = 0x4000;
+    dscb.ds1recfm = strcmp(format, "FB") == 0 ? 0x90
+                    : strcmp(format, "VB") == 0 ? 0x50 : 0xc0;
+    dscb.ds1blkl = blksize;
+    dscb.ds1lrecl = lrecl;
+    dscb.ds1dsind = 0x80;
+    dscb.ds1scal1 = 0xc0;
+    dscb.ds1scal3[2] = 1;
+    dscb.ds1lstar[2] = 1;
+    dscb.ds1trbal[0] = 0xe2;
+    dscb.ds1trbal[1] = 0xfa;
+    dscb.ds1ext1[0] = 0x81;
+    dscb.startcchh[0] = (unsigned char)(start >> 8);
+    dscb.startcchh[1] = (unsigned char)start;
+    dscb.endcchh[0] = (unsigned char)((start + cylinders - 1) >> 8);
+    dscb.endcchh[1] = (unsigned char)(start + cylinders - 1);
+    dscb.endcchh[3] = 14;
+    if (wrblock(device, freec, freeh, freer, &dscb,
+                sizeof dscb, 0x0d) != sizeof dscb
+        || rdblock(device, freec, freeh, freer, check,
+                   sizeof check, 0x0e) != sizeof check
+        || memcmp(check, &dscb, sizeof dscb) != 0)
+    {
+        memset(blank, 0, sizeof blank);
+        wrblock(device, freec, freeh, freer, blank, sizeof blank, 0x0d);
+        printf("ALLOC: VTOC write/readback failed\n");
+        return 12;
+    }
+    printf("ALLOC: %s %.6s cyl=%d..%d %s/%d/%d\n", name,
+           pdos->volumes[volume].volser, start, start + cylinders - 1,
+           format, lrecl, blksize);
+    return 0;
+#endif
+}
+
+/* Preserve physical FB/VB blocks, including a variable record whose data
+   length is zero. The byte-stream COPY command cannot promise that case.
+   This bounded path accepts only separate, one-cylinder PS extents whose
+   entire logical file fits on its first track. */
+static int pdosRecordCopy(PDOS *pdos, const char *input)
+{
+#ifndef ZARCH
+    (void)pdos; (void)input;
+    printf("RCOPY: unsupported on this build\n");
+    return 8;
+#else
+    char source[48], target[48], extra;
+    DSCB1 src, dst;
+    unsigned char probe[MAXBLKSZ], verify[MAXBLKSZ], countbuf[MAXBLKSZ + 8];
+    unsigned char *saved;
+    int sizes[64], offsets[64];
+    int i, j, n, sc, sh, tc, th, total, records, length, format, lrecl;
+    int vc, vh, vr, rc;
+    if (sscanf(input, "%47s %47s %c", source, target, &extra) != 2)
+    {
+        printf("usage: RCOPY source target\n");
+        return 8;
+    }
+    for (i = 0; source[i]; i++) source[i] = toupper((unsigned char)source[i]);
+    for (i = 0; target[i]; i++) target[i] = toupper((unsigned char)target[i]);
+    if (strcmp(source, target) == 0 || pdosVolumeIndex(pdos, pdos->curdev) <= 0
+        || !pdos64ReadDscbLoc(pdos->curdev, source, &src, NULL, NULL, NULL)
+        || !pdos64ReadDscbLoc(pdos->curdev, target, &dst, &vc, &vh, &vr))
+    {
+        printf("RCOPY: separate existing datasets on exchange disk required\n");
+        return 8;
+    }
+    sc = ((unsigned char)src.startcchh[0] << 8) | (unsigned char)src.startcchh[1];
+    sh = ((unsigned char)src.startcchh[2] << 8) | (unsigned char)src.startcchh[3];
+    tc = ((unsigned char)dst.startcchh[0] << 8) | (unsigned char)dst.startcchh[1];
+    th = ((unsigned char)dst.startcchh[2] << 8) | (unsigned char)dst.startcchh[3];
+    format = (unsigned char)src.ds1recfm;
+    lrecl = (unsigned short)src.ds1lrecl;
+    if (src.ds1dsorg != 0x4000 || dst.ds1dsorg != 0x4000
+        || src.ds1noepv != 1 || dst.ds1noepv != 1
+        || (format != 0x90 && format != 0x50)
+        || dst.ds1recfm != src.ds1recfm
+        || dst.ds1blkl != src.ds1blkl || dst.ds1lrecl != src.ds1lrecl
+        || sc < 3 || tc < 3 || sc == tc || sc >= 100 || tc >= 100
+        || sh != 0 || th != 0
+        || src.endcchh[0] != src.startcchh[0]
+        || src.endcchh[1] != src.startcchh[1]
+        || dst.endcchh[0] != dst.startcchh[0]
+        || dst.endcchh[1] != dst.startcchh[1]
+        || (unsigned char)src.endcchh[3] != 14
+        || (unsigned char)dst.endcchh[3] != 14
+        || rdblock(pdos->curdev, tc, 0, 1, probe,
+                   sizeof probe, 0x0e) != 0)
+    {
+        printf("RCOPY: matching FB/VB geometry and empty target required\n");
+        return 8;
+    }
+    saved = malloc(50000);
+    if (saved == NULL) return 12;
+    records = total = 0; rc = 8;
+    for (n = 1; n <= 64; n++)
+    {
+        length = rdblock(pdos->curdev, sc, 0, n, probe,
+                         sizeof probe, 0x0e);
+        if (length == 0) { rc = 0; break; }
+        if (length < 0 || length > (unsigned short)src.ds1blkl
+            || total + length > 50000) break;
+        if (format == 0x90)
+        {
+            if (lrecl < 1 || length % lrecl != 0) break;
+        }
+        else
+        {
+            if (length < 4 || (((unsigned char)probe[0] << 8)
+                               | (unsigned char)probe[1]) != length) break;
+            for (j = 4; j < length; )
+            {
+                int rdw;
+                if (j + 4 > length) break;
+                rdw = ((unsigned char)probe[j] << 8)
+                      | (unsigned char)probe[j + 1];
+                if (rdw < 4 || rdw > lrecl || j + rdw > length) break;
+                j += rdw;
+            }
+            if (j != length) break;
+        }
+        offsets[records] = total; sizes[records] = length;
+        memcpy(saved + total, probe, length);
+        total += length; records++;
+    }
+    if (rc != 0)
+    {
+        printf("RCOPY: source framing, length or EOF invalid\n");
+        free(saved); return 8;
+    }
+    if (records == 0)
+    {
+        printf("RCOPY: empty source; empty target retained\n");
+        free(saved); return 0;
+    }
+    for (n = 1; n <= records + 1; n++)
+    {
+        length = n <= records ? sizes[n - 1] : 0;
+        countbuf[0] = (unsigned char)(tc >> 8);
+        countbuf[1] = (unsigned char)tc;
+        countbuf[2] = countbuf[3] = countbuf[5] = 0;
+        countbuf[4] = (unsigned char)n;
+        countbuf[6] = (unsigned char)(length >> 8);
+        countbuf[7] = (unsigned char)length;
+        if (length) memcpy(countbuf + 8, saved + offsets[n - 1], length);
+        if (wrblock(pdos->curdev, tc, 0, n - 1, countbuf,
+                    length + 8, 0x1d) != length + 8)
+        {
+            printf("RCOPY: output write failed at block %d\n", n);
+            free(saved); return 12;
+        }
+    }
+    for (n = 1; n <= records; n++)
+        if (rdblock(pdos->curdev, tc, 0, n, verify,
+                    sizeof verify, 0x0e) != sizes[n - 1]
+            || memcmp(verify, saved + offsets[n - 1], sizes[n - 1]) != 0)
+        {
+            printf("RCOPY: output readback failed at block %d\n", n);
+            free(saved); return 12;
+        }
+    free(saved);
+    dst.ds1lstar[0] = dst.ds1lstar[1] = 0;
+    dst.ds1lstar[2] = (unsigned char)(records + 1);
+    if (wrblock(pdos->curdev, vc, vh, vr,
+                ((char *)&dst) + 44, sizeof dst - 44, 0x05)
+        != sizeof dst - 44) return 12;
+    printf("RCOPY: %s -> %s blocks=%d bytes=%d\n",
+           source, target, records, total);
+    return 0;
+#endif
+}
+
+/* DEVICES discovers channel addresses without issuing CKD reads to a tape.
+   MOUNT validates an explicitly named DASD. TAPE is a separate device class. */
+static int pdosMediaCommand(PDOS *pdos, const char *verb, char *parm)
+{
+    char input[96], first[16], second[16], serial[7];
+    int length = *(short *)parm;
+    int address, device, i, count;
+    char extra;
+    unsigned int hash;
+    char block[MAXBLKSZ];
+
+    if (length < 0 || length >= sizeof input) return 8;
+    memcpy(input, parm + sizeof(short), length);
+    input[length] = '\0';
+    first[0] = second[0] = '\0';
+    sscanf(input, "%15s %15s", first, second);
+    for (i = 0; first[i]; i++) first[i] = toupper((unsigned char)first[i]);
+    if (strcmp(verb, "DEVICES") == 0)
+    {
+        for (i = 0; i < 4096; i++)
+        {
+            address = getdevn(0x10000 + i);
+            if (address == 0) break;
+            printf("DEVICE %04X %s\n", address,
+                   pdosVolumeIndex(pdos, 0x10000 + i) >= 0 ? "DASD" :
+                   pdos->tape_device == 0x10000 + i ? "TAPE" : "unclassified");
+        }
+        return 0;
+    }
+    if (strcmp(verb, "VOLUMES") == 0)
+    {
+        for (i = 0; i < pdos->volume_count; i++)
+            printf("VOLUME %04X %.6s %s%s\n", pdos->volumes[i].address,
+                   pdos->volumes[i].volser,
+                   i == 0 ? "IPL protected" : "exchange",
+                   pdos->curdev == pdos->volumes[i].device ? " selected" : "");
+        return 0;
+    }
+    if (strcmp(verb, "ALLOC") == 0)
+        return pdosAllocateDataset(pdos, input);
+    if (strcmp(verb, "RCOPY") == 0)
+        return pdosRecordCopy(pdos, input);
+    if (strcmp(verb, "MOUNT") == 0)
+    {
+        if (sscanf(input, "%x %15s %c", &address, second, &extra) != 2
+            || address <= 0 || address > 0xffff || strlen(second) != 6)
+        {
+            printf("usage: MOUNT address(hex) expected-volser(6)\n");
+            return 8;
+        }
+        memcpy(serial, second, 7);
+        for (i = 0; i < 6; i++) serial[i] = toupper((unsigned char)serial[i]);
+        device = getssid(address);
+        if (device == 0 || pdos->volume_count >= PDOS_MAX_VOLUMES
+            || pdosVolumeIndex(pdos, device) >= 0)
+        {
+            printf("MOUNT: device absent, already mounted or table full\n");
+            return 8;
+        }
+        if (!pdosReadVolumeLabel(device, block)
+            || memcmp(block, serial, 6) != 0)
+        {
+            printf("MOUNT: VOL1 missing or serial mismatch at %04X\n", address);
+            return 8;
+        }
+        for (i = 0; i < pdos->volume_count; i++)
+            if (memcmp(pdos->volumes[i].volser, serial, 6) == 0)
+            {
+                printf("MOUNT: duplicate volume serial %.6s\n", serial);
+                return 8;
+            }
+        i = pdos->volume_count++;
+        pdos->volumes[i].device = device;
+        pdos->volumes[i].address = address;
+        memcpy(pdos->volumes[i].volser, serial, 7);
+#ifdef ZARCH
+        memset(pdos64_dasd_ucb[i], 0, 64);
+        pdos64_dasd_ucb[i][0x12] = 0x20;
+        memcpy(pdos64_dasd_ucb[i] + 0x1c, serial, 6);
+#endif
+        printf("MOUNT: %04X %.6s ready\n", address, serial);
+        return 0;
+    }
+    if (strcmp(verb, "SELECT") == 0 || strcmp(verb, "UNMOUNT") == 0)
+    {
+        if (strlen(first) != 6 || second[0] != '\0') return 8;
+        for (i = 0; i < pdos->volume_count; i++)
+            if (memcmp(pdos->volumes[i].volser, first, 6) == 0) break;
+        if (i == pdos->volume_count) return 8;
+        if (strcmp(verb, "SELECT") == 0)
+        {
+            pdos->curdev = pdos->volumes[i].device;
+            printf("SELECT: %.6s\n", first);
+            return 0;
+        }
+        if (i == 0 || i != pdos->volume_count - 1
+            || pdos->curdev == pdos->volumes[i].device)
+        {
+            printf("UNMOUNT: IPL, selected or not the last mount\n");
+            return 8;
+        }
+#ifdef ZARCH
+        {
+            TIOT *tiot = pdos->psa->psatold->tcbtio;
+            int n;
+            for (n = 0; n < tiot->count; n++)
+                if (tiot->device[n] == pdos->volumes[i].device)
+                {
+                    if (tiot->open_count[n] != 0)
+                    {
+                        printf("UNMOUNT: volume has open DD\n");
+                        return 8;
+                    }
+                }
+            for (n = 0; n < PDOS64_PDS_WRITES; n++)
+                if (pdos64_pds_writes[n].dcb != NULL
+                    && pdos64_pds_writes[n].device == pdos->volumes[i].device)
+                    return 8;
+            for (n = tiot->count - 1; n >= 0; n--)
+                if (tiot->device[n] == pdos->volumes[i].device)
+                    pdos64FreeDd(pdos, tiot,
+                                 (char *)tiot->ddentry[n] + 4);
+        }
+#endif
+        for (; i + 1 < pdos->volume_count; i++)
+        {
+            pdos->volumes[i] = pdos->volumes[i + 1];
+#ifdef ZARCH
+            memcpy(pdos64_dasd_ucb[i], pdos64_dasd_ucb[i + 1], 64);
+#endif
+        }
+        pdos->volume_count--;
+        printf("UNMOUNT: %.6s\n", first);
+        return 0;
+    }
+    if (strcmp(verb, "TAPE") == 0)
+    {
+        if (strcmp(first, "STATUS") == 0)
+        {
+            if (pdos->tape_device)
+                printf("TAPE: mounted %04X %s\n", pdos->tape_address,
+                       pdos->tape_writable ? "write" : "read");
+            else
+                printf("TAPE: off\n");
+            return 0;
+        }
+        if (strcmp(first, "OFF") == 0)
+        {
+#ifdef ZARCH
+            TIOT *tiot = pdos->psa->psatold->tcbtio;
+            for (i = 0; i < tiot->count; i++)
+                if (tiot->device[i] == pdos->tape_device
+                    && pdos->tape_device && tiot->open_count[i] != 0)
+                    return 8;
+            for (i = tiot->count - 1; i >= 0; i--)
+                if (tiot->device[i] == pdos->tape_device
+                    && pdos->tape_device)
+                    pdos64FreeDd(pdos, tiot,
+                                 (char *)tiot->ddentry[i] + 4);
+#endif
+            pdos->tape_device = pdos->tape_address = pdos->tape_writable = 0;
+            printf("TAPE: off\n");
+            return 0;
+        }
+        if (strcmp(first, "MOUNT") == 0)
+        {
+            char mode[16];
+            if (pdos->tape_device) return 8;
+            mode[0] = '\0';
+            count = sscanf(input, "%15s %x %15s %c",
+                           first, &address, mode, &extra);
+            if (count < 2 || count > 3
+                || address <= 0 || address > 0xffff) return 8;
+            for (i = 0; mode[i]; i++) mode[i] = toupper((unsigned char)mode[i]);
+            if (mode[0] && strcmp(mode, "WRITE") != 0) return 8;
+            device = getssid(address);
+            if (!device || pdosVolumeIndex(pdos, device) >= 0) return 8;
+            pdos->tape_device = device;
+            pdos->tape_address = address;
+            pdos->tape_writable = strcmp(mode, "WRITE") == 0;
+            printf("TAPE: %04X %s; position is device current position\n",
+                   address, pdos->tape_writable ? "write" : "read");
+            return 0;
+        }
+        if (strcmp(first, "READ") == 0 && pdos->tape_device)
+        {
+            count = rdtape(pdos->tape_device, block, sizeof block);
+            if (count < 0) { printf("TAPE: read error\n"); return 12; }
+            hash = 2166136261U;
+            for (i = 0; i < count; i++)
+                hash = (hash ^ (unsigned char)block[i]) * 16777619U;
+            printf("TAPE: record length=%d fnv32=%08X", count, hash);
+            for (i = 0; i < count && i < 16; i++)
+                printf(" %02X", (unsigned char)block[i]);
+            printf("\n");
+            return 0;
+        }
+        if (strcmp(first, "REWIND") == 0 && pdos->tape_device)
+        {
+            if (tapectl(pdos->tape_device, 0x07) != 0)
+            { printf("TAPE: rewind error\n"); return 12; }
+            printf("TAPE: rewound %04X\n", pdos->tape_address);
+            return 0;
+        }
+        if (strcmp(first, "SCAN") == 0 && pdos->tape_device)
+        {
+            unsigned long total = 0;
+            int records = 0;
+            while (records < 100000 && total < 512UL * 1024 * 1024)
+            {
+                count = rdtape(pdos->tape_device, block, sizeof block);
+                if (count < 0) { printf("TAPE: scan read error\n"); return 12; }
+                if (count == 0)
+                {
+                    printf("TAPE: filemark records=%d bytes=%lu\n",
+                           records, total);
+                    return 0;
+                }
+                records++;
+                total += count;
+            }
+            printf("TAPE: scan limit records=%d bytes=%lu\n", records, total);
+            return 8;
+        }
+        if (strcmp(first, "MARK") == 0 && pdos->tape_device
+            && pdos->tape_writable)
+        {
+            if (tapectl(pdos->tape_device, 0x1f) != 0)
+            { printf("TAPE: mark error\n"); return 12; }
+            printf("TAPE: filemark written\n");
+            return 0;
+        }
+        if (strcmp(first, "WRITE") == 0 && pdos->tape_device
+            && pdos->tape_writable)
+        {
+            const char *hex = strchr(input, ' ');
+            const char *digits = "0123456789ABCDEF";
+            int n, hi, lo;
+            if (hex == NULL) return 8;
+            while (*hex == ' ') hex++;
+            n = strlen(hex);
+            if (n < 2 || n > 80 || n % 2) return 8;
+            for (i = 0; i < n / 2; i++)
+            {
+                const char *p = strchr(digits,
+                                       toupper((unsigned char)hex[2 * i]));
+                const char *q = strchr(digits,
+                                       toupper((unsigned char)hex[2 * i + 1]));
+                if (p == NULL || q == NULL) return 8;
+                hi = p - digits;
+                lo = q - digits;
+                block[i] = (hi << 4) | lo;
+            }
+            count = wrtape(pdos->tape_device, block, n / 2);
+            if (count != n / 2)
+            { printf("TAPE: write error\n"); return 12; }
+            printf("TAPE: wrote record length=%d\n", count);
+            return 0;
+        }
+        printf("usage: TAPE STATUS, MOUNT addr(hex), REWIND, READ, SCAN\n");
+        printf("       TAPE MOUNT addr WRITE, WRITE hex, MARK, OFF\n");
+        return 8;
+    }
+    return 8;
+}
 
 /* do DIR command */
 
@@ -4991,6 +5795,7 @@ static int pdosNewF(PDOS *pdos, char *parm)
     int dirhead;
     int dirrec;
     int cnt;
+    int volume = pdosVolumeIndex(pdos, pdos->curdev);
 
     dsn = parm;
 #if 0
@@ -5012,7 +5817,8 @@ static int pdosNewF(PDOS *pdos, char *parm)
     memset(dscb1->ds1dsnam, ' ', sizeof dscb1->ds1dsnam);
     memcpy(dscb1->ds1dsnam, dsn, len);
     dscb1->ds1fmtid = '1'; /* format 1 DSCB */
-    memcpy(dscb1->ds1dssn, "PDOS00", 6);
+    memcpy(dscb1->ds1dssn,
+           volume >= 0 ? pdos->volumes[volume].volser : "PDOS00", 6);
     dscb1->ds1volsq[1] = 1; /* volume sequence number */
     memcpy(dscb1->ds1credt, "\x6e\x00\x01", 3); /* 2010-01-01 */
     memcpy(dscb1->ds1expdt, "\x00\x00\x00", 3); /* 1900-01-00 ? */
@@ -5046,7 +5852,7 @@ static int pdosNewF(PDOS *pdos, char *parm)
     /* last head on that cylinder too */
     memcpy(dscb1->endcchh + 2, "\x00\x0e", 2);
     
-    cnt = wrblock(pdos->ipldev, dircyl, dirhead, dirrec, tbuf, 140, 0x0d);
+    cnt = wrblock(pdos->curdev, dircyl, dirhead, dirrec, tbuf, 140, 0x0d);
 #if 0
     printf("cnt from wrblock is %d\n", cnt);
 #endif
@@ -5056,7 +5862,7 @@ static int pdosNewF(PDOS *pdos, char *parm)
     memcpy(tbuf, "\x00\x01\x00\x00\x0d\x2c\x00\x60", 8);
     strcpy(tbuf + 8, "AAAA");
     /* free directory space starts at 1 0 12 */    
-    wrblock(pdos->ipldev, 1, 0, 12, tbuf, 140, 0x1d);
+    wrblock(pdos->curdev, 1, 0, 12, tbuf, 140, 0x1d);
 #endif
 
 #if 0
@@ -5111,7 +5917,7 @@ static int pdosGetMaxima(PDOS *pdos, int *dircyl, int *dirhead,
     
     *dirrec = *dirhead = *dircyl = *datacyl = 0;
     /* read VOL1 record which starts on cylinder 0, head 0, record 3 */
-    cnt = rdblock(pdos->ipldev, 0, 0, 3, tbuf, MAXBLKSZ, 0x0e);
+    cnt = rdblock(pdos->curdev, 0, 0, 3, tbuf, MAXBLKSZ, 0x0e);
     if (cnt >= 20)
     {
         split_cchhr(tbuf + 15, &cyl, &head, &rec);
@@ -5119,7 +5925,7 @@ static int pdosGetMaxima(PDOS *pdos, int *dircyl, int *dirhead,
         
         while (errcnt < 4)
         {
-            cnt = rdblock(pdos->ipldev, cyl, head, rec, &dscb1,
+            cnt = rdblock(pdos->curdev, cyl, head, rec, &dscb1,
                           sizeof dscb1, 0x0e);
             if (cnt < 0)
             {
@@ -5666,7 +6472,7 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
     strcat(srchprog2, ".COM ");
     
     /* read VOL1 record */
-    cnt = rdblock(pdos->ipldev, 0, 0, 3, tbuf, MAXBLKSZ, 0x0e);
+    cnt = rdblock(pdos->curdev, 0, 0, 3, tbuf, MAXBLKSZ, 0x0e);
     if (cnt >= 20)
     {
         cyl = head = rec = 0;
@@ -5676,7 +6482,7 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
         memcpy((char *)&rec + sizeof(int) - 1, tbuf + 19, 1);
         
         while ((cnt =
-               rdblock(pdos->ipldev, cyl, head, rec, &dscb1, sizeof dscb1,
+               rdblock(pdos->curdev, cyl, head, rec, &dscb1, sizeof dscb1,
                        0x0e))
                > 0)
         {
@@ -5740,7 +6546,7 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
         return (-1);
     }
     diskbound = 1;
-    cnt = rdblock(pdos->ipldev, cyl, head, rec, tbuf, MAXBLKSZ, 0x0e);
+    cnt = rdblock(pdos->curdev, cyl, head, rec, tbuf, MAXBLKSZ, 0x0e);
     }
     else if (!__ismem)
     {
@@ -5829,7 +6635,7 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
 #endif
             return (-1);
         }
-        cnt = rdblock(pdos->ipldev, cyl, i, j, tbuf, MAXBLKSZ, 0x0e);
+        cnt = rdblock(pdos->curdev, cyl, i, j, tbuf, MAXBLKSZ, 0x0e);
         }
         else
         {

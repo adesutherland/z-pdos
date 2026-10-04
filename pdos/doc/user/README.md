@@ -91,6 +91,12 @@ package manager. The
 [qualification record](../qualification/QUALIFICATION.md) describes the actual
 cREXX workloads, storage budgets, file results and skips.
 
+The [exchange disk and tape guide](MEDIA.md) covers the current source's
+second CKD volume, guest `ALLOC` and `RCOPY`, and raw HET/AWS tape records.
+The [fixture guide](FIXTURES.md) covers checked CMS and TSO tape imports and
+exact stopped-disk export. These source changes are newer than the published
+image.
+
 ## Build a fresh disk from source
 
 Run these commands from the repository root. You need cREXX, CMake, a native

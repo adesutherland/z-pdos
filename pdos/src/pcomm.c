@@ -323,6 +323,34 @@ static void processInput(void)
         printf("z/PDOS PDIO1; PCOMM operator interface 1\n");
         printf("Exact image build: see the host image receipt.\n");
     }
+    else if (ins_strcmp(buf, "devices") == 0 ||
+             ins_strcmp(buf, "volumes") == 0 ||
+             ins_strcmp(buf, "mount") == 0 ||
+             ins_strcmp(buf, "select") == 0 ||
+             ins_strcmp(buf, "unmount") == 0 ||
+             ins_strcmp(buf, "alloc") == 0 ||
+             ins_strcmp(buf, "rcopy") == 0 ||
+             ins_strcmp(buf, "tape") == 0)
+    {
+        int select_volume = ins_strcmp(buf, "select") == 0;
+        char selected[7];
+        selected[0] = '\0';
+        if (select_volume && strlen(p) == 6)
+        {
+            size_t i;
+            memcpy(selected, p, 6);
+            selected[6] = '\0';
+            for (i = 0; i < 6; i++)
+                selected[i] = toupper((unsigned char)selected[i]);
+        }
+        if (*p != '\0') p[-1] = ' ';
+        commandNumber++;
+        printf("PCOMM BEGIN %u %s\n", commandNumber, buf);
+        rc = system(buf);
+        printf("PCOMM END %u RC=%d\n", commandNumber, rc);
+        if (select_volume && rc == 0 && selected[0] != '\0')
+            strcpy(drive, selected);
+    }
     else if (ins_strcmp(buf, "tso") == 0 ||
              ins_strcmp(buf, "cms") == 0 ||
              ins_strcmp(buf, "cp") == 0)
@@ -630,6 +658,12 @@ static void dohelp(char *topic)
     printf("z/PDOS PCOMM: first steps\n");
     printf("VERSION  show interface and build-identity location\n");
     printf("DIR      list datasets, dates, formats and extents\n");
+    printf("DEVICES  list attached addresses; VOLUMES lists mounted DASD\n");
+    printf("MOUNT address volser; SELECT volser; UNMOUNT volser\n");
+    printf("ALLOC name FB|VB|U lrecl blksize cylinders on selected disk\n");
+    printf("RCOPY source target  preserve FB/VB logical records exactly\n");
+    printf("TAPE STATUS, MOUNT address, REWIND, READ, SCAN\n");
+    printf("TAPE MOUNT address WRITE for output; WRITE hex, MARK, OFF\n");
     printf("NAME     run installed NAME.EXE or NAME.BAT\n");
     printf("SHOWRC   toggle extra return-code display\n");
     printf("EXIT     end PCOMM (not a restart)\n");

@@ -16,7 +16,7 @@ them or authorisation to implement every backlog item.
 | Order | Outcome and first checkpoint | Items |
 | --- | --- | --- |
 | 1 | **Load, run and judge.** Start with an end-to-end TSO31 or TSO64 cREXX check from the base image using unchanged native program bytes. Make program installation, native batch delivery, per-command results and cleanup one repeatable operator flow. A human must also be able to enter commands longer than the 80-column 3270 field without silent truncation, read a stable prompt and input line, and tell which command produced each result. Bound executable reads to their dataset extent before accepting arbitrary staged packages. | [PD-013](#pd-013-repeatable-program-conformance-run), [PD-009](#pd-009-temporary-package-lifecycle), [PD-004](#pd-004-batch-file-delivery), [PD-005](#pd-005-command-length-diagnostics), [PD-007](#pd-007-results-and-scrollback), [PD-008](#pd-008-operator-diagnostics), [PD-006](#pd-006-console-input-and-prompts), [PD-012](#pd-012-direct-executable-reads-need-an-extent-boundary) |
-| 2 | **Move fixtures both ways.** Import and export text, binary and record-oriented fixtures with explicit CMS or TSO names, framing and encoding. Check logical records and exact binary bytes after a guest run. | [PD-014](#pd-014-cms-and-tso-fixture-exchange) |
+| 2 | **Move fixtures both ways.** Make a second CKD volume discoverable, mountable and selectable while protecting IPL. Let the operator allocate a bounded output dataset on the selected exchange volume. Expose sequential tape record I/O using unchanged mounted images. Import/export CMS and TSO fixtures with explicit naming, framing and encoding, then check exact guest results. | [PD-018](#pd-018-multiple-dasd-volumes), [PD-020](#pd-020-safe-guest-dataset-allocation), [PD-019](#pd-019-virtual-tape-io), [PD-014](#pd-014-cms-and-tso-fixture-exchange) |
 | 3 | **Run CMS cREXX binaries.** Inventory the exact CMS24 and CMS31 MODULE, entry and service contracts first. Qualify unchanged CMS31 RXVM, then its RXAS/RXC chain, against the bounded cREXX workload. Add the separate low-address path before attempting the historical CMS24 package. A TSO build of the same source does not establish CMS binary compatibility. | [PD-015](#pd-015-cms-crexx-binary-contract), [PD-016](#pd-016-cms31-crexx-execution), [PD-001](#pd-001-amode24rmode24-application-loading), [PD-017](#pd-017-cms24-crexx-execution) |
 | Supporting gates | Qualify truthful invalid storage requests before widening the service surface, and correct region-table initialization before expanding mappings. Keep shared instruction selectors and native 64-bit kernel conversion behind the operator and compatibility outcomes unless a measured dependency moves them forward. | [PD-002](#pd-002-conditional-storage-service-errors), [PD-011](#pd-011-region-first-table-padding), [PD-003](#pd-003-shared-selectors-and-native-64-bit-kernel) |
 
@@ -30,8 +30,47 @@ private paths, accounts or image versions.
 Step 1 is implemented, locally guest-qualified and manually accepted in the
 current source; see
 the [operator guide](user/CONFORMANCE.md) and
-[4 October evidence](qualification/STEP1-2026-10-04.md). The published 0.1.0
-image predates it. Orders 2 and 3 remain open.
+[4 October evidence](qualification/STEP1-2026-10-04.md). Order 2 is implemented
+and locally guest-qualified in the bounded source profile; see the
+[media guide](user/MEDIA.md), [fixture guide](user/FIXTURES.md) and
+[phase 2 evidence](qualification/PHASE2-2026-10-04.md). The published 0.1.0
+image predates both orders. Order 3 remains open.
+
+### Phase 2 delivery contract
+
+1. **DASD discovery and selection.** `DEVICES` shows attached channel addresses
+   without treating every address as CKD. `MOUNT address expected-volser` reads
+   the real VOL1 label and refuses a mismatch or duplicate; `VOLUMES` shows
+   mounted volumes; `SELECT volser` changes dataset and executable lookup.
+   IPL stays protected and selected by default. An allocated DD pins its
+   device; `UNMOUNT` refuses the IPL, selected and open volumes, and releases
+   closed DD bindings. The first implementation supports four CKD volumes
+   with LIFO unmount.
+2. **Guest output allocation.** `ALLOC` creates a named sequential
+   dataset on the selected exchange volume from an explicit record format,
+   logical/block length and bounded space request. Refuse IPL, duplicates,
+   unsupported formats, insufficient free space and invalid VTOC state
+   without publishing a partial dataset. Report the chosen extent and
+   return code. Existing-dataset `COPY`, record-preserving `RCOPY`, and native
+   programs can then use it. This first allocator is confined to the
+   100-cylinder `dasdload` 3390 exchange layout without a format-5 free map.
+3. **Tape record I/O.** An operator attaches an unchanged AWS or HET image to
+   Hercules, registers its device read-only with `TAPE MOUNT address`, and
+   reads physical records through `TAPE READ` or an allocated `TAP:address` DD.
+   Output uses a separate, explicitly writable tape image. Raw record,
+   file-mark, rewind and output round trips have local guest evidence, as
+   do short native `TAP:` read and write transfers. Larger native transfers
+   and release-image interpretation still need their own checks;
+   the container alone does not identify CMS or z/OS logical contents.
+4. **Fixture interpretation and proof.** A manifest pins archive and image
+   SHA-256, medium, format, logical name, source/destination, record length,
+   code page and expected record/byte hashes. VMFPLC2 CMS HET and z/OS
+   standard-label AWS are distinct adapters. Preserve their original tape
+   bytes in the release ZIP. Stage disposable output on exchange CKD, run the
+   checked mount/allocation/record-copy list, then export and compare logical
+   records and exact binary bytes. Run an unchanged native program separately
+   where its binary contract is supported. CMS MODULE execution remains order
+   3. A tape read alone is transport evidence, not a CMS or z/OS program pass.
 
 ## PD-001: AMODE24/RMODE24 application loading
 
@@ -153,11 +192,38 @@ image predates it. Orders 2 and 3 remain open.
 ## PD-014: CMS and TSO fixture exchange
 
 - Type: improvement
-- Status: Open
+- Status: Done
 - Target: z/PDOS host/disk fixture tooling and the selected cREXX record-file contract
-- Observation: The existing Lab delivery tool inserts text or binary members into an existing simple VB PDS on a stopped image, and separate private staging/readback tools handle the qualified package. The product image has no general, documented import/export route. CMS file name/type/mode and TSO dataset/member naming and record conventions are different.
-- Evidence: [0.1 qualification](qualification/QUALIFICATION.md), [user guide](user/README.md), and the Lab's managed-PDOS delivery and readback reports. No common CMS/TSO physical disk format is established.
-- Acceptance: Define a portable fixture manifest with explicit logical name, destination/source, record format and length, text encoding or binary mode, and expected hashes. Import and export the cREXX text, blank/empty, and ordered 00–FF binary cases through the supported CMS and TSO fixture routes and z/PDOS; compare logical records and binary bytes after execution. Reject unsupported framing, record length, missing datasets and ambiguous conversions without partially accepting a candidate. Check unaffected disk content and keep image changes offline. State any CMS or TSO record forms outside the supported subset.
+- Observation: The product recipe inspects a release ZIP and unchanged tape images to pin SHA-256 and logical-record hashes, strictly rechecks them, decodes bounded CMS VMFPLC2 HET and standard-label TSO AWS records, builds a fresh exchange CKD, runs checked guest `ALLOC`/`RCOPY` commands, and exports exact logical records after shutdown. It keeps CMS file name/type/mode and TSO dataset/label rules separate. The route does not execute CMS MODULEs.
+- Evidence: [Phase 2 guest and stopped-disk results](qualification/PHASE2-2026-10-04.md), [fixture guide](user/FIXTURES.md), and `pdos/scripts/fixtures.crexx` with its bounded binary helper. The unchanged beta-3 CMS31 HET `IOBAD CREXX` fixture and a synthetic standard-label AWS both passed exact readback.
+- Acceptance: Define a portable fixture manifest with explicit logical name, destination/source, record format and length, text encoding or binary mode, and expected hashes. Import and export the cREXX text, blank/empty, and ordered 00–FF binary cases through the supported CMS and TSO fixture routes and z/PDOS; compare logical records and binary bytes after execution. Create output datasets through PD-020 rather than requiring the operator to prebuild every output slot. Reject unsupported framing, record length, missing datasets and ambiguous conversions without partially accepting a candidate. Check unaffected disk content and keep image changes offline. State any CMS or TSO record forms outside the supported subset.
+
+## PD-018: Multiple DASD volumes
+
+- Type: improvement
+- Status: Done
+- Target: z/PDOS CKD discovery, mount registry, DD bindings and direct loader
+- Observation: Phase 1 bound native datasets and executable loads to the IPL subchannel even though `DIR` already used a separate current-device field. The current phase 2 source provides explicit address discovery, VOL1-checked mount, volume selection and protected unmount, then routes native DD, PDS and executable I/O through the selected or bound device. `ALLOC` now creates bounded sequential outputs on a selected exchange image.
+- Evidence: [phase 2 guest and stopped-disk checks](qualification/PHASE2-2026-10-04.md) and [operator guide](user/MEDIA.md).
+- Acceptance: On a stopped, disposable two-3390 image, mount a labeled exchange volume without changing the IPL disk; reject absent, wrong-label and duplicate addresses. Select it, list and read its datasets, run a native program or batch from it, write and read back output there, return to IPL, and refuse unsafe unmount. Verify unchanged IPL bytes and complete cleanup. Show accurate prompt and return codes.
+
+## PD-020: Safe guest dataset allocation
+
+- Type: improvement
+- Status: Done
+- Target: selected exchange CKD volume, VTOC and PCOMM allocation command
+- Observation: `ALLOC` now checks the selected non-IPL 100-cylinder exchange volume's VOL1, VTOC layout and occupied extents, initializes EOF before publishing a new sequential DSCB, reads that DSCB back and reports the chosen extent. FB80 and VB outputs then passed guest writes and exact stopped-disk readback. Duplicate, malformed geometry and IPL requests returned RC 8. The inherited `pdosNewF` remains separate.
+- Evidence: [phase 2 guest record](qualification/PHASE2-2026-10-04.md), `pdos/src/pdos.c` (`pdosAllocateDataset`), and the [media guide](user/MEDIA.md).
+- Acceptance: Offer `ALLOC` with explicit dataset name, PS record format, logical/block length and bounded cylinder request on a selected non-IPL CKD volume. Discover and reserve a real free extent, update the VTOC consistently, initialize an empty dataset, and report volume, extent and return code. Reject duplicate names, unsupported geometry, full or malformed VTOCs, insufficient space, IPL requests and open conflicting DDs before publication. On an injected write failure, leave no discoverable partial dataset. Guest-qualify allocation followed by native program output and stopped-disk byte readback, and show the command in `HELP`. Keep a simple path for the operator while retaining exact geometry in the qualification receipt.
+
+## PD-019: Virtual tape I/O
+
+- Type: improvement
+- Status: Done
+- Target: Hercules virtual 3420 attachments, z/PDOS raw record service and native `TAP:` DD
+- Observation: Inherited `RDTAPE`/`WRTAPE` and old pseudo-dataset names exist, but phase 1 had no mounted tape, no native DD admission and no qualified record/error semantics. The current phase 2 source registers one attached tape read-only by default, reports physical record length/hash/prefix, reads across file marks, writes to a separate explicitly writable image, and admits a matching `TAP:` DD. The inherited `TAV:` path is outside this delivery.
+- Evidence: [phase 2 guest and stopped-tape checks](qualification/PHASE2-2026-10-04.md) and [operator guide](user/MEDIA.md). Short native `TAP:` read and write transfers passed; larger application records remain unqualified.
+- Acceptance: Mount unchanged checked HET and AWS images on a leased guest, read records across file marks with explicit rewind and error/EOF behavior, compare guest observations with host records, and reject wrong/unregistered devices. On a separate writable output image, write records and file marks, stop the guest, export and compare exact records and hashes. Do not claim VMFPLC2 or standard-label interpretation from raw tape transport alone.
 
 ## PD-015: CMS cREXX binary contract
 

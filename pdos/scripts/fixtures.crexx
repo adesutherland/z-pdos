@@ -1,0 +1,186 @@
+/* Checked CMS/TSO tape fixtures on a disposable z/PDOS exchange disk.
+ * prepare ABS_MANIFEST build/pdos/NEW ABS_HERCULES_BIN
+ * inspect ABS_DRAFT.json ABS_NEW_MANIFEST.json ABS_HERCULES_BIN
+ * run SCRIPT_PORT build/pdos/PREPARED build/pdos/NEW_RUN
+ * verify ABS_STOPPED_EXCHANGE.cckd build/pdos/PREPARED build/pdos/NEW_EXPORT ABS_HERCULES_BIN
+ * The operator owns guest leases, media attachment and shutdown. */
+options levelb
+import rxfnsb
+
+main: procedure = .int
+  arg args = .string[]
+  if args.0 < 1 then return usage()
+  mode = args.1
+  if mode = "inspect" then do
+    if args.0 <> 4 then return usage()
+    draft = args.2; pinned = args.3; inspect_hercules = args.4
+    call require left(draft,1) = "/" & left(pinned,1) = "/" & left(inspect_hercules,1) = "/", "absolute draft, output and Hercules paths"
+    address crexx "run test ! -e :pinned"
+    call require rc = 0, "fresh pinned manifest path"
+    call runlog "python3 pdos/scripts/fixture-media.py inspect --draft " || shellquote(draft) || " --out " || shellquote(pinned) || " --hercules " || shellquote(inspect_hercules), pinned || ".inspect.log"
+    say "Pinned checked fixture manifest:" pinned
+    return 0
+  end
+  if mode = "prepare" then do
+    if args.0 <> 4 then return usage()
+    manifest = args.2; prepared = args.3; hercules = args.4
+    call require left(manifest,1) = "/" & left(hercules,1) = "/", "absolute manifest and Hercules paths"
+    call require owned(prepared), "fresh build/pdos/ output path"
+    address crexx "run test ! -e :prepared"
+    call require rc = 0, "output already exists"
+    tools = "dasdload cckd2ckd ckd2cckd vmfplc2"
+    do i = 1 to words(tools)
+      binary = hercules || "/" || word(tools,i)
+      address crexx "run test -x :binary"
+      call require rc = 0, "missing Hercules utility: " || binary
+    end
+    address crexx "run cmake -E make_directory :prepared"
+    call require rc = 0, "create work directory"
+    locations = .string[]
+    address crexx "pwd" output locations
+    root = strip(locations.1)
+    absolute = root || "/" || prepared
+    media = absolute || "/media"
+    call runlog "python3 pdos/scripts/fixture-media.py plan --manifest " || shellquote(manifest) || " --out " || shellquote(media) || " --hercules " || shellquote(hercules), absolute || "/plan.log"
+    call runlog "cd " || shellquote(media) || " && " || shellquote(hercules || "/dasdload") || " -bz2 ctl.txt empty.cckd", absolute || "/dasdload.log"
+    call runlog shellquote(hercules || "/cckd2ckd") || " -q -cyls 100 " || shellquote(media || "/empty.cckd") || " " || shellquote(absolute || "/empty.ckd"), absolute || "/expand.log"
+    call runlog "python3 pdos/scripts/fixture-media.py stage --disk " || shellquote(absolute || "/empty.ckd") || " --lock " || shellquote(media || "/lock.json") || " --media " || shellquote(media) || " --out " || shellquote(absolute || "/staged.ckd"), absolute || "/stage.log"
+    call runlog shellquote(hercules || "/ckd2cckd") || " -q -bz2 -cyls 100 " || shellquote(absolute || "/staged.ckd") || " " || shellquote(absolute || "/exchange.cckd"), absolute || "/compress.log"
+    call runlog shellquote(hercules || "/cckd2ckd") || " -q -cyls 100 " || shellquote(absolute || "/exchange.cckd") || " " || shellquote(absolute || "/readback.ckd"), absolute || "/readback.log"
+    staged = absolute || "/staged.ckd"
+    readback = absolute || "/readback.ckd"
+    call runlog "python3 pdos/scripts/fixture-media.py compare --left " || shellquote(staged) || " --right " || shellquote(readback), absolute || "/compare.log"
+    empty = absolute || "/empty.ckd"
+    empty_cckd = media || "/empty.cckd"
+    address crexx "run cmake -E rm -f :empty :staged :readback :empty_cckd"
+    call require rc = 0, "remove intermediate media"
+    say "Prepared checked exchange disk:" absolute || "/exchange.cckd"
+    say "Attach at 01BA and boot a fresh guest. Then run:"
+    say "crexx -nokeep pdos/scripts/fixtures.crexx --args run SCRIPT_PORT" prepared "build/pdos/NEW_RUN"
+    return 0
+  end
+  if mode = "run" then do
+    if args.0 <> 4 then return usage()
+    port = args.2; run_prepared = args.3; run_result = args.4
+    call require verify(port,"0123456789") = 0 & length(port) <= 5 & length(port) > 0, "numeric script port"
+    call require owned(run_prepared) & owned(run_result), "build/pdos paths"
+    commands = run_prepared || "/media/guest-commands.txt"
+    address crexx "run test -f :commands"
+    call require rc = 0, "prepared guest commands"
+    address crexx "run test ! -e :run_result"
+    call require rc = 0, "fresh run directory"
+    address crexx "run cmake -E make_directory :run_result"
+    call require rc = 0, "create run directory"
+    run_locations = .string[]
+    address crexx "pwd" output run_locations
+    run_absolute = strip(run_locations.1) || "/" || run_result
+    rows = guest_screen(port)
+    prompt_seen = 0
+    do screen_index = 1 to rows.0
+      if pos("PDOS00:\>",rows[screen_index]) > 0 then prompt_seen = 1
+      if pos("PCOMM BEGIN ",rows[screen_index]) > 0 then call require 0, "fresh PCOMM session required"
+    end
+    call require prompt_seen, "booted IPL PCOMM prompt required"
+    call require guest_action(port,"Set(aidWait,false)"), "disable AID wait"
+    trace_path = run_absolute || "/console.trace"
+    call require guest_action(port,"ScreenTrace(On," || trace_path || ")"), "start console trace"
+    command_index = 0
+    do while lines(commands) > 0
+      command = linein(commands)
+      if strip(command) = "" then iterate
+      command_index = command_index + 1
+      call require guest_action(port,'String("' || command || '")'), "enter " || command
+      call require guest_action(port,"Enter()"), "submit " || command
+      marker = "PCOMM END " || command_index || " RC=0"
+      call require guest_await(port,marker,60), "command failed or timed out: " || command
+      say "PASS" command_index command
+    end
+    call lineout commands
+    call require guest_action(port,"ScreenTrace(Off)"), "stop console trace"
+    say "Guest commands passed. Exit PCOMM, stop Hercules, then verify the stopped disk."
+    return 0
+  end
+  if mode = "verify" then do
+    if args.0 <> 5 then return usage()
+    disk = args.2; verify_prepared = args.3; result = args.4; verify_hercules = args.5
+    call require left(disk,1) = "/" & owned(verify_prepared) & owned(result) & left(verify_hercules,1) = "/", "absolute disk/Hercules and build/pdos paths"
+    address crexx "run test -f :disk"
+    call require rc = 0, "stopped exchange disk required"
+    address crexx "run test ! -e :result"
+    call require rc = 0, "fresh export directory required"
+    verify_media = verify_prepared || "/media"
+    lock = verify_media || "/lock.json"
+    address crexx "run test -f :lock"
+    call require rc = 0, "prepared fixture lock"
+    /* The binary CKD interface needs flat CKD, and verify must never
+       edit or open the guest's original image for writing. */
+    expanded = result || ".readback.ckd"
+    baseline = result || ".baseline.ckd"
+    address crexx "run test ! -e :expanded"
+    call require rc = 0, "fresh readback path"
+    address crexx "run test ! -e :baseline"
+    call require rc = 0, "fresh baseline path"
+    call runlog shellquote(verify_hercules || "/cckd2ckd") || " -q -cyls 100 " || shellquote(disk) || " " || shellquote(expanded), result || ".expand.log"
+    prepared_disk = verify_prepared || "/exchange.cckd"
+    call runlog shellquote(verify_hercules || "/cckd2ckd") || " -q -cyls 100 " || shellquote(prepared_disk) || " " || shellquote(baseline), result || ".baseline.log"
+    call runlog "python3 pdos/scripts/fixture-media.py verify --disk " || shellquote(expanded) || " --base " || shellquote(baseline) || " --lock " || shellquote(lock) || " --media " || shellquote(verify_media) || " --out " || shellquote(result), result || ".verify.log"
+    address crexx "run cmake -E rm -f :expanded :baseline"
+    call require rc = 0, "remove flat readback"
+    say "Exact fixture exports:" result || "/receipt.json"
+    return 0
+  end
+  return usage()
+
+guest_action: procedure = .boolean
+  arg port = .string, command = .string
+  rows = .string[]; errors = .string[]
+  address crexx "run x3270if -t :port :command" output rows error errors
+  return rc = 0
+
+guest_screen: procedure = .string[]
+  arg port = .string
+  rows = .string[]; errors = .string[]
+  address crexx "run x3270if -t :port Ascii()" output rows error errors
+  if rc <> 0 then call arraydrop rows
+  return rows
+
+guest_await: procedure = .boolean
+  arg port = .string, marker = .string, seconds = .int
+  started = time("R")
+  do while (time("E") as .float) < seconds
+    rows = guest_screen(port)
+    do i = 1 to rows.0
+      if pos(marker,rows[i]) > 0 then return 1
+    end
+    address crexx "run sleep 0.1"
+  end
+  return 0
+
+owned: procedure = .boolean
+  arg value = .string
+  return left(value,11) = "build/pdos/" & length(value) > 11 & pos("..",value) = 0
+
+runlog: procedure = .int
+  arg command = .string, log = .string
+  address system "( " || command || " ) > " || shellquote(log) || " 2>&1"
+  result = rc
+  if result <> 0 then address crexx "run tail -n 25 :log"
+  call require result = 0, "command failed; see " || log
+  return 0
+
+shellquote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'", value, "'\''") || "'"
+
+require: procedure
+  arg condition = .boolean, message = .string
+  if condition then return
+  say "Fixture error:" message
+  exit 1
+
+usage: procedure = .int
+  say "Usage: fixtures.crexx inspect ABS_DRAFT.json ABS_NEW_MANIFEST.json ABS_HERCULES_BIN"
+  say "Usage: fixtures.crexx prepare ABS_MANIFEST build/pdos/NEW ABS_HERCULES_BIN"
+  say "       fixtures.crexx run SCRIPT_PORT build/pdos/PREPARED build/pdos/NEW_RUN"
+  say "       fixtures.crexx verify ABS_STOPPED_EXCHANGE.cckd build/pdos/PREPARED build/pdos/NEW_EXPORT ABS_HERCULES_BIN"
+  return 2
