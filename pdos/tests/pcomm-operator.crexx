@@ -1,0 +1,63 @@
+/* Host PCOMM contract: continuation, 198-byte batch edge, no truncated run. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 1 then return 2
+  out = args.1
+  address crexx "run cmake -E make_directory :out"
+  if rc <> 0 then return 1
+  program = out || "/pcomm-host"
+  address crexx "run clang -std=c90 -O1 pdos/src/pcomm.c -o :program"
+  if rc <> 0 then return 1
+  batch = out || "/EDGE.BAT"
+  call lineout batch,"printf " || copies("A",191)
+  call lineout batch,"echo MUST_NOT_EXECUTE" || copies("Z",179)
+  call lineout batch,"echo SAFE_AFTER_ERROR"
+  call lineout batch
+  input = out || "/input.txt"
+  call lineout input,"printf " || copies("B",64) || "&"
+  call lineout input,copies("C",64)
+  call lineout input,"echo " || copies("D",70) || "&"
+  call lineout input,copies("E",70) || "&"
+  call lineout input,copies("F",53)
+  call lineout input,"printf " || copies("G",70) || "&"
+  call lineout input,copies("H",70) || "&"
+  call lineout input,copies("I",52)
+  call lineout input,"EDGE"
+  call lineout input,"VERSION"
+  call lineout input,"HELP CMS"
+  call lineout input,"exit"
+  call lineout input
+  output = out || "/console.txt"
+  address system "cd " || shellquote(out) || " && ./pcomm-host < input.txt > console.txt 2>&1"
+  if rc <> 0 then return 1
+  rows = readlines(output)
+  all = ""
+  do i = 1 to rows.0
+    all = all || rows[i] || '0a'x
+  end
+  call require pos("MORE>",all) > 0, "continuation prompt"
+  call require pos(copies("B",64) || copies("C",64),all) > 0, "joined command"
+  call require pos("PCOMM BEGIN 1 printf",all) > 0 & pos("PCOMM END 1 RC=0",all) > 0, "first result markers"
+  call require pos(copies("D",70) || copies("E",70) || copies("F",53),all) > 0, "198-character console command"
+  call require pos("command exceeds 198 characters; not run",all) > 0, "199-character console rejection"
+  call require pos(copies("A",191),all) > 0, "198-character batch command"
+  call require pos("PCOMM BEGIN 2 printf",all) > 0 & pos("PCOMM BEGIN 3",all) = 0, "overlong console not dispatched"
+  call require pos("EDGE.BAT command exceeds 198",all) > 0, "overlong batch diagnostic"
+  call require pos("MUST_NOT_EXECUTE",all) = 0, "overlong prefix not executed"
+  call require pos("SAFE_AFTER_ERROR",all) > 0, "next batch command ran"
+  call require pos("z/PDOS PDIO1",all) > 0, "version"
+  call require pos("CMS MODULE execution is not yet supported",all) > 0, "compatibility help"
+  say "PCOMM host continuation, boundary and operator help passed"
+  return 0
+
+require: procedure
+  arg ok = .boolean, name = .string
+  if ok then return
+  say "PCOMM control failed:" name
+  exit 1
+
+shellquote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'", value, "'\''") || "'"

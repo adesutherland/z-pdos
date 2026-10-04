@@ -14,6 +14,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
+#include <stdlib.h>
 
 static char buf[200];
 static size_t len;
@@ -25,9 +26,14 @@ static int primary = 0;
 static int term = 0;
 static int showrc = 0;
 static int echo = 1;
+static unsigned int commandNumber = 0;
+static int batchDepth = 0;
 
-static void parseArgs(int argc, char **argv);
+static int parseArgs(int argc, char **argv);
 static void readAutoExec(void);
+static int readPhysicalLine(FILE *fp, const char *source);
+static int readConsoleCommand(void);
+static void runBatch(FILE *fp, const char *source);
 static void processInput(void);
 static void putPrompt(void);
 static void dotype(char *file);
@@ -36,7 +42,7 @@ static void dofill(char *p);
 static void mkiplmem(char *p);
 static void domemdump(char *p);
 static void dodir(char *pattern);
-static void dohelp(void);
+static void dohelp(char *topic);
 static void changedir(char *to);
 static void changedisk(int drive);
 static int ins_strcmp(char *one, char *two);
@@ -44,7 +50,7 @@ static int ins_strncmp(char *one, char *two, size_t len);
 
 int main(int argc, char **argv)
 {
-    parseArgs(argc, argv);
+    if (!parseArgs(argc, argv)) return 2;
     if (singleCommand)
     {
         processInput();
@@ -62,17 +68,18 @@ int main(int argc, char **argv)
     while (!term)
     {
         putPrompt();
-        fgets(buf, sizeof buf, stdin);
-
+        if (!readConsoleCommand()) break;
         processInput();
     }
     printf("thankyou for using pcomm!\n");
     return (0);
 }
 
-static void parseArgs(int argc, char **argv)
+static int parseArgs(int argc, char **argv)
 {
     int x;
+    size_t used;
+    size_t part;
     
     if (argc > 1)
     {
@@ -90,19 +97,103 @@ static void parseArgs(int argc, char **argv)
     }
     if (singleCommand)
     {
-        strcpy(buf, "");
+        used = 0;
+        buf[0] = '\0';
         for (x = 2; x < argc; x++)
         {
-            strcat(buf, *(argv + x));
-            strcat(buf, " ");
+            part = strlen(argv[x]);
+            if (used + part + (x > 2 ? 1 : 0) > sizeof buf - 2)
+            {
+                printf("PCOMM: command exceeds 198 characters\n");
+                return 0;
+            }
+            if (x > 2) buf[used++] = ' ';
+            memcpy(buf + used, argv[x], part);
+            used += part;
         }
-        len = strlen(buf);
-        if (len > 0)
-        {
-            buf[len - 1] = '\0';
-        }
+        buf[used] = '\0';
     }
-    return;
+    return 1;
+}
+
+/* A physical batch record must fit whole. Never execute a truncated prefix. */
+static int readPhysicalLine(FILE *fp, const char *source)
+{
+    size_t count;
+    int c;
+
+    if (fgets(buf, sizeof buf, fp) == NULL) return 0;
+    count = strlen(buf);
+    if (count == 0 || buf[count - 1] != '\n' || count > sizeof buf - 1)
+    {
+        while ((c = fgetc(fp)) != EOF && c != '\n') ;
+        printf("PCOMM: %s command exceeds 198 characters or lacks a delimiter\n",
+               source);
+        buf[0] = '\0';
+        return -1;
+    }
+    if (count - 1 > sizeof buf - 2)
+    {
+        printf("PCOMM: %s command exceeds 198 characters\n", source);
+        buf[0] = '\0';
+        return -1;
+    }
+    return 1;
+}
+
+/* The 3270 field is shorter than a PCOMM command. A trailing & joins the
+   next entered fragment without adding or removing whitespace. */
+static int readConsoleCommand(void)
+{
+    char part[sizeof buf];
+    size_t used = 0;
+    size_t count;
+    int more;
+    int c;
+
+    buf[0] = '\0';
+    for (;;)
+    {
+        if (fgets(part, sizeof part, stdin) == NULL) return 0;
+        count = strlen(part);
+        if (count == 0 || part[count - 1] != '\n')
+        {
+            while ((c = fgetc(stdin)) != EOF && c != '\n') ;
+            printf("PCOMM: console fragment too long; command not run\n");
+            buf[0] = '\0';
+            return 1;
+        }
+        count--;
+        more = count != 0 && part[count - 1] == '&';
+        if (more) count--;
+        if (used + count > sizeof buf - 2)
+        {
+            printf("PCOMM: command exceeds 198 characters; not run\n");
+            buf[0] = '\0';
+            return 1;
+        }
+        memcpy(buf + used, part, count);
+        used += count;
+        if (!more)
+        {
+            buf[used++] = '\n';
+            buf[used] = '\0';
+            return 1;
+        }
+        printf("MORE> ");
+        fflush(stdout);
+    }
+}
+
+static void runBatch(FILE *fp, const char *source)
+{
+    int status;
+
+    while ((status = readPhysicalLine(fp, source)) != 0)
+    {
+        if (status > 0) processInput();
+        if (term) break;
+    }
 }
 
 static void readAutoExec(void)
@@ -112,11 +203,7 @@ static void readAutoExec(void)
     fp = fopen("AUTOEXEC.BAT", "r");
     if (fp != NULL)
     {
-        while (fgets(buf, sizeof buf, fp) != NULL)
-        {
-            processInput();
-            if (term) break;
-        }
+        runBatch(fp, "AUTOEXEC.BAT");
         fclose(fp);
     }
     return;
@@ -229,7 +316,19 @@ static void processInput(void)
     }
     else if (ins_strcmp(buf, "help") == 0)
     {
-        dohelp();
+        dohelp(p);
+    }
+    else if (ins_strcmp(buf, "version") == 0)
+    {
+        printf("z/PDOS PDIO1; PCOMM operator interface 1\n");
+        printf("Exact image build: see the host image receipt.\n");
+    }
+    else if (ins_strcmp(buf, "tso") == 0 ||
+             ins_strcmp(buf, "cms") == 0 ||
+             ins_strcmp(buf, "cp") == 0)
+    {
+        printf("%s command environment is not provided by PCOMM.\n", buf);
+        printf("Use HELP TSO or HELP CMS for the supported boundary.\n");
     }
 #if 0
     else if ((strlen(buf) == 2) && (buf[1] == ':'))
@@ -245,11 +344,15 @@ static void processInput(void)
         fp = fopen(fnm, "r");
         if (fp != NULL)
         {
-            while (fgets(buf, sizeof buf, fp) != NULL)
+            if (batchDepth >= 8)
             {
-                /* recursive call */
-                processInput();
-                if (term) break;
+                printf("PCOMM: nested batch limit reached: %s\n", fnm);
+            }
+            else
+            {
+                batchDepth++;
+                runBatch(fp, fnm);
+                batchDepth--;
             }
             fclose(fp);
             return;
@@ -262,7 +365,10 @@ static void processInput(void)
             *p = ' ';
         }
         /* printf("pcomm is calling %s\n", buf); */
+        commandNumber++;
+        printf("PCOMM BEGIN %u %s\n", commandNumber, buf);
         rc = system(buf);
+        printf("PCOMM END %u RC=%d\n", commandNumber, rc);
         if (showrc)
         {
             printf("rc from program is %d\n", rc);
@@ -502,28 +608,34 @@ static void dodir(char *pattern)
     return;
 }
 
-static void dohelp(void)
+static void dohelp(char *topic)
 {
-    printf("The following commands are available:\n\n");
-    printf("HELP - display this help\n");
-    printf("TYPE - display contents of a file\n");
-    printf("DUMPBLK - dump a block on disk\n");
-    printf("ZAPBLK - zap a block on disk\n");
-    printf("NEWBLK - create a block on disk\n");
-    printf("RAMDISK - create a ramdisk (but lose IPL disk)\n");
-    printf("DIR - display directory\n");
-    printf("SHOWRC - display return code from programs\n");
-    printf("EXIT - exit operating system\n");
-    printf("ECHO - display provided text\n");
-    printf("COPY - copy a file\n");
-    printf("FILL - create a file with NULs\n");
-    printf("DISKINIT - initialize a disk (3390-1)\n");
-    printf("FIL2DSK - restore a file to disk\n");
-    printf("DSK2FIL - dump a disk to a file\n");
-    printf("MKIPLMEM - make a pdos.img suitable for direct memory load\n");
-    printf("MEMDUMP - display memory\n");
-    printf("MEMTEST - test writing to memory either side of 2 GiB\n");
-    printf("anything else will be assumed to be a .EXE program\n");
+    if (ins_strcmp(topic, "TSO") == 0 || ins_strcmp(topic, "CMS") == 0 ||
+        ins_strcmp(topic, "CP") == 0)
+    {
+        printf("PCOMM is z/PDOS, not a TSO, CMS or CP command environment.\n");
+        printf("Native TSO-style load modules may run when their mode and\n");
+        printf("services are supported. CMS MODULE execution is not yet supported.\n");
+        printf("Datasets are shown with DIR; host tools prepare and check disks.\n");
+        return;
+    }
+    if (ins_strcmp(topic, "ADVANCED") == 0)
+    {
+        printf("TYPE/COPY/FILL access files. CD and REBOOT are placeholders.\n");
+        printf("DUMPBLK, ZAPBLK, NEWBLK, DISKINIT, FIL2DSK, DSK2FIL,\n");
+        printf("RAMDISK, MKIPLMEM, MEMDUMP and MEMTEST are development tools.\n");
+        printf("Use them only on a disposable disk; see the operator guide.\n");
+        return;
+    }
+    printf("z/PDOS PCOMM: first steps\n");
+    printf("VERSION  show interface and build-identity location\n");
+    printf("DIR      list datasets, dates, formats and extents\n");
+    printf("NAME     run installed NAME.EXE or NAME.BAT\n");
+    printf("SHOWRC   toggle extra return-code display\n");
+    printf("EXIT     end PCOMM (not a restart)\n");
+    printf("Long command: end each field fragment with &; MORE> asks for next.\n");
+    printf("Each external run prints PCOMM BEGIN and PCOMM END with its RC.\n");
+    printf("HELP TSO, HELP CMS: compatibility boundary. HELP ADVANCED: tools.\n");
     return;
 }
 

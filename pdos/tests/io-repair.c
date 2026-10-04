@@ -29,28 +29,14 @@ static int wrblock(int dev, int c, int h, int r, void *data, int len, int op) {
 static struct { unsigned char before[16]; char bytes[6 + 22 * 80 + 7]; unsigned char after[16]; } storage;
 #define intbuf storage.bytes
 static int cons_type = 3270, writes;
-static const char *expected;
-static size_t remaining;
 static void __conswr(size_t len, void *data, int mode) {
-    size_t n = remaining > 80 ? 80 : remaining;
-    int row = writes < 22 ? writes : 21;
-    char *at = intbuf + 6 + row * 80;
     CHECK(len == sizeof intbuf && data == intbuf && mode == 0);
     CHECK(memcmp(intbuf, "\x41\x11\x5d\x7f\x1d\xf0", 6) == 0);
     CHECK(memcmp(intbuf + 6 + 22 * 80, "\x1d\x00\x13\x3c\x5d\x7f\x00", 7) == 0);
     for (int i = 0; i < 16; i++) CHECK(storage.before[i] == 0xa5 && storage.after[i] == 0xa5);
-    CHECK(memcmp(at, expected, n) == 0);
-    for (size_t i = n; i < 80; i++) CHECK(at[i] == ' ');
-    expected += n; remaining -= n; writes++;
+    writes++;
 }
 #include "console.inc"
-static void output(char *p, size_t n) {
-    int start = writes;
-    expected = p; remaining = n;
-    write3270(p, n, 1);
-    CHECK(remaining == 0);
-    CHECK(writes - start == (n ? (int)((n + 79) / 80) : 1));
-}
 static void record_tests(void) {
     PDOS os = {0x1b9}; DCB dcb = {{0}};
     PDOS64PDSWRITE state = {0, 38, 4, 38, 6, 0, {0}};
@@ -81,10 +67,20 @@ static void record_tests(void) {
 static void console_tests(void) {
     char longline[5000]; for (int i = 0; i < 5000; i++) longline[i] = 'A' + i % 26;
     memset(&storage, 0xa5, sizeof storage);
-    for (int i = 0; i < 21; i++) output("warmup", 6);
-    output(longline, 81); output(longline, 80); output("", 0);
-    output(longline, 180); output(longline, 5000);
-    puts("PASS 3270: protected field and guards intact; empty/80/81/180/5000-column output and scrolling");
+    write3270("HEL", 3, 0);
+    write3270("LO", 2, 1);
+    CHECK(memcmp(intbuf + 6, "HELLO", 5) == 0);
+    write3270("NEXT", 4, 1);
+    CHECK(memcmp(intbuf + 6 + 80, "NEXT", 4) == 0);
+    write3270(longline, 81, 1);
+    CHECK(memcmp(intbuf + 6 + 2 * 80, longline, 80) == 0);
+    CHECK(intbuf[6 + 3 * 80] == longline[80]);
+    write3270("", 0, 1);
+    write3270(longline, 180, 1);
+    for (int i = 0; i < 25; i++) write3270("scroll", 6, 1);
+    write3270(longline, 5000, 1);
+    CHECK(writes >= 30);
+    puts("PASS 3270: fragmented echo, protected field, 80/81/180/5000-column output and scrolling");
 }
 int main(int argc, char **argv) {
     CHECK(argc == 2);

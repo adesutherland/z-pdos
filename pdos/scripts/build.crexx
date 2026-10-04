@@ -73,6 +73,9 @@ main: procedure = .int
         else call require rc = 0, "repaired " || check || " passes ASAN/UBSAN"
       end
     end
+    pcomm_work = out || "/pcomm-operator"
+    address crexx "run crexx -nokeep pdos/tests/pcomm-operator.crexx --args :pcomm_work"
+    call require rc = 0, "PCOMM operator contract"
     say "Current OS/runtime source identities recorded; old fault controls fail; repaired functions pass ASAN/UBSAN."
     return 0
   end
@@ -121,7 +124,7 @@ extract: procedure = .int
   do i = 1 to lines.0
     if pos("static int pdos64PdsRecord(P",lines[i]) = 1 then active = 1
     if pos("static int pdos64PdsCloseWrite",lines[i]) = 1 then active = 0
-    if lines[i] = "static void write3270(char *buf, size_t lenbuf, int cr)" then active = 2
+    if lines[i] = "static void next3270Line(int *row, int *column)" then active = 2
     if lines[i] = "static int cprintf(char *format, ...)" then active = 0
     if active = 1 then do
       call lineout record,lines[i]

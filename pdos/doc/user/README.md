@@ -46,8 +46,12 @@ it is not a claim that every newly generated image has been booted.
 
 ## At the PCOMM prompt
 
-PCOMM is the command processor. Begin with `HELP` to see the commands and
-`DIR` to inspect datasets. `SHOWRC` toggles display of command return codes.
+PCOMM is the command processor. Begin with `HELP` for the first-run route,
+`VERSION` for its interface and build-receipt location, and `DIR` to inspect
+datasets, creation dates, record formats and extents. `HELP TSO` and `HELP CMS`
+explain the command and binary compatibility boundary. `SHOWRC` toggles an
+extra display of command return codes; every external command also prints
+numbered `PCOMM BEGIN` and `PCOMM END ... RC=` lines.
 Commands for editing raw blocks or initializing disks are development tools
 and can change the disk; use only your working copy.
 
@@ -57,12 +61,17 @@ datasets. The current `CD` handler does not implement directory changes, and
 the kernel terminate; it is not a restart command.
 
 PCOMM looks for a named `.BAT` file before forwarding an external command to
-the kernel. Startup may report an absent `AUTOEXEC.BAT`. These expected probes
-and genuine failures are not yet presented as clearly as they should be.
-Console commands are limited to 80 columns; batch processing uses a 200-byte
-buffer with at most 198 characters before the delimiter. Native batch text
-uses EBCDIC with hex `15` newlines, not a host UTF-8 file copied unchanged.
-The [backlog](../BACKLOG.md) records these operator limitations.
+the kernel. The current source hides expected missing `AUTOEXEC.BAT` and
+`NAME.BAT` probes, while retaining failures for present invalid datasets.
+The 3270 entry field is shorter than a full PCOMM command. End a field entry
+with `&`, press Enter, and enter the next fragment at `MORE>`; PCOMM joins the
+fragments without inserting a space. You can repeat this up to 198 target
+characters. End at most 79 characters per field with `&` included. An overlong
+command is rejected before dispatch. Native batch lines have the same
+198-character limit and use IBM1047 bytes with hex `15` line delimiters, not
+a host UTF-8 file copied unchanged. Long output scrolls above a stable prompt
+and editable input line; use a complete 3270 ScreenTrace when exact output
+matters.
 
 ## Running applications
 
@@ -74,8 +83,11 @@ and a separate high-resident body. AMODE24 applications are currently rejected.
 Use the application's exact packaging and installation instructions; an XMIT
 transport or ELF object is not directly executable by the z/PDOS loader.
 Application installation must preserve dataset structure and load bytes, and
-offline disk updates require the guest to be stopped. The base image does not
-provide a general package manager. The
+offline disk updates require the guest to be stopped. The
+[conformance candidate guide](CONFORMANCE.md) gives the current source's
+checked installer and script runner for this bounded disk profile. The
+published 0.1.0 image predates those changes. The base image has no general
+package manager. The
 [qualification record](../qualification/QUALIFICATION.md) describes the actual
 cREXX workloads, storage budgets, file results and skips.
 

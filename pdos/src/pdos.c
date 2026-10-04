@@ -3907,6 +3907,7 @@ static void pdos64SVC99(PDOS *pdos, SVC99RB *rb)
     SVC99TU *return_dd = NULL;
     int have_dd = 0, have_dsn = 0, disposition = 0;
     int i, rc;
+    int expected_probe = 0;
     static unsigned int next_dd = 1;
 
     memset(ddname, ' ', sizeof ddname);
@@ -3950,7 +3951,14 @@ static void pdos64SVC99(PDOS *pdos, SVC99RB *rb)
         goto fail;
     if (rb->verb == 2 && have_dd)
     {
-        if (!pdos64FreeDd(tiot, (char *)ddname)) goto fail;
+        if (!pdos64FreeDd(tiot, (char *)ddname))
+        {
+            /* PDPCLIB closes its transient PCOMM DD before each OPEN.
+               An unbound slot at this point is normal cleanup. */
+            if (memcmp(ddname, "PDP000HD", 8) == 0)
+                expected_probe = 1;
+            goto fail;
+        }
         goto success;
     }
     if (rb->verb != 1 || !have_dsn || disposition != 8)
@@ -3971,7 +3979,17 @@ static void pdos64SVC99(PDOS *pdos, SVC99RB *rb)
     if (!have_dd || pdos64DdSlot(tiot, (char *)ddname) >= 0)
         goto fail;
     rc = pdos64BindDd(pdos, tiot, (char *)ddname, dsn);
-    if (rc != 1) goto fail;
+    if (rc != 1)
+    {
+        size_t n = strlen(dsn);
+        int cyl, head, rec;
+        /* PCOMM tests NAME.BAT before trying the executable. Hide only
+           the missing-name probe; a present but invalid dataset still logs. */
+        if (rc == 0 && n >= 4 && strcmp(dsn + n - 4, ".BAT") == 0
+            && findFile(pdos->ipldev, dsn, &cyl, &head, &rec) != 0)
+            expected_probe = 1;
+        goto fail;
+    }
     if (return_dd != NULL) memcpy(return_dd->parm1, ddname, 8);
 success:
     printf("P64 S99 OK verb=%d dd=%.8s dsn=%s disp=%d count=%d\n",
@@ -3980,8 +3998,9 @@ success:
     pdos->context->regs[0] = 0;
     return;
 fail:
-    printf("P64 S99 FAIL verb=%d dd=%.8s dsn=%s disp=%d count=%d\n",
-           rb->verb, ddname, dsn, disposition, tiot->count);
+    if (!expected_probe)
+        printf("P64 S99 FAIL verb=%d dd=%.8s dsn=%s disp=%d count=%d\n",
+               rb->verb, ddname, dsn, disposition, tiot->count);
     rb->error_reason = 12;
     pdos->context->regs[15] = 12;
     pdos->context->regs[0] = 12;
@@ -5610,6 +5629,10 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
     int cyl;
     int head;
     int rec;
+    int endcyl = -1;
+    int endhead = -1;
+    int diskbound = 0;
+    int eofseen = 0;
     int i;
     int j;
     char tbuf[MAXBLKSZ];
@@ -5701,6 +5724,22 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
         printf("executable %s not found!\n", srchprog);
         return (-1);
     }
+    if (dscb1.ds1noepv != 1)
+    {
+        printf("unsupported executable extent count\n");
+        return (-1);
+    }
+    endcyl = ((unsigned char)dscb1.endcchh[0] << 8)
+        | (unsigned char)dscb1.endcchh[1];
+    endhead = ((unsigned char)dscb1.endcchh[2] << 8)
+        | (unsigned char)dscb1.endcchh[3];
+    if (head >= 15 || endhead >= 15 || cyl > endcyl
+        || (cyl == endcyl && head > endhead))
+    {
+        printf("invalid executable extent\n");
+        return (-1);
+    }
+    diskbound = 1;
     cnt = rdblock(pdos->ipldev, cyl, head, rec, tbuf, MAXBLKSZ, 0x0e);
     }
     else if (!__ismem)
@@ -5770,10 +5809,7 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
         cnt = 0;
     }
     }
-    /* Note that we read until we get EOF (a zero-length block). */
-    /* +++ note that we need a security check in here to ensure
-       that people don't leave out an EOF to read the next guy's
-       data - use the endcchh */
+    /* A disk load must find EOF inside its declared first extent. */
     while (cnt != 0)
     {
 #if DSKDEBUG
@@ -5782,6 +5818,17 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
 #endif
         if (!first || (!__istape && !__iscard))
         {
+        if (diskbound && (cyl > endcyl
+                          || (cyl == endcyl && i > endhead)))
+        {
+            printf("executable has no EOF inside its extent\n");
+#if defined(ZARCH)
+            memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem, raw);
+#else
+            memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.btlmem, raw);
+#endif
+            return (-1);
+        }
         cnt = rdblock(pdos->ipldev, cyl, i, j, tbuf, MAXBLKSZ, 0x0e);
         }
         else
@@ -5821,6 +5868,7 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
             continue;
         }
         lastcnt = cnt;
+        if (cnt == 0) eofseen = 1;
         if (cnt > 0 && (load - initial) > EXE_CAPACITY - cnt)
         {
             printf("executable exceeds loader capacity\n");
@@ -5839,6 +5887,17 @@ static int pdosLoadExe(PDOS *pdos, char *prog, char *parm)
         if (__istape && (cnt != 18452)) break;
         if (__iscard && ((load - initial) >= imgsize)) break;
         }
+    }
+
+    if (diskbound && !eofseen)
+    {
+        printf("executable has no EOF inside its extent\n");
+#if defined(ZARCH)
+        memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem, raw);
+#else
+        memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.btlmem, raw);
+#endif
+        return (-1);
     }
 
     exeLen = load - initial;    
@@ -6063,11 +6122,25 @@ static void join_cchhr(char *cchhr, int cyl, int head, int rec)
     return;
 }
 
+static void next3270Line(int *row, int *column)
+{
+    *column = 0;
+    (*row)++;
+    if (*row == 22)
+    {
+        memmove(intbuf + 6, intbuf + 6 + 80, 21 * 80);
+        memset(intbuf + 6 + 21 * 80, ' ', 80);
+        *row = 21;
+    }
+}
+
 static void write3270(char *buf, size_t lenbuf, int cr)
 {
     static int first = 1;
-    static int lineupto = 0;
+    static int row = 0;
+    static int column = 0;
     static char *hex = "0123456789ABCDEF";
+    size_t x;
 
     if (first)
     {
@@ -6104,22 +6177,17 @@ static void write3270(char *buf, size_t lenbuf, int cr)
         }
         first = 0;
     }
-    /* Keep output within the protected rows, before the input field. */
-    do
+    /* Console writes may arrive one character at a time. Keep the current
+       row until a real newline or 80 printed columns, and never enter the
+       editable field on row 22. */
+    for (x = 0; x < lenbuf; x++)
     {
-        size_t part = lenbuf > 80 ? 80 : lenbuf;
-        memset(intbuf + 6 + lineupto * 80, ' ', 80);
-        memcpy(intbuf + 6 + lineupto * 80, buf, part);
-        __conswr(sizeof intbuf, intbuf, 0);
-        lineupto++;
-        if (lineupto == 22)
-        {
-            lineupto--;
-            memmove(intbuf + 6, intbuf + 6 + 80, lineupto * 80);
-        }
-        buf += part;
-        lenbuf -= part;
-    } while (lenbuf != 0);
+        if (column == 80) next3270Line(&row, &column);
+        intbuf[6 + row * 80 + column] = buf[x];
+        column++;
+    }
+    if (cr) next3270Line(&row, &column);
+    if (lenbuf != 0 || cr) __conswr(sizeof intbuf, intbuf, 0);
 }
 
 static int cprintf(char *format, ...)

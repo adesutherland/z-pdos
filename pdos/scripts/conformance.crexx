@@ -1,0 +1,182 @@
+/* Build a disposable native-program disk, or judge one leased 3270 run.
+ * prepare BASE.cckd MANIFEST.json NEW_BUILD_DIR HERCULES_BIN
+ * run SCRIPT_PORT PREPARED_DIR NEW_RESULT_DIR
+ * Run from the repository root. Never replaces or starts a guest. */
+options levelb
+import rxfnsb
+
+main: procedure = .int expose port
+  arg args = .string[]
+  if args.0 = 0 then return usage()
+  mode = args.1
+  if mode = "prepare" then do
+    if args.0 <> 5 then return usage()
+    base = args.2; manifest = args.3; out = args.4; hercules = args.5
+    call require left(base,1) = "/" & left(manifest,1) = "/", "absolute base and manifest"
+    call require left(hercules,1) = "/", "absolute Hercules utilities directory"
+    call require left(out,11) = "build/pdos/" & length(out) > 11 & pos("..",out) = 0, "owned build/pdos output"
+    address crexx "run test ! -e :out"
+    call require rc = 0, "fresh output directory required"
+    do i = 1 to 3
+      tool = hercules || "/" || word("dasdload cckd2ckd ckd2cckd",i)
+      address crexx "run test -x :tool"
+      call require rc = 0, "missing Hercules utility: " || tool
+    end
+    locations = .string[]
+    address crexx "pwd" output locations
+    root = strip(locations.1)
+    absolute = root || "/" || out
+    address crexx "run cmake -E make_directory :absolute"
+    call require rc = 0, "create output"
+    flat = absolute || "/base.ckd"
+    call runlog shellquote(hercules || "/cckd2ckd") || " -q -cyls 100 " || shellquote(base) || " " || shellquote(flat), absolute || "/base-convert.log"
+    media = absolute || "/media"
+    call runlog "python3 pdos/scripts/conformance-media.py prepare --base " || shellquote(flat) || " --manifest " || shellquote(manifest) || " --out " || shellquote(media), absolute || "/prepare.log"
+    call runlog "cd " || shellquote(media) || " && " || shellquote(hercules || "/dasdload") || " -bz2 ctl.txt datasets.cckd", absolute || "/dasdload.log"
+    call runlog shellquote(hercules || "/cckd2ckd") || " -q -cyls 100 " || shellquote(media || "/datasets.cckd") || " " || shellquote(absolute || "/datasets.ckd"), absolute || "/datasets-convert.log"
+    installer = absolute || "/install-ipl"
+    address crexx "run clang -std=c90 -O2 pdos/src/install-ipl.c -o :installer"
+    call require rc = 0, "build IPL installer"
+    call runlog shellquote(installer) || " " || shellquote(absolute || "/datasets.ckd") || " " || shellquote(absolute || "/boot.ckd") || " " || shellquote(media || "/pload.sys") || " " || shellquote(media || "/pdos.sys") || " " || shellquote(media || "/pcomm.exe") || " " || shellquote(media || "/config.sys"), absolute || "/ipl.log"
+    call runlog "python3 pdos/scripts/conformance-media.py patch-batch --disk " || shellquote(absolute || "/boot.ckd") || " --batch " || shellquote(media || "/conform.raw") || " --lock " || shellquote(media || "/manifest.lock.json") || " --media " || shellquote(media) || " --out " || shellquote(absolute || "/candidate.ckd"), absolute || "/batch.log"
+    candidate = absolute || "/candidate.cckd"
+    call runlog shellquote(hercules || "/ckd2cckd") || " -q -bz2 -cyls 100 " || shellquote(absolute || "/candidate.ckd") || " " || shellquote(candidate), absolute || "/compress.log"
+    readback = absolute || "/readback.ckd"
+    call runlog shellquote(hercules || "/cckd2ckd") || " -q -cyls 100 " || shellquote(candidate) || " " || shellquote(readback), absolute || "/readback-convert.log"
+    call runlog "python3 pdos/scripts/conformance-media.py verify --disk " || shellquote(readback) || " --lock " || shellquote(media || "/manifest.lock.json") || " --media " || shellquote(media), absolute || "/verify.log"
+    call runlog "shasum -a 256 " || shellquote(base) || " " || shellquote(manifest) || " " || shellquote(candidate) || " " || shellquote(readback) || " " || shellquote(media || "/conform.raw") || " " || shellquote("pdos/scripts/conformance.crexx") || " " || shellquote("pdos/scripts/conformance-media.py"), absolute || "/inputs-outputs.sha256"
+    temporary = .string[]
+    temporary[1] = flat; temporary[2] = absolute || "/datasets.ckd"
+    temporary[3] = absolute || "/boot.ckd"; temporary[4] = absolute || "/candidate.ckd"
+    temporary[5] = readback; temporary[6] = media || "/datasets.cckd"
+    do clean_index = 1 to 6
+      disposable = temporary[clean_index]
+      address crexx "run cmake -E rm -f :disposable"
+      call require rc = 0, "remove verified temporary disk"
+    end
+    say "Prepared and read back candidate:" candidate
+    say "Boot only through your guest operator procedure. Then run:"
+    say "crexx -nokeep pdos/scripts/conformance.crexx --args run SCRIPT_PORT" out "NEW_RESULT_DIR"
+    return 0
+  end
+  if mode = "run" then do
+    if args.0 <> 4 then return usage()
+    port = args.2; prepared = args.3; result = args.4
+    call require verify(port,"0123456789") = 0 & length(port) <= 5 & length(port) > 0, "numeric script port"
+    call require left(prepared,11) = "build/pdos/" & pos("..",prepared) = 0, "prepared directory"
+    call require left(result,11) = "build/pdos/" & pos("..",result) = 0, "result directory"
+    lock = prepared || "/media/manifest.lock.json"
+    address crexx "run test -f :lock"
+    call require rc = 0, "prepared manifest lock"
+    address crexx "run test ! -e :result"
+    call require rc = 0, "fresh result directory"
+    locations = .string[]
+    address crexx "pwd" output locations
+    run_root = strip(locations.1)
+    run_absolute = run_root || "/" || result
+    address crexx "run cmake -E make_directory :run_absolute"
+    call require rc = 0, "create result"
+    trace_path = run_absolute || "/console.trace"
+    marker_file = prepared || "/media/completion-marker.txt"
+    marker = strip(linein(marker_file))
+    call lineout marker_file
+    if ready() = 0 then return 1
+    previous = screen()
+    prompt_seen = 0
+    do screen_row = 1 to previous.0
+      if pos("PDOS00:",previous[screen_row]) > 0 then prompt_seen = 1
+      if pos("PCOMM BEGIN ",previous[screen_row]) > 0 | pos("PCOMM END ",previous[screen_row]) > 0 | pos(marker,previous[screen_row]) > 0 then do
+        say "Conformance needs a freshly booted candidate and unused PCOMM session."
+        return 1
+      end
+    end
+    if prompt_seen = 0 then return 1
+    phrases = prepared || "/media/expected-output.txt"
+    do while lines(phrases) > 0
+      phrase = linein(phrases)
+      do phrase_row = 1 to previous.0
+        if pos(phrase,previous[phrase_row]) > 0 then do
+          say "Expected output is already on the screen; use a fresh boot."
+          return 1
+        end
+      end
+    end
+    call lineout phrases
+    if action("Set(aidWait,false)") <> 0 then return 1
+    if action("ScreenTrace(On," || trace_path || ")") <> 0 then return 1
+    if action('String("CONFORM")') <> 0 then return 1
+    if action("Enter()") <> 0 then return 1
+    plan = prepared || "/media/response-plan.tsv"
+    do while lines(plan) > 0
+      line = linein(plan)
+      separator = pos('09'x,line)
+      if separator = 0 then return 1
+      prompt = left(line,separator-1); answer = substr(line,separator+1)
+      if await_text(prompt,180) <> 0 then return 1
+      if answer <> "" then if action('String("' || answer || '")') <> 0 then return 1
+      if action("Enter()") <> 0 then return 1
+    end
+    call lineout plan
+    if await_text(marker,300) <> 0 then return 1
+    if await_text("PDOS00:",30) <> 0 then return 1
+    if action("ScreenTrace(Off)") <> 0 then return 1
+    receipt = run_absolute || "/result.json"
+    call runlog "python3 pdos/scripts/conformance-media.py evaluate --lock " || shellquote(lock) || " --trace " || shellquote(trace_path) || " --out " || shellquote(receipt), run_absolute || "/judge.log"
+    say "Conformance receipt:" receipt
+    return 0
+  end
+  return usage()
+
+action: procedure = .int expose port
+  arg value = .string
+  rows = .string[]; errors = .string[]
+  address crexx "run x3270if -t :port :value" output rows error errors
+  return rc
+
+screen: procedure = .string[] expose port
+  rows = .string[]; errors = .string[]
+  address crexx "run x3270if -t :port Ascii()" output rows error errors
+  if rc <> 0 then call arraydrop rows
+  return rows
+
+ready: procedure = .boolean expose port
+  rows = .string[]; errors = .string[]
+  address crexx "run x3270if -t :port Query(KeyboardLock)" output rows error errors
+  if rc <> 0 | rows.0 <> 1 then return 0
+  return strip(rows.1) = "false"
+
+await_text: procedure = .int
+  arg marker = .string, seconds = .int
+  started = time("R")
+  do while (time("E") as .float) < seconds
+    rows = screen()
+    do i = 1 to rows.0
+      if pos(marker,rows[i]) > 0 then if ready() then return 0
+    end
+    address crexx "run sleep 0.1"
+  end
+  say "Console timeout waiting for:" marker
+  return 1
+
+runlog: procedure = .int
+  arg command = .string, log = .string
+  address system "( " || command || " ) > " || shellquote(log) || " 2>&1"
+  result = rc
+  if result <> 0 then address crexx "run tail -n 30 :log"
+  call require result = 0, "command failed; see " || log
+  return 0
+
+shellquote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'", value, "'\''") || "'"
+
+require: procedure
+  arg condition = .boolean, message = .string
+  if condition then return
+  say "Conformance error:" message
+  exit 1
+
+usage: procedure = .int
+  say "Usage: conformance.crexx prepare ABS_BASE.cckd ABS_MANIFEST.json build/pdos/NEW ABS_HERCULES_BIN"
+  say "   or: conformance.crexx run SCRIPT_PORT build/pdos/PREPARED build/pdos/NEW_RESULT"
+  return 2
