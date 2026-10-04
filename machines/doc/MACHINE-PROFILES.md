@@ -1,14 +1,18 @@
 # Shared machine-profile direction
 
-1 October 2026. I want Mainframe Classic Tools and the Mainframe ELF SDK to
+This is the shared-selector design recorded on 1 October 2026. For the
+current distinction between machine, ABI, load mode and service selections,
+start with [Profiles and interfaces](../../doc/PROFILES.md).
+
+I want Mainframe Classic Tools and the Mainframe ELF SDK to
 use the same names and hardware instruction ceilings for the same machine
 profiles. A shared machine name does not imply a shared object format, ABI,
 character model or runtime. Those are explicit tool-family contracts.
 
 This table is aligned to Mainframe ELF SDK revision
 `5bb30294a4d420c16cfbb141e08db25496e6a659`, its `toolchain/profiles/` records
-and `tools/s370_check.c` / `tools/audit_s370.crexx`. The local SDK checkout is
-`/Users/adrian/CLionProjects/mainframe-cross-sdk`. The
+and its then-current `tools/s370_check.c` / `tools/audit_s370.crexx`. Those
+paths describe the pinned revision, not the SDK's later source layout. The
 [SDK repository](https://github.com/adesutherland/mainframe-elf-sdk) owns
 its maintained definitions. Reconcile changes against the pinned definitions
 before enabling a Classic selector.

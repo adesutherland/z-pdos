@@ -1,18 +1,29 @@
-# z/PDOS 0.1
+# z/PDOS
 
-Paul Edwards created PDOS. We maintain z/PDOS as a descendant of his mainframe implementation, preserving the inherited public-domain notices and attribution while maintaining our repairs directly in source.
+z/PDOS is a small mainframe operating system descended from Paul Edwards's
+PDOS. It boots from a freshly built 3390 disk and supplies the selected
+MVS-style services needed to run native applications. The base system consists
+of PLOAD, the kernel and PCOMM command processor.
 
-The recorded 0.1 fresh image boots and runs unchanged cREXX TSO31, TSO64 ANY and TSO64 HIGH packages. AMODE24 loading remains a known limitation. New build evidence and that exact guest qualification are distinct.
+The current kernel is written in **32-bit C and runs in AMODE31**. Assembler
+support lets it preserve and dispatch 64-bit application state, with fixed
+high-memory windows for the qualified workloads. It has one address space and
+synchronous application execution. A native 64-bit C kernel is a separate goal.
 
-`src/` is the single maintained implementation. `tests/` owns its checks;
-`scripts/` owns build recipes, run from the repository root. The optional
-`archive/` is frozen reference material and is excluded from normal builds
-and required tests. Source changes are ordinary Git changes without patch stacks.
+The recorded source-built milestone runs unchanged cREXX TSO31, TSO64 ANY and
+TSO64 HIGH packages, including compiler, assembler, terminal and file workloads.
+AMODE24 loading and broader service compatibility remain open. The downloadable
+0.1.0 image has its own host-build evidence, distinct from that guest run.
 
-- [Build and user guide](doc/user/README.md)
-- [Architecture](doc/architecture/README.md)
-- [Upstream and contributors](UPSTREAM.md)
-- [Licence scope](LICENSE)
-- [Documentation index](doc/README.md)
-- [Agent guidance](AGENTS.md)
-- [Backlog and known issues](doc/BACKLOG.md)
+- [Boot the image or build your own](doc/user/README.md)
+- [Architecture: boot, execution, memory, loading and services](doc/architecture/README.md)
+- [Development and source map](doc/development/README.md)
+- [Exact guest qualification](doc/qualification/QUALIFICATION.md)
+- [Known issues and next steps](doc/BACKLOG.md)
+- [Origins and contributors](UPSTREAM.md), [licence](LICENSE), [agent rules](AGENTS.md)
+
+The maintained code is in `src/`. The shared C library and native runtime are
+owned by [PDPCLIB](../pdpclib/README.md); this component does not keep another
+runtime copy. Build recipes select `pdos-zarch` explicitly and use the
+maintained Classic tools. Optional frozen `archive/` material is reference
+only and is excluded from normal builds.

@@ -1,18 +1,34 @@
 # Mainframe Classic C
 
-Our maintained GCC 3.4.6/i370/cc370 compiler, command `mf-classic-cc`, retaining GCC terms, Jan Stein, Dave Pitts, Linas Vepstas, Paul Edwards and other contributors, and Mike Beer's recorded repairs.
+Classic C is the maintained GCC 3.4.6/i370/cc370 C cross-compiler. Its MVS
+launcher is `mf-classic-cc`; its CMS launcher is `mf-classic-cc-cms`. They run
+on the host computer and produce mainframe assembler text for the next stage.
 
-MVS and CMS native host code-generation checks pass. The selected z/PDOS workload builds through the Classic route. The current launcher supports compile-to-text and rejects unsupported driver operations; named machine-profile selectors remain unqualified.
+The compiler preserves the work of Jan Stein, Dave Pitts, Linas Vepstas,
+Paul Edwards and other GCC/cc370 contributors, including Mike Beer's recorded
+repairs. Inherited source and derived changes retain their GNU GPL and other
+file-level terms; the original launcher and integration have their own stated
+MIT scope.
 
-`src/` is the single maintained implementation. `tests/` owns its checks;
-`scripts/` owns build recipes, run from the repository root. The optional
-`archive/` is frozen reference material and is excluded from normal builds
-and required tests. Source changes are ordinary Git changes without patch stacks.
+Both variants use 32-bit `int`, `long` and pointers, unsigned plain `char`,
+EBCDIC characters and the inherited PDPCLIB macro calling convention. This
+compiler does not generate a native LP64 C kernel. Its data model also differs
+from the modern [ELF SDK](https://github.com/adesutherland/mainframe-elf-sdk)
+application route.
 
-- [Build and user guide](doc/user/README.md)
-- [Architecture](doc/architecture/README.md)
-- [Upstream and contributors](UPSTREAM.md)
-- [Licence scope](LICENSE)
-- [Documentation index](doc/README.md)
-- [Agent guidance](AGENTS.md)
-- [Backlog and known issues](doc/BACKLOG.md)
+The launcher supports `-S`, `-E`, `-fsyntax-only` and compiler queries. It
+rejects object generation, implicit assembly/linking and unqualified named
+profile requests. Target headers and runtime are explicit inputs. MVS and CMS
+host code-generation checks pass; the selected MVS route builds z/PDOS. That
+does not establish a complete Classic CMS application/runtime port.
+
+- [User guide](doc/user/README.md)
+- [Architecture and interfaces](doc/architecture/README.md)
+- [Development](doc/development/README.md)
+- [Known issues and next steps](doc/BACKLOG.md)
+- [Origins and contributors](UPSTREAM.md), [licence](LICENSE), [agent rules](AGENTS.md)
+
+`src/` is the maintained implementation; `scripts/` contains recipes run from
+the repository root. Generated output belongs under ignored root `build/`.
+Optional frozen `archive/` material is reference only and is excluded from
+normal builds. Each component has one backlog and records its own evidence.

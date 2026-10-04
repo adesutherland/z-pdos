@@ -101,8 +101,11 @@ Unused template bytes are zero, and DDNAME is space-padded. Pointer words
 receive ordinary four-byte fixups; the image gate must verify their required
 24-bit placement. Selected BSAM/BPAM/EXCP forms are described below; DCBE
 and other keyword forms remain unsupported.
-The retained PDOS OPEN handler consumes the shared DCB fields, but its behavior
-has not been requalified with this new producer.
+The PDOS OPEN handler consumes the shared DCB fields. Template checks alone
+do not qualify its behavior. The [OS guest record](../../../pdos/doc/qualification/QUALIFICATION.md)
+identifies the complete source-built workload that ran; the
+[selected TSO guide](TSO31-INTERFACES.md) identifies the separate later z/OS
+service results. Neither establishes every OPEN form listed here.
 
 GET accepts a DCB address or register 1–12, with no area operand. Its original
 locate-mode linkage supplies R1, loads the low-three-byte DCB entry at offset

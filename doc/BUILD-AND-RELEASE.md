@@ -1,165 +1,178 @@
-# Builds, installers and signing
+# Install, build and release the Classic tools
 
-I use GitHub-hosted runners to check the complete Classic host toolchain and
-prepare installable downloads from one source revision. Version tags are the
-publication decision. Preparing these recipes does not qualify an unrun host,
-guest or signing operation.
+The [0.1.0 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.0)
+contains tools for macOS Apple Silicon, macOS Intel, Linux x64 and Windows x64,
+plus a source archive and a separate z/PDOS base disk image.
 
-The workflow builds macOS ARM64, macOS Intel, Linux x64 and Windows x64.
-The Linux job also constructs a fresh z/PDOS disk using distro Hercules
-utilities. Each host runs both Classic C variants and the complete CTest suite,
-then exercises a relocated installed compiler/assembler/linker chain with exact
-expected output bytes. Missing cREXX, compiler variants, macros or linker cannot
-silently remove required checks. Existing archives are not build dependencies.
+The [release workflow](https://github.com/adesutherland/z-pdos/actions/runs/37103970675)
+passed for source `3394771ee4d1c62054ae4f052a502bec2ba93ace`: both compiler
+variants, the required host suite and a relocated compile/assemble/link check
+on all four hosts, plus the Linux source-to-image checks. macOS packages were
+signed and notarized; Windows signed downloads were published through the
+separate local signing step. Later `develop` commits are newer source, not
+changes to the contents of the tagged packages.
 
-The bootstrap runtime is cREXX `v1.0.0-beta.3`, source
-`ae1607b8e145174422cee7f3e73fbcc37a65226c`. The four public ZIP filenames and
-SHA-256 digests are frozen in `.github/crexx-bootstrap.txt`; the workflow checks
-the downloaded bytes before executing them. They are build tools, not bundled
-runtime dependencies of the Classic commands.
+## Choose a download
 
-## Local build and packages
+| Host / purpose | Download | Installation |
+| --- | --- | --- |
+| macOS Apple Silicon | `macos-arm64-signed.pkg` or `macos-arm64-signed.zip` | PKG installer or portable directory. |
+| macOS Intel | `macos-x86_64-signed.pkg` or `macos-x86_64-signed.zip` | PKG installer or portable directory. |
+| Linux x64 | `linux-x64.zip` | Extract and use the `bin` directory. |
+| Windows x64 | `windows-x64-signed-setup.exe` or `windows-x64-signed.zip` | Per-user installer or portable directory. |
+| Run the operating system | `pdos-image.zip` | Follow the [OS boot guide](../pdos/doc/user/README.md). |
+| Inspect or rebuild the release | `source.tar.gz` | Corresponding maintained source and recipes. |
 
-Run from the repository root, with cREXX, CMake, native C tools, make, Bison and Flex:
+These are filename suffixes; release assets start with `z-pdos-0.1.0-`.
+Verify downloads against the release's `SHA256SUMS` before use. The image ZIP
+also has an internal inventory for its extracted files.
+
+The macOS PKG requires administrator installation. It puts the payload in
+`/usr/local/lib/z-pdos` and four command symlinks in `/usr/local/bin`. Its
+Developer ID signature, notarization and stapled ticket accompany the
+installer. The portable ZIP contains signed native files.
+
+The Windows installer defaults to `%LOCALAPPDATA%\Programs\z-pdos`, adds its
+own `bin` directory to the user PATH, and removes owned files and PATH entries
+on uninstall. Restart terminals after installation. Portable ZIP users on any
+host can invoke the tools by their extracted paths; keep the complete package
+together when moving it.
+
+## What is installed
+
+| Command | Purpose |
+| --- | --- |
+| `mf-classic-cc` | MVS C compiler launcher. |
+| `mf-classic-cc-cms` | CMS C compiler launcher. |
+| `mf-classic-as` | Classic source-to-object assembler. |
+| `mf-classic-ld` | Classic object linker and native-format producer. |
+
+Windows commands have an `.exe` suffix. The compiler launchers find their
+private `xgcc` and `cc1` under `libexec/z-pdos/<variant>` relative to the
+installed executable. Copying only a launcher will not work. The commands do
+not need cREXX installed to run.
+
+The compiler supports assembler-text output (`-S`), preprocessing (`-E`),
+syntax checks and queries. It rejects implicit assembly/linking and unsupported
+profile selections. Target headers and runtime choices must be supplied
+explicitly. PDPCLIB source, headers and macros are under
+`share/z-pdos/pdpclib/source`; installation does not create a target sysroot.
+See [Classic C usage](../compiler/doc/user/README.md),
+[assembler syntax](../assembler/doc/user/USER.md) and
+[linker formats](../linker/doc/user/USER.md).
+
+Windows private compilers include the pinned GNU libiconv runtime. Its licence,
+package identity and matching source/build archive are under
+`share/z-pdos/host-libraries/libiconv`. Retain the package's component licences
+and attribution; [LICENSES.md](../LICENSES.md) explains their scope.
+
+## Build from the checkout
+
+Run from the repository root with cREXX, CMake, native C development tools,
+make, Bison and Flex. The complete development recipe builds both compiler
+variants and runs the required host checks:
 
 ```sh
 crexx -nokeep scripts/build.crexx --args full-test
+```
+
+To stage, verify and create a local macOS development package:
+
+```sh
 crexx -nokeep scripts/release.crexx --args stage macos-arm64 0.1.0-dev.local
 crexx -nokeep scripts/release.crexx --args verify macos-arm64 0.1.0-dev.local
 PDOS_APPLE_SIGNING=unsigned crexx -nokeep scripts/release.crexx --args package macos-arm64 0.1.0-dev.local
 ```
 
-Use `macos-x86_64`, `linux-x64` or `windows-x64` on the corresponding host.
-Staging and packaging require new output directories under
-`build/release/<platform>/`. Clear or move only your own completed output before
-another run. The package records its source commit, working-tree dirtiness,
-platform, version and signing status in `release.json`. `SHA256SUMS` describes
-final package bytes. Local dirty packages are development evidence.
+Use the corresponding platform key `macos-x86_64`, `linux-x64` or
+`windows-x64` on other hosts. `PDOS_APPLE_SIGNING` controls the macOS packaging
+path. Staging and packaging require new output directories under
+`build/release/<platform>/`; move or remove only your own previous output.
+`release.json` records source commit, working-tree dirtiness, platform, version
+and signing status. A local dirty package is development evidence.
 
-Portable ZIPs contain `bin/mf-classic-cc` (MVS), `mf-classic-cc-cms`,
-`mf-classic-as` and `mf-classic-ld`, with `.exe` on Windows. Both compilers find
-their private `xgcc`/`cc1` under `libexec/z-pdos/<variant>` relative to the actual
-launcher executable, including invocation through installed symlinks. Keep the
-whole package together. Compiler operations and target profiles retain their
-documented limits; installation does not add implicit assembly or linking.
-PDPCLIB headers/macros/source profiles are under `share/z-pdos/pdpclib/source`.
-Supply the selected target headers explicitly. There is no host libc sysroot.
+For the operating-system image, use the [OS build recipe](../pdos/doc/user/README.md#build-a-fresh-disk-from-source).
+It additionally requires Clang, `shasum` and Hercules disk utilities. The four
+host-tool packages do not imply a source-to-image build on every host: the
+release image job runs on Linux, and the original local source-to-image
+milestone ran on Apple Silicon macOS.
 
-Licences and attribution accompany each component. The tagged repository source
-is the corresponding source for the inherited GPL compiler, including its
-retained notices and exceptions. No private image, key or external manual is
-included in Git.
+## How the hosted release works
 
-## macOS
+The [workflow source](../.github/workflows/build-release.yml) is the maintained
+recipe. It builds the four host variants, checks both C compilers and the
+required suite, stages each package, and exercises the installed tools after
+relocation. Missing required inputs cannot silently remove checks.
 
-The PKG installs the payload under `/usr/local/lib/z-pdos` and four command
-symlinks under `/usr/local/bin`. Administrator installation is required.
-Portable ZIP users can run the commands from their own extracted directory.
+The build bootstrap uses cREXX `v1.0.0-beta.3`, source
+`ae1607b8e145174422cee7f3e73fbcc37a65226c`. The public ZIP filenames and SHA-256
+hashes are pinned in [crexx-bootstrap.txt](../.github/crexx-bootstrap.txt) and
+verified before execution. cREXX orchestrates the build; it is not a bundled
+runtime dependency of the installed Classic commands.
 
-`PDOS_APPLE_SIGNING=required` selects Developer ID signing of all eight native
-files, an Installer-signed PKG, Apple notarization with explicit Accepted status,
-ticket stapling and Gatekeeper assessment. Any missing setting or failed step
-fails packaging. A temporary private keychain and exported certificates are
-removed on success and handled failures. The workflow also cleans them after a
-cancelled or failed job. The ZIP carries the signed native files; the PKG carries
-the stapled ticket. Development/PR builds explicitly select unsigned packages.
+Windows uses MSYS2 UCRT64 for the inherited configure/make build and native
+Windows cREXX. `scripts/windows-shell.c` adapts the pinned runtime's raw shell
+command text to Bash's `-c` interface. The tools it builds are native Windows
+executables. The package checks account for their private DLL dependencies;
+installer filename escaping is owned by `scripts/windows-inventory.crexx`.
 
-Create these repository Actions secrets, matching CREXX:
+Linux also builds a fresh 100-cylinder CCKD disk from source. Loader,
+relocation, dataset, compression-readback and corruption checks must pass.
+The image archive records actual tool identities and includes a Hercules
+configuration and boot instructions. It has only the base OS; no private disk
+or cREXX application package is copied into it. These host checks do not start
+a guest or establish new application execution.
+
+A pushed version tag such as `v0.1.0` runs the release matrix. Publication waits
+for all required host and image jobs; prerelease suffixes produce prereleases.
+The workflow creates neither the tag nor a development commit. Trusted branch
+and manual builds can exercise signing, but only version-tag pushes publish a
+release. Pull requests receive no signing secrets.
+
+## Maintainer reference: macOS signing
+
+`PDOS_APPLE_SIGNING=required` requires Developer ID signing of the native files,
+an Installer-signed PKG, an Accepted notarization result, ticket stapling and
+Gatekeeper assessment. A missing setting or failed step fails packaging.
+Development/PR packages explicitly select unsigned output.
+
+Configure these Actions secrets for the signing account:
 
 | Secret | Value |
 | --- | --- |
-| `APPLE_DEVELOPER_ID_CERTIFICATE_BASE64` | Base64 Application `.p12` with private key |
-| `APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD` | Application export password |
-| `APPLE_DEVELOPER_ID_IDENTITY` | Exact Application certificate Common Name |
-| `APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_BASE64` | Base64 Installer `.p12` with private key |
-| `APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_PASSWORD` | Installer export password |
-| `APPLE_DEVELOPER_ID_INSTALLER_IDENTITY` | Exact Installer certificate Common Name |
-| `APPLE_ID` | Developer account email |
-| `APPLE_APP_SPECIFIC_PASSWORD` | Generated Apple app-specific notarization password |
-| `APPLE_TEAM_ID` | Developer team identifier |
+| `APPLE_DEVELOPER_ID_CERTIFICATE_BASE64` | Base64 Application `.p12`, including its private key. |
+| `APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD` | Application certificate export password. |
+| `APPLE_DEVELOPER_ID_IDENTITY` | Exact Application certificate identity. |
+| `APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_BASE64` | Base64 Installer `.p12`, including its private key. |
+| `APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_PASSWORD` | Installer certificate export password. |
+| `APPLE_DEVELOPER_ID_INSTALLER_IDENTITY` | Exact Installer certificate identity. |
+| `APPLE_ID` | Developer account email. |
+| `APPLE_APP_SPECIFIC_PASSWORD` | Account's app-specific notarization password. |
+| `APPLE_TEAM_ID` | Developer team identifier. |
 
-On the Mac, use Keychain Access to select each Developer ID certificate and
-its matching private key, then export them separately as password-protected
-PKCS#12 (`.p12`) files. A certificate-only `.cer` export cannot sign. Example
-local filenames are `~/signing/developer-id-application.p12` and
-`~/signing/developer-id-installer.p12`; keep them outside the repository.
-The two password secrets contain the corresponding export passwords.
+Export the two certificates with their matching private keys as separate,
+password-protected PKCS#12 files. Use each full Base64 value without quotes or
+extra text. Certificate identities must match the exports, including spaces.
+Keep account values, keys and local export files outside Git.
 
-Generate each Base64 value as one continuous string, without quotes or a
-trailing newline:
+The script creates a temporary private keychain and cleans it on success and
+handled failure; the workflow also cleans up after failed or cancelled jobs.
+`scripts/macos-payload.crexx` handles payload hashes and component PKG creation
+without re-entering the running cREXX release orchestrator.
 
-```sh
-base64 -i "$HOME/signing/developer-id-application.p12" | tr -d '\r\n' | pbcopy
-# Paste into APPLE_DEVELOPER_ID_CERTIFICATE_BASE64.
-base64 -i "$HOME/signing/developer-id-installer.p12" | tr -d '\r\n' | pbcopy
-# Paste into APPLE_DEVELOPER_ID_INSTALLER_CERTIFICATE_BASE64.
-```
+## Maintainer reference: Windows signing
 
-One `=` or two `==` at the end are both valid Base64 padding. Keep them.
-The RAG packager validates Base64 strictly; `Excess data after padding` means
-the copied secret contains extra data after its encoded value, rather than
-proving that the number of equals signs is wrong.
+CI initially produces unsigned Windows packages. A separate local operation
+signs and publishes them; this step completed for 0.1.0, whose release assets
+are now signed. No Windows signing key is uploaded to GitHub.
 
-The current identity examples are
-`Developer ID Application: Adrian   Sutherland (S4ESV5CK46)` and
-`Developer ID Installer: Adrian   Sutherland (S4ESV5CK46)`; preserve the exact
-Common Name, including spaces. Read it in Keychain Access and check validity
-there before exporting. `APPLE_TEAM_ID` is `S4ESV5CK46` for these certificates.
-For Application signing, `codesign` also accepts the certificate SHA-1 printed
-by `security find-identity -v -p codesigning`. The current local fingerprint is
-`9AB0CBB6E1C3A4FCF72F3E0DE7BC1B0770A2DD68`; it must match the Application
-certificate actually exported. This avoids Common Name spacing mistakes.
-`APPLE_ID` is the email used for the developer account, for example
-`developer@example.com`. Generate `APPLE_APP_SPECIFIC_PASSWORD` at
-[Apple Account](https://account.apple.com/) under Sign-In and Security →
-App-Specific Passwords; its format is `xxxx-xxxx-xxxx-xxxx`.
-The account procedure is documented by [Apple Support](https://support.apple.com/en-gb/102654).
+The local signing route requires a logged-in SimplySign token, cREXX, `jsign`,
+`osslsigncode`, NSIS, CMake and authenticated `gh`. Set `PROVIDER` to the PKCS11
+configuration and `CERTUM_ALIAS` to the token's actual certificate alias.
+`TSA_URL` optionally selects the timestamp service.
 
-The signing script refreshes payload hashes and constructs the component PKG
-through `scripts/macos-payload.crexx`. These leaf operations do not call back
-into the running release orchestrator: cREXX keeps its script execution lock
-until child commands finish.
-
-Trusted branch/manual builds and version tags exercise signing. PRs receive no
-signing secrets, including PRs from the same repository. Only pushed version
-tags can publish releases. GitHub supplies the release token automatically.
-
-## Windows
-
-The hosted build uses the MSYS2 UCRT64 toolchain, Unix tools for the inherited
-configure/make interface, and native Windows cREXX. The configured ADDRESS SHELL
-is MSYS2 Bash through the small native `scripts/windows-shell.c` adapter. The
-pinned cREXX runtime's Windows shell interface passes raw command text; the
-adapter preserves that text as one Bash `-c` argument, including quotes and
-redirection. The workflow checks these controls before building dependencies.
-This adapter implements the Windows process interface; orchestration remains
-cREXX. The built
-Classic tools are native Windows PE executables. MinGW host configuration and
-Windows launcher support do not imply completed hosted Windows qualification.
-The delivery includes pinned GNU libiconv 1.19-1 from MSYS2 beside each private
-compiler. Its licence, package identity and matching source/build archive are
-under `share/z-pdos/host-libraries/libiconv`. Both runtime DLL and source archive
-are checked against pinned SHA-256 values. The native package and installer
-checks compile with a child PATH containing only Windows directories, inspect
-every PE import and reject a deliberately missing private runtime DLL.
-
-The shared `scripts/windows-inventory.crexx` generates uninstall instructions
-for both unsigned CI and local signed packages. It escapes literal dollar signs
-in the retained `mf$*.mac` names using NSIS string syntax.
-
-The NSIS installer is per-user under `%LOCALAPPDATA%\Programs\z-pdos`.
-It adds only its own `bin` directory to the user PATH, preserves long and
-pre-existing entries, and removes only owned files/entries on uninstall.
-The small PowerShell helper implements the Windows registry interface; build,
-packaging and signing orchestration remain cREXX. Restart terminals after
-installation to pick up PATH changes.
-
-CI packages Windows downloads as unsigned. After installing SimplySign and
-logging in locally on the Mac, set `PROVIDER` to its PKCS11 configuration file,
-`CERTUM_ALIAS` to your certificate alias and optionally `TSA_URL` to the
-timestamp service. Requirements: cREXX with native packaging tools, `jsign`,
-`osslsigncode`, NSIS, CMake and authenticated `gh`. No Windows key is uploaded
-to GitHub.
+The following command **uploads to an existing release and replaces its
+unsigned Windows downloads**. Use it only for an authorized release:
 
 ```sh
 export PROVIDER=/absolute/path/provider.macos.cfg
@@ -168,56 +181,17 @@ export TSA_URL=http://time.certum.pl
 crexx -nokeep scripts/sign-windows.crexx --args /absolute/path/z-pdos-0.1.0-windows-x64-unsigned.zip 0.1.0
 ```
 
-For the existing CREXX setup the provider file is
-`/Users/adrian/CLionProjects/CREXX/scripts/provider.macos.cfg`:
+The script checks the unsigned payload inventory, signs the native files and
+helper, refreshes hashes, signs private NSIS plugins and the uninstaller, then
+signs and verifies the final installer. It leaves the original local ZIP
+unchanged and writes final assets under `build/release/windows-local-assets`.
+It uploads the signed ZIP and installer, updates `SHA256SUMS`, verifies their
+presence, and removes the matching unsigned release assets. It defaults to
+`adesutherland/z-pdos`; an optional third argument selects another repository.
+It does not alter the tag, version or release notes.
 
-```text
-name=SimplySignPKCS
-library=/usr/local/lib/libSimplySignPKCS.dylib
-```
-
-Use the certificate alias shown by the configured token, rather than the
-Apple identity or a certificate filename. CREXX currently uses
-`7DDC0FE9C4D43C9D1D900B39548410F1`. If SimplySign reports
-`CKR_FUNCTION_FAILED`, refresh its local login before repeating the signing
-step. Provider/alias/timestamp settings describe local Windows signing; they
-are not additional GitHub secrets.
-
-Signing verifies the unsigned payload inventory, signs its PE files and helper,
-refreshes hashes, signs private NSIS plugins and the generated uninstaller,
-then signs/verifies the final installer. The original ZIP remains unchanged.
-Final assets and checksums are under `build/release/windows-local-assets`.
-The script uploads the signed installer and ZIP to the existing version tag,
-updates the shared `SHA256SUMS`, checks that both signed files are present,
-then deletes the matching unsigned downloads and confirms they are gone.
-It defaults to `adesutherland/z-pdos`; an optional third argument selects a
-different repository. It does not change the version, tag or release notes.
-If upload is interrupted, reuse the completed signed files without signing again:
+If upload was interrupted after signing, reuse the completed assets:
 
 ```sh
 crexx -nokeep scripts/sign-windows.crexx --args --upload-only 0.1.0
 ```
-
-## PDOS disk image and release tags
-
-The Linux host builds a fresh `media/pdos00.cckd` using the existing
-`pdos/scripts/image.crexx` recipe. Loader, relocation, dataset, compression
-readback and corruption controls must pass. The image archive includes a
-Hercules example configuration, operator instructions, source/tool identities
-and checksums. It contains only the base OS; it does not bundle cREXX applications
-or a managed/private guest disk.
-
-The image job records the actual distro Hercules tool versions and hashes.
-Its host image checks are distinct from the recorded Hercules 4.9.1 guest
-qualification. It does not start or modify a shared Lab guest, and it does not
-claim that this freshly produced image has passed a new application guest run.
-The exact existing guest evidence remains in `pdos/doc/qualification/`.
-
-`VERSION` and the CMake product version are `0.1.0`. A pushed `v0.1.0` or
-`v0.1.0-<prerelease>` tag builds the full matrix. Publication depends on every
-host and image check succeeding. Prerelease suffixes create prereleases.
-The release contains host installers/ZIPs, the fresh image ZIP and a combined
-checksum inventory. Windows downloads remain labelled unsigned until the
-separate local signing operation and explicitly authorised upload.
-
-The workflow itself creates neither tags nor development commits.

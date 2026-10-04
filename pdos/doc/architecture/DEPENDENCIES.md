@@ -1,56 +1,72 @@
-# PDIO1 build dependencies
+# From source to a z/PDOS image
 
-2 October 2026. This records the selected repaired OS workload. The independent
-source-to-image build now passes locally. Its boot and application acceptance
-remain separate from assembly, linking and disk readback.
+The active build takes maintained source through compilation, assembly, linking
+and disk construction. It uses no prebuilt mainframe objects or proprietary
+mainframe build tools. The recipes run from the repository root and write
+under ignored `build/pdos/`.
 
-| Stage | Selected input or interface | Current state |
+## Source inputs
+
+| Input | Owner and purpose |
+| --- | --- |
+| Four OS C units | `pdos/src/`: `pload.c`, `pdos.c`, `pcomm.c`, `pdosutil.c`. |
+| Thirteen common C units | `pdpclib/src/`: START, STDIO, STDLIB, CTYPE, STRING, TIME, ERRNO, ASSERT, LOCALE, MATH, SETJMP, SIGNAL, MEMMGR. |
+| Six handwritten assembler units | OS PLOADSUP and PDOSSUP; PDPCLIB SAPSTART, SAPSUPA, MVSSTART and selected MVSSUPA. |
+| Configuration and linkage macros | Selected PDPTOP, PDPMAIN, PDPPRLG and PDPEPIL, plus the original selected service/linkage interfaces under `pdpclib/src/interfaces/`. |
+| Host tools | Maintained Classic C MVS, Classic Assembler and Classic Linker; cREXX orchestration, ordinary native build tools, Clang for host checks, and Hercules disk utilities. |
+
+[`compile-inputs.txt`](../../scripts/compile-inputs.txt) names the 17 C units.
+[`assembly-inputs.txt`](../../scripts/assembly-inputs.txt) names six handwritten
+modules plus four macro/configuration inputs. Those ten input rows do not mean
+ten additional objects: the full route produces **23 objects**.
+
+PDPCLIB preparation selects `pdos-zarch` directly from maintained source.
+`MVSSUPA` is assembled from its common and profile-specific modules; preparation
+does not apply a patch stack. The generated C assembler text uses the selected
+PDPCLIB linkage macros, literals, external references and page tables. The
+runtime also contains IBM hexadecimal floating-point code, so an integer-only
+ELF SDK contract cannot be substituted for this entire library.
+
+## The three links
+
+| Program | Startup and native support | Additional code |
 | --- | --- | --- |
-| OS C source | `pdos.c`, `pdosutil.c/.h`, `pload.c`, `pcomm.c` | Exact retained PDIO1 selection; all four C units compile and independently assemble with Classic C/Assembler |
-| Runtime C | START, STDIO, STDLIB, CTYPE, STRING, TIME, ERRNO, ASSERT, LOCALE, MATH, SETJMP, SIGNAL, MEMMGR | One maintained PDPCLIB with merged canonical/Lab fixes and `pdos-zarch` configuration; all 13 units compile and independently assemble with Classic C/Assembler |
-| Source macros | PDPTOP, PDPMAIN, PDPPRLG, PDPEPIL | Retained source-owned bytes; all selected C and handwritten consumers assemble with bounded COPY, library lookup and conditional state |
-| Kernel startup and support | SAPSTART, SAPSUPA, PDOSSUP | All assemble under the z900 ceiling and explicit PDOS services; freshly linked PLOAD/PDOS load reconstruction passes |
-| Loader support | PLOADSUP plus PLOAD and PDOSUTIL | Fresh PLOAD links; source-described first-record placement, startup PSW and all disk bytes pass |
-| Command processor | MVSSTART, MVSSUPA, PCOMM and the selected common runtime | Fresh PCOMM assembles/links and passes PDOS's actual loader at two bases; absent MVS/TSO services are explicitly rejected |
-| External native macro interfaces | YREGS, SAVE, RETURN, CVT and the reached control-block/service forms | Original build used IBM MACLIB/MODGEN. This route uses independently authored selected interfaces, checked offsets/bytes and source-owned service expansions; it does not import IBM macros or establish a complete replacement library |
-| Qualified C producer | Repaired GCCMVS 3.2.3 v90, binary SHA-256 `f85eb831865c7de8eb12f74d26b5607414cf7a9204a4609fcd9f1826c3fa7bec` | Historical native kernel build input; the local Classic C checkpoint is a different GCC 3.4.6 producer |
-| Qualified assembler/binder | ASMA90 and IEWL | Historical qualification route; replacing these requires independent object, relocation and load-image checks |
-| Independent tools | `mf-classic-cc`, `mf-classic-as`, `mf-classic-ld` | 23 fresh objects and all three load modules pass; no reused native objects or binder |
-| IPL source | Historical `s370/ipl3390.txt` in the frozen upstream archive, current PLOAD startup and explicit IPL1/2 CCWs in src/install-ipl.c | Original host byte writer/checker verifies literal CCW vectors, source PLOAD PSW, VTOC extents and complete payload readback; builds do not read the archive |
-| Disk producer | Hercules `dasdload`, CKD/CCKD conversion, source-described IPL installation | `pdos/scripts/image.crexx` builds a new 100-cylinder 3390, checks compression readback, rejects corruption and preserves existing outputs; utilities are explicit external host inputs |
-| Application inputs | Pinned external cREXX TSO31/TSO64 packages from their producer | External consumers; package binaries and private disk inputs are not OS source |
+| PLOAD | SAPSTART, START, SAPSUPA | Common runtime, PLOAD, PLOADSUP, PDOSUTIL. |
+| PDOS | SAPSTART, START, SAPSUPA | Common runtime, PDOS, PDOSSUP, PDOSUTIL. |
+| PCOMM | MVSSTART, START, MVSSUPA | Common runtime and PCOMM. |
 
-The accepted kernel link included the common runtime plus SAPSTART/SAPSUPA,
-PDOS, PDOSSUP and PDOSUTIL. PLOAD uses the common runtime, PLOAD/PLOADSUP
-and PDOSUTIL. PCOMM uses MVSSTART/MVSSUPA and the common runtime. Original
-native member names such as SPSZ1, SPUZ1, PDIO1O, PDSIO1O and PDUZ8O are
-build identities, not additional missing C source units. The repair rebuilt
-only the changed kernel objects and reused identified common objects.
+[`link.crexx`](../../scripts/link.crexx) writes the native load modules and
+independent flat links. It exercises the actual loader implementation at bases
+zero and 2 MiB and compares reconstructed bytes, entry and mode information.
+The loader/kernel use AMODE31/RMODE24; PCOMM uses AMODE31/RMODE ANY.
 
-The retained [`compile-inputs.txt`](../../scripts/compile-inputs.txt) reproduces the 17 C
-units and historical compile switches with the new producer. The retained
-[`assembly-inputs.txt`](../../scripts/assembly-inputs.txt) selects ten source inputs.
-`pdos/scripts/inventory.crexx` creates a per-input operation-count CSV in ignored output.
-It counts spelled directives, instructions, macros and continuation records;
-inactive conditional branches and macro prototypes are included. It cannot
-establish active instruction coverage or a final-object ISA ceiling.
+[`image.crexx`](../../scripts/image.crexx) then stages the flat PLOAD, native
+PDOS and PCOMM images and explicitly encoded `CONFIG.SYS`. Hercules `dasdload`,
+`cckd2ckd` and `ckd2cckd`, together with the source-owned IPL writer/checker,
+construct a fresh 100-cylinder volume. Conversion explicitly preserves that
+size. The recipe checks all dataset bytes, decompressed disk readback and
+malformed/corrupt controls. It records input/output hashes and tool identities.
 
-The generated kernel starts with `COPY PDPTOP`. Its output uses source-owned
-entry/exit macros, `EQU *`, branch aliases, literal pools, address literals
-with expressions, external references and page tables. The full runtime also
-uses IBM hexadecimal floating point; the shared SDK integer-only contract
-does not automatically admit that code.
+## What the evidence establishes
 
-PDOSSUP starts with `TITLE`, then `COPY PDPTOP` and YREGS. It uses AIF/AGO
-and source-owned architecture switches. Selected z/Architecture branches
-include `STMG`, `LPSWE`, subchannel operations and full-width context code.
-An AMODE31 kernel can require these instructions. The assembler's `s370`
-selector is only a first-language diagnostic probe here, not the OS's machine
-profile. `&ZSYS='S380'` is the inherited application step-down convention;
-`&XSYS='ZARCH'` selects OS instructions. This is standard z/Architecture,
-not the community S/380 ISA or the fictional counterfactual architecture.
+A C compile proves neither assembly nor guest execution. A reconstructed load
+module proves neither a successful IPL nor application behavior. Host media
+checks show that the intended bytes reached the image; the
+[guest qualification](../qualification/QUALIFICATION.md) records boot and real
+application results separately.
 
-Some upstream IPL/conversion utilities cast host pointers to `int` or serialize
-native `short`/`int` fields. A successful native host compile would not make
-those tools endian-, alignment- or host-width-safe. The standalone producer
-must use explicit target byte encodings and checked relocation/layout rules.
+The [0.1.0 release run](https://github.com/adesutherland/z-pdos/actions/runs/37103970675)
+built the four host packages and a fresh Linux-produced image. Its image
+checks did not perform a new guest run. The earlier source-built guest
+milestone, subsequent repository reorganisation and later service work each
+retain their own input identities.
+
+Earlier investigations used GCCMVS 3.2.3, IBM ASMA90/IEWL and identified native
+objects. Those are historical comparison inputs, not prerequisites of the
+current build. Old names such as PDIO1 and SPSZ1 in records are experiment or
+member identities, not additional missing source components. Frozen upstream
+IPL material is provenance; the build does not read `archive/`.
+
+See the [build guide](../user/README.md) for commands, the
+[build contract](../development/BUILD-CONTRACT.md) for the recorded acceptance
+stages, and the [licensing guide](../../../LICENSES.md) for source origins.

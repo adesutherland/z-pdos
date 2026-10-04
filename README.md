@@ -1,138 +1,128 @@
 # z/PDOS and Mainframe Classic Tools
 
-Cross-platform development tools and an operating system for mainframe software,
-with [cREXX](https://github.com/adesutherland/CREXX), a REXX language
-implementation, as their first substantial application.
-
-I want to make it practical to develop mainframe software on an everyday
-computer: edit the source, cross-compile it, build an executable, and test it
-on a mainframe system. This repository brings together the compiler, assembler,
-linker, C runtime and z/PDOS operating system needed for that work.
-
-cREXX gives us a real language implementation and real applications to develop
-and test. Its compiler, assembler and runtime exercise much more than a small
-demonstration program: they need working file I/O, character encoding, memory
-management, loading and error handling. As cREXX and other applications develop,
-their needs will shape these tools. The aim is to turn problems encountered by
-those applications into useful, tested improvements to the shared toolchain.
-
-## A maintained fork, with an acknowledged heritage
+Build mainframe software on an everyday computer, from C source to a bootable
+operating system. This repository contains **z/PDOS**, a small mainframe OS,
+and the compiler, assembler, linker and C library used to build it.
 
 **Paul Edwards created PDOS and PDPCLIB.** His work is the foundation of the
-operating system and C runtime maintained here. z/PDOS is our fork of the
-mainframe PDOS implementation, and its name identifies the system developed
-in this repository.
+operating system and runtime maintained here. z/PDOS is our fork of his
+mainframe implementation, with its own development direction and preserved
+upstream attribution.
 
-The tools have their own histories too. Mainframe Classic C descends from
-GCC 3.4.6 and the i370/cc370 work of **Jan Stein, Dave Pitts, Linas Vepstas,
-Paul Edwards** and other GCC and cc370 contributors. It incorporates recorded
-repairs by **Mike Beer**, alongside our integration and portability work.
-Mainframe Classic Linker derives from **PDLD** and preserves its contributors'
-work and notices. Mainframe Classic Assembler is an original implementation
-by **Adrian Sutherland**.
+I want to make mainframe systems understandable and practical to develop:
+read the source, change it, build it locally, and see what happens on the
+machine. [cREXX](https://github.com/adesutherland/CREXX), a Rexx language
+implementation, is our first substantial application. Its compiler, assembler
+and virtual machine exercise loading, storage, files, terminal input and error
+handling together.
 
-These contributions make the project possible. Each component's `UPSTREAM.md`
-records its origins, contributors and the changes brought into our maintained
-source. Original notices and licences stay with that source.
+[Download 0.1.0](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.0)
+· [Run z/PDOS](pdos/doc/user/README.md)
+· [Understand the architecture](pdos/doc/architecture/README.md)
+· [Documentation](doc/README.md)
 
-This is an evolving fork with its own development direction. We will make
-choices around the applications and mainframe environments we are supporting,
-and those choices may differ from upstream. We intend to keep that development
-respectful and traceable: credit the people whose work we build on, explain our
-changes, and make useful work easy to review and share.
+## What works today
 
-## The first milestone: cross-building z/PDOS 0.1
+The 0.1 milestone established a complete build from maintained source using
+Mainframe Classic C, Classic Assembler and Classic Linker. It produces the
+boot loader, kernel and command processor, then constructs a fresh disk.
+**The mainframe build requires no proprietary compiler, assembler, binder,
+IBM macro library or prebuilt mainframe objects.**
 
-On **2 October 2026**, z/PDOS 0.1 was built from source on an Apple Silicon Mac
-using the Mainframe Classic compiler, assembler and linker maintained in this
-repository. The complete OS build uses **no separately supplied mainframe
-compiler, assembler or binder, and no prebuilt mainframe objects**.
+The recorded source-built system boots under Hercules and runs unchanged
+cREXX TSO31, TSO64 ANY and TSO64 HIGH application packages. That includes
+compiling and assembling Rexx programs, running the results, interactive input
+and file-output readback. The [guest qualification record](pdos/doc/qualification/QUALIFICATION.md)
+names the exact source, binaries, machine and remaining limits.
 
-That build produces the loader, operating system and command processor, and
-constructs a fresh bootable disk image. The resulting system boots under
-Hercules and runs the unchanged cREXX TSO31, TSO64 ANY and TSO64 HIGH packages.
-Those checks include compiling and assembling cREXX programs, running the
-results, interactive input, diagnostics and complete file-output readback.
+z/PDOS currently has a **32-bit C kernel running in 31-bit addressing mode**.
+Handwritten assembler preserves and dispatches 64-bit application contexts;
+selected applications can also load code above 4 GiB. A native 64-bit C kernel
+is future work. The current system has one address space and synchronous
+application execution. It implements the MVS-style services needed by the
+qualified workloads; it is not a general replacement for z/OS or TSO.
 
-Ordinary host build tools are still needed to build the Classic tools, and
-Hercules supplies disk utilities and emulation. The independence achieved here
-is the mainframe compile, assemble and link chain, taking our maintained source
-through to a system running real applications.
+The [0.1.0 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.0)
+provides macOS Apple Silicon and Intel packages, Linux x64 tools, signed
+Windows x64 packages, a source archive and a base OS disk image. All four host
+builds and relocated compiler/assembler/linker checks passed. The release
+image passed host loader and disk checks; it does **not** carry a new guest
+qualification beyond the separately recorded milestone run.
 
-The [0.1 qualification record](pdos/doc/qualification/QUALIFICATION.md) describes
-the exact machine, inputs, results and limits. The subsequent
-[repository reorganisation](doc/REORGANISATION-20261002.md) preserved the OS
-payloads and guest-visible disk bytes, with all 91 integration checks passing.
+AMODE24 application loading, broader file semantics and parts of the console
+interface remain open. Start with the [known issues](pdos/doc/BACKLOG.md)
+when deciding whether the present system fits an experiment.
 
-The current accepted route is the documented Hercules configuration. Loading
-24-bit applications and several operator-interface improvements remain in the
-[z/PDOS backlog](pdos/doc/BACKLOG.md). Running the build tools on mainframe
-hosts themselves is a further development goal.
+## How the pieces fit
 
-## What is in the repository?
-
-| Component | What it provides |
-| --- | --- |
-| [z/PDOS](pdos/README.md) | The mainframe operating system, loader and command processor |
-| [PDPCLIB](pdpclib/README.md) | The shared C library, native support and explicit system-service configurations |
-| [Mainframe Classic Assembler](assembler/README.md) | `mf-classic-as`: a portable assembler for the supported classic mainframe source and object formats |
-| [Mainframe Classic C](compiler/README.md) | `mf-classic-cc`: the maintained GCC/i370/cc370-derived C cross-compiler, with MVS and CMS targets |
-| [Mainframe Classic Linker](linker/README.md) | `mf-classic-ld`: the PDLD-derived linker used to produce mainframe load modules |
-| [TSO31 entry bridge](tso31-bridge/README.md) | An experimental adapter between a 31-bit TSO entry and an ELF program |
-
-[Machine definitions](machines/README.md) describe the hardware targets shared
-by the work. Each component documents its own calling conventions, object
-formats and operating-system services; a shared machine name alone does not
-make two toolchains interchangeable.
-
-The separate [Mainframe ELF SDK](https://github.com/adesutherland/mainframe-elf-sdk)
-provides the modern GCC/GNU assembler route. It is a related project with its
-own source, build process and application interfaces.
-
-## Build and explore
-
-The complete source-to-image route has been checked on Apple Silicon macOS.
-You need a native C compiler, make, CMake and cREXX for the commands below.
-Other host and target combinations have their own component checks and
-qualification work.
-
-From the repository root, build and check both Classic C variants, then the
-assembler, linker, entry bridge and focused C-library tests:
-
-```sh
-crexx -nokeep compiler/scripts/build.crexx --args test mvs
-crexx -nokeep compiler/scripts/build.crexx --args test cms
-crexx -nokeep scripts/build.crexx --args test
+```text
+OS + PDPCLIB C ── Classic C ──► assembler source
+                               │
+handwritten assembler ─────────┤
+PDPCLIB native code and macros ─┘
+                               │ Classic Assembler
+                               ▼
+                        classic object decks
+                               │ Classic Linker
+                               ▼
+                     loader, kernel and shell
+                               │ image recipe + Hercules disk utilities
+                               ▼
+                       bootable z/PDOS disk
 ```
 
-To build a fresh OS image, follow the [z/PDOS build guide](pdos/doc/user/README.md).
-It explains the additional Clang and Hercules utility requirements and the
-image checks. The [compiler guide](compiler/doc/user/README.md) and other
-component guides describe individual tool use. Generated outputs go into
-ignored `build/`; `-nokeep` removes cREXX's temporary compiler files.
+| Component | Role |
+| --- | --- |
+| [z/PDOS](pdos/README.md) | Boot loader, kernel, program loader, disk and console services, and PCOMM command processor. |
+| [PDPCLIB](pdpclib/README.md) | C library and native support. Explicit profiles choose the system services and source modules used by a build. |
+| [Classic C](compiler/README.md) | GCC 3.4.6/i370/cc370-derived C compiler. The MVS and CMS launchers produce assembler text; the MVS route builds the OS. |
+| [Classic Assembler](assembler/README.md) | Original portable assembler by Adrian Sutherland. Produces classic mainframe object records from the supported source language. |
+| [Classic Linker](linker/README.md) | PDLD-derived linker. Resolves classic objects and produces flat images, native load modules and XMIT transports. |
+| [TSO31 entry bridge](tso31-bridge/README.md) | Separate experimental adapter for calling an ELF program from a 31-bit TSO entry. It is not the z/PDOS kernel. |
 
-The [build and release guide](doc/BUILD-AND-RELEASE.md) describes the prepared
-GitHub runner matrix, macOS PKG and Windows installers, local Windows signing,
-and tag-driven releases. The recipes have local Apple Silicon checks;
-hosted platform and signing qualification still require their first run.
+The separate [Mainframe ELF SDK](https://github.com/adesutherland/mainframe-elf-sdk)
+uses modern GCC, GNU Binutils and Newlib for application development. It
+consumes selected Classic tools and PDPCLIB native services from this
+repository. The two toolchains share some components, but their C calling
+conventions and runtimes differ. An ELF object cannot be handed directly to
+the z/PDOS loader: the application route must produce the supported native
+load format and obey its service contract.
 
-## Working on the project
+[Profiles and interfaces](doc/PROFILES.md) explains how hardware, C data width,
+application addressing mode and runtime services are selected independently.
+The [OS architecture guide](pdos/doc/architecture/README.md) follows boot,
+loading, memory and service calls through to their implementation.
 
-Each component has one current `src/` tree and its own user, architecture,
-development, AI and qualification documentation under `doc/`. We maintain
-source directly, with changes recorded through normal Git commits. Optional
-`archive/` directories preserve frozen upstream baselines as acknowledgement
-and reference; builds and required tests work without them.
+## Get started
 
-Bug reports and proposals are especially useful when they come with a real
-program, a named target and a reproducible result. Each component's
-`doc/BACKLOG.md` keeps its defects, planned improvements and missing checks
-together. The [shared workflow](doc/WORKFLOW.md) explains how we take an item
-through implementation and validation. Read [AGENTS.md](AGENTS.md) for the
-repository's engineering and source-maintenance rules.
+To explore the OS, download the **PDOS image ZIP**, keep an untouched copy,
+and follow the [boot guide](pdos/doc/user/README.md). The image contains the
+base OS only; cREXX applications are separate downloads.
 
-Licensing follows the individual components and their inherited source.
-Original project material is MIT-licensed; the compiler retains its GPL terms
-and applicable exceptions, while inherited PDOS, PDPCLIB and PDLD material
-retains its own declarations and notices. [LICENSES.md](LICENSES.md) maps those
-terms and links to the component licences and upstream records.
+To develop software on your computer, choose the **Classic tools package**
+for your host. The [installation guide](doc/BUILD-AND-RELEASE.md) explains the
+installers, portable ZIPs and source build. See the
+[compiler guide](compiler/doc/user/README.md) for its supported operations.
+Installing the tools does not install a mainframe guest or a target sysroot.
+
+For OS development, read the [source and change guide](pdos/doc/development/README.md)
+after the architecture. Work takes place on `develop`, the public default
+branch. Each component has one maintained `src/` tree and one
+`doc/BACKLOG.md`; optional `archive/` directories are frozen references and
+are excluded from normal builds. [The shared workflow](doc/WORKFLOW.md)
+describes how changes and their evidence are recorded.
+
+## Origins and licensing
+
+Alongside Paul Edwards's PDOS and PDPCLIB, Classic C preserves the work of
+Jan Stein, Dave Pitts, Linas Vepstas, Paul Edwards and other GCC/cc370
+contributors, including Mike Beer's recorded repairs. Classic Linker derives
+from PDLD. Each component's `UPSTREAM.md` records its lineage and contributors.
+
+We avoided proprietary build dependencies by maintaining the toolchain and
+implementing the selected assembler macros and service interfaces in source.
+That does not make every file MIT-licensed: inherited public-domain notices,
+GNU GPL terms and file-level exceptions remain in force. The
+[licensing and provenance guide](LICENSES.md) explains the boundary, including
+external operating systems used for qualification. No IBM operating system,
+macro library or private guest disk is included in the release.

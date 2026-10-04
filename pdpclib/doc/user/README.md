@@ -1,6 +1,10 @@
 # PDPCLIB user guide
 
-The library is maintained in src/ and consumed by selected target builds.
+PDPCLIB is consumed by a selected target build, not installed as the host
+computer's C library. Its maintained source is in `src/`. A profile chooses
+configuration and native modules; see [architecture](../architecture/README.md)
+for the portable-C, startup and service boundaries.
+
 Focused host checks use CMake, Clang/GCC and cREXX:
 
 ```sh
@@ -16,11 +20,13 @@ assembly, linking or guest qualification.
 
 The native recipe uses the source-built Classic Assembler and the maintained
 PDOS31 service and linkage macros. It requires a new output directory and
-writes a source/object SHA-256 receipt. The `pdos-zarch` source now assembles
-as a classic object deck; that result has not been linked or newly run in a
-guest. The same recipe accepts `tso31-lean` to expose its historical assembly
-boundary. For the SDK's documented file subset, run it with
-`tso31-sdk-files`. This selection assembles a complete TSO service object
+writes a source/object SHA-256 receipt. The standalone native recipe stops
+at an object deck: it does not link or run a guest. The separate complete OS
+build and its [guest record](../../../pdos/doc/qualification/QUALIFICATION.md)
+provide the z/PDOS source-to-execution evidence. The same recipe accepts
+`tso31-lean` to expose its historical assembly boundary. For the SDK's
+documented file subset, added after the z/PDOS 0.1.0 release source, run it
+with `tso31-sdk-files`. This selection assembles a complete TSO service object
 using source-owned TSO terminal, EXTRACT and control-block forms. It keeps
 sequential and partitioned dataset paths and explicitly rejects VSAM,
 IDCAMS and supervisor-mode switching. On z/OS 1.5, the source-built service
