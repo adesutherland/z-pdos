@@ -33,6 +33,9 @@ main: procedure = .int
   address system "cd " || shellquote(out) || " && ./pcomm-host < input.txt > console.txt 2>&1"
   if rc <> 0 then return 1
   rows = readlines(output)
+  version_rows = readlines("VERSION")
+  call require version_rows.0 = 1, "single release version"
+  version = strip(version_rows[1])
   all = ""
   do i = 1 to rows.0
     all = all || rows[i] || '0a'x
@@ -47,7 +50,7 @@ main: procedure = .int
   call require pos("EDGE.BAT command exceeds 198",all) > 0, "overlong batch diagnostic"
   call require pos("MUST_NOT_EXECUTE",all) = 0, "overlong prefix not executed"
   call require pos("SAFE_AFTER_ERROR",all) > 0, "next batch command ran"
-  call require pos("z/PDOS PDIO1",all) > 0, "version"
+  call require pos("z/PDOS " || version || "; PDIO1",all) > 0, "release version and interface"
   call require pos("CMS CHECK 31 RXVM|RXAS|RXC",all) > 0, "compatibility help"
   call require pos("CMS RUN 24 RXVM",all) > 0, "CMS24 operator help"
   say "PCOMM host continuation, boundary and operator help passed"

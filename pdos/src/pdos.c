@@ -73,8 +73,7 @@
 #include <limits.h>
 
 #include "pdosutil.h"
-
-#define ZPDOS_VERSION "0.1"
+#include "zpdos-version.h"
 
 #include "__memmgr.h"
 
@@ -989,6 +988,9 @@ void dexit(int oneexit, DCB *dcb);
 void trkclc(void);
 void datoff(void);
 void daton(void);
+#ifdef ZARCH
+void pdosWait(void);
+#endif
 extern int __consdn;
 extern int __istape;
 extern int __iscard;
@@ -1094,6 +1096,12 @@ int main(int argc, char **argv)
         {
             ret = pdosRun(pdos); /* dispatch tasks */
             pdosTerm(pdos);
+#ifdef ZARCH
+            /* CMS24's fixed image covers the PLOAD heap. The kernel owns
+               shutdown once it has run, so do not return through PLOAD's
+               C termination path after that image has been loaded. */
+            pdosWait();
+#endif
         }
     }
     return (ret);

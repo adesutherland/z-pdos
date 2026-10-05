@@ -92,6 +92,7 @@ main: procedure = .int
     inputs[17+i] = hercules || "/" || word("dasdload cckd2ckd ckd2cckd",i)
   end
   inputs[21] = "pdos/tests/check-image.crexx"
+  inputs[22] = "VERSION"
   address system "shasum -a 256 " || quoted(inputs) || " > " || shellquote(out || "/inputs.sha256")
   call require rc = 0, "source manifest and exact producer identities"
   call runlog "git rev-parse HEAD && git status --short && uname -a && clang --version && crexx --version && " || shellquote(compiler) || " --version", out || "/versions.log"

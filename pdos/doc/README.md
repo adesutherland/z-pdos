@@ -14,6 +14,9 @@ and an application's service call.
   machine, inputs, outcomes and limits.
 - [Stage 3 CMS qualification](qualification/STAGE3-2026-10-05.md): bounded
   unchanged CMS31 and CMS24 MODULE results from current source.
+- [0.1.1 local operator acceptance](qualification/0.1.1-OPERATOR-UAT-2026-10-05.md):
+  managed guest, CMS/TSO cREXX, CKD/tape and shutdown checks on the repaired
+  candidate; separate from a tagged or published release.
 - [Backlog](BACKLOG.md): the single current defect and development queue.
 - [AI guidance](ai/README.md): component guidance for automated work.
 

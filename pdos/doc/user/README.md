@@ -47,9 +47,10 @@ it is not a claim that every newly generated image has been booted.
 ## At the PCOMM prompt
 
 PCOMM is the command processor. Begin with `HELP` for the first-run route,
-`VERSION` for its interface and build-receipt location, and `DIR` to inspect
-datasets, creation dates, record formats and extents. `HELP TSO` and `HELP CMS`
-explain the command and binary compatibility boundary. `SHOWRC` toggles an
+`VERSION` for its release version, interface and build-receipt location, and
+`DIR` to inspect datasets, creation dates, record formats and extents.
+`HELP TSO` and `HELP CMS` explain the command and binary compatibility
+boundary. `SHOWRC` toggles an
 extra display of command return codes; every external command also prints
 numbered `PCOMM BEGIN` and `PCOMM END ... RC=` lines.
 Commands for editing raw blocks or initializing disks are development tools
@@ -89,8 +90,10 @@ Application installation must preserve dataset structure and load bytes, and
 offline disk updates require the guest to be stopped. The
 [conformance candidate guide](CONFORMANCE.md) gives the current source's
 checked installer and script runner for this bounded disk profile. The
-published 0.1.0 image predates those changes. The base image has no general
-package manager. The
+published 0.1.0 image predates those changes. The current source and locally
+accepted [0.1.1 candidate](../qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
+report 0.1.1; publication remains a separate release action.
+The base image has no general package manager. The
 [qualification record](../qualification/QUALIFICATION.md) describes the actual
 cREXX workloads, storage budgets, file results and skips.
 

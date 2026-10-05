@@ -1250,6 +1250,28 @@ WFNEWIO  DC    A(X'00040000'+AM64BIT)
 *
 **********************************************************************
 *                                                                    *
+*  PDOSWAIT - final z/Architecture wait without PLOAD C termination *
+*                                                                    *
+**********************************************************************
+         AIF   ('&XSYS' NE 'ZARCH').PDWEND
+         ENTRY PDOSWAIT
+PDOSWAIT DS    0H
+         BALR  R12,0
+         USING *,R12
+         LPSWE PDWPSW
+         LTORG
+         DROP  ,
+         DS    0D
+PDWPSW   DC    A(X'00060000'+AM64BIT)
+         DC    A(AMBIT)
+         DC    A(0)
+         DC    A(X'00000444')
+.PDWEND  ANOP
+*
+*
+*
+**********************************************************************
+*                                                                    *
 *  DSECTS                                                            *
 *                                                                    *
 **********************************************************************

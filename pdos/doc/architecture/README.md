@@ -133,7 +133,11 @@ most 630,784 bytes before the 12 MiB application pool, even before allocator
 overhead and later kernel allocations. The boot check rejects layouts where
 that initial allocation crosses the pool; the standalone heap itself has no
 general upper bound. The reserved 15–16 MiB stack is a bounded CMS24
-compatibility bridge. Moving the kernel body above the line, while retaining
+compatibility bridge. A CMS24 fixed-origin image also covers PLOAD's 1 MiB
+boot heap. After the kernel has run, z/Architecture shutdown loads its own
+`0444` wait PSW instead of returning through PLOAD's C exit path. This avoids
+using the overwritten boot heap during shutdown; it does not give that heap
+separate storage. Moving the kernel body above the line, while retaining
 below-line entry and channel-I/O resources, belongs to
 [PD-003](../BACKLOG.md#pd-003-shared-selectors-and-native-64-bit-kernel).
 High virtual addresses do not require physical storage at the same address:

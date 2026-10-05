@@ -79,9 +79,9 @@ crexx -nokeep scripts/build.crexx --args full-test
 To stage, verify and create a local macOS development package:
 
 ```sh
-crexx -nokeep scripts/release.crexx --args stage macos-arm64 0.1.0-dev.local
-crexx -nokeep scripts/release.crexx --args verify macos-arm64 0.1.0-dev.local
-PDOS_APPLE_SIGNING=unsigned crexx -nokeep scripts/release.crexx --args package macos-arm64 0.1.0-dev.local
+crexx -nokeep scripts/release.crexx --args stage macos-arm64 0.1.1-dev.local
+crexx -nokeep scripts/release.crexx --args verify macos-arm64 0.1.1-dev.local
+PDOS_APPLE_SIGNING=unsigned crexx -nokeep scripts/release.crexx --args package macos-arm64 0.1.1-dev.local
 ```
 
 Use the corresponding platform key `macos-x86_64`, `linux-x64` or
@@ -96,6 +96,10 @@ It additionally requires Clang, `shasum` and Hercules disk utilities. The four
 host-tool packages do not imply a source-to-image build on every host: the
 release image job runs on Linux, and the original local source-to-image
 milestone ran on Apple Silicon macOS.
+The root `VERSION` and `pdos/src/zpdos-version.h` must carry the same release
+number. The PCOMM host check compares the guest `VERSION` output with the root
+file, and the image receipt hashes both inputs. Guest acceptance remains a
+separate gate before selecting a shared image.
 
 ## How the hosted release works
 
@@ -123,7 +127,7 @@ configuration and boot instructions. It has only the base OS; no private disk
 or cREXX application package is copied into it. These host checks do not start
 a guest or establish new application execution.
 
-A pushed version tag such as `v0.1.0` runs the release matrix. Publication waits
+A pushed version tag such as `v0.1.1` runs the release matrix. Publication waits
 for all required host and image jobs; prerelease suffixes produce prereleases.
 The workflow creates neither the tag nor a development commit. Trusted branch
 and manual builds can exercise signing, but only version-tag pushes publish a

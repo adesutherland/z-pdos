@@ -203,10 +203,11 @@ def prepare(args):
         if not command.split() or command.split()[0].upper() + '.EXE' not in names or type(item['expected_rc']) is not int:
             raise ValueError('check must call an installed program and name its expected RC')
         expected = item.get('output_contains')
-        if (not isinstance(expected, list) or not expected
+        if (not isinstance(expected, list)
                 or any(not isinstance(s, str) or not s or '\n' in s or '\r' in s
-                       or s in command or s in output_phrases for s in expected)):
-            raise ValueError('nonempty output checks distinct from command are required')
+                       or s in command for s in expected)
+                or len(expected) != len(set(expected))):
+            raise ValueError('output checks must be unique within a command and distinct from it')
         output_phrases.update(expected)
         responses = item.get('responses', [])
         if not isinstance(responses, list):
@@ -228,7 +229,8 @@ def prepare(args):
         raise ValueError('batch exceeds one native block')
     (args.out / 'conform.raw').write_bytes(raw)
     (args.out / 'response-plan.tsv').write_text('\n'.join(response_plan) + ('\n' if response_plan else ''))
-    (args.out / 'expected-output.txt').write_text('\n'.join(sorted(output_phrases)) + '\n')
+    (args.out / 'expected-output.txt').write_text(
+        ''.join(phrase + '\n' for phrase in sorted(output_phrases)))
     (args.out / 'completion-marker.txt').write_text(marker + '\n')
     (args.out / 'ctl.txt').write_text('\n'.join(control) + '\n')
     (args.out / 'manifest.lock.json').write_text(json.dumps({

@@ -110,7 +110,9 @@ with `PCOMM END ... RC=0`; the console trace stays in the run directory.
 `ALLOC` creates the outputs on the guest. A native TSO-style program may be
 run against the selected exchange volume where its binary and services are
 already qualified; [program conformance](CONFORMANCE.md) owns that test.
-Unchanged CMS MODULE execution is a later compatibility stage.
+Unchanged CMS MODULE execution uses the separate checked
+[CMS route](README.md#running-applications); it is not part of this fixture
+copy script.
 
 Exit PCOMM normally, stop Hercules, and run the export check against the
 stopped exchange image:

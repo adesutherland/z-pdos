@@ -15,6 +15,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <stdlib.h>
+#include "zpdos-version.h"
 
 static char buf[200];
 static size_t len;
@@ -320,7 +321,7 @@ static void processInput(void)
     }
     else if (ins_strcmp(buf, "version") == 0)
     {
-        printf("z/PDOS PDIO1; PCOMM operator interface 1\n");
+        printf("z/PDOS %s; PDIO1; PCOMM operator interface 1\n", ZPDOS_VERSION);
         printf("Exact image build: see the host image receipt.\n");
     }
     else if (ins_strcmp(buf, "devices") == 0 ||
@@ -665,7 +666,7 @@ static void dohelp(char *topic)
         return;
     }
     printf("z/PDOS PCOMM: first steps\n");
-    printf("VERSION  show interface and build-identity location\n");
+    printf("VERSION  show release version, interface and build-identity location\n");
     printf("DIR      list datasets, dates, formats and extents\n");
     printf("DEVICES  list attached addresses; VOLUMES lists mounted DASD\n");
     printf("MOUNT address volser; SELECT volser; UNMOUNT volser\n");

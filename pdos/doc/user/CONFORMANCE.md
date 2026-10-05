@@ -34,6 +34,10 @@ are bounded to one native batch and a simple one-block PDS directory. An
 subset uses single extents, ordinary members and VB records. Supply the
 application's *actual* loader companions, library and fixture datasets; a
 TSO-style launcher or XMIT file alone does not make a CMS MODULE runnable.
+Use an explicit empty `output_contains` list for a command judged by its
+return code and separate output readback. A phrase may appear in different
+checks: the judge searches only between that check's numbered `PCOMM BEGIN`
+and `PCOMM END` markers.
 
 A small manifest shape (replace paths, hashes and package-specific names):
 
