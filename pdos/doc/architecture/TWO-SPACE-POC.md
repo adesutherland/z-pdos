@@ -105,6 +105,91 @@ The current release kernel still has one ASCE and key-zero application
 execution as described in this architecture guide. No IPL or CMS/TSO binary
 was run by this fixture.
 
+## Steps 3 and 4: small K64 core, C31 services and shared-U calls
+
+The successor proof puts the assembler nucleus at K virtual
+`0x0100000000000000` and a separately backed Classic C31 service at K virtual
+`0x02000000`. U uses `0x02000000` for a different application module. Each
+space has a **region-first ASCE**, loaded as a full 64-bit CR1 value. Sparse
+region-first, region-second, region-third, segment and page tables support
+every 64-bit virtual bit; the high K nucleus exercises a nonzero region-first
+index. The current C32 kernel's eager 8.8 MiB table structure and 4 GiB
+aliasing are not part of this design. `twospace_dat.c` builds these tables from
+an independently reserved K-accessible real pool, with 4 KiB pages and
+big-endian 64-bit entries. Both table pools and backing frames must be
+reserved before translation is enabled. Page-table storage and low channel
+buffers consume real memory but **no U virtual addresses below 16 MiB**.
+Live table mutation will need translation invalidation; this builder is for
+bootstrap construction only.
+
+The SVC entry remains a real, DAT-off interruption island. It saves full
+registers and the old PSW, loads the K ASCE with `LCTLG`, then branches to
+the high K nucleus. That nucleus checks the full U pointer, copies a bounded
+request through a K alias into a K-owned C31 buffer, and invokes a Classic
+C service through a low K trampoline. It rejects a forged pointer whose low
+32 bits match a valid address. This fixture's aliases are fixed to two known
+pages; a general service gate will need checked page walks, lengths, overflow,
+write direction, access rights and fault recovery. The service returns in
+the caller's original 24, 31 or 64-bit mode and key 8. K code/data and DAT
+tables are not mapped in U.
+
+One AMODE24 application calls a different AMODE31 application directly in U.
+The callee invokes the same SVC and returns a code; the caller survives and
+continues to an AMODE64 application. The `twospace_placement.c` ledger is a
+bounded C31-compatible interval model for a future loader: it records page
+reservations with split high/low 32-bit addresses, rejects fixed-origin
+collisions, finds a free page-aligned location for a relocatable image and
+releases a module's reservations. The fixture refuses a conflicting fixed
+module before constructing U's DAT. It does not yet relocate or load a CMS
+MODULE or TSO load module, nor does it implement the REXX `ADDRESS` dispatcher.
+The synchronous call and return path is the first machine gate for that
+dispatcher.
+
+| PoC resource | Real backing | Virtual placement |
+| --- | --- | --- |
+| K DAT tables | 135,168 bytes, 33 real 4 KiB frames | No U mapping |
+| U DAT tables | 94,208 bytes, 23 real 4 KiB frames | No U mapping |
+| K64 nucleus | One real code page in the fixture | `0x0100000000000000` in K |
+| Classic C31 service and trampoline | Two real pages | `0x02000000`–`0x02001fff` in K |
+| U application pages below 16 MiB | Two real pages | `0x20000` and `0x21000` in U |
+| Other U application pages | Three real pages | `0x02000000`, `0x110000000`, `0x110001000` in U |
+
+The current fixture leaves 16,769,024 of 16,777,216 low U virtual bytes
+unmapped. A production CMS `0x14` compatibility page, images, stacks, heaps
+and guards reduce that amount. The measure says nothing about free *real*
+storage; a loader must separately count real frames. We will preserve a
+generous 31/64-bit heap policy and measure the constrained 24-bit budget
+against actual CMS24 and TSO24 images.
+
+This is a microkernel-shaped boundary: the K64 nucleus owns switching,
+interrupts, physical-frame and DAT authority, and checked transfer of service
+messages. C31 supervisor services run only in K; TSO and CMS personalities
+can use distinct adapters there. U holds applications and any in-space call
+protocol. No IBM TSO or CMS API is implied merely by this boundary.
+
+The [Step 3/4 qualification note](../qualification/TWO-SPACE-STEPS3-4-2026-10-05.md)
+records the actual Classic tool and Hercules checks.
+
+## Step 5: boot integration gate
+
+The current PLOAD reads a native `PDOS.SYS` load module into a fixed one-MiB
+slot at real 2 MiB, allocates its heap at real 1 MiB, and enters a one-ASCE
+C32 kernel. Its heap overlaps the checked fixed CMS24 RXVM image. Replacing
+`PDOS.SYS` with a flat core is not an IPL path: the successor fixture is
+currently installed with Hercules `loadcore` and has prebuilt real pages.
+
+The successor boot route must load a compact image into independently
+reserved real frames, protect K frames and tables, construct K/U region-first
+ASCEs, and enter the K64 nucleus from a real DAT-off island. It must give the
+C31 service body a K virtual home below 2 GiB, give U no kernel virtual
+mapping, and keep channel-command buffers reachable by 24-bit real addresses.
+It then needs program, external, I/O and machine-check entries, nesting and
+recovery, a bounded general U-buffer copier, service personality adapters,
+and collision-checked CMS/TSO module loading. Finally the normal 3390 image
+builder and fresh IPL qualification must select that route explicitly and run
+CMS24/CMS31 and TSO31/TSO64 binaries. Until then, Steps 3/4 are a machine
+proof and target component build, not a booted replacement kernel.
+
 ## Primary architecture and compatibility references
 
 - IBM, *z/Architecture Principles of Operation*, SA22-7832-14:

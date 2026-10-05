@@ -11,8 +11,8 @@ support or qualification. See [profiles](../../../doc/PROFILES.md) for those
 boundaries and the [exact guest record](../qualification/QUALIFICATION.md)
 for what has run.
 
-The proposed two-address-space successor and its separate diskless machine
-proof are in [the two-space PoC contract](TWO-SPACE-POC.md). The current
+The proposed two-address-space successor and its diskless K64/C31/shared-U
+results are in [the two-space PoC contract](TWO-SPACE-POC.md). The current
 disk-boot kernel described below has not yet adopted that layout.
 
 ## The system at a glance

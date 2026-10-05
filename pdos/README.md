@@ -10,6 +10,11 @@ support lets it preserve and dispatch 64-bit application state, with fixed
 high-memory windows for the qualified workloads. It has one address space and
 synchronous application execution. A native 64-bit C kernel is a separate goal.
 
+The [two-space successor proof](doc/architecture/TWO-SPACE-POC.md) exercises
+an AMODE64 assembler nucleus, protected Classic C31 services and applications
+sharing a separate 64-bit address space. It is a diskless machine result;
+the booted release kernel has not adopted it.
+
 The recorded source-built milestone runs unchanged cREXX TSO31, TSO64 ANY and
 TSO64 HIGH packages, including compiler, assembler, terminal and file workloads.
 The later [stage 3 source result](doc/qualification/STAGE3-2026-10-05.md) runs
