@@ -25,13 +25,13 @@ def run(args):
         "DIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\n"
         f"01B9 3390 {disk}\n")
     out.joinpath("run.rc").write_text(
-        f"sysclear\nipl 01B9\npause 1\nstopall\npsw\ngpr\ncr\n"
-        f"savecore \"{out / 'result.core'}\" 0 3ffff\nquit\n")
+        f"sysclear\nipl 01B9\npause 5\nstopall\npsw\ngpr\ncr\n"
+        f"savecore \"{out / 'result.core'}\" 0 1fffff\nquit\n")
     cmd = [str(hercules), "-t", "-f", str(out / "machine.cnf"),
            "-r", str(out / "run.rc")]
     try:
         proc = subprocess.run(cmd, cwd=out, capture_output=True, text=True,
-                              timeout=20)
+                              timeout=45)
         log = proc.stdout + proc.stderr
     except subprocess.TimeoutExpired as exc:
         log = (exc.stdout or b"").decode(errors="replace") + \
@@ -39,10 +39,27 @@ def run(args):
         proc = None
     out.joinpath("hercules.log").write_text(log)
     result_path = out / "result.core"
-    if result_path.exists() and result_path.stat().st_size == 0x40000:
+    if result_path.exists() and result_path.stat().st_size == 0x200000:
         raw = result_path.read_bytes()
+        reference = core.read_bytes()
         try:
             judged = judge(raw[:0xf000], log)
+            checks = judged["checks"]
+            report = struct.unpack_from(">8I", raw, 0x4080)
+            _, stage, launch, kpool, upool, kbytes, ubytes, real_bytes = report
+            checks["guest_built_asces"] = raw[0x4000:0x4010] == reference[0x4000:0x4010]
+            checks["guest_built_dat_tables"] = raw[0x100000:0x180000] == reference[0x100000:0x180000]
+            checks["checked_handover_report"] = (report[0] == 0x54535232 and
+                real_bytes == 0x1000000 and stage >= 0x400000 and
+                stage + 0x200000 <= launch and launch + 4096 <= real_bytes and
+                (kpool, upool, kbytes, ubytes) == (0x100000, 0x140000, 139264, 94208))
+            checks["guest_dat_unmap_remap_ptlb"] = struct.unpack_from(">I",raw,0x40a0)[0] == 2
+            judged["handover"] = {"stage_real": hex(stage),
+                                  "launcher_real": hex(launch),
+                                  "kernel_table_pool_real": hex(kpool),
+                                  "application_table_pool_real": hex(upool),
+                                  "kernel_table_bytes": kbytes,
+                                  "application_table_bytes": ubytes}
         except ValueError as exc:
             judged = {"pass": False, "checks": {"result_structure": False},
                       "reason": str(exc),

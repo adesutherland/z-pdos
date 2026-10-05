@@ -138,6 +138,14 @@ kcore:
     lghi %r1, 0x2000
     larl %r8, kcore
     stg %r8, 32(%r1)
+    larl %r6, k_table_alias_va
+    lg %r6, 0(%r6)
+    lg %r7, 0(%r6)           /* K31-addressable K DAT pool */
+    stg %r7, 40(%r1)
+    larl %r6, u_table_alias_va
+    lg %r6, 0(%r6)
+    lg %r7, 0(%r6)           /* K31-addressable U DAT pool */
+    stg %r7, 48(%r1)
     lg %r2, 8(%r1)
     sllg %r4, %r2, 5
     la %r4, 64(%r4,%r1)
@@ -187,6 +195,8 @@ return_app:
     lg %r1, 0(%r1)
     br %r1
 .balign 8
+k_table_alias_va: .quad 0x05000000
+u_table_alias_va: .quad 0x05040000
 low_user_va: .quad 0x21000
 high_user_va: .quad 0x110001000
 low_alias_va: .quad 0x04000000

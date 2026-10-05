@@ -1,55 +1,83 @@
 #!/usr/bin/env python3
-"""Checked binary adapter for the successor IPL fixture's U/18452 stream."""
+"""Binary adapter for the checked successor core dataset.
+
+The disk carries no DAT tables or ASCEs. The C31 guest stage constructs them
+when it reads this position-independent sparse package.
+"""
 import hashlib
 import json
 from pathlib import Path
 import struct
 import sys
+import zlib
 
 BLOCK = 18452
 PAGE = 4096
 CORE = 0x200000
-LAUNCH = 0x800000
+REAL = 0x1000000
+ENTRY = 0x1000
+LAUNCH_ITEM = CORE
+MAX_DATA_RECORDS = 40
 
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def pack(core, launch):
-    if len(core) != CORE or core[0x2000:0x2008] != b"PD2NEXT1":
+def crc(data):
+    return zlib.crc32(data) & 0xffffffff
+
+
+def bare_core(source):
+    if len(source) != CORE or source[0x2000:0x2008] != b"PD2NEXT1":
         raise ValueError("expected exact successor core")
-    if not 0 < len(launch) <= PAGE:
-        raise ValueError("launch stub exceeds one page")
+    if (struct.unpack_from(">I", source, 0x4004)[0] != 0x10000f or
+            struct.unpack_from(">I", source, 0x400c)[0] != 0x14000f):
+        raise ValueError("expected checked host DAT reference")
+    core = bytearray(source)
+    core[0x4000:0x4010] = bytes(16)
+    core[0x100000:0x180000] = bytes(0x80000)
+    return bytes(core)
+
+
+def pack(source, launch):
+    core = bare_core(source)
+    if not 0 < len(launch) <= PAGE or launch.count(b"TSL2") != 1:
+        raise ValueError("launch stub must have one descriptor and fit a page")
     entries = [(at, core[at:at + PAGE]) for at in range(0, CORE, PAGE)
                if any(core[at:at + PAGE])]
-    entries.append((LAUNCH, launch))
-    records = []
+    entries.append((LAUNCH_ITEM, launch))
+    data_records = []
     body = bytearray()
     count = 0
     for at, payload in entries:
         item = struct.pack(">IH", at, len(payload)) + payload
-        if 8 + len(body) + len(item) > BLOCK:
-            records.append(b"TSP1" + struct.pack(">HH", len(records), count) +
-                           bytes(body).ljust(BLOCK - 8, b"\0"))
+        if count == 4 or 8 + len(body) + len(item) > BLOCK:
+            data_records.append(b"TSD2" + struct.pack(">HH", len(data_records), count) +
+                                bytes(body).ljust(BLOCK - 8, b"\0"))
             body = bytearray()
             count = 0
         body.extend(item)
         count += 1
     if count:
-        records.append(b"TSP1" + struct.pack(">HH", len(records), count) +
-                       bytes(body).ljust(BLOCK - 8, b"\0"))
-    records.append(b"TSP1" + struct.pack(">HH", len(records), 0) +
-                   bytes(BLOCK - 8))
-    if len(records) > 40:
-        raise ValueError("sparse core exceeds fixed 15-track dataset")
+        data_records.append(b"TSD2" + struct.pack(">HH", len(data_records), count) +
+                            bytes(body).ljust(BLOCK - 8, b"\0"))
+    if not data_records or len(data_records) > MAX_DATA_RECORDS:
+        raise ValueError("core exceeds bounded dataset")
+    header = b"TSP2" + struct.pack(">HHIIIIIII", 2, 40, CORE, REAL,
+                                   len(data_records), crc(core), crc(launch),
+                                   len(launch), ENTRY)
+    header += struct.pack(">I", crc(header))
+    records = [header.ljust(BLOCK, b"\0"), *data_records,
+               b"TSE2" + struct.pack(">HH", len(data_records), 0) +
+               bytes(BLOCK - 8)]
     package = b"".join(records)
     rebuilt = bytearray(CORE)
-    launched = None
+    found_launch = None
     seen = set()
-    for seq, block in enumerate(records):
-        if block[:4] != b"TSP1" or struct.unpack_from(">H", block, 4)[0] != seq:
-            raise ValueError("package sequence check failed")
+    for seq, block in enumerate(data_records):
+        if block[:4] != b"TSD2" or struct.unpack_from(">H", block, 4)[0] != seq:
+            raise ValueError("record sequence check failed")
         n = struct.unpack_from(">H", block, 6)[0]
         offset = 8
         for _ in range(n):
@@ -60,25 +88,28 @@ def pack(core, launch):
             if at in seen or len(payload) != size:
                 raise ValueError("duplicate/truncated package entry")
             seen.add(at)
-            if at == LAUNCH:
-                launched = payload
+            if at == LAUNCH_ITEM:
+                found_launch = payload
             elif at % PAGE or size != PAGE or at >= CORE:
                 raise ValueError("bad core page entry")
             else:
                 rebuilt[at:at + PAGE] = payload
-    if rebuilt != core or launched != launch:
-        raise ValueError("sparse package does not reconstruct its inputs")
-    return package, len(entries) - 1, len(records)
+        if any(block[offset:]):
+            raise ValueError("nonzero record padding")
+    if bytes(rebuilt) != core or found_launch != launch:
+        raise ValueError("package does not reconstruct its inputs")
+    return package, len(entries) - 1, len(records), core
 
 
 def main():
     if len(sys.argv) != 4:
         return 2
-    core = Path(sys.argv[1]).read_bytes()
+    source = Path(sys.argv[1]).read_bytes()
     launch = Path(sys.argv[2]).read_bytes()
-    package, pages, records = pack(core, launch)
+    package, pages, records, core = pack(source, launch)
     Path(sys.argv[3]).write_bytes(package)
-    print(json.dumps({"core_sha256": digest(core),
+    print(json.dumps({"source_core_sha256": digest(source),
+                      "bare_core_sha256": digest(core),
                       "launch_sha256": digest(launch),
                       "package_sha256": digest(package),
                       "nonzero_core_pages": pages,

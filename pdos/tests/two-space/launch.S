@@ -1,18 +1,22 @@
-/* Real-address launch stub. It must live outside both copy ranges. */
+/* Real-address PIC launch stub. The C31 stage checks and fills TSL2 after
+   choosing nonoverlapping real frames. */
 .section .text,"ax"
 .global launch
 launch:
-    lghi %r0, 0
-    larl %r1, copy_size
-    lg %r1, 0(%r1)
-    larl %r2, source
-    lg %r2, 0(%r2)
+    larl %r4, launch_info
+    lg %r0, 8(%r4)
+    lg %r1, 24(%r4)
+    lg %r2, 16(%r4)
     lgr %r3, %r1
     mvcl %r0, %r2
-    larl %r4, start_psw
-    lpswe 0(%r4)
+    lpswe 32(%r4)
 .balign 8
-copy_size: .quad 0x200000
-source: .quad 0x400000
-start_psw: .quad 0x0000000180000000, 0x1000
+launch_info:
+    .ascii "TSL2"
+    .long 0
+    .quad 0                  /* destination real */
+    .quad 0                  /* source real */
+    .quad 0                  /* copy bytes */
+    .quad 0x0000000180000000 /* DAT-off AMODE64 PSW */
+    .quad 0                  /* entry real */
 .section .note.GNU-stack,"",@progbits

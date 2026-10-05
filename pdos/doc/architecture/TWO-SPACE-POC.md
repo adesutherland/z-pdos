@@ -8,7 +8,7 @@ data use K virtual addresses below 2 GiB. All applications, including AMODE24,
 AMODE31 and AMODE64 programs, use the same U translation. Application-to-
 application calls therefore retain ordinary in-space pointers when the target
 ABI permits them. This is a design contract and a bounded machine proof, not
-an implemented disk-boot kernel or a general CMS/TSO compatibility claim.
+a replacement disk-boot OS or a general CMS/TSO compatibility claim.
 
 ## Step 1: address and transition contract
 
@@ -192,18 +192,58 @@ The [Step 5 qualification note](../qualification/TWO-SPACE-STEP5-2026-10-05.md)
 records the exact image and guest result. The dataset names and fixed real
 addresses are fixture details, not a compatibility or ABI commitment.
 
-The production successor boot route must reserve real frames, construct and
-protect K/U region-first tables in the guest, and enter the K64 nucleus from
-a real DAT-off island. This proof boots tables prebuilt by the product C DAT
-source on the host, so live guest construction is still open. The route must
-give the C31 service body a K virtual home below 2 GiB, give U no kernel virtual
-mapping, and keep channel-command buffers reachable by 24-bit real addresses.
-It then needs program, external, I/O and machine-check entries, nesting and
-recovery, a bounded general U-buffer copier, service personality adapters,
-and collision-checked CMS/TSO module loading. Finally the normal 3390 image
-builder and fresh IPL qualification must select that route explicitly and run
-CMS24/CMS31 and TSO31/TSO64 binaries. The current disk proof establishes
-the boot crossing, not a booted replacement operating system.
+At this Step 5 checkpoint the tables were prebuilt by product C source on the
+host. The later guest-construction checkpoint is described below. The remaining
+OS integration needs program, external, I/O and machine-check entries, nesting
+and recovery, a bounded general U-buffer copier, service personality adapters,
+and collision-checked CMS/TSO module loading. The boot crossing does not by
+itself establish a replacement operating system.
+
+## Production slices 1 and 2: checked handover and guest DAT
+
+The successor now uses a separate `KCORE.BIN` dataset. `COMMAND.EXE` remains
+the ordinary PCOMM application. The version-2 package contains a 40-byte
+header, bounded sparse 4 KiB core pages, one position-independent launch stub,
+a terminator, sequence checks and CRC32 values for the bare core and stub.
+Every record is a fixed U/18452 block. The stage reads only within the
+dataset's DSCB first extent and checks the entire package before calling the
+launcher. CRC32 detects accidental package damage; this is not authenticated
+boot. The disk package has zeroed DAT pools and ASCE slots, which prevents a
+host-built table image from satisfying the guest-construction check.
+
+The C31 stage uses a supplied-storage real-frame ledger over the named 16 MiB
+profile. It reserves real 0–4 MiB for the live PLOAD/stage interval during
+loading, the 15–16 MiB PLOAD/stage stack, and 0–2 MiB for the final core
+during copy and execution. It allocates the 2 MiB staging source and one-page
+launcher outside both live intervals;
+the current first-fit result is real 4–6 MiB and real 6 MiB respectively.
+The launcher is position-independent and receives its checked source, length
+and entry through a descriptor patched by the guest. PLOAD and the C31 stage
+are dead before the launcher overwrites their real frames. The linked fixture
+still chooses the final real destination at zero; the transient staging
+locations are allocated, not built into the package or launcher.
+
+A second ledger reserves every supplied final-core page, then allocates
+separate contiguous K/U DAT table pools in unused final-core frames. The C31
+guest stage runs the product sparse region-first builder there and writes both
+ASCEs into the core control page. In the checked 16 MiB profile the chosen
+pool origins are real `0x100000` and `0x140000`. The base mappings use 33 K
+and 23 U 4 KiB table frames. K-only C31 virtual aliases at `0x05000000` and
+`0x05040000` make both completed pools reachable after DAT is enabled; the
+aliases add one K table frame, so the current K total is 34 frames. The K64
+entry still runs at virtual `0x0100000000000000`, while U has no K or table
+mappings. `TSDATTACH` can reopen a completed pool through its K alias using the
+recorded real origin, ASCE and used size. A source-level map/unmap API
+requires a purge callback once a table is marked live. The guest stage calls
+a Classic-assembled single-CPU `PTLB` callback for an unmap/remap cycle before
+it enables DAT, then boots the final table set. This verifies the guest
+builder, callback execution and final tables; a DAT-on runtime mutation by K
+is a separate integration check before services depend on it.
+
+The exact fresh IPL, host comparison and deliberately damaged-package result
+are in the [slices 1/2 qualification record](../qualification/TWO-SPACE-SLICES1-2-2026-10-05.md).
+The first two slices do not migrate the OS service, loader or interruption
+paths. The active release kernel remains the one-ASCE C32 system.
 
 ## Primary architecture and compatibility references
 

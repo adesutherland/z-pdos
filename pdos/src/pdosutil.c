@@ -29,7 +29,8 @@ int int_rdblock(int dev, int cyl, int head, int rec,
 /* find a file on disk */
 /* 0 = success, else negative return code */
 
-int findFile(int ipldev, char *dsn, int *c, int *h, int *r)
+int findFileExtent(int ipldev, char *dsn, int *c, int *h, int *r,
+                   int *endc, int *endh)
 {
     char *raw;
     char *initial;
@@ -57,6 +58,7 @@ int findFile(int ipldev, char *dsn, int *c, int *h, int *r)
     } dscb1;
     int len;
     int errcnt = 0;
+    int found = 0;
 
     if (memchr(dsn, '\0', FILENAME_MAX) == NULL)
     {
@@ -120,6 +122,7 @@ int findFile(int ipldev, char *dsn, int *c, int *h, int *r)
                                dscb1.startcchh, 2);
                         memcpy((char *)&head + sizeof(int) - 2,
                                dscb1.startcchh + 2, 2);
+                        found = 1;
                         break;
                     }
                 }
@@ -133,7 +136,7 @@ int findFile(int ipldev, char *dsn, int *c, int *h, int *r)
         }        
     }
     
-    if (cnt <= 0)
+    if (cnt <= 0 || !found)
     {
         /* not found */
         return (-1);
@@ -141,7 +144,18 @@ int findFile(int ipldev, char *dsn, int *c, int *h, int *r)
     *c = cyl;
     *h = head;
     *r = rec;
+    if (endc != NULL && endh != NULL)
+    {
+        *endc = *endh = 0;
+        memcpy((char *)endc + sizeof(int) - 2, dscb1.endcchh, 2);
+        memcpy((char *)endh + sizeof(int) - 2, dscb1.endcchh + 2, 2);
+    }
     return (0);
+}
+
+int findFile(int ipldev, char *dsn, int *c, int *h, int *r)
+{
+    return findFileExtent(ipldev, dsn, c, h, r, NULL, NULL);
 }
 
 

@@ -11,6 +11,8 @@
 /*********************************************************************/
 
 int findFile(int ipldev, char *dsn, int *c, int *h, int *r);
+int findFileExtent(int ipldev, char *dsn, int *c, int *h, int *r,
+                   int *endc, int *endh);
 int fixPE(char *buf, int *len, int *entry, int rlad, int capacity);
 /* Return the native directory's AMODE code: 0=24, 1=64, 2=31, 3=ANY. */
 int fixPEMode(char *buf, int *len, int *entry, int rlad, int capacity,

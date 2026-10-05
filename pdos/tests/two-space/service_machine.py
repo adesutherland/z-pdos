@@ -99,13 +99,15 @@ def make_core(elf, classic, dat_emit, out):
             qword(built_core, 0x140000 + 8 * 8) != 0x20:
         raise ValueError("high K R1 entry or U isolation absent")
     kstats = {"table_bytes": kbytes, "table_4k_frames": kbytes // 4096,
-              "mapped_pages": len(kernel)}
+              "mapped_pages": len(kernel) + 2 * 0x40000 // 4096}
     ustats = {"table_bytes": ubytes, "table_4k_frames": ubytes // 4096,
               "mapped_pages": len(application)}
     return {"kernel_asce": hex(kasce), "application_asce": hex(uasce),
             "kernel_dat": kstats, "application_dat": ustats,
             "kernel_mappings": {hex(k): hex(v) for k, v in kernel.items()},
             "application_mappings": {hex(k): hex(v) for k, v in application.items()},
+            "kernel_table_aliases": {"kernel": ["0x5000000", "0x503ffff"],
+                                     "application_tables": ["0x5040000", "0x507ffff"]},
             "kernel_pages_in_application_low_virtual": 0,
             "application_low_virtual_bytes": sum(4096 for va in application if va < 0x1000000),
             "application_low_unmapped_bytes": 0x1000000 - sum(4096 for va in application if va < 0x1000000),
@@ -121,6 +123,8 @@ def judge(raw, log):
     checks = {"four_svc_entries": qword(raw, 0x2008) == 4,
               "completion_marker": qword(raw, 0x2010) == 1,
               "kcore_above_region_third_range": qword(raw, 0x2020) == KCORE,
+              "k_can_read_own_dat_pool": qword(raw, 0x2028) == 0x10400f,
+              "k_can_read_u_dat_pool": qword(raw, 0x2030) == 0x14400f,
               "expected_isolation_fault": raw[0x8e:0x90] == b"\0\x11",
               "fault_in_problem_amode64": qword(raw, 0x150) & 0xFFFFFFFFFC000000 == 0x0481000180000000,
               "unmapped_kernel_entry_page": qword(raw, 0xa8) & ~4095 == 0x1000}
@@ -157,6 +161,7 @@ def run(args):
         "pdos/tests/two-space/" + name: digest(src / name)
         for name in ("service.S", "service.ld", "service_machine.py", "machine.py")}
     for name in ("twospace_service.c", "twospace_dat.c", "twospace_dat.h",
+                 "twospace_fixture.c", "twospace_fixture.h",
                  "twospace_placement.c", "twospace_placement.h"):
         manifest["source_sha256"]["pdos/src/" + name] = digest(src.parent.parent / "src" / name)
     for name in ("dat.c", "dat_emit.c", "placement.c"):

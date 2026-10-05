@@ -18,6 +18,11 @@ main: procedure = .int
   root = strip(locations.1); out = root || "/" || work
   address crexx "run cmake -E make_directory :out"
   call require rc = 0, "create output"
+  realtest = out || "/real-test"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_real.c pdos/tests/two-space/real.c -o :realtest"
+  call require rc = 0, "real-frame ledger host build"
+  address crexx "run :realtest"
+  call require rc = 0, "real-frame lifetime and release controls"
   base = work || "/base"
   call runlog "crexx -nokeep pdos/scripts/image.crexx --args " || shellquote(base) || " " || shellquote(hercdir), out || "/base-build.log"
   classiccc = root || "/build/compiler/mvs/gcc/mf-classic-cc"
@@ -25,10 +30,22 @@ main: procedure = .int
   classicld = root || "/build/tools/linker/mf-classic-ld"
   asm = out || "/boot.asm"; obj = out || "/boot.obj"
   module = out || "/boot.mvs"; mapfile = out || "/boot.map"
-  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src -I pdpclib/src -DUSE_MEMMGR pdos/src/twospace_boot.c -o :asm"
-  call require rc = 0, "Classic C31 IPL stage"
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :obj"
-  call require rc = 0, "Classic assembler IPL stage"
+  boot_sources = "twospace_boot twospace_dat twospace_fixture twospace_real"
+  boot_objects = .string[]
+  do i = 1 to words(boot_sources)
+    name = word(boot_sources,i)
+    asm = out || "/" || name || ".asm"
+    obj = out || "/" || name || ".obj"
+    source = "pdos/src/" || name || ".c"
+    address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src -I pdpclib/src -DUSE_MEMMGR :source -o :asm"
+    call require rc = 0, "Classic C31 " || name
+    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :obj"
+    call require rc = 0, "Classic assembler " || name
+    boot_objects[i] = obj
+  end
+  tlbobj = out || "/twospace_tlb.obj"
+  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_tlb.asm :tlbobj"
+  call require rc = 0, "Classic assembler single-CPU PTLB"
   c = out || "/base/c/objects"; support = out || "/base/support"
   objects = .string[]
   objects[1] = support || "/SAPSTART.obj"
@@ -39,9 +56,12 @@ main: procedure = .int
     objects[i+3] = c || "/" || word(common,i) || ".obj"
   end
   count = words(common)+4
-  objects[count] = obj
-  objects[count+1] = support || "/PLOADSUP.obj"
-  objects[count+2] = c || "/PDOSUTIL.obj"
+  do i = 1 to boot_objects.0
+    objects[count+i-1] = boot_objects[i]
+  end
+  objects[count+boot_objects.0] = tlbobj
+  objects[count+boot_objects.0+1] = support || "/PLOADSUP.obj"
+  objects[count+boot_objects.0+2] = c || "/PDOSUTIL.obj"
   address crexx "run :classicld --oformat mvs --image-base 0 --amode 31 --rmode 24 -e @@MAIN -Map :mapfile -o :module :objects[]"
   call require rc = 0, "native C31 IPL stage link"
   launchobj = out || "/launch.o"; launchbin = out || "/launch.bin"
@@ -53,12 +73,16 @@ main: procedure = .int
   address crexx "run cmake -E make_directory :media"
   call require rc = 0, "media output"
   pload = media || "/pload.sys"; pdos = media || "/pdos.sys"
-  package = media || "/command.exe"; config = media || "/config.sys"
+  package = media || "/kcore.bin"; config = media || "/config.sys"
+  command = media || "/command.exe"
   from = out || "/base/linked/PLOAD-0.bin"
   address crexx "run cmake -E copy :from :pload"
   call require rc = 0, "source-built PLOAD"
   address crexx "run cmake -E copy :module :pdos"
   call require rc = 0, "successor IPL stage"
+  from = out || "/base/linked/PCOMM.mvs"
+  address crexx "run cmake -E copy :from :command"
+  call require rc = 0, "ordinary COMMAND.EXE dataset"
   call runlog "env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pack_core.py " || shellquote(core) || " " || shellquote(launchbin) || " " || shellquote(package), out || "/package.log"
   call put_binary config,'F0F0F0F940F3F2F7F015'x
   ctl = media || "/ctl.txt"
@@ -68,31 +92,44 @@ main: procedure = .int
   call lineout ctl,"PDOS.SYS SEQ pdos.sys CYL 1 1 0 PS F 18452 18452"
   call lineout ctl,"CONFIG.SYS SEQ config.sys CYL 1 1 0 PS F 10 10"
   call lineout ctl,"COMMAND.EXE SEQ command.exe CYL 1 1 0 PS F 18452 18452"
+  call lineout ctl,"KCORE.BIN SEQ kcore.bin CYL 1 1 0 PS F 18452 18452"
   call lineout ctl
   installer = out || "/base/install-ipl"
   address crexx "cd :media"
   call runlog shellquote(hercdir || "/dasdload") || " -bz2 ctl.txt datasets.cckd", media || "/dasdload.log"
   call runlog shellquote(hercdir || "/cckd2ckd") || " -q -cyls 100 datasets.cckd datasets.ckd", media || "/cckd2ckd.log"
-  call runlog shellquote(installer) || " datasets.ckd pdos00.ckd pload.sys pdos.sys command.exe config.sys", media || "/ipl-check.log"
+  call runlog shellquote(installer) || " datasets.ckd pdos00.ckd pload.sys pdos.sys command.exe config.sys kcore.bin", media || "/ipl-check.log"
   call runlog shellquote(hercdir || "/ckd2cckd") || " -q -bz2 -cyls 100 pdos00.ckd pdos00.cckd", media || "/ckd2cckd.log"
   call runlog shellquote(hercdir || "/cckd2ckd") || " -q -cyls 100 pdos00.cckd readback.ckd", media || "/readback.log"
-  call runlog shellquote(installer) || " --compare pdos00.ckd readback.ckd pload.sys pdos.sys command.exe config.sys", media || "/roundtrip-check.log"
+  call runlog shellquote(installer) || " --compare pdos00.ckd readback.ckd pload.sys pdos.sys command.exe config.sys kcore.bin", media || "/roundtrip-check.log"
   address crexx "cd :root"
   inputs = .string[]
   inputs[1] = "pdos/src/twospace_boot.c"
-  inputs[2] = "pdos/tests/two-space/launch.S"
-  inputs[3] = "pdos/tests/two-space/pack_core.py"
-  inputs[4] = "pdos/tests/two-space/ipl_machine.py"
-  inputs[5] = "pdos/scripts/two-space-ipl.crexx"
-  inputs[6] = core; inputs[7] = gnuas; inputs[8] = gnuld
-  inputs[9] = classiccc; inputs[10] = classicas; inputs[11] = classicld
-  inputs[12] = hercdir || "/hercules"
+  inputs[2] = "pdos/src/twospace_dat.c"
+  inputs[3] = "pdos/src/twospace_fixture.c"
+  inputs[4] = "pdos/src/twospace_real.c"
+  inputs[5] = "pdos/src/twospace_tlb.asm"
+  inputs[6] = "pdos/src/twospace_dat.h"
+  inputs[7] = "pdos/src/twospace_fixture.h"
+  inputs[8] = "pdos/src/twospace_real.h"
+  inputs[9] = "pdos/src/pdosutil.c"
+  inputs[10] = "pdos/src/pdosutil.h"
+  inputs[11] = "pdos/src/install-ipl.c"
+  inputs[12] = "pdos/tests/two-space/real.c"
+  inputs[13] = "pdos/tests/two-space/launch.S"
+  inputs[14] = "pdos/tests/two-space/pack_core.py"
+  inputs[15] = "pdos/tests/two-space/ipl_machine.py"
+  inputs[16] = "pdos/scripts/two-space-ipl.crexx"
+  inputs[17] = core; inputs[18] = gnuas; inputs[19] = gnuld
+  inputs[20] = classiccc; inputs[21] = classicas; inputs[22] = classicld
+  inputs[23] = hercdir || "/hercules"
   manifest = out || "/inputs.sha256"
   address system "shasum -a 256 " || quoted(inputs) || " > " || shellquote(manifest)
   call require rc = 0, "successor IPL producer identities"
   outputs = .string[]
   outputs[1] = module; outputs[2] = launchbin; outputs[3] = package
-  outputs[4] = media || "/pdos00.ckd"; outputs[5] = media || "/pdos00.cckd"
+  outputs[4] = command; outputs[5] = media || "/pdos00.ckd"
+  outputs[6] = media || "/pdos00.cckd"
   manifest = out || "/outputs.sha256"
   address system "shasum -a 256 " || quoted(outputs) || " > " || shellquote(manifest)
   call require rc = 0, "successor IPL output identities"

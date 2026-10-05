@@ -113,7 +113,8 @@ static void dataset(FILE *disk, const char *name, const char *path,
     REQUIRE(logical > 0 && count == (logical+block-1)/block*block);
     printf("%s: all %lu source bytes and %lu zero padding bytes read back\n",name,logical,count-logical);
 }
-static void validate(FILE *disk, const char **files, int installed)
+static void validate(FILE *disk, const char **files, int installed,
+                     int successor)
 {
     static const unsigned char keys[8] = {0xc9,0xd7,0xd3,0xf1,0xc9,0xd7,0xd3,0xf2};
     unsigned char header[512], psw[8], *p; unsigned key, size; unsigned long target; FILE *pload;
@@ -137,6 +138,7 @@ static void validate(FILE *disk, const char **files, int installed)
     dataset(disk,"PDOS.SYS",files[1],45,60,18452);
     dataset(disk,"COMMAND.EXE",files[2],75,90,18452);
     dataset(disk,"CONFIG.SYS",files[3],60,75,10);
+    if (successor) dataset(disk,"KCORE.BIN",files[4],90,105,18452);
 }
 static void unchanged(FILE *input, FILE *output, int transport)
 {
@@ -164,15 +166,19 @@ static void unchanged(FILE *input, FILE *output, int transport)
 int main(int argc, char **argv)
 {
     FILE *input, *output, *existing; size_t n, i; int transport;
-    const char *files[4];
-    transport = argc == 8 && !strcmp(argv[1],"--compare");
+    const char *files[5];
+    int successor;
+    transport = argc >= 8 && !strcmp(argv[1],"--compare");
     if (transport) { --argc; ++argv; }
-    if (argc != 7) return 2;
-    for (i = 0; i < 4; ++i) files[i] = argv[i+3];
+    if (argc != 7 && argc != 8) return 2;
+    successor = argc == 8;
+    for (i = 0; i < (size_t)(successor ? 5 : 4); ++i) files[i] = argv[i+3];
     bootstrap();
     if (transport) {
         input = fopen(argv[1],"rb"); output = fopen(argv[2],"rb"); REQUIRE(input && output);
-        validate(input,files,1); validate(output,files,1); unchanged(input,output,1);
+        validate(input,files,1,successor);
+        validate(output,files,1,successor);
+        unchanged(input,output,1);
         REQUIRE(fclose(input) == 0 && fclose(output) == 0);
         puts("CCKD roundtrip: every guest byte unchanged; only the 12-digit host serial may differ");
         return 0;
@@ -181,7 +187,7 @@ int main(int argc, char **argv)
     if (existing) { fclose(existing); fprintf(stderr,"IPL output already exists\n"); return 2; }
     if (errno != ENOENT || !strcmp(argv[1],argv[2])) return 2;
     input = fopen(argv[1],"rb"); REQUIRE(input != NULL);
-    validate(input,files,0); REQUIRE(fseek(input,0,SEEK_SET) == 0);
+    validate(input,files,0,successor); REQUIRE(fseek(input,0,SEEK_SET) == 0);
     output = fopen(argv[2],"wb"); REQUIRE(output != NULL);
     while ((n = fread(track,1,sizeof track,input)) != 0) REQUIRE(fwrite(track,1,n,output) == n);
     REQUIRE(!ferror(input) && fclose(input) == 0);
@@ -190,7 +196,7 @@ int main(int argc, char **argv)
     REQUIRE(fclose(output) == 0);
     input = fopen(argv[1],"rb"); output = fopen(argv[2],"rb"); REQUIRE(input && output);
     unchanged(input,output,0); REQUIRE(fclose(input) == 0);
-    validate(output,files,1); REQUIRE(fclose(output) == 0);
+    validate(output,files,1,successor); REQUIRE(fclose(output) == 0);
     puts("100-cylinder CKD image: source IPL vectors, placement and complete payload readback pass");
     return 0;
 }

@@ -9,10 +9,14 @@ static TSPADDR address(unsigned int hi, unsigned int lo)
 static unsigned int word(const unsigned char *p)
 { return ((unsigned int)p[0]<<24)|((unsigned int)p[1]<<16)|
          ((unsigned int)p[2]<<8)|(unsigned int)p[3]; }
+static void purge(void *context)
+{ ++*(unsigned int *)context; }
 
 int main(void)
 {
-    TSDSTATE k, u, small;
+    TSDSTATE k, u, small, attached;
+    TSPADDR previous;
+    unsigned int purges = 0U;
     unsigned char *kp, *up, *tiny;
     kp = (unsigned char *)malloc(0x40000U);
     up = (unsigned char *)malloc(0x40000U);
@@ -36,7 +40,26 @@ int main(void)
     CHECK(small.used == 16384U); /* failure leaves no partial tables */
     CHECK(TSDMAP(&k, address(0,1), address(0,0)) == TSD_BAD);
     CHECK(TSDMAP(&k, address(0,0x500000U), address(0,0x100000U)) == TSD_BAD);
+    CHECK(TSDMAPTABLE(&k,address(0,0x05000000U),
+                      address(0,0x100000U)) == TSD_OK);
+    CHECK(TSDLIVE(&u,0,0) == TSD_BAD);
+    CHECK(TSDLIVE(&u,purge,&purges) == TSD_OK);
+    CHECK(TSDUNMAP(&u,address(0,0x20000U),&previous) == TSD_OK);
+    CHECK(previous.hi == 0U && previous.lo == 0x5000U && purges == 1U);
+    CHECK(TSDUNMAP(&u,address(0,0x20000U),&previous) == TSD_MISSING);
+    CHECK(purges == 1U);
+    CHECK(TSDMAP(&u,address(0,0x20000U),address(0,0x5000U)) == TSD_OK);
+    CHECK(purges == 2U);
+    CHECK(TSDMAP(&u,address(0,0x20000U),address(0,0x5000U)) == TSD_EXISTS);
+    CHECK(purges == 2U);
+    CHECK(TSDATTACH(&attached,up,0x140000U,0x40000U,u.used,u.asce_lo)
+          == TSD_OK);
+    CHECK(TSDLIVE(&attached,purge,&purges) == TSD_OK);
+    CHECK(TSDUNMAP(&attached,address(0,0x20000U),&previous) == TSD_OK);
+    CHECK(previous.lo == 0x5000U && purges == 3U);
+    CHECK(TSDMAP(&attached,address(0,0x20000U),
+                 address(0,0x5000U)) == TSD_OK && purges == 4U);
     free(kp); free(up); free(tiny);
-    puts("full-width sparse DAT: high K, separate U, duplicate and exhausted pool pass");
+    puts("full-width sparse DAT: high K, separate U, live purge, unmap and remap pass");
     return 0;
 }

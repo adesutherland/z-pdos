@@ -61,7 +61,7 @@ main: procedure = .int
   address crexx "run :placetest"
   if rc <> 0 then return rc
   datemit = out || "/dat-emit"
-  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src pdos/src/twospace_dat.c pdos/src/twospace_placement.c pdos/tests/two-space/dat_emit.c -o :datemit"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src pdos/src/twospace_dat.c pdos/src/twospace_fixture.c pdos/src/twospace_placement.c pdos/tests/two-space/dat_emit.c -o :datemit"
   if rc <> 0 then return rc
   asobject = out || "/service.o"
   elf = out || "/service.elf"
