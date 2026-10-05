@@ -5,6 +5,13 @@ and disk construction. It uses no prebuilt mainframe objects or proprietary
 mainframe build tools. The recipes run from the repository root and write
 under ignored `build/pdos/`.
 
+The separate [two-space successor](TWO-SPACE-POC.md) uses
+`two-space-next.crexx` and `two-space-ipl.crexx` to build a diagnostic K64
+core, Classic C31 endpoint and disposable `KCORE.BIN` IPL disk. Those inputs
+are outside the active three-link `image.crexx` route below. The latest
+[storage checkpoint](../qualification/TWO-SPACE-STORAGE-OVERLAY-2026-10-05.md)
+qualifies that fixture, not a replacement `PDOS.SYS` image.
+
 ## Source inputs
 
 | Input | Owner and purpose |

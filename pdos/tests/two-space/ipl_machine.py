@@ -6,9 +6,28 @@ from pathlib import Path
 import struct
 import subprocess
 import sys
+import zlib
 
 from machine import digest
 from service_machine import judge
+
+
+def page_unmapped(raw, root, virtual):
+    hi, lo = virtual >> 32, virtual & 0xffffffff
+    indexes = (hi >> 21, (hi >> 10) & 2047,
+               ((hi & 1023) << 1) | (lo >> 31),
+               (lo >> 20) & 2047, (lo >> 12) & 255)
+    origin = root & ~4095
+    for level, index in enumerate(indexes):
+        entry = struct.unpack_from(">Q", raw, origin + index * 8)[0]
+        if level == 4:
+            return entry == 0x400
+        if entry == (0x400 if level == 3 else 0x20):
+            return True
+        origin = entry & ~4095
+        if origin < 0x140000 or origin >= 0x180000:
+            return False
+    return False
 
 
 def run(args):
@@ -48,12 +67,23 @@ def run(args):
             report = struct.unpack_from(">8I", raw, 0x4080)
             _, stage, launch, kpool, upool, kbytes, ubytes, real_bytes = report
             checks["guest_built_asces"] = raw[0x4000:0x4010] == reference[0x4000:0x4010]
-            checks["guest_built_dat_tables"] = raw[0x100000:0x180000] == reference[0x100000:0x180000]
+            checks["guest_built_dat_tables"] = (
+                struct.unpack_from(">I",raw,0x40b0)[0] ==
+                    zlib.crc32(reference[0x100000:0x140000]) and
+                struct.unpack_from(">I",raw,0x40b4)[0] ==
+                    zlib.crc32(reference[0x140000:0x180000]) and
+                raw[0x100000:0x140000] == reference[0x100000:0x140000])
+            checks["runtime_u_pages_released"] = (
+                page_unmapped(raw, 0x14000f, 0x22000) and
+                page_unmapped(raw, 0x14000f, 0x02010000) and
+                raw[0x140000:0x180000] == reference[0x140000:0x180000])
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
                 real_bytes == 0x1000000 and stage >= 0x400000 and
                 stage + 0x200000 <= launch and launch + 4096 <= real_bytes and
-                (kpool, upool, kbytes, ubytes) ==
-                (0x100000, 0x140000, 200704, 94208))
+                (kpool, upool, kbytes) ==
+                (0x100000, 0x140000, 200704) and
+                struct.unpack_from(">I",raw,0x40b8)[0] == 94208 and
+                ubytes == 94208)
             checks["guest_dat_unmap_remap_ptlb"] = struct.unpack_from(">I",raw,0x40a0)[0] == 2
             judged["handover"] = {"stage_real": hex(stage),
                                   "launcher_real": hex(launch),

@@ -11,11 +11,23 @@ support or qualification. See [profiles](../../../doc/PROFILES.md) for those
 boundaries and the [exact guest record](../qualification/QUALIFICATION.md)
 for what has run.
 
-The proposed two-address-space successor, its K64/C31/shared-U proofs and its
-checked guest-DAT IPL and bounded interruption/service gate are in
+The two-address-space successor, its K64/C31/shared-U proofs, checked guest-DAT
+IPL, bounded interruption/service gate and live storage checkpoint are in
 [the two-space PoC contract](TWO-SPACE-POC.md).
 The current released disk-boot kernel described below has not yet adopted
 that layout.
+
+The successor now has a coherent but bounded memory path. K64 owns the ASCE
+switch and saves full-width context; a K-only C31 endpoint walks U's tables
+through a K alias. U allocation chooses an interval in one shared 64-bit map,
+backs it with real frames outside the core, zeroes them and changes the live
+U DAT with a single-CPU purge. It can return a low U address backed by high
+real storage. The first actual service subset is conditional SVC 120
+GETMAIN/FREEMAIN. A host-checked overlay primitive can preserve a suspended
+fixed-origin caller while child frames occupy the same U address. See the
+[exact checkpoint](../qualification/TWO-SPACE-STORAGE-OVERLAY-2026-10-05.md).
+The successor still lacks the format loaders, CMS/TSO service adapters,
+device I/O and command dispatch needed to become the selected OS.
 
 ## The system at a glance
 

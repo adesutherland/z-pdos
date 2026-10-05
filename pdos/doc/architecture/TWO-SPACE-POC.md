@@ -258,6 +258,49 @@ are in the [slices 1/2 qualification record](../qualification/TWO-SPACE-SLICES1-
 Slices 3/4 add the bounded interruption and service gate described above.
 The active release kernel remains the one-ASCE C32 system.
 
+## PD-003 storage and fixed-overlay checkpoint
+
+The [storage and overlay record](../qualification/TWO-SPACE-STORAGE-OVERLAY-2026-10-05.md)
+extends the same 16 MiB successor with a K-owned page allocator. The K64
+nucleus passes a saved-context request to a C31 endpoint through K memory.
+Conditional SVC 120 GETMAIN/FREEMAIN is the first real service subset: K
+assigns a U virtual interval, backs it with separate real frames, gives them
+storage key 8, changes U's live DAT, purges the single CPU's translations and
+returns the full address in
+R1. A C31 pointer never represents a U virtual address. The fixture's
+AMODE24 call obtains U `0x22000` using real `0x200000`; an AMODE64 caller
+obtains U `0x02010000`. A 16 MiB request fails truthfully in the 16 MiB
+physical profile, without taking 24-bit virtual space. The U callers wrote
+their new pages in problem state. Both successful frees restore the original
+U PTEs and storage key 0. K, DAT tables and heaps remain absent from U's
+low range; physical K and channel reservations still reduce real capacity.
+
+The allocator's search begins at `0x20000` for 24-bit requests and skips the
+live interval inventory. With a registered CMS24 RXVM image ending at
+`0x1bb000`, the first subsequent page can start there. This retains the
+`0x1bb000`–`0x200000` gap that an artificial 2 MiB U floor would lose. The
+host interval calculation leaves 15,089,664 low virtual bytes unreserved
+after the CMS24 image and a U-owned page at zero, before a U stack or heap.
+The real guest has **not** yet loaded that CMS24 image under K64, and TSO24
+placement and heap measurements remain pending.
+
+Fixed-origin collision handling now has a K-owned page-backing primitive.
+It keeps a suspended caller's real frames intact, maps distinct child frames
+at exactly the same U address, and restores the caller's mapping after a
+nested child. Two levels, original byte preservation and return-code transfer
+passed a host control. The direct, nonoverlapping U call in the machine
+fixture remains separate. There is no CMS/TSO format loader, relocation pass,
+REXX `ADDRESS` integration or actual colliding guest call yet.
+
+The guest bootstrap records CRC32 values for both completed DAT pools before
+K runs. The IPL oracle compares these to the host reference, then checks the
+post-run U table state separately. This avoids mistaking a legitimate live
+map/unmap for a bad bootstrap. The fresh fixture IPL passes 79 checks. The
+successor is still a selectable test dataset on its own disposable disk, not
+the normal `PDOS.SYS` replacement selected for CMS/TSO applications. The
+service endpoint also lacks channel/dataset, terminal and command handlers;
+those are the main integration work in slices 5–7.
+
 ## Primary architecture and compatibility references
 
 - IBM, *z/Architecture Principles of Operation*, SA22-7832-14:

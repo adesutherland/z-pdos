@@ -129,11 +129,22 @@ exercised during guest startup before DAT is enabled; both table pools have
 K-only C31 virtual aliases exercised after DAT is enabled. Slices 3 and 4
 now pass a fresh IPL of that fixture, including nested SVC, U fault recovery,
 full-width U page walks, bounded transfers, CMS/TSO probe selectors and a
-synthetic machine-check fail-stop control. DAT-on runtime mutation, real
-asynchronous external/I/O handling, machine-check hardware injection, frame
-reclamation by the running K nucleus and wider memory profiles remain open.
+synthetic machine-check fail-stop control. Real asynchronous external/I/O
+handling, machine-check hardware injection, general frame reclamation by the
+running K nucleus and wider memory profiles remain open.
 The final-core placement is still the fixture's linked real-zero image;
 actual CMS/TSO application compatibility remains unqualified.
+
+The [storage and overlay checkpoint](qualification/TWO-SPACE-STORAGE-OVERLAY-2026-10-05.md)
+adds a K C31 conditional SVC 120 subset, live DAT map/free with PTLB and no
+above-to-below fallback. The fresh diagnostic 3390 IPL passes its storage
+and restored-table checks. The host control exercises two nested fixed-origin
+backing swaps and caller restoration. Slice 5 still needs channel/dataset,
+terminal and command services plus the 24-bit channel-buffer and real CMS24/
+TSO24 budget audits. Slice 6 still needs actual CMS/TSO format loading,
+relocation and REXX `ADDRESS` calls. Slice 7 still needs an explicitly selected
+normal replacement image and unchanged CMS/TSO guest qualification. The
+release route remains the one-ASCE kernel.
 
 ## PD-004: Batch-file delivery
 

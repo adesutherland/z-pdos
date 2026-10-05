@@ -195,6 +195,11 @@ int main(int argc, char **argv)
     put32(core+0x4094U,dat.kbytes); put32(core+0x4098U,dat.ubytes);
     put32(core+0x409cU,TSF_REAL_BYTES);
     put32(core+0x40a0U,purges);
+    /* Preserve the guest-built boot snapshot before K performs live U map
+       changes. The runtime updates 0x4098 with its current U table use. */
+    put32(core+0x40b0U,crc32_bytes(core+kpool,TSF_POOL_BYTES));
+    put32(core+0x40b4U,crc32_bytes(core+upool,TSF_POOL_BYTES));
+    put32(core+0x40b8U,dat.ubytes);
     DETAIL[1]=stage; DETAIL[2]=launch;
     DIAG = 0x5453ffffU;
     ((void (*)(void))stub)();

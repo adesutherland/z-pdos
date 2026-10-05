@@ -176,6 +176,22 @@ def judge(raw, log):
     checks["write_to_u_code_denied"] = struct.unpack_from(">I",raw,0x1201c)[0] == 0xfffffffc
     checks["wrapped_u_address_rejected"] = struct.unpack_from(">I",raw,0x12020)[0] == 0xfffffffd
     checks["oversized_u_length_rejected"] = struct.unpack_from(">I",raw,0x12028)[0] == 0xfffffffd
+    checks["cms24_live_getmain_freemain"] = (
+        struct.unpack_from(">III",raw,0x7020) == (0x22000,0,0) and
+        struct.unpack_from(">I",raw,0x702c)[0] == 0x5a)
+    checks["tso64_above_line_getmain_freemain"] = (
+        qword(raw,0x12030) == 0x02010000 and
+        struct.unpack_from(">II",raw,0x12038) == (0,0) and
+        struct.unpack_from(">I",raw,0x12058)[0] == 0xa5)
+    checks["no_low_fallback_on_real_exhaustion"] = (
+        struct.unpack_from(">I",raw,0x12040)[0] == 4 and
+        qword(raw,0x12044) == 0)
+    checks["full_width_storage_length_rejected"] = (
+        struct.unpack_from(">I",raw,0x1204c)[0] == 8 and
+        qword(raw,0x12050) == 0)
+    checks["live_dat_mutations_purged"] = (
+        struct.unpack_from(">I",raw,0x40ac)[0] == 4 and
+        0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x40000)
     errors = [x for x in log.splitlines() if re.search(r"HHC\d{5}E\b", x)]
     checks["no_hercules_error"] = not errors
     return {"pass": all(checks.values()), "checks": checks,
@@ -193,12 +209,16 @@ def run(args):
     manifest["source_sha256"] = {
         "pdos/tests/two-space/" + name: digest(src / name)
         for name in ("service.S", "service.ld", "service_machine.py", "machine.py")}
-    for name in ("twospace_service.c", "twospace_gate.c", "twospace_gate.h",
+    for name in ("twospace_service.c", "twospace_entry.asm", "twospace_tlb.asm",
+                 "twospace_key.asm",
+                 "twospace_gate.c", "twospace_gate.h",
                  "twospace_dat.c", "twospace_dat.h",
                  "twospace_fixture.c", "twospace_fixture.h",
-                 "twospace_placement.c", "twospace_placement.h"):
+                 "twospace_placement.c", "twospace_placement.h",
+                 "twospace_memory.c", "twospace_memory.h",
+                 "twospace_real.c", "twospace_real.h"):
         manifest["source_sha256"]["pdos/src/" + name] = digest(src.parent.parent / "src" / name)
-    for name in ("dat.c", "dat_emit.c", "placement.c", "gate.c"):
+    for name in ("dat.c", "dat_emit.c", "placement.c", "gate.c", "memory.c"):
         manifest["source_sha256"]["pdos/tests/two-space/" + name] = digest(src / name)
     manifest["source_sha256"]["pdos/scripts/two-space-next.crexx"] = digest(src.parent.parent / "scripts/two-space-next.crexx")
     manifest["elf_sha256"] = digest(args.elf)

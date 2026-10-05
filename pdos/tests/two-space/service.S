@@ -169,6 +169,24 @@ app_a:
     larl %r2, app_data_va
     lg %r2, 0(%r2)
     st %r15, 8(%r2)          /* first Classic C result */
+    lghi %r0, 4096           /* conditional below-line GETMAIN */
+    lghi %r1, 0
+    lghi %r2, 0
+    lghi %r15, 0x10
+    svc 120
+    larl %r2, app_data_va
+    lg %r2, 0(%r2)
+    st %r1, 32(%r2)
+    st %r15, 36(%r2)
+    mvi 0(%r1), 0x5a        /* problem-state write proves storage key 8 */
+    llgc %r4, 0(%r1)
+    st %r4, 44(%r2)
+    lghi %r0, 4096
+    lghi %r15, 0x10
+    svc 120                 /* FREEMAIN, same U task */
+    larl %r2, app_data_va
+    lg %r2, 0(%r2)
+    st %r15, 40(%r2)
     sam31
     larl %r15, app_b_va
     lg %r15, 0(%r15)
@@ -262,6 +280,43 @@ app_high:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 40(%r2)
+    lghi %r0, 4096          /* above-line GETMAIN stays above the line */
+    lghi %r1, 0
+    lghi %r2, 0
+    lghi %r15, 0x30
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    stg %r1, 48(%r2)
+    st %r15, 56(%r2)
+    mvi 0(%r1), 0xa5
+    llgc %r4, 0(%r1)
+    st %r4, 88(%r2)
+    lghi %r0, 4096
+    lghi %r15, 0x30
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 60(%r2)
+    lghi %r0, 4096          /* 16 MiB exceeds the 14 MiB free real pool */
+    sllg %r0, %r0, 12
+    lghi %r1, 0
+    lghi %r15, 0x30
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 64(%r2)
+    stg %r1, 68(%r2)
+    lghi %r0, 1             /* high-half length must not truncate to 4 KiB */
+    sllg %r0, %r0, 32
+    aghi %r0, 4096
+    lghi %r1, 0
+    lghi %r15, 0x30
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 76(%r2)
+    stg %r1, 80(%r2)
     larl %r3, high_data_va
     lg %r3, 0(%r3)
     l %r3, 44(%r3)
@@ -316,6 +371,10 @@ kcore:
     jne initial_nested_done
     svc 1                    /* K-on-DAT nested entry, then exact return */
 initial_nested_done:
+    lghi %r3, 0x3000
+    l %r2, 0xa0(%r3)
+    chi %r2, 120
+    je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore
     stg %r8, 32(%r1)
@@ -344,6 +403,9 @@ initial_nested_done:
     stg %r5, 16(%r4)
     aghi %r2, 1
     stg %r2, 8(%r1)
+storage_no_record:
+    lghi %r3, 0x3000
+    lg %r5, 8(%r3)
     larl %r6, bounce_va
     lg %r6, 0(%r6)           /* K-owned full-width descriptor */
     srlg %r7, %r5, 32
@@ -360,6 +422,18 @@ initial_nested_done:
     br %r1
 .global kcore_after_c
 kcore_after_c:
+    larl %r6, bounce_va
+    lg %r6, 0(%r6)
+    l %r2, 16(%r6)
+    chi %r2, 120
+    jne no_storage_address
+    llgf %r2, 0(%r6)
+    sllg %r2, %r2, 32
+    llgf %r4, 4(%r6)
+    ogr %r2, %r4
+    lghi %r3, 0x3000
+    stg %r2, 8(%r3)         /* complete U address back to caller R1 */
+no_storage_address:
     larl %r1, c_result_va
     lg %r1, 0(%r1)
     llgf %r2, 0(%r1)

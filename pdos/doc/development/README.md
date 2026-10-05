@@ -28,6 +28,7 @@ All paths in this table are relative to the repository root.
 | Command processor | `pdos/src/pcomm.c` | PDPCLIB `system()`/startup path and kernel command handling. |
 | C library and service macros | `pdpclib/src/`, `pdpclib/src/profiles/pdos-zarch/`, `pdpclib/src/interfaces/` | Shared component: changes may affect both OS and external SDK consumers. |
 | Build and distribution | `pdos/scripts/`, root `scripts/`, `.github/workflows/build-release.yml` | [Source-to-image dependencies](../architecture/DEPENDENCIES.md). |
+| Two-space successor memory | `pdos/src/twospace_dat.c`, `twospace_gate.c`, `twospace_real.c`, `twospace_placement.c`, `twospace_memory.c`, `twospace_key.asm` | K-owned table alias, live PTLB, U frame storage keys, real-frame and U interval ownership, fixed-origin overlay; `two-space-next.crexx` and `two-space-ipl.crexx` build its diagnostic image. |
 
 ## Follow a request across the boundary
 
