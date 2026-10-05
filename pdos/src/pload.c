@@ -44,17 +44,10 @@ static char buf[40000];
    starting at location 0. */
 #define PLOAD_START 0x0
 
-/* when pload is directly IPLed, and thus starts from the
-   address in location 0, it knows to create its own stack,
-   which it does at 0.5 MB in (thus creating a restriction
-   of only being 0.5 MB in size unless this is changed) */
-/* This is governed by the code in sapstart, so these constants
-   need to match that */
-#define PLOAD_STACK (PLOAD_START + 0x080000)
-
-/* the heap - for the equivalent of getmains - is located
-   another 0.5 MB in, ie at the 1 MB location */
-#define PLOAD_HEAP (PLOAD_STACK + 0x080000)
+/* The z/Architecture standalone stack lives in the reserved 15-16 MiB
+   system range. It must stay clear of a CMS24 image at 0x20000-0x1ba6c0.
+   SAPSTART owns the actual stack pointer. The PLOAD heap stays at 1 MiB. */
+#define PLOAD_HEAP 0x100000
 
 /* PDOS is loaded another 1 MB above the PLOAD heap - ie the 2 MB location */
 #define PDOS_CODE (PLOAD_HEAP + 0x100000)
@@ -63,8 +56,7 @@ static char buf[40000];
    to load itself, since it wasn't directly IPLed */
 #define PDOS_ENTRY (PDOS_CODE + 0x800)
 
-/* The heap starts 1 MB after the code (ie the 3 MB location).
-   So PDOS can't be more than 1 MB in size unless this is changed */
+/* The low kernel image retains its current one-MiB bound. */
 #define PDOS_HEAP (PDOS_CODE + 0x100000)
 
 int main(int argc, char **argv)
@@ -86,6 +78,7 @@ int main(int argc, char **argv)
              char *heap; } pblock = { 0, 4, (char *)PDOS_HEAP };
     void (*fun)(void *);
     int x;
+    int eof = 0;
     int cnt;
 
     ipldev = initsys();
@@ -102,7 +95,7 @@ int main(int argc, char **argv)
         cyl, head, rec);
 #endif
     load = start;
-    for (x = 0; x < 30; x++)
+    for (x = 0; x < (PDOS_HEAP - PDOS_CODE) / CHUNKSZ; x++)
     {
 #if 0
         printf("loading to %p from %d, %d, %d\n", load, cyl, head, rec);
@@ -120,12 +113,16 @@ int main(int argc, char **argv)
                 cnt = rdblock(ipldev, cyl, head, rec, load, CHUNKSZ, 0x0e);
             }
         }
-        if (cnt <= 0) break; /* reached EOF or error */
+        if (cnt <= 0)
+        {
+            eof = cnt == 0;
+            break;
+        }
         load += CHUNKSZ;
         rec++;
     }
     cnt = load - start;
-    if (fixPE(start, &cnt, (int *)&entry, (int)start,
+    if (!eof || fixPE(start, &cnt, (int *)&entry, (int)start,
               PDOS_HEAP - PDOS_CODE) != 0)
     {
         printf("MVS PE module corrupt\n");

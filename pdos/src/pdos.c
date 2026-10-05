@@ -174,7 +174,7 @@ virt (S/380)
 old real memory map:
 
 0 = PLOAD executable
-0.5 = PLOAD stack (also used by PDOS, and can extend into heap area)
+0.5 = historical PLOAD stack; z/Architecture uses the reserved 15-16 MB
 1 = PLOAD heap
 2 = PDOS code
 3 = PDOS heap
@@ -203,34 +203,19 @@ old virtual memory map:
    starting at location 0. */
 #define PLOAD_START 0x0 /* 0 MB */
 
-/* when pload is directly IPLed, and thus starts from the
-   address in location 0, it knows to create its own stack,
-   which it does at 0.5 MB in (thus creating a restriction
-   of only being 0.5 MB in size unless this is changed) */
-/* Note that these definitions need to match corresponding
-   defines in sapstart - or else make them variables and
-   get the infrastructure to inform PDOS of whatever it
-   needs to know. */
-#define PLOAD_STACK (PLOAD_START + 0x080000) /* 0.5 MB */
-
-/* the heap - for the equivalent of getmains - is located
-   another 0.5 MB in, ie at the 1 MB location */
-#define PLOAD_HEAP (PLOAD_STACK + 0x080000) /* 1 MB */
+/* The boot heap is independent of the standalone stack. SAPSTART keeps
+   that stack in the reserved 15-16 MiB region on z/Architecture. */
+#define PLOAD_HEAP 0x100000
 
 /* PDOS is loaded another 1 MB above the PLOAD heap - ie the 2 MB location */
 #define PDOS_CODE (PLOAD_HEAP + 0x100000) /* 2 MB */
 
-/* The heap starts 1 MB after the code (ie the 3 MB location).
-   So PDOS can't be more than 1 MB in size unless this is changed.
-   Note that PDOS doesn't bother to create its own stack, and instead
-   relies on the one that pload is mandated to provide being 
-   big enough, which is a fairly safe bet given that it is
-   effectively 1.5 MB in size, since it can eat into the old heap
-   if required. */
+/* The current low kernel image is bounded to one MiB. PD-003 owns the
+   above-line growth path; the CMS24 bridge only relocates its live stack. */
 #define PDOS_HEAP (PDOS_CODE + 0x100000)  /* 3 MB */
 
-/* approximately where pcomm executable is loaded to */
-#define PCOMM_LOAD (PDOS_HEAP + 0x200000) /* 5 MB */
+/* Legacy below-line application load point. */
+#define PCOMM_LOAD (PDOS_HEAP + 0x200000)
 
 /* entry point for MVS executables can be at known location 8
    into mvsstart, so long as that is linked first. In the future,
@@ -300,7 +285,7 @@ old virtual memory map:
 
 #ifdef ZARCH
 #define BTL_PRIVSTART 0xc00000 /* private region starts at 12 MB */
-#define BTL_PRIVLEN 3 /* how many MB to give to private region */
+#define BTL_PRIVLEN 3 /* below-line applications end before the stack */
 #else
 #define BTL_PRIVSTART PCOMM_LOAD /* private region starts at 5 MB */
 #define BTL_PRIVLEN 10 /* how many MB to give to private region */
@@ -453,6 +438,19 @@ typedef struct cdentry {
     void *cdentpt; /* entry point of module */
 } CDENTRY;
 
+#ifdef ZARCH
+typedef struct cms_file {
+    unsigned char id[18];
+    unsigned char *data;
+    unsigned int length;
+    unsigned int records;
+    unsigned int cursor;
+    unsigned int capacity;
+    unsigned int source_bytes;
+    int dirty;
+} CMSFILE;
+#endif
+
 /* note that RB has another 64 bytes in a prefix area */
 typedef struct rb {
     char filler1[12];
@@ -467,6 +465,13 @@ typedef struct rb {
     int savearea[20]; /* needs to be in user space */
     char *pptrs[1];
 #ifdef ZARCH
+    /* CMS application PLIST and service identity live with its task. */
+    unsigned char cms_plist[128];
+    unsigned char cms_fst[40];
+    int cms_personality; /* 0, 24, or 31 */
+    unsigned int cms_lowcore_before;
+    char *cms_heap;
+    CMSFILE cms_files[8];
     /* Native AMODE64 members use an independent, full-width context. */
     int module_amode;
     int module_rmode_any;
@@ -522,6 +527,8 @@ typedef struct {
    the selected z/PDOS image places its static data below the first 5 MB,
    which the fixed DAT maps with V=R. No general PC namespace is implied. */
 static CVT pdos64_cvt;
+static unsigned int pdos_cms_sysref[4];
+extern void cmsfst(void);
 static unsigned int pdos64_aste_space[32];
 static unsigned int pdos64_link_space[64];
 static unsigned int pdos64_entry_space[256];
@@ -1001,6 +1008,10 @@ static void pdosProcessSVC(PDOS *pdos);
 static void pdosSVC99(PDOS *pdos);
 static int pdosDoDIR(PDOS *pdos, char *parm);
 static int pdosMediaCommand(PDOS *pdos, const char *verb, char *parm);
+static int pdosCmsCommand(PDOS *pdos, const char *input);
+static void pdosCmsSVC204(PDOS *pdos);
+static void pdosCmsSVC202(PDOS *pdos);
+static void pdosCmsFstLookup(PDOS *pdos);
 static int pdosAllocateDataset(PDOS *pdos, const char *input);
 static int pdosRecordCopy(PDOS *pdos, const char *input);
 static int pdosReadVolumeLabel(int device, char serial[7]);
@@ -1058,6 +1069,17 @@ int main(int argc, char **argv)
     char *p;
     int remain;
     int ret = EXIT_FAILURE;
+
+#ifdef ZARCH
+    /* The standalone malloc heap has no upper bound. Keep its initial
+       address-space tables clear of the below-line application pool. */
+    if (PDOS_HEAP >= BTL_PRIVSTART
+        || sizeof(PDOS) + ASPACE_ALIGN >= BTL_PRIVSTART - PDOS_HEAP)
+    {
+        printf("PDOS kernel tables exceed reserved low heap\n");
+        return EXIT_FAILURE;
+    }
+#endif
 
     /* we need to align the PDOS structure on a 4k boundary */
     p = malloc(sizeof(PDOS) + ASPACE_ALIGN);
@@ -3104,6 +3126,19 @@ static void pdosProcessSVC(PDOS *pdos)
         }
         else
         {
+#ifdef ZARCH
+            if (pdos->context->cms_personality)
+            {
+                *(unsigned int *)20 = pdos->context->cms_lowcore_before;
+                for (i = 0; i < 8; i++)
+                    if (pdos->context->cms_files[i].data != NULL)
+                        memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
+                                   pdos->context->cms_files[i].data);
+                if (pdos->context->cms_heap != NULL)
+                    memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
+                               pdos->context->cms_heap);
+            }
+#endif
             /* set ECB of person waiting */
             /* +++ needs to run at user priviledge */
             *pdos->context->rblinkb->postecb =
@@ -3114,8 +3149,12 @@ static void pdosProcessSVC(PDOS *pdos)
 
             /* free old context */
 #if defined(ZARCH)
-            memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
-                       pdos->context);
+            if (pdos->context->cms_personality == 24)
+                memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.btlmem,
+                           pdos->context);
+            else
+                memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
+                           pdos->context);
 #else
             memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.btlmem,
                        pdos->context);
@@ -3149,6 +3188,20 @@ static void pdosProcessSVC(PDOS *pdos)
              && pdos->context->module_rmode_any == 1)
     {
         pdos64HighService(pdos, svc);
+    }
+#endif
+#ifdef ZARCH
+    else if (svc == 204 && pdos->context->cms_personality == 31)
+    {
+        pdosCmsSVC204(pdos);
+    }
+    else if (svc == 202 && pdos->context->cms_personality == 24)
+    {
+        pdosCmsSVC202(pdos);
+    }
+    else if (svc == 205 && pdos->context->cms_personality == 31)
+    {
+        pdosCmsFstLookup(pdos);
     }
 #endif
     else if ((svc == 120) || (svc == 10))
@@ -3822,7 +3875,8 @@ static void pdosProcessSVC(PDOS *pdos)
                  || memcmp(prog, "UNMOUNT ", 8) == 0
                  || memcmp(prog, "ALLOC   ", 8) == 0
                  || memcmp(prog, "RCOPY   ", 8) == 0
-                 || memcmp(prog, "TAPE    ", 8) == 0)
+                 || memcmp(prog, "TAPE    ", 8) == 0
+                 || memcmp(prog, "CMS     ", 8) == 0)
         {
             char verb[9];
             int rc;
@@ -3831,11 +3885,15 @@ static void pdosProcessSVC(PDOS *pdos)
             *strchr(verb, ' ') = '\0';
             parm = (char *)((unsigned int)parm & 0x7FFFFFFFUL);
             rc = pdosMediaCommand(pdos, verb, parm);
-            *pdos->context->postecb =
-                pdos->aspaces[pdos->curr_aspace].o.tcb.tcbcmp = rc;
-            pdos->context->regs[15] = 0; /* ATTACH accepted; WAIT reads TCBCMP */
-            pdos->context->regs[1] =
-                (int)&pdos->aspaces[pdos->curr_aspace].o.tcb;
+            if (rc == -100) newcont = 0;
+            else
+            {
+                *pdos->context->postecb =
+                    pdos->aspaces[pdos->curr_aspace].o.tcb.tcbcmp = rc;
+                pdos->context->regs[15] = 0; /* WAIT reads TCBCMP */
+                pdos->context->regs[1] =
+                    (int)&pdos->aspaces[pdos->curr_aspace].o.tcb;
+            }
         }
         else if (memcmp(prog, "DISKINIT", 8) == 0)
         {
@@ -4719,6 +4777,864 @@ static int pdosRecordCopy(PDOS *pdos, const char *input)
 #endif
 }
 
+/* The checked exchange stores unchanged CMS MODULE bytes behind a separate
+   staging envelope. The loader validates records before dispatch. */
+static unsigned int pdosCmsWord(const unsigned char *p)
+{
+    return ((unsigned int)p[0] << 24) | ((unsigned int)p[1] << 16)
+         | ((unsigned int)p[2] << 8) | (unsigned int)p[3];
+}
+
+static void pdosCmsPutWord(unsigned char *p, unsigned int value)
+{
+    p[0] = (unsigned char)(value >> 24);
+    p[1] = (unsigned char)(value >> 16);
+    p[2] = (unsigned char)(value >> 8);
+    p[3] = (unsigned char)value;
+}
+
+static int pdosCmsRecord(const unsigned char *data, int length, int *at,
+                         const unsigned char **record, int *size)
+{
+    int n;
+    if (*at < 0 || *at > length - 2) return 0;
+    n = ((unsigned int)data[*at] << 8) | (unsigned char)data[*at + 1];
+    if (n < 1 || n > length - *at - 2) return 0;
+    *record = data + *at + 2;
+    *size = n;
+    *at += n + 2;
+    return 1;
+}
+
+#ifdef ZARCH
+/* Load one checked file as CMS variable records. Its framed record bytes are
+   the same logical records used by the CMS package tape, not a flat host file. */
+static int pdosCmsFile(PDOS *pdos, const unsigned char id[18])
+{
+    enum { LIMIT = 3 * 1024 * 1024 };
+    RB *rb = pdos->context;
+    CMSFILE *file;
+    DSCB1 dscb;
+    char dataset[32], name[9], type[9], block[MAXBLKSZ];
+    unsigned char *data;
+    unsigned int hash, expected, payload, records, source_bytes;
+    int slot, i, n, used, eof, cyl, head, rec, startc, starth, endc, endh;
+    int at;
+    const unsigned char *record;
+    int size;
+
+    for (slot = 0; slot < 8; slot++)
+        if (rb->cms_files[slot].data != NULL
+            && memcmp(rb->cms_files[slot].id, id, 18) == 0)
+            return slot;
+    for (slot = 0; slot < 8; slot++)
+        if (rb->cms_files[slot].data == NULL) break;
+    if (slot == 8 || id[16] != 0xc1 || id[17] != 0xf1) return -2;
+    memcpy(name, id, 8); name[8] = '\0';
+    memcpy(type, id + 8, 8); type[8] = '\0';
+    for (i = 7; i >= 0 && name[i] == ' '; i--) name[i] = '\0';
+    for (i = 7; i >= 0 && type[i] == ' '; i--) type[i] = '\0';
+    if (name[0] == '\0' || type[0] == '\0') return -2;
+    sprintf(dataset, "CMS%d.%s.%s", rb->cms_personality, name, type);
+    if (!pdos64ReadDscb(pdos, dataset, &dscb)) return -1;
+    if (dscb.ds1noepv != 1 || dscb.ds1dsorg != 0x4000
+        || ((unsigned char)dscb.ds1recfm != 0x80
+            && (unsigned char)dscb.ds1recfm != 0x90)
+        || dscb.ds1blkl != 18452 || dscb.ds1lrecl != 18452)
+        return -2;
+    startc = ((unsigned char)dscb.startcchh[0] << 8)
+           | (unsigned char)dscb.startcchh[1];
+    starth = ((unsigned char)dscb.startcchh[2] << 8)
+           | (unsigned char)dscb.startcchh[3];
+    endc = ((unsigned char)dscb.endcchh[0] << 8)
+         | (unsigned char)dscb.endcchh[1];
+    endh = ((unsigned char)dscb.endcchh[2] << 8)
+         | (unsigned char)dscb.endcchh[3];
+    if (startc < 3 || endc >= 100 || starth >= 15 || endh >= 15
+        || startc > endc || (startc == endc && starth > endh)) return -2;
+    data = memmgrAllocate(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
+                          LIMIT, 0);
+    if (data == NULL) return -2;
+    used = eof = 0;
+    for (cyl = startc; cyl <= endc && !eof; cyl++)
+        for (head = cyl == startc ? starth : 0;
+             head <= (cyl == endc ? endh : 14) && !eof; head++)
+            for (rec = 1; rec <= 100; rec++)
+            {
+                n = rdblock(pdos->curdev, cyl, head, rec, block,
+                            sizeof block, 0x0e);
+                if (n < 0) break;
+                if (n == 0) { eof = 1; break; }
+                if (n != 18452 || used > LIMIT - n) goto bad;
+                memcpy(data + used, block, n);
+                used += n;
+            }
+    if (!eof || used < 64 || memcmp(data, "\x50\x44\x43\x4d\x53\x46\x30\x31", 8)
+        || pdosCmsWord(data + 8) != (unsigned int)rb->cms_personality) goto bad;
+    payload = pdosCmsWord(data + 12);
+    source_bytes = pdosCmsWord(data + 16);
+    records = pdosCmsWord(data + 20);
+    expected = pdosCmsWord(data + 56);
+    if (payload == 0 || payload > LIMIT - 64 || used < 64 + payload
+        || source_bytes == 0 || records == 0 || records > 65535) goto bad;
+    for (i = 64 + payload; i < used; i++) if (data[i] != 0) goto bad;
+    hash = 0x811c9dc5U;
+    for (i = 0; i < (int)payload; i++)
+        hash = (hash ^ data[64 + i]) * 0x01000193U;
+    if (hash != expected) goto bad;
+    at = 64;
+    for (i = 0; i < (int)records; i++)
+    {
+        if (!pdosCmsRecord(data, 64 + payload, &at, &record, &size)
+            || size > 256) goto bad;
+    }
+    if (at != 64 + (int)payload) goto bad;
+    file = &rb->cms_files[slot];
+    memcpy(file->id, id, 18);
+    file->data = data;
+    file->length = 64 + payload;
+    file->records = records;
+    file->cursor = 64;
+    file->capacity = LIMIT;
+    file->source_bytes = source_bytes;
+    printf("CMS FILE: %s records=%u source-bytes=%u\n",
+           dataset, records, source_bytes);
+    return slot;
+bad:
+    memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem, data);
+    return -2;
+}
+
+static int pdosCmsNewFile(PDOS *pdos, const unsigned char id[18])
+{
+    enum { LIMIT = 8 * 1024 * 1024 };
+    RB *rb = pdos->context;
+    CMSFILE *file;
+    int slot;
+    for (slot = 0; slot < 8; slot++)
+        if (rb->cms_files[slot].data == NULL) break;
+    if (slot == 8 || id[16] != 0xc1 || id[17] != 0xf1) return -1;
+    file = &rb->cms_files[slot];
+    file->data = memmgrAllocate(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
+                                LIMIT, 0);
+    if (file->data == NULL) return -1;
+    memset(file->data, 0, 64);
+    memcpy(file->id, id, 18);
+    file->length = file->cursor = 64;
+    file->capacity = LIMIT;
+    file->records = file->source_bytes = 0;
+    file->dirty = 1;
+    return slot;
+}
+
+static int pdosCmsCommit(PDOS *pdos, CMSFILE *file)
+{
+    unsigned char block[18452 + 8], verify[18452];
+    char name[9], type[9], dataset[32], allocation[80];
+    DSCB1 dscb;
+    unsigned int hash;
+    int i, blocks, cylinders, startc, starthead, cyl, head, rec;
+    int bytes, n, written;
+
+    if (!file->dirty || file->records == 0 || file->length <= 64) return 0;
+    memcpy(name, file->id, 8); name[8] = '\0';
+    memcpy(type, file->id + 8, 8); type[8] = '\0';
+    for (i = 7; i >= 0 && name[i] == ' '; i--) name[i] = '\0';
+    for (i = 7; i >= 0 && type[i] == ' '; i--) type[i] = '\0';
+    sprintf(dataset, "CMS%d.%s.%s", pdos->context->cms_personality,
+            name, type);
+    memcpy(file->data, "\x50\x44\x43\x4d\x53\x46\x30\x31", 8);
+    pdosCmsPutWord(file->data + 8, pdos->context->cms_personality);
+    pdosCmsPutWord(file->data + 12, file->length - 64);
+    pdosCmsPutWord(file->data + 16, file->source_bytes);
+    pdosCmsPutWord(file->data + 20, file->records);
+    hash = 0x811c9dc5U;
+    for (i = 64; i < (int)file->length; i++)
+        hash = (hash ^ file->data[i]) * 0x01000193U;
+    pdosCmsPutWord(file->data + 56, hash);
+    blocks = (file->length + 18451) / 18452;
+    cylinders = (blocks + 44) / 45 + 1;
+    if (cylinders > 16) return 12;
+    sprintf(allocation, "%s FB 18452 18452 %d", dataset, cylinders);
+    if (pdosAllocateDataset(pdos, allocation) != 0
+        || !pdos64ReadDscb(pdos, dataset, &dscb)) return 12;
+    startc = ((unsigned char)dscb.startcchh[0] << 8)
+           | (unsigned char)dscb.startcchh[1];
+    starthead = ((unsigned char)dscb.startcchh[2] << 8)
+              | (unsigned char)dscb.startcchh[3];
+    if (starthead != 0) return 12;
+    written = 0;
+    for (i = 0; i <= blocks; i++)
+    {
+        cyl = startc + i / 45;
+        head = (i / 3) % 15;
+        rec = i % 3 + 1;
+        bytes = i == blocks ? 0 : 18452;
+        memset(block, 0, sizeof block);
+        block[0] = (unsigned char)(cyl >> 8);
+        block[1] = (unsigned char)cyl;
+        block[2] = 0;
+        block[3] = (unsigned char)head;
+        block[4] = (unsigned char)rec;
+        block[6] = (unsigned char)(bytes >> 8);
+        block[7] = (unsigned char)bytes;
+        if (bytes != 0)
+        {
+            n = file->length - written;
+            if (n > bytes) n = bytes;
+            memcpy(block + 8, file->data + written, n);
+            written += n;
+        }
+        if (wrblock(pdos->curdev, cyl, head, rec - 1, block,
+                    bytes + 8, 0x1d) != bytes + 8) return 12;
+        if (rdblock(pdos->curdev, cyl, head, rec, verify,
+                    sizeof verify, 0x0e) != bytes) return 12;
+        if (bytes != 0 && memcmp(verify, block + 8, bytes) != 0) return 12;
+    }
+    if (written != (int)file->length) return 12;
+    file->dirty = 0;
+    printf("CMS FILE: committed %s records=%u bytes=%u\n",
+           dataset, file->records, file->source_bytes);
+    return 0;
+}
+
+static void pdosCmsFillFst(unsigned char fst[40],
+                           const unsigned char id[18], unsigned int records)
+{
+    memset(fst, 0, 40);
+    memcpy(fst, id, 16);
+    memcpy(fst + 24, id + 16, 2);
+    fst[16] = 0x10; fst[17] = 0x04;
+    fst[18] = 0; fst[19] = 0;
+    fst[26] = (unsigned char)(records >> 8);
+    fst[27] = (unsigned char)records;
+    fst[30] = 0xe5;
+    pdosCmsPutWord(fst + 32, 256);
+    fst[38] = 0xf2; fst[39] = 0xf6;
+}
+
+/* The CMS FSTLKP veneer enumerates actual CMS31 datasets on the selected
+   exchange volume. R0 is a monotonically advancing VTOC cursor; R1 returns
+   a transient FST, exactly as the caller's snapshot loop expects. */
+static void pdosCmsFstLookup(PDOS *pdos)
+{
+    RB *rb = pdos->context;
+    unsigned int target = (unsigned int)rb->regs[0];
+    unsigned int seen = 0;
+    unsigned char raw[140], id[18];
+    int c, h, r, n, i, j, k, name_len, type_len, stop;
+
+    rb->regs[15] = 1;
+    if (pdosVolumeIndex(pdos, pdos->curdev) <= 0 || target > 1024)
+        return;
+    stop = 0;
+    for (c = 1; c <= 2 && !stop; c++)
+        for (h = 0; h < 15 && !stop; h++)
+            for (r = (c == 1 && h == 0) ? 3 : 1; r <= 100; r++)
+            {
+                n = rdblock(pdos->curdev, c, h, r, raw, sizeof raw, 0x0e);
+                if (n < 0) break;
+                if (n != 140 || raw[44] == 0) { stop = 1; break; }
+                if (raw[44] != '1' || memcmp(raw, "CMS31.", 6)) continue;
+                i = 6;
+                for (name_len = 0; name_len < 8 && raw[i] != '.';
+                     name_len++, i++) ;
+                if (!name_len || raw[i++] != '.') continue;
+                j = i;
+                for (type_len = 0; type_len < 8 && raw[j] != ' ';
+                     type_len++, j++) ;
+                if (!type_len || raw[j] != ' ') continue;
+                for (k = j; k < 44; k++) if (raw[k] != ' ') break;
+                if (k != 44) continue;
+                if (seen++ != target) continue;
+                memset(id, ' ', sizeof id);
+                memcpy(id, raw + 6, name_len);
+                memcpy(id + 8, raw + i, type_len);
+                id[16] = 0xc1; id[17] = 0xf1;
+                pdosCmsFillFst(rb->cms_fst, id, 1);
+                rb->regs[0] = (int)(target + 1);
+                rb->regs[1] = (int)rb->cms_fst;
+                rb->regs[15] = 0;
+                return;
+            }
+}
+#endif
+
+/* Keep CMS 24 SVC 202 and CMS 31 CMSCALL on the same checked record store,
+   while preserving their distinct console and address contracts. */
+static void pdosCmsService(PDOS *pdos, int legacy)
+{
+#ifdef ZARCH
+    RB *rb = pdos->context;
+    unsigned int at = (unsigned int)rb->regs[1] & 0x7fffffffU;
+    unsigned int low = legacy ? 0x20000U : 0x1000000U;
+    unsigned int high = legacy ? 0x1000000U : MAXASIZE * 1024U * 1024U;
+    unsigned char *plist;
+    unsigned int bytes, address, length, flags;
+    int slot, size, position;
+    const unsigned char *record;
+    unsigned char *fst;
+    CMSFILE *file;
+    char line[300];
+    int count;
+    char *heap;
+
+    flags = (unsigned int)rb->regs[15];
+    rb->regs[15] = 12;
+    if (at < low || at > high - 56)
+        return;
+    plist = (unsigned char *)at;
+    if (!legacy && memcmp(plist, "DMSFROSV", 8) == 0)
+    {
+        bytes = (unsigned int)rb->regs[0];
+        if (flags != 0x00e00000U
+            || bytes == 0 || (bytes & 7U)
+            || bytes != *(unsigned int *)(plist + 16)
+            || rb->cms_heap != NULL)
+            return;
+        heap = memmgrAllocate(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
+                              bytes, memid);
+        if (heap == NULL) return;
+        rb->cms_heap = heap;
+        rb->regs[1] = (int)heap;
+        rb->regs[15] = 0;
+        printf("CMSSTOR: obtained %u bytes at %08X\n", bytes,
+               (unsigned int)heap);
+    }
+    else if (!legacy && memcmp(plist, "DMSFRRSV", 8) == 0)
+    {
+        address = (unsigned int)rb->regs[8] & 0x7fffffffU;
+        bytes = *(unsigned int *)(plist + 16);
+        if (rb->cms_heap != NULL
+            && address == (unsigned int)rb->cms_heap && bytes != 0)
+        {
+            memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
+                       rb->cms_heap);
+            rb->cms_heap = NULL;
+            rb->regs[15] = 0;
+        }
+    }
+    else if (!legacy && memcmp(plist, "LINEWRT ", 8) == 0)
+    {
+        address = *(unsigned int *)(plist + 8) & 0x7fffffffU;
+        length = *(unsigned int *)(plist + 12);
+        if (address >= low && address < high
+            && length <= 130
+            && length <= high - address)
+        {
+            printf("%.*s\n", (int)length, (char *)address);
+            rb->regs[15] = 0;
+        }
+    }
+    else if (legacy && memcmp(plist, "TYPLIN  ", 8) == 0)
+    {
+        address = *(unsigned int *)(plist + 8);
+        length = *(unsigned int *)(plist + 12);
+        if ((address & 0xff000000U) == 0x01000000U
+            && (length & 0xffff0000U) == 0xc2800000U
+            && (address & 0x00ffffffU) >= low
+            && (address & 0x00ffffffU) < high
+            && (length & 0xffffU) <= 130
+            && (length & 0xffffU) <= high - (address & 0x00ffffffU))
+        {
+            printf("%.*s\n", (int)(length & 0xffffU),
+                   (char *)(address & 0x00ffffffU));
+            rb->regs[15] = 0;
+        }
+    }
+    else if (!legacy && memcmp(plist, "LINERD  ", 8) == 0)
+    {
+        address = *(unsigned int *)(plist + 8) & 0x7fffffffU;
+        length = *(unsigned int *)(plist + 12);
+        if (address < low || address >= high
+            || length < 1 || length > 130
+            || length > high - address
+            || plist[36] != 0xce || plist[37] != 0xc0) return;
+        if ((cons_type == 3270) || (cons_type == 3275))
+        {
+            intbuf[0] = 0xc3;
+            __conswr(sizeof intbuf, intbuf, 0);
+            intbuf[0] = 0x41;
+            count = __c3270r(sizeof line, line);
+            if (count == 3 && (unsigned char)line[0] == 0x7d)
+                count = 0;
+            else if (count >= 6)
+            {
+                memmove(line, line + 6, count - 6);
+                count -= 6;
+            }
+            else if (count >= 0) count = -1;
+        }
+        else count = __consrd(sizeof line, line);
+        if (count < 0 || count > (int)length) return;
+        if (count) memcpy((void *)address, line, count);
+        rb->regs[0] = count;
+        rb->regs[15] = 0;
+    }
+    else if (legacy && memcmp(plist, "WAITRD  ", 8) == 0)
+    {
+        address = pdosCmsWord(plist + 8);
+        length = ((unsigned int)plist[14] << 8) | plist[15];
+        if ((address & 0xff000000U) != 0x01000000U
+            || plist[12] != 0xe3 || plist[13] != 0
+            || (address & 0x00ffffffU) < low
+            || (address & 0x00ffffffU) >= high
+            || length < 1 || length > 130
+            || length > high - (address & 0x00ffffffU)) return;
+        if (cons_type == 3270 || cons_type == 3275)
+        {
+            intbuf[0] = 0xc3;
+            __conswr(sizeof intbuf, intbuf, 0);
+            intbuf[0] = 0x41;
+            count = __c3270r(sizeof line, line);
+            if (count == 3 && (unsigned char)line[0] == 0x7d) count = 0;
+            else if (count >= 6)
+            {
+                memmove(line, line + 6, count - 6);
+                count -= 6;
+            }
+            else if (count >= 0) count = -1;
+        }
+        else count = __consrd(sizeof line, line);
+        if (count < 0 || count > (int)length) return;
+        if (count) memcpy((void *)(address & 0x00ffffffU), line, count);
+        plist[14] = (unsigned char)(count >> 8);
+        plist[15] = (unsigned char)count;
+        rb->regs[15] = 0;
+    }
+    else if (memcmp(plist, "STATE   ", 8) == 0)
+    {
+        if (plist[8] == 0x5c || plist[16] == 0x5c)
+        {
+            rb->regs[15] = 28; /* wildcard presence probe before FSTLKP */
+            return;
+        }
+        slot = pdosCmsFile(pdos, plist + 8);
+        if (slot == -1) { rb->regs[15] = 28; return; }
+        if (slot < 0) return;
+        file = &rb->cms_files[slot];
+        fst = rb->cms_fst;
+        *(unsigned int *)(plist + 28) = (unsigned int)fst;
+        pdosCmsFillFst(fst, plist + 8, file->records);
+        rb->regs[15] = 0;
+    }
+    else if (memcmp(plist, "RDBUF   ", 8) == 0)
+    {
+        slot = pdosCmsFile(pdos, plist + 8);
+        if (slot == -1) { rb->regs[15] = 28; return; }
+        if (slot < 0) return;
+        file = &rb->cms_files[slot];
+        if (*(unsigned short *)(plist + 26) == 1) file->cursor = 64;
+        if (file->cursor >= file->length)
+        {
+            printf("CMS RDBUF: EOF %8.8s %8.8s\n", plist + 8, plist + 16);
+            return; /* RC 12: EOF */
+        }
+        position = (int)file->cursor;
+        if (!pdosCmsRecord(file->data, file->length, &position,
+                           &record, &size)) return;
+        address = *(unsigned int *)(plist + 28) & 0x7fffffffU;
+        length = *(unsigned int *)(plist + 32);
+        if (file->cursor == 64)
+            printf("CMS RDBUF: first %8.8s %8.8s record=%d cap=%u size=%d at=%08X\n",
+                   plist + 8, plist + 16,
+                   *(unsigned short *)(plist + 26), length, size, address);
+        if (address < low || address >= high
+            || length < (unsigned int)size
+            || length > high - address) return;
+        memcpy((void *)address, record, size);
+        pdosCmsPutWord(plist + 40, size);
+        file->cursor = (unsigned int)position;
+        rb->regs[15] = 0;
+    }
+    else if (memcmp(plist, "ERASE   ", 8) == 0)
+    {
+        slot = pdosCmsFile(pdos, plist + 8);
+        if (slot == -1) rb->regs[15] = 28;
+        /* Existing distribution and output files are protected here. */
+    }
+    else if (memcmp(plist, "WRBUF   ", 8) == 0)
+    {
+        slot = pdosCmsFile(pdos, plist + 8);
+        if (slot == -1) slot = pdosCmsNewFile(pdos, plist + 8);
+        if (slot < 0) return;
+        file = &rb->cms_files[slot];
+        address = *(unsigned int *)(plist + 28) & 0x7fffffffU;
+        length = *(unsigned int *)(plist + 32);
+        if (!file->dirty || file->records >= 65535 || length < 1
+            || length > 256 || address < low
+            || address >= high
+            || length > high - address
+            || file->length > file->capacity - length - 2) return;
+        file->data[file->length] = (unsigned char)(length >> 8);
+        file->data[file->length + 1] = (unsigned char)length;
+        memcpy(file->data + file->length + 2, (void *)address, length);
+        file->length += length + 2;
+        file->source_bytes += length;
+        file->records++;
+        rb->regs[15] = 0;
+    }
+    else if (memcmp(plist, "FINIS   ", 8) == 0)
+    {
+        slot = pdosCmsFile(pdos, plist + 8);
+        if (slot == -1)
+        {
+            slot = pdosCmsNewFile(pdos, plist + 8);
+            if (slot < 0) return;
+            file = &rb->cms_files[slot];
+            file->data[64] = 0;
+            file->data[65] = 1;
+            file->data[66] = 0x40; /* CMS native empty-file blank record */
+            file->length = 67;
+            file->source_bytes = file->records = 1;
+        }
+        if (slot < 0) return;
+        file = &rb->cms_files[slot];
+        rb->regs[15] = file->dirty ? pdosCmsCommit(pdos, file) : 0;
+    }
+    else printf("CMS SVC%d: unsupported request\n", legacy ? 202 : 204);
+#else
+    (void)pdos;
+    (void)legacy;
+#endif
+}
+
+static void pdosCmsSVC204(PDOS *pdos)
+{
+    pdosCmsService(pdos, 0);
+}
+
+static void pdosCmsSVC202(PDOS *pdos)
+{
+    /* The historical command SVC carries an inline four-byte error
+       continuation. Resume after that word with the returned R15 status. */
+    pdos->context->psw2 += 4;
+    pdosCmsService(pdos, 1);
+}
+
+static int pdosCmsCommand(PDOS *pdos, const char *input)
+{
+#ifndef ZARCH
+    (void)pdos;
+    (void)input;
+    printf("CMS: this machine profile is unsupported\n");
+    return 8;
+#else
+    enum { STAGE_LIMIT = 9 * 1024 * 1024, IMAGE_LIMIT = 8 * 1024 * 1024 };
+    char action[16], name[9], dataset[24], words[16][16];
+    const char *scan;
+    unsigned char block[MAXBLKSZ], *stage = NULL, *image = NULL;
+    const unsigned char *module, *record, *header;
+    DSCB1 dscb;
+    unsigned int hash, expected_hash, origin, end, entry, image_bytes;
+    unsigned int base, old, address, previous, rebase, image_at;
+    int profile, startc, starth, endc, endh, device;
+    int at, used, payload, size, count, image_count, records_seen;
+    int cyl, head, rec, n, i, j, relocated, eof, rc = 8;
+    int fields, run, width;
+    RB *child;
+
+    fields = 0;
+    scan = input;
+    while (*scan)
+    {
+        while (*scan == ' ' || *scan == '\t') scan++;
+        if (!*scan) break;
+        if (fields == 16) break;
+        width = 0;
+        while (scan[width] && scan[width] != ' ' && scan[width] != '\t')
+            width++;
+        if (width < 1 || width > 8) break;
+        memcpy(words[fields], scan, width);
+        words[fields][width] = '\0';
+        fields++;
+        scan += width;
+    }
+    if (*scan || fields < 3)
+    {
+        printf("CMS: one to eight characters per token, at most 16 tokens\n");
+        return 8;
+    }
+    strcpy(action, words[0]);
+    strcpy(name, words[2]);
+    profile = strcmp(words[1], "24") == 0 ? 24 :
+              strcmp(words[1], "31") == 0 ? 31 : 0;
+    run = fields >= 4 && strcmp(action, "RUN") == 0;
+    if (!(run || (fields == 3 && strcmp(action, "CHECK") == 0))
+        || !((profile == 24 && strcmp(name, "RXVM") == 0)
+             || (profile == 31 && (strcmp(name, "RXVM") == 0
+                                    || strcmp(name, "RXAS") == 0
+                                    || strcmp(name, "RXC") == 0))))
+    {
+        printf("usage: CMS CHECK 31 RXVM|RXAS|RXC or 24 RXVM\n");
+        printf("       CMS RUN 31 RXVM|RXAS|RXC or 24 RXVM arguments\n");
+        return 8;
+    }
+    if (pdosVolumeIndex(pdos, pdos->curdev) <= 0)
+    {
+        printf("CMS: select the checked exchange volume first\n");
+        return 8;
+    }
+    sprintf(dataset, "CMS%d.%s", profile, name);
+    device = pdos->curdev;
+    if (!pdos64ReadDscb(pdos, dataset, &dscb)
+        || dscb.ds1noepv != 1 || dscb.ds1dsorg != 0x4000
+        || (unsigned char)dscb.ds1recfm != 0x80
+        || dscb.ds1blkl != 18452 || dscb.ds1lrecl != 18452)
+    {
+        printf("CMS: checked MODULE dataset missing or wrong geometry\n");
+        return 8;
+    }
+    startc = ((unsigned char)dscb.startcchh[0] << 8)
+           | (unsigned char)dscb.startcchh[1];
+    starth = ((unsigned char)dscb.startcchh[2] << 8)
+           | (unsigned char)dscb.startcchh[3];
+    endc = ((unsigned char)dscb.endcchh[0] << 8)
+         | (unsigned char)dscb.endcchh[1];
+    endh = ((unsigned char)dscb.endcchh[2] << 8)
+         | (unsigned char)dscb.endcchh[3];
+    if (startc < 3 || endc >= 100 || starth >= 15 || endh >= 15
+        || startc > endc || (startc == endc && starth > endh))
+    {
+        printf("CMS: invalid MODULE extent\n");
+        return 8;
+    }
+    stage = memmgrAllocate(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
+                           STAGE_LIMIT, 0);
+    if (stage == NULL)
+    {
+        printf("CMS: insufficient scratch storage\n");
+        return 12;
+    }
+    used = eof = 0;
+    for (cyl = startc; cyl <= endc && !eof; cyl++)
+        for (head = cyl == startc ? starth : 0;
+             head <= (cyl == endc ? endh : 14) && !eof; head++)
+            for (rec = 1; rec <= 100; rec++)
+            {
+                n = rdblock(device, cyl, head, rec, block,
+                            sizeof block, 0x0e);
+                if (n < 0) break;
+                if (n == 0) { eof = 1; break; }
+                if (n != 18452 || used > STAGE_LIMIT - n)
+                {
+                    printf("CMS: corrupt or oversized stage block\n");
+                    goto done;
+                }
+                memcpy(stage + used, block, n);
+                used += n;
+            }
+    if (!eof || used < 64 || memcmp(stage, "\x50\x44\x43\x4d\x53\x4d\x30\x31", 8)
+        || pdosCmsWord(stage + 8) != (unsigned int)profile)
+    {
+        printf("CMS: missing EOF or invalid stage envelope\n");
+        goto done;
+    }
+    payload = pdosCmsWord(stage + 12);
+    expected_hash = pdosCmsWord(stage + 56);
+    if (payload < 82 || payload > STAGE_LIMIT - 64 || used < 64 + payload)
+    {
+        printf("CMS: invalid staged MODULE length\n");
+        goto done;
+    }
+    for (i = 64 + payload; i < used; i++)
+        if (stage[i] != 0)
+        {
+            printf("CMS: nonzero stage padding\n");
+            goto done;
+        }
+    module = stage + 64;
+    hash = 0x811c9dc5U;
+    for (i = 0; i < payload; i++)
+        hash = (hash ^ module[i]) * 0x01000193U;
+    if (hash != expected_hash)
+    {
+        printf("CMS: MODULE transfer digest mismatch\n");
+        goto done;
+    }
+    at = records_seen = 0;
+    if (!pdosCmsRecord(module, payload, &at, &header, &size) || size != 80)
+    {
+        printf("CMS: invalid MODULE header record\n");
+        goto done;
+    }
+    records_seen++;
+    entry = pdosCmsWord(header);
+    origin = pdosCmsWord(header + 4);
+    end = pdosCmsWord(header + 8);
+    image_bytes = end - origin;
+    if (origin < 0x20000U || (origin & 7U) || end != pdosCmsWord(header + 12)
+        || end <= origin || image_bytes > IMAGE_LIMIT
+        || entry < origin || entry >= end || (end & 7U)
+        || (profile == 24 ? end >= 0x1000000U : end >= 0x80000000U)
+        || image_bytes != pdosCmsWord(stage + 16))
+    {
+        printf("CMS: invalid MODULE address or image length\n");
+        goto done;
+    }
+    image_count = (image_bytes + 65534U) / 65535U;
+    image = memmgrAllocate(&pdos->aspaces[pdos->curr_aspace].o.atlmem,
+                            image_bytes, 0);
+    if (image == NULL)
+    {
+        printf("CMS: insufficient image storage\n");
+        rc = 12;
+        goto done;
+    }
+    image_at = 0;
+    for (i = 0; i < image_count; i++)
+    {
+        unsigned int wanted = image_bytes - image_at;
+        if (wanted > 65535U) wanted = 65535U;
+        if (!pdosCmsRecord(module, payload, &at, &record, &size)
+            || (unsigned int)size != wanted)
+        {
+            printf("CMS: malformed MODULE image record\n");
+            goto done;
+        }
+        memcpy(image + image_at, record, size);
+        image_at += size;
+        records_seen++;
+    }
+    relocated = 0;
+    if (profile == 31)
+    {
+        if (header[32] != 0x48 || header[34] != 2
+            || header[40] != 0 || header[41] != 3
+            || header[43] != 3 || (unsigned char)header[44] != 0xa0
+            || (unsigned char)header[46] != 0x80)
+        {
+            printf("CMS: unsupported CMS31 header flags\n");
+            goto done;
+        }
+        count = ((unsigned char)header[48] << 8) | (unsigned char)header[49];
+        if (count < 1 || (unsigned char)header[45] !=
+            (count > 1 ? 0xf0 : 0xd0)
+            || !pdosCmsRecord(module, payload, &at, &record, &size)
+            || size != 72 || pdosCmsWord(record + 12) != (entry | 0x80000000U)
+            || pdosCmsWord(record + 20) != origin)
+        {
+            printf("CMS: invalid CMS31 map or RLD count\n");
+            goto done;
+        }
+        records_seen++;
+        base = (unsigned int)image;
+        if (base < 0x1000000U || base > 0x7fffffffU - image_bytes)
+        {
+            printf("CMS: image not placed in 31-bit application storage\n");
+            goto done;
+        }
+        previous = end;
+        for (i = 0; i < count; i++)
+        {
+            if (!pdosCmsRecord(module, payload, &at, &record, &size)
+                || size % 5 || (i != count - 1 && size != 65535))
+            {
+                printf("CMS: invalid CMS31 RLD record\n");
+                goto done;
+            }
+            records_seen++;
+            for (j = 0; j < size; j += 5)
+            {
+                address = pdosCmsWord(record + j + 1);
+                if (record[j] != 3 || address < origin
+                    || address > end - 4 || address >= previous)
+                {
+                    printf("CMS: unsupported relocation entry\n");
+                    goto done;
+                }
+                previous = address;
+                old = pdosCmsWord(image + address - origin);
+                if (old < origin || old > end)
+                {
+                    printf("CMS: relocation target outside image\n");
+                    goto done;
+                }
+                rebase = base + old - origin;
+                pdosCmsPutWord(image + address - origin, rebase);
+                relocated++;
+            }
+        }
+        if (relocated == 0)
+        {
+            printf("CMS: no relocations in CMS31 MODULE\n");
+            goto done;
+        }
+    }
+    else if (header[43] != 0x80 || header[40] || header[41]
+             || origin != 0x20000U || end > 0x200000U)
+    {
+        printf("CMS: unsupported CMS24 header or fixed-origin range\n");
+        goto done;
+    }
+    else base = origin;
+    if (at != payload || records_seen != (int)pdosCmsWord(stage + 20))
+    {
+        printf("CMS: trailing or missing MODULE records\n");
+        goto done;
+    }
+    if (run)
+    {
+        child = memmgrAllocate(profile == 24
+                               ? &pdos->aspaces[pdos->curr_aspace].o.btlmem
+                               : &pdos->aspaces[pdos->curr_aspace].o.atlmem,
+                               sizeof *child, 0);
+        if (child == NULL)
+        {
+            printf("CMS: insufficient task storage\n");
+            rc = 12;
+            goto done;
+        }
+        memset(child, 0, sizeof *child);
+        memset(child->cms_plist, 0xff, sizeof child->cms_plist);
+        for (i = 2; i < fields; i++)
+        {
+            memset(child->cms_plist + (i - 2) * 8, ' ', 8);
+            memcpy(child->cms_plist + (i - 2) * 8,
+                   words[i], strlen(words[i]));
+        }
+        child->rblinkb = pdos->context;
+        child->regs[1] = (int)child->cms_plist;
+        child->regs[13] = (int)child->savearea;
+        child->regs[14] = (int)gotret;
+        child->regs[15] = (int)(base + entry - origin);
+        child->psw1 = PSW_ENABLE_INT | (profile == 31 ? 0x00010000U : 0);
+        child->psw2 = (base + entry - origin)
+                    | (profile == 31 ? 0x80000000U : 0);
+        child->module_amode = profile == 31 ? 2 : 0;
+        child->module_rmode_any = profile == 31;
+        child->cms_personality = profile;
+        child->cms_lowcore_before = *(unsigned int *)20;
+        if (profile == 31)
+        {
+            pdos_cms_sysref[3] = (unsigned int)cmsfst;
+            *(unsigned int *)20 = (unsigned int)pdos_cms_sysref;
+        }
+        else memcpy((void *)origin, image, image_bytes);
+        pdos->context->next_exe = (char *)image;
+        pdos->context = child;
+        pdos->aspaces[pdos->curr_aspace].o.curr_rb = child;
+        printf("CMS RUN: %s entry=%08X AMODE%d\n", dataset,
+               base + entry - origin, profile);
+        image = NULL; /* parent owns the image until task completion */
+        rc = -100; /* the ATTACH handler now has a new context */
+    }
+    else if (profile == 31)
+        printf("CMS CHECK: %s image=%u entry=%08X relocations=%d valid\n",
+               dataset, image_bytes, base + entry - origin, relocated);
+    else
+        printf("CMS CHECK: %s image=%u fixed-origin=%08X valid\n",
+               dataset, image_bytes, origin);
+    if (!run) rc = 0;
+done:
+    if (image != NULL)
+        memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem, image);
+    if (stage != NULL)
+        memmgrFree(&pdos->aspaces[pdos->curr_aspace].o.atlmem, stage);
+    return rc;
+#endif
+}
+
 /* DEVICES discovers channel addresses without issuing CKD reads to a tape.
    MOUNT validates an explicitly named DASD. TAPE is a separate device class. */
 static int pdosMediaCommand(PDOS *pdos, const char *verb, char *parm)
@@ -4761,6 +5677,8 @@ static int pdosMediaCommand(PDOS *pdos, const char *verb, char *parm)
         return pdosAllocateDataset(pdos, input);
     if (strcmp(verb, "RCOPY") == 0)
         return pdosRecordCopy(pdos, input);
+    if (strcmp(verb, "CMS") == 0)
+        return pdosCmsCommand(pdos, input);
     if (strcmp(verb, "MOUNT") == 0)
     {
         if (sscanf(input, "%x %15s %c", &address, second, &extra) != 2

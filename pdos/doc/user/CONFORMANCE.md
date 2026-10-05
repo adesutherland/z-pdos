@@ -110,5 +110,7 @@ the accepted managed version intact.
 
 The installer preserves exact incoming native bytes and checks logical PDS
 member records. It does not provide general TSO or CMS allocation commands,
-CMS MODULE execution, arbitrary PDS layouts, or fixture export. Fixture
-exchange and CMS binary execution have their own ordered backlog items.
+CMS MODULE execution, arbitrary PDS layouts, or fixture export through this
+native conformance route. The separate checked CMS exchange-disk and
+`CMS CHECK`/`CMS RUN` path is described in the
+[stage 3 record](../qualification/STAGE3-2026-10-05.md).

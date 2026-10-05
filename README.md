@@ -35,6 +35,11 @@ compiling and assembling Rexx programs, running the results, interactive input
 and file-output readback. The [guest qualification record](pdos/doc/qualification/QUALIFICATION.md)
 names the exact source, binaries, machine and remaining limits.
 
+The later [stage 3 current-source result](pdos/doc/qualification/STAGE3-2026-10-05.md)
+adds checked unchanged CMS31 RXVM/RXAS/RXC MODULE execution and a separate
+fixed-origin CMS24 RXVM IO24 subset. This local guest result is newer than the
+published 0.1.0 image and does not qualify general CMS services.
+
 z/PDOS currently has a **32-bit C kernel running in 31-bit addressing mode**.
 Handwritten assembler preserves and dispatches 64-bit application contexts;
 selected applications can also load code above 4 GiB. A native 64-bit C kernel
@@ -49,8 +54,8 @@ builds and relocated compiler/assembler/linker checks passed. The release
 image passed host loader and disk checks; it does **not** carry a new guest
 qualification beyond the separately recorded milestone run.
 
-AMODE24 application loading, broader file semantics and parts of the console
-interface remain open. Start with the [known issues](pdos/doc/BACKLOG.md)
+Native TSO24 AMODE24/RMODE24 direct loading, broader file semantics and parts
+of the console interface remain open. Start with the [known issues](pdos/doc/BACKLOG.md)
 when deciding whether the present system fits an experiment.
 
 ## How the pieces fit

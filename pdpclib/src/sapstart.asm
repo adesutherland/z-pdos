@@ -33,7 +33,12 @@ SAPSTART TITLE 'S A P S T A R T  ***  STARTUP ROUTINE FOR C'
 * low memory for hardware use, while z/Arch has 8192 bytes
 * reserved (I think).
 *
-STACKLOC EQU   X'080000'    The stack starts here (0.5 MiB)
+         AIF ('&XSYS' EQ 'ZARCH').ZSTACK
+STACKLOC EQU   X'080000'    Historical stand-alone stack (0.5 MiB)
+         AGO .ZSTACKEND
+.ZSTACK ANOP
+STACKLOC EQU   X'F00000'    z/PDOS reserved system MiB, away from CMS24
+.ZSTACKEND ANOP
 HEAPLOC  EQU   X'100000'    Where malloc etc come from (1 MiB)
 CHUNKSZ  EQU   18452        The executable is split into blocks
 CCHUNKSZ EQU   18432        Card data is a multiple of 72
@@ -450,10 +455,8 @@ ST4PSW   DC    A(X'000C0000'+AM64BIT)
 * block to the startup routine, with various bits of information
 * for it to interpret.
 STAGE4   DS    0H
-* Since our program is less than 0.5 MB, set the stack at
-* location 0.5 MB. Note that the other thing to worry about
-* is the heap, which is set here, and returned in the sapsupa 
-* GETM routine.
+* Set the stack at the profile's reserved location. The heap is
+* independent and returned by the sapsupa GETM routine.
          L     R13,=A(STACKLOC)  Stack location
          LA    R2,0
          ST    R2,4(R13)         backchain to nowhere

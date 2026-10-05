@@ -330,7 +330,8 @@ static void processInput(void)
              ins_strcmp(buf, "unmount") == 0 ||
              ins_strcmp(buf, "alloc") == 0 ||
              ins_strcmp(buf, "rcopy") == 0 ||
-             ins_strcmp(buf, "tape") == 0)
+             ins_strcmp(buf, "tape") == 0 ||
+             ins_strcmp(buf, "cms") == 0)
     {
         int select_volume = ins_strcmp(buf, "select") == 0;
         char selected[7];
@@ -352,7 +353,6 @@ static void processInput(void)
             strcpy(drive, selected);
     }
     else if (ins_strcmp(buf, "tso") == 0 ||
-             ins_strcmp(buf, "cms") == 0 ||
              ins_strcmp(buf, "cp") == 0)
     {
         printf("%s command environment is not provided by PCOMM.\n", buf);
@@ -638,12 +638,21 @@ static void dodir(char *pattern)
 
 static void dohelp(char *topic)
 {
-    if (ins_strcmp(topic, "TSO") == 0 || ins_strcmp(topic, "CMS") == 0 ||
-        ins_strcmp(topic, "CP") == 0)
+    if (ins_strcmp(topic, "CMS") == 0)
+    {
+        printf("CMS CHECK 31 RXVM|RXAS|RXC validates a staged MODULE.\n");
+        printf("CMS CHECK 24 RXVM validates the fixed-origin format.\n");
+        printf("CMS RUN 31 RXVM|RXAS|RXC args starts checked CMS31 modules.\n");
+        printf("CMS RUN 24 RXVM args starts the fixed-origin CMS24 runtime.\n");
+        printf("Arguments are blank-separated tokens of at most 8 characters.\n");
+        printf("Select a checked exchange volume before CMS CHECK or RUN.\n");
+        return;
+    }
+    if (ins_strcmp(topic, "TSO") == 0 || ins_strcmp(topic, "CP") == 0)
     {
         printf("PCOMM is z/PDOS, not a TSO, CMS or CP command environment.\n");
         printf("Native TSO-style load modules may run when their mode and\n");
-        printf("services are supported. CMS MODULE execution is not yet supported.\n");
+        printf("services are supported. HELP CMS lists the CMS qualification.\n");
         printf("Datasets are shown with DIR; host tools prepare and check disks.\n");
         return;
     }
@@ -664,6 +673,7 @@ static void dohelp(char *topic)
     printf("RCOPY source target  preserve FB/VB logical records exactly\n");
     printf("TAPE STATUS, MOUNT address, REWIND, READ, SCAN\n");
     printf("TAPE MOUNT address WRITE for output; WRITE hex, MARK, OFF\n");
+    printf("CMS CHECK validates staged MODULEs; HELP CMS shows the run gate.\n");
     printf("NAME     run installed NAME.EXE or NAME.BAT\n");
     printf("SHOWRC   toggle extra return-code display\n");
     printf("EXIT     end PCOMM (not a restart)\n");

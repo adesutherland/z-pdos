@@ -17,8 +17,8 @@ them or authorisation to implement every backlog item.
 | --- | --- | --- |
 | 1 | **Load, run and judge.** Start with an end-to-end TSO31 or TSO64 cREXX check from the base image using unchanged native program bytes. Make program installation, native batch delivery, per-command results and cleanup one repeatable operator flow. A human must also be able to enter commands longer than the 80-column 3270 field without silent truncation, read a stable prompt and input line, and tell which command produced each result. Bound executable reads to their dataset extent before accepting arbitrary staged packages. | [PD-013](#pd-013-repeatable-program-conformance-run), [PD-009](#pd-009-temporary-package-lifecycle), [PD-004](#pd-004-batch-file-delivery), [PD-005](#pd-005-command-length-diagnostics), [PD-007](#pd-007-results-and-scrollback), [PD-008](#pd-008-operator-diagnostics), [PD-006](#pd-006-console-input-and-prompts), [PD-012](#pd-012-direct-executable-reads-need-an-extent-boundary) |
 | 2 | **Move fixtures both ways.** Make a second CKD volume discoverable, mountable and selectable while protecting IPL. Let the operator allocate a bounded output dataset on the selected exchange volume. Expose sequential tape record I/O using unchanged mounted images. Import/export CMS and TSO fixtures with explicit naming, framing and encoding, then check exact guest results. | [PD-018](#pd-018-multiple-dasd-volumes), [PD-020](#pd-020-safe-guest-dataset-allocation), [PD-019](#pd-019-virtual-tape-io), [PD-014](#pd-014-cms-and-tso-fixture-exchange) |
-| 3 | **Run CMS cREXX binaries.** Inventory the exact CMS24 and CMS31 MODULE, entry and service contracts first. Qualify unchanged CMS31 RXVM, then its RXAS/RXC chain, against the bounded cREXX workload. Add the separate low-address path before attempting the historical CMS24 package. A TSO build of the same source does not establish CMS binary compatibility. | [PD-015](#pd-015-cms-crexx-binary-contract), [PD-016](#pd-016-cms31-crexx-execution), [PD-001](#pd-001-amode24rmode24-application-loading), [PD-017](#pd-017-cms24-crexx-execution) |
-| Supporting gates | Qualify truthful invalid storage requests before widening the service surface, and correct region-table initialization before expanding mappings. Keep shared instruction selectors and native 64-bit kernel conversion behind the operator and compatibility outcomes unless a measured dependency moves them forward. | [PD-002](#pd-002-conditional-storage-service-errors), [PD-011](#pd-011-region-first-table-padding), [PD-003](#pd-003-shared-selectors-and-native-64-bit-kernel) |
+| 3 | **Run CMS cREXX binaries.** The current source's checked unchanged-MODULE route passed [local guest qualification](qualification/STAGE3-2026-10-05.md): CMS31 RXVM and a fresh RXC → RXAS → RXVM chain, plus the separate fixed-origin CMS24 RXVM IO24 subset. This does not qualify native TSO24 or the full historical CMS24 compiler chain. A TSO build of the same source does not establish CMS binary compatibility. | [PD-015](#pd-015-cms-crexx-binary-contract), [PD-016](#pd-016-cms31-crexx-execution), [PD-017](#pd-017-cms24-crexx-execution), [PD-001](#pd-001-amode24rmode24-application-loading) |
+| Supporting gates | Qualify truthful invalid storage requests before widening the service surface, and correct region-table initialization before expanding mappings. Stage 3 measured less than 1 MiB of low heap headroom after the initial kernel allocation, so a reserved above-line home for bulky kernel data now needs a focused design and guest test before further low-memory growth. | [PD-002](#pd-002-conditional-storage-service-errors), [PD-011](#pd-011-region-first-table-padding), [PD-003](#pd-003-shared-selectors-and-native-64-bit-kernel) |
 
 The current TSO31, TSO64 ANY and TSO64 HIGH guest results can be reused for
 unchanged bytes and services. A new installer, fixture path, loader or CMS
@@ -34,7 +34,10 @@ the [operator guide](user/CONFORMANCE.md) and
 and locally guest-qualified in the bounded source profile; see the
 [media guide](user/MEDIA.md), [fixture guide](user/FIXTURES.md) and
 [phase 2 evidence](qualification/PHASE2-2026-10-04.md). The published 0.1.0
-image predates both orders. Order 3 remains open.
+image predates these changes. Order 3 is implemented and locally
+guest-qualified for the bounded CMS31 and CMS24 workloads recorded in the
+[stage 3 result](qualification/STAGE3-2026-10-05.md). Native TSO24 and broader
+CMS services remain separate work.
 
 ### Phase 2 delivery contract
 
@@ -69,8 +72,9 @@ image predates both orders. Order 3 remains open.
    bytes in the release ZIP. Stage disposable output on exchange CKD, run the
    checked mount/allocation/record-copy list, then export and compare logical
    records and exact binary bytes. Run an unchanged native program separately
-   where its binary contract is supported. CMS MODULE execution remains order
-   3. A tape read alone is transport evidence, not a CMS or z/OS program pass.
+   where its binary contract is supported. CMS MODULE execution has its
+   separate order 3 qualification; a tape read alone is transport evidence,
+   not a CMS or z/OS program pass.
 
 ## PD-001: AMODE24/RMODE24 application loading
 
@@ -95,9 +99,9 @@ image predates both orders. Order 3 remains open.
 - Type: improvement
 - Status: Open
 - Target: pdos-zarch C32 kernel and native application contexts
-- Observation: The current C32 kernel runs AMODE31 with z/Architecture support; a full-width C kernel is a separate conversion.
-- Evidence: Machine contract and existing 0.1 qualification.
-- Acceptance: Review selectors against shared ceilings and give a 64-bit conversion its own ABI, source and guest acceptance.
+- Observation: The current C32 kernel runs AMODE31 below 16 MiB with a one-MiB linked image slot. Its `PDOS` structure, mostly eager DAT and address-space tables, is 8,802,304 bytes; the initial aligned allocation leaves at most 630,784 bytes before the 12 MiB below-line application pool. Stage 3 exposed an overlap between the CMS24 fixed-origin image and its inherited low stack; the bounded bridge moves that stack to the reserved 15–16 MiB range. A trial with an 8 MiB heap start and 10 MiB application-pool start booted PCOMM but stalled at CMS24 execution; its initial kernel allocation could not fit in that gap, so the trial did not isolate the image-slot limit. Existing 31/64 application loads use above-line storage, but GETMAIN can still use or fall back to `btlmem`. Dropping CMS24 alone would not remove that dependency or bound the kernel heap. Kernel growth belongs with the native 64-bit roadmap: move the main kernel above the line while retaining explicit below-line interrupt/SVC entry and channel-I/O buffers. Moving the current linked image wholesale would put its 24-bit channel addresses and startup assumptions out of contract.
+- Evidence: Machine contract, existing 0.1 qualification, and the [stage 3 guest record](qualification/STAGE3-2026-10-05.md).
+- Acceptance: First separate the kernel image limit from its heap address, reserve an above-line region for the large DAT and kernel structures outside application allocation, and audit 24-bit channel buffers plus GETMAIN below-line requests and fallback. Then design and qualify the split below-line entry/I/O layer, relocatable above-line kernel body, storage and DAT layout, shared selectors and native 64-bit C ABI through fresh IPL, CMS24/CMS31, TSO31/TSO64 and failure-control guest gates. The stage 3 stack move and low-heap overlap check are compatibility guards, not completion of this item.
 
 ## PD-004: Batch-file delivery
 
@@ -228,26 +232,26 @@ image predates both orders. Order 3 remains open.
 ## PD-015: CMS cREXX binary contract
 
 - Type: qualification
-- Status: Open
+- Status: Done
 - Target: unchanged CMS24 and CMS31 cREXX MODULE packages and the z/PDOS loader/service boundary
-- Observation: The current native loader accepts selected TSO-style load modules. CMS24 uses a fixed-origin MODULE; CMS31 uses a separate relocatable MODULE and CMS entry, storage, terminal and file services. Matching C source or machine instruction ceiling alone does not make either package executable on z/PDOS.
-- Evidence: Mainframe Lab's CMS MODULE, CMS31 and ABI/runtime guides and the tagged beta 3 CMS24/CMS31 qualification; z/PDOS [architecture](architecture/README.md) and [0.1 qualification](qualification/QUALIFICATION.md).
+- Observation: The current source pins the unchanged beta 3 CMS24/CMS31 MODULE bytes, record and relocation contracts, and distinct CMS service surfaces. Checked exchange-disk staging and `CMS CHECK` reject malformed format and address inputs before dispatch. This local proof is not a released image.
+- Evidence: [Stage 3 local guest qualification](qualification/STAGE3-2026-10-05.md), `pdos/scripts/cms.crexx`, `pdos/scripts/cms-module.py`, and Mainframe Lab's tagged beta 3 CMS qualification.
 - Acceptance: Pin the exact unchanged CMS cREXX package bytes and inventory their loader records, address/mode, entry/return, SVC/CMSCALL/DIAGNOSE, file naming/record, console and storage requirements against current z/PDOS behavior. Run a bounded loader/service probe with explicit rejection of unsupported operations. Record the selected adapter or environment design, its owner and the specific prerequisites for PD-016 and PD-017; do not treat a repackaged or recompiled TSO executable as a CMS pass.
 
 ## PD-016: CMS31 cREXX execution
 
 - Type: improvement
-- Status: Open
+- Status: Done
 - Target: `cms20-esa31-v1` cREXX MODULEs on the selected z/PDOS machine
-- Observation: CMS31 has a qualified cREXX native compiler chain on CMS 20, but no unchanged CMS31 MODULE has been loaded or run on z/PDOS. Its relocatable MODULE and CMS service contract need their own implementation and guest evidence.
-- Evidence: Mainframe Lab's tagged beta 3 CMS31 qualification and the contract to be recorded under PD-015.
+- Observation: The unchanged CMS31 RXVM/RXAS/RXC MODULEs run through the checked current-source guest path. Supplied and fresh IOQUAL, live input, library/imports, bounded heap, failure cases and exact stopped-disk outputs passed locally. This has not been published as a z/PDOS image.
+- Evidence: [Stage 3 local guest qualification](qualification/STAGE3-2026-10-05.md), the pinned PD-015 contract and complete private 3270 traces.
 - Acceptance: On a named z/PDOS build and machine, load the unchanged CMS31 RXVM MODULE and run supplied and fresh cREXX bytecode with the selected console and file fixtures, exact outputs and return codes. Then qualify unchanged CMS31 RXAS and RXC through a fresh RXC → RXAS → RXVM chain with the required library/import cases, bounded heap and failure controls. Preserve the separate CMS 20 result and identify unsupported CMS services explicitly.
 
 ## PD-017: CMS24 cREXX execution
 
 - Type: improvement
-- Status: Open
+- Status: Done
 - Target: `vm370-4381-v1` cREXX MODULEs on a separately qualified low-address z/PDOS path
-- Observation: The historical CMS24 package uses a fixed-origin MODULE and a constrained storage/service profile. z/PDOS currently rejects even TSO24 AMODE24/RMODE24 direct loading before dispatch; PD-001 is a prerequisite, but it does not by itself provide CMS services.
-- Evidence: Mainframe Lab's tagged beta 3 CMS24 qualification, [PD-001](#pd-001-amode24rmode24-application-loading), and [0.1 qualification](qualification/QUALIFICATION.md).
-- Acceptance: After PD-015 and PD-001, load the unchanged historical CMS24 RXVM MODULE at its required origin and run its qualified library-free IO24 subset with actual input, exact binary/text readback, expected return codes and negative service/address controls. Keep its constrained heap separate from the wider profiles. A full historical CMS24 compiler chain requires separate evidence and is not implied by this subset.
+- Observation: The unchanged fixed-origin CMS24 RXVM MODULE ran the library-free IO24 subset at `0x20000`, with live input and exact stopped-disk output. Missing-file and invalid-mode controls returned expected errors; an altered-origin MODULE was rejected with RC 8. Native TSO24 loading remains open under PD-001. The local CMS24 result has not been published as an image.
+- Evidence: [Stage 3 local guest qualification](qualification/STAGE3-2026-10-05.md), the pinned PD-015 contract, and [PD-001](#pd-001-amode24rmode24-application-loading).
+- Acceptance: After PD-015, load the unchanged historical CMS24 RXVM MODULE at its required origin and run its qualified library-free IO24 subset with actual input, exact binary/text readback, expected return codes and negative service/address controls. Keep its constrained heap separate from the wider profiles. The distinct native TSO24 path remains PD-001; a full historical CMS24 compiler chain requires separate evidence and is not implied by this subset.

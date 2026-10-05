@@ -118,14 +118,24 @@ object manager behind these calls.
 
 | Region in the active disk-boot configuration | Current placement |
 | --- | --- |
-| PLOAD, boot stack and boot heap | PLOAD starts at 0; stack base 0.5 MiB; heap base 1 MiB. |
-| Kernel image and standalone heap | Kernel starts at 2 MiB; its heap starts at 3 MiB. |
-| Below-line application allocation | 5 MiB to 15 MiB, managed by `btlmem`. “The line” is the 16 MiB boundary. |
+| PLOAD, boot stack and boot heap | PLOAD starts at 0; the z/Architecture standalone stack starts in the reserved 15–16 MiB system range; PLOAD heap starts at 1 MiB. Other standalone profiles retain their historical 0.5 MiB stack. |
+| Kernel image and standalone heap | Kernel starts at 2 MiB; its heap starts at 3 MiB and shares the 3–12 MiB range with its large DAT tables. |
+| Below-line application allocation | 12 MiB to 15 MiB, managed by `btlmem` in the active z/Architecture build. CMS24 MODULE images use their checked fixed origin at `0x20000` and must end by 2 MiB. “The line” is the 16 MiB boundary. |
 | Above-line application allocation | 16 MiB to 512 MiB, managed by `atlmem`. PCOMM and direct native loads use low-address storage in this area. |
 | High application heap | Virtual `0x100000000` (4 GiB), backed by 128 MiB of real storage starting at `0x30000000` (768 MiB). |
 | High code/stack windows | Two 16 MiB slots starting at virtual `0x110000000` (4 GiB + 256 MiB), backed by 32 MiB starting at real `0x38000000` (896 MiB). |
 
 The qualified Hercules configuration supplies **4096 MiB of real storage**.
+The linked kernel is 0x2f628 bytes in its one MiB slot at 2–3 MiB. Its
+compiled `PDOS` structure is 8,802,304 bytes, mostly eager DAT tables. The
+initial allocation requests another 4,096 bytes for alignment, leaving at
+most 630,784 bytes before the 12 MiB application pool, even before allocator
+overhead and later kernel allocations. The boot check rejects layouts where
+that initial allocation crosses the pool; the standalone heap itself has no
+general upper bound. The reserved 15–16 MiB stack is a bounded CMS24
+compatibility bridge. Moving the kernel body above the line, while retaining
+below-line entry and channel-I/O resources, belongs to
+[PD-003](../BACKLOG.md#pd-003-shared-selectors-and-native-64-bit-kernel).
 High virtual addresses do not require physical storage at the same address:
 the tables map those windows to the real ranges above. The selected code
 initially maps the low 4 GiB directly and aliases it into the next 4 GiB,

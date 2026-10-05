@@ -48,7 +48,8 @@ main: procedure = .int
   call require pos("MUST_NOT_EXECUTE",all) = 0, "overlong prefix not executed"
   call require pos("SAFE_AFTER_ERROR",all) > 0, "next batch command ran"
   call require pos("z/PDOS PDIO1",all) > 0, "version"
-  call require pos("CMS MODULE execution is not yet supported",all) > 0, "compatibility help"
+  call require pos("CMS CHECK 31 RXVM|RXAS|RXC",all) > 0, "compatibility help"
+  call require pos("CMS RUN 24 RXVM",all) > 0, "CMS24 operator help"
   say "PCOMM host continuation, boundary and operator help passed"
   return 0
 

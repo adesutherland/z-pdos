@@ -75,10 +75,13 @@ matters.
 
 ## Running applications
 
-The recorded application routes are TSO31, TSO64 ANY and TSO64 HIGH cREXX
+The recorded 0.1 guest route covers TSO31, TSO64 ANY and TSO64 HIGH cREXX
 packages. Their native load bytes were preserved when removing transport
 framing and staging them onto the test disk. The HIGH route uses a low launcher
-and a separate high-resident body. AMODE24 applications are currently rejected.
+and a separate high-resident body. In current source, checked CMS24 RXVM and
+CMS31 RXVM/RXAS/RXC MODULEs also have a bounded `CMS CHECK`/`CMS RUN` path;
+see the [stage 3 record](../qualification/STAGE3-2026-10-05.md). Native TSO24
+loading remains a separate backlog item.
 
 Use the application's exact packaging and installation instructions; an XMIT
 transport or ELF object is not directly executable by the z/PDOS loader.
@@ -93,6 +96,10 @@ cREXX workloads, storage budgets, file results and skips.
 
 The [exchange disk and tape guide](MEDIA.md) covers the current source's
 second CKD volume, guest `ALLOC` and `RCOPY`, and raw HET/AWS tape records.
+The CMS route requires an unchanged checked release ZIP, a fresh exchange disk
+made by `pdos/scripts/cms.crexx`, and `MOUNT`/`SELECT` of that disk. `HELP CMS`
+shows the guest commands and their bounded profiles. Its guest result does not
+extend to general CMS commands or every CMS application.
 The [fixture guide](FIXTURES.md) covers checked CMS and TSO tape imports and
 exact stopped-disk export. These source changes are newer than the published
 image.

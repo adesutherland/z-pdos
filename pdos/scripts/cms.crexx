@@ -1,0 +1,81 @@
+/* Checked, unchanged CMS MODULE staging on a fresh exchange disk.
+ * inspect ABS_RELEASE.zip SHA256 ABS_NEW_CONTRACT.json
+ * prepare ABS_RELEASE.zip ABS_CONTRACT.json build/pdos/NEW ABS_HERCULES_BIN
+ * Guest execution and exact output verification are separate qualification
+ * gates; this recipe currently stops after complete stopped-disk readback. */
+options levelb
+import rxfnsb
+
+main: procedure = .int
+  arg args = .string[]
+  archive = .string
+  contract = .string
+  if args.0 < 1 then return usage()
+  if args.1 = "inspect" then do
+    if args.0 <> 4 then return usage()
+    archive = args.2; hash = args.3; contract = args.4
+    call require left(archive,1) = "/" & left(contract,1) = "/", "absolute ZIP and contract paths"
+    address crexx "run test ! -e :contract"
+    call require rc = 0, "fresh contract path"
+    call runlog "python3 pdos/scripts/cms-module.py inspect " || shellquote(archive) || " " || shellquote(hash) || " " || shellquote(contract), contract || ".inspect.log"
+    say "Pinned CMS MODULE contract:" contract
+    return 0
+  end
+  if args.1 = "prepare" then do
+    if args.0 <> 5 then return usage()
+    archive = args.2; contract = args.3; work = args.4; hercules = args.5
+    call require left(archive,1) = "/" & left(contract,1) = "/" & left(hercules,1) = "/", "absolute ZIP, contract and Hercules paths"
+    call require owned(work), "fresh build/pdos/ output path"
+    address crexx "run test ! -e :work"
+    call require rc = 0, "output already exists"
+    tools = "dasdload cckd2ckd"
+    do i = 1 to words(tools)
+      binary = hercules || "/" || word(tools,i)
+      address crexx "run test -x :binary"
+      call require rc = 0, "missing Hercules utility: " || binary
+    end
+    address crexx "run cmake -E make_directory :work"
+    call require rc = 0, "create work directory"
+    locations = .string[]
+    address crexx "pwd" output locations
+    absolute = strip(locations.1) || "/" || work
+    media = absolute || "/media"
+    call runlog "python3 pdos/scripts/cms-module.py stage " || shellquote(archive) || " " || shellquote(contract) || " " || shellquote(media), absolute || "/stage.log"
+    call runlog "cd " || shellquote(media) || " && " || shellquote(hercules || "/dasdload") || " -bz2 ctl.txt exchange.cckd", absolute || "/dasdload.log"
+    flat = absolute || "/exchange.ckd"
+    call runlog shellquote(hercules || "/cckd2ckd") || " -q -cyls 100 " || shellquote(media || "/exchange.cckd") || " " || shellquote(flat), absolute || "/readback.log"
+    call runlog "python3 pdos/scripts/cms-module.py verify-stage " || shellquote(flat) || " " || shellquote(media), absolute || "/verify.log"
+    address crexx "run cmake -E rm -f :flat"
+    call require rc = 0, "remove temporary flat CKD"
+    say "Checked CMS MODULE exchange disk:" media || "/exchange.cckd"
+    say "Mount and select this disk in the guest, then use CMS CHECK and CMS RUN."
+    return 0
+  end
+  return usage()
+
+owned: procedure = .boolean
+  arg value = .string
+  return left(value,11) = "build/pdos/" & length(value) > 11 & pos("..",value) = 0
+
+runlog: procedure = .int
+  arg command = .string, log = .string
+  address system "( " || command || " ) > " || shellquote(log) || " 2>&1"
+  result = rc
+  if result <> 0 then address crexx "run tail -n 25 :log"
+  call require result = 0, "command failed; see " || log
+  return 0
+
+shellquote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'", value, "'\''") || "'"
+
+require: procedure
+  arg condition = .boolean, message = .string
+  if condition then return
+  say "CMS staging error:" message
+  exit 1
+
+usage: procedure = .int
+  say "Usage: cms.crexx inspect ABS_RELEASE.zip SHA256 ABS_NEW_CONTRACT.json"
+  say "       cms.crexx prepare ABS_RELEASE.zip ABS_CONTRACT.json build/pdos/NEW ABS_HERCULES_BIN"
+  return 2

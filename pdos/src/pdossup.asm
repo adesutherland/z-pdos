@@ -506,6 +506,13 @@ GOTRET   DS    0H
 * force an SVC - it will take care of the rest
          SVC   3
          DC    H'0'                   PDOS should not return here
+
+* CMS FSTLKP service veneer for the bounded CMS31 personality. The lowcore
+* SYSREF pointer reaches this unprivileged entry; SVC 205 performs the lookup.
+         ENTRY CMSFST
+CMSFST   DS    0H
+         SVC   205
+         BR    R14
 *
 *
 *

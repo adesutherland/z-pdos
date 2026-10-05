@@ -12,6 +12,8 @@ and an application's service call.
 - [Build contract](development/BUILD-CONTRACT.md): recorded acceptance stages.
 - [0.1 guest qualification](qualification/QUALIFICATION.md): exact historical
   machine, inputs, outcomes and limits.
+- [Stage 3 CMS qualification](qualification/STAGE3-2026-10-05.md): bounded
+  unchanged CMS31 and CMS24 MODULE results from current source.
 - [Backlog](BACKLOG.md): the single current defect and development queue.
 - [AI guidance](ai/README.md): component guidance for automated work.
 
