@@ -36,8 +36,9 @@ and file-output readback. The [guest qualification record](pdos/doc/qualificatio
 names the exact source, binaries, machine and remaining limits.
 
 The [stage 3 source result](pdos/doc/qualification/STAGE3-2026-10-05.md)
-adds checked unchanged CMS31 RXVM/RXAS/RXC MODULE execution and a separate
-fixed-origin CMS24 RXVM IO24 subset. The
+adds unchanged CMS cREXX applications: the 31-bit RXC compiler, RXAS assembler
+and RXVM virtual machine run a fresh source-to-execution chain, and the
+fixed-origin 24-bit RXVM runs its bounded IO24 subset. The
 [0.1.1 operator acceptance](pdos/doc/qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
 qualifies those bounded routes on a named local image; it does not establish
 general CMS services.
