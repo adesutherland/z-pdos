@@ -137,6 +137,8 @@ static const mf_octet name_LPSW[] = { 0x4c, 0x50, 0x53, 0x57 };
 static const mf_octet name_SIO[] = { 0x53, 0x49, 0x4f };
 static const mf_octet name_LCTL[] = { 0x4c, 0x43, 0x54, 0x4c };
 static const mf_octet name_STCTL[] = { 0x53, 0x54, 0x43, 0x54, 0x4c };
+static const mf_octet name_LCTLG[] = { 0x4c, 0x43, 0x54, 0x4c, 0x47 };
+static const mf_octet name_STCTG[] = { 0x53, 0x54, 0x43, 0x54, 0x47 };
 static const mf_octet name_SIGP[] = { 0x53, 0x49, 0x47, 0x50 };
 static const mf_octet name_STCK[] = { 0x53, 0x54, 0x43, 0x4b };
 static const mf_octet name_PC[] = { 0x50, 0x43 };
@@ -171,6 +173,8 @@ static const struct mf_instruction instructions[] = {
     { { name_SIO, 3 }, MF_S360, MF_S, 0x9c00, 4 },
     { { name_LCTL, 4 }, MF_S370, MF_RS, 0xb7, 4 },
     { { name_STCTL, 5 }, MF_S370, MF_RS, 0xb6, 4 },
+    { { name_LCTLG, 5 }, MF_Z900, MF_RSY, 0xeb2f, 6 },
+    { { name_STCTG, 5 }, MF_Z900, MF_RSY, 0xeb25, 6 },
     { { name_SIGP, 4 }, MF_S370, MF_RS, 0xae, 4 },
     { { name_STCK, 4 }, MF_S370, MF_S, 0xb205, 4 },
     { { name_PC, 2 }, MF_S370, MF_S, 0xb218, 4 },

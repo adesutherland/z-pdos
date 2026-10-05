@@ -11,6 +11,10 @@ support or qualification. See [profiles](../../../doc/PROFILES.md) for those
 boundaries and the [exact guest record](../qualification/QUALIFICATION.md)
 for what has run.
 
+The proposed two-address-space successor and its separate diskless machine
+proof are in [the two-space PoC contract](TWO-SPACE-POC.md). The current
+disk-boot kernel described below has not yet adopted that layout.
+
 ## The system at a glance
 
 ```text
@@ -139,7 +143,7 @@ boot heap. After the kernel has run, z/Architecture shutdown loads its own
 using the overwritten boot heap during shutdown; it does not give that heap
 separate storage. Moving the kernel body above the line, while retaining
 below-line entry and channel-I/O resources, belongs to
-[PD-003](../BACKLOG.md#pd-003-shared-selectors-and-native-64-bit-kernel).
+[PD-003](../BACKLOG.md#pd-003-two-space-supervisor-and-shared-application-memory).
 High virtual addresses do not require physical storage at the same address:
 the tables map those windows to the real ranges above. The selected code
 initially maps the low 4 GiB directly and aliases it into the next 4 GiB,

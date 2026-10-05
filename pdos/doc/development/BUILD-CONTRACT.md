@@ -72,7 +72,9 @@ ABI or claim a new instruction facility. Later selectors must use the same
 hardware ceiling in Classic and ELF tools.
 The SDK's historical integer application profiles remain separate contracts.
 Retain the existing generous high heap and code/stack mappings for 64-bit
-applications. The later native 64-bit kernel conversion remains separate work.
+applications. The proposed [two-space successor](../architecture/TWO-SPACE-POC.md)
+uses an AMODE64 assembler nucleus with C31 supervisor services; integrating it
+into a native boot image remains separate work.
 
 ## Boot and application evidence
 

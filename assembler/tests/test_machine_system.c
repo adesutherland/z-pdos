@@ -9,6 +9,8 @@ int main(void)
     static const struct vector { const char *name; mf_octet bytes[6]; unsigned length; enum mf_profile minimum; } v[] = {
         {"LPSW",{0x82,0,0xd1,0x23},4,MF_S360}, {"SIO",{0x9c,0,0xd1,0x23},4,MF_S360},
         {"LCTL",{0xb7,0x6f,0xd1,0x23},4,MF_S370}, {"STCTL",{0xb6,0x6f,0xd1,0x23},4,MF_S370},
+        {"LCTLG",{0xeb,0x6f,0xd1,0x23,0x45,0x2f},6,MF_Z900},
+        {"STCTG",{0xeb,0x6f,0xd1,0x23,0x45,0x25},6,MF_Z900},
         {"SIGP",{0xae,0x6f,0xd1,0x23},4,MF_S370}, {"STCK",{0xb2,5,0xd1,0x23},4,MF_S370},
         {"STNSM",{0xac,0xfb,0xd1,0x23},4,MF_S370}, {"STOSM",{0xad,0xfb,0xd1,0x23},4,MF_S370},
         {"BSM",{0x0b,0x6f},2,MF_ESA390}, {"MSCH",{0xb2,0x32,0xd1,0x23},4,MF_ESA390},
@@ -53,5 +55,5 @@ int main(void)
             op.r1 = 1; CHECK(mf_encode(v[i].minimum,ins,&op,bytes,sizeof bytes,&length) == MF_RANGE);
         }
     }
-    puts("system: 20 independent encodings, profile exclusions and field limits pass"); return 0;
+    puts("system: 22 independent encodings, profile exclusions and field limits pass"); return 0;
 }

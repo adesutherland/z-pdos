@@ -1,0 +1,28 @@
+/* Diskless two-ASCE proof. Binary image/Hercules handling is in machine.py.
+ * Run from the z-pdos repository root with a fresh build path. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 4 then do
+    say "Usage: crexx -nokeep pdos/scripts/two-space.crexx --args FRESH_BUILD_DIR S390_AS S390_LD HERCULES"
+    return 2
+  end
+  out = args.1
+  asmtool = args.2
+  ldtool = args.3
+  herctool = args.4
+  if left(out,6) <> "build/" | pos("..",out) > 0 then return 2
+  address crexx "run test ! -e :out"
+  if rc <> 0 then return 2
+  address crexx "run mkdir -p :out"
+  if rc <> 0 then return rc
+  object = out || "/probe.o"
+  elf = out || "/image.elf"
+  address crexx "run :asmtool -m64 -march=z900 pdos/tests/two-space/probe.S -o :object"
+  if rc <> 0 then return rc
+  address crexx "run :ldtool -m elf64_s390 -T pdos/tests/two-space/image.ld :object -o :elf"
+  if rc <> 0 then return rc
+  result = out || "/run"
+  address crexx "run python3 pdos/tests/two-space/machine.py :elf :result :asmtool :ldtool :herctool"
+  return rc
