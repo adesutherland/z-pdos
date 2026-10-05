@@ -1,16 +1,20 @@
 # Install, build and release the Classic tools
 
-The [0.1.0 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.0)
+The [0.1.1 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.1)
 contains tools for macOS Apple Silicon, macOS Intel, Linux x64 and Windows x64,
 plus a source archive and a separate z/PDOS base disk image.
 
-The [release workflow](https://github.com/adesutherland/z-pdos/actions/runs/37103970675)
-passed for source `3394771ee4d1c62054ae4f052a502bec2ba93ace`: both compiler
+The [release workflow](https://github.com/adesutherland/z-pdos/actions/runs/37308481475)
+passed for source `69b638d38dc4221cbed399d8fde5bf4883673901`: both compiler
 variants, the required host suite and a relocated compile/assemble/link check
 on all four hosts, plus the Linux source-to-image checks. macOS packages were
-signed and notarized; Windows signed downloads were published through the
-separate local signing step. Later `develop` commits are newer source, not
-changes to the contents of the tagged packages.
+signed and notarized. Windows downloads are initially unsigned pending the
+separate local signing step. The
+[local operator acceptance](../pdos/doc/qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
+and downloadable Linux-built base image have distinct image identities.
+The released image receipt pins the same PLOAD, PDOS, PCOMM and CONFIG payload
+hashes as the locally accepted bare producer. Its CCKD container has a separate
+hash and was not itself used for that guest run.
 
 ## Choose a download
 
@@ -19,11 +23,11 @@ changes to the contents of the tagged packages.
 | macOS Apple Silicon | `macos-arm64-signed.pkg` or `macos-arm64-signed.zip` | PKG installer or portable directory. |
 | macOS Intel | `macos-x86_64-signed.pkg` or `macos-x86_64-signed.zip` | PKG installer or portable directory. |
 | Linux x64 | `linux-x64.zip` | Extract and use the `bin` directory. |
-| Windows x64 | `windows-x64-signed-setup.exe` or `windows-x64-signed.zip` | Per-user installer or portable directory. |
+| Windows x64 | `windows-x64-unsigned-setup.exe` or `windows-x64-unsigned.zip` | Per-user installer or portable directory; local signing pending. |
 | Run the operating system | `pdos-image.zip` | Follow the [OS boot guide](../pdos/doc/user/README.md). |
 | Inspect or rebuild the release | `source.tar.gz` | Corresponding maintained source and recipes. |
 
-These are filename suffixes; release assets start with `z-pdos-0.1.0-`.
+These are filename suffixes; release assets start with `z-pdos-0.1.1-`.
 Verify downloads against the release's `SHA256SUMS` before use. The image ZIP
 also has an internal inventory for its extracted files.
 
@@ -167,8 +171,9 @@ without re-entering the running cREXX release orchestrator.
 ## Maintainer reference: Windows signing
 
 CI initially produces unsigned Windows packages. A separate local operation
-signs and publishes them; this step completed for 0.1.0, whose release assets
-are now signed. No Windows signing key is uploaded to GitHub.
+signs and publishes them; this step completed for 0.1.0. The 0.1.1 Windows
+downloads remain unsigned until that operation succeeds. No Windows signing
+key is uploaded to GitHub.
 
 The local signing route requires a logged-in SimplySign token, cREXX, `jsign`,
 `osslsigncode`, NSIS, CMake and authenticated `gh`. Set `PROVIDER` to the PKCS11
@@ -182,7 +187,7 @@ unsigned Windows downloads**. Use it only for an authorized release:
 export PROVIDER=/absolute/path/provider.macos.cfg
 export CERTUM_ALIAS=your-token-alias
 export TSA_URL=http://time.certum.pl
-crexx -nokeep scripts/sign-windows.crexx --args /absolute/path/z-pdos-0.1.0-windows-x64-unsigned.zip 0.1.0
+crexx -nokeep scripts/sign-windows.crexx --args /absolute/path/z-pdos-0.1.1-windows-x64-unsigned.zip 0.1.1
 ```
 
 The script checks the unsigned payload inventory, signs the native files and
@@ -197,5 +202,5 @@ It does not alter the tag, version or release notes.
 If upload was interrupted after signing, reuse the completed assets:
 
 ```sh
-crexx -nokeep scripts/sign-windows.crexx --args --upload-only 0.1.0
+crexx -nokeep scripts/sign-windows.crexx --args --upload-only 0.1.1
 ```

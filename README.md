@@ -16,7 +16,7 @@ implementation, is our first substantial application. Its compiler, assembler
 and virtual machine exercise loading, storage, files, terminal input and error
 handling together.
 
-[Download 0.1.0](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.0)
+[Download 0.1.1](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.1)
 · [Run z/PDOS](pdos/doc/user/README.md)
 · [Understand the architecture](pdos/doc/architecture/README.md)
 · [Documentation](doc/README.md)
@@ -35,10 +35,12 @@ compiling and assembling Rexx programs, running the results, interactive input
 and file-output readback. The [guest qualification record](pdos/doc/qualification/QUALIFICATION.md)
 names the exact source, binaries, machine and remaining limits.
 
-The later [stage 3 current-source result](pdos/doc/qualification/STAGE3-2026-10-05.md)
+The [stage 3 source result](pdos/doc/qualification/STAGE3-2026-10-05.md)
 adds checked unchanged CMS31 RXVM/RXAS/RXC MODULE execution and a separate
-fixed-origin CMS24 RXVM IO24 subset. This local guest result is newer than the
-published 0.1.0 image and does not qualify general CMS services.
+fixed-origin CMS24 RXVM IO24 subset. The
+[0.1.1 operator acceptance](pdos/doc/qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
+qualifies those bounded routes on a named local image; it does not establish
+general CMS services.
 
 z/PDOS currently has a **32-bit C kernel running in 31-bit addressing mode**.
 Handwritten assembler preserves and dispatches 64-bit application contexts;
@@ -47,12 +49,12 @@ is future work. The current system has one address space and synchronous
 application execution. It implements the MVS-style services needed by the
 qualified workloads; it is not a general replacement for z/OS or TSO.
 
-The [0.1.0 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.0)
-provides macOS Apple Silicon and Intel packages, Linux x64 tools, signed
-Windows x64 packages, a source archive and a base OS disk image. All four host
-builds and relocated compiler/assembler/linker checks passed. The release
-image passed host loader and disk checks; it does **not** carry a new guest
-qualification beyond the separately recorded milestone run.
+The [0.1.1 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.1)
+provides macOS Apple Silicon and Intel packages, Linux x64 tools, Windows x64
+packages, a source archive and a base OS disk image. All four host builds and
+relocated compiler/assembler/linker checks passed. The downloadable base image
+passed host loader and disk checks; the separate local operator acceptance
+does not claim that exact release-image ZIP was booted.
 
 Native TSO24 AMODE24/RMODE24 direct loading, broader file semantics and parts
 of the console interface remain open. Start with the [known issues](pdos/doc/BACKLOG.md)

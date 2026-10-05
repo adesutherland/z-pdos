@@ -1,7 +1,7 @@
 # Run and build z/PDOS
 
 The quickest way to explore the system is the **PDOS image ZIP** from the
-[0.1.0 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.0).
+[0.1.1 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.1).
 The Classic tools downloads are separate packages for building mainframe
 software on your host computer.
 
@@ -42,7 +42,10 @@ The 100-cylinder disk contains `PLOAD.SYS`, `PDOS.SYS`, `CONFIG.SYS` and
 
 The release image passed host construction and readback checks. The bundled
 qualification document describes the separate earlier source-built guest run;
-it is not a claim that every newly generated image has been booted.
+it is not a claim that every newly generated image has been booted. For 0.1.1,
+the release receipt's PLOAD, PDOS, PCOMM and CONFIG hashes match the locally
+accepted bare producer, while the downloadable CCKD container has a separate
+identity and was not itself booted in that operator run.
 
 ## At the PCOMM prompt
 
@@ -88,11 +91,12 @@ Use the application's exact packaging and installation instructions; an XMIT
 transport or ELF object is not directly executable by the z/PDOS loader.
 Application installation must preserve dataset structure and load bytes, and
 offline disk updates require the guest to be stopped. The
-[conformance candidate guide](CONFORMANCE.md) gives the current source's
-checked installer and script runner for this bounded disk profile. The
-published 0.1.0 image predates those changes. The current source and locally
-accepted [0.1.1 candidate](../qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
-report 0.1.1; publication remains a separate release action.
+[conformance candidate guide](CONFORMANCE.md) gives the checked installer and
+script runner for this bounded disk profile. The 0.1.1 base image contains the
+operator commands, while the host runner and application packages must be
+supplied separately. The locally accepted
+[0.1.1 working image](../qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
+reports 0.1.1 and retains its checked cREXX packages.
 The base image has no general package manager. The
 [qualification record](../qualification/QUALIFICATION.md) describes the actual
 cREXX workloads, storage budgets, file results and skips.
@@ -104,8 +108,7 @@ made by `pdos/scripts/cms.crexx`, and `MOUNT`/`SELECT` of that disk. `HELP CMS`
 shows the guest commands and their bounded profiles. Its guest result does not
 extend to general CMS commands or every CMS application.
 The [fixture guide](FIXTURES.md) covers checked CMS and TSO tape imports and
-exact stopped-disk export. These source changes are newer than the published
-image.
+exact stopped-disk export. The base image includes no fixture packages.
 
 ## Build a fresh disk from source
 

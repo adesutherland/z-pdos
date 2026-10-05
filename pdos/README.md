@@ -17,8 +17,8 @@ unchanged CMS31 RXVM/RXAS/RXC MODULEs and the separate fixed-origin CMS24 RXVM
 IO24 subset. The [0.1.1 local operator acceptance](doc/qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
 covers the repaired shutdown path, CMS and TSO cREXX workloads, CKD/tape media
 and managed-image lifecycle. Native TSO24 loading and broader service
-compatibility remain open. The downloadable 0.1.0 image has its own host-build
-evidence, distinct from these later guest runs.
+compatibility remain open. The downloadable 0.1.1 base image has its own host
+build and disk checks; it was not the installed image used for operator acceptance.
 
 - [Boot the image or build your own](doc/user/README.md)
 - [Architecture: boot, execution, memory, loading and services](doc/architecture/README.md)

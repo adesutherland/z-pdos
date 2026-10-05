@@ -5,9 +5,10 @@ This is the current source's bounded PDIO1 operator route. It creates a new
 native load streams and optional simple VB PDS members, builds `CONFORM.BAT`,
 and checks the stopped disk after compression. A leased 3270 run then produces
 one PASS/FAIL receipt with each command, expected and actual return code, and
-required output text. The published 0.1.0 image does not contain the new PCOMM
-result markers, console continuation or screen repair; build a current image
-with the [source image recipe](README.md#build-a-fresh-disk-from-source) first.
+required output text. The 0.1.1 image contains the PCOMM result markers,
+console continuation and screen repair. Use a working copy of the released
+image or build a fresh one with the
+[source image recipe](README.md#build-a-fresh-disk-from-source).
 
 ## Inputs
 

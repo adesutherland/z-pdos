@@ -55,11 +55,12 @@ checks show that the intended bytes reached the image; the
 [guest qualification](../qualification/QUALIFICATION.md) records boot and real
 application results separately.
 
-The [0.1.0 release run](https://github.com/adesutherland/z-pdos/actions/runs/37103970675)
+The [0.1.1 release run](https://github.com/adesutherland/z-pdos/actions/runs/37308481475)
 built the four host packages and a fresh Linux-produced image. Its image
-checks did not perform a new guest run. The earlier source-built guest
-milestone, subsequent repository reorganisation and later service work each
-retain their own input identities.
+checks did not perform a new guest run. The
+[local 0.1.1 operator acceptance](../qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
+names a separate source-built and installed image. The earlier source-built
+milestone and service work retain their own input identities.
 
 Earlier investigations used GCCMVS 3.2.3, IBM ASMA90/IEWL and identified native
 objects. Those are historical comparison inputs, not prerequisites of the

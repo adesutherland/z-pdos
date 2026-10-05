@@ -19,10 +19,12 @@ records identify their own inputs.
 
 The [0.1 guest qualification](../pdos/doc/qualification/QUALIFICATION.md)
 is the detailed record of running the source-built OS and unchanged cREXX
-applications. It is distinct from the
-[0.1.0 release build](https://github.com/adesutherland/z-pdos/actions/runs/37103970675),
-which checked all four host packages and built a fresh disk without a new
-guest run.
+applications. The later
+[0.1.1 local operator acceptance](../pdos/doc/qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
+names its own managed image and CMS/TSO inputs. The
+[0.1.1 release build](https://github.com/adesutherland/z-pdos/actions/runs/37308481475)
+checked all four host packages and built a fresh base disk; that downloadable
+disk was not separately booted in the local operator run.
 
 The [2 October reorganisation record](REORGANISATION-20261002.md) and
 [release preparation report](RELEASE-PREPARATION-20261002.md) preserve earlier

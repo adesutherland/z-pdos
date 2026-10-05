@@ -33,11 +33,13 @@ the [operator guide](user/CONFORMANCE.md) and
 [4 October evidence](qualification/STEP1-2026-10-04.md). Order 2 is implemented
 and locally guest-qualified in the bounded source profile; see the
 [media guide](user/MEDIA.md), [fixture guide](user/FIXTURES.md) and
-[phase 2 evidence](qualification/PHASE2-2026-10-04.md). The published 0.1.0
-image predates these changes. Order 3 is implemented and locally
-guest-qualified for the bounded CMS31 and CMS24 workloads recorded in the
-[stage 3 result](qualification/STAGE3-2026-10-05.md). Native TSO24 and broader
-CMS services remain separate work.
+[phase 2 evidence](qualification/PHASE2-2026-10-04.md). Order 3 is implemented
+and locally guest-qualified for the bounded CMS31 and CMS24 workloads recorded
+in the [stage 3 result](qualification/STAGE3-2026-10-05.md). These routes are
+in the 0.1.1 release; the
+[operator acceptance](qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
+names the separate locally tested image. Native TSO24 and broader CMS services
+remain separate work.
 
 ### Phase 2 delivery contract
 
@@ -106,7 +108,7 @@ CMS services remain separate work.
 ## PD-004: Batch-file delivery
 
 - Type: improvement
-- Status: Done in current source; unreleased
+- Status: Done in 0.1.1
 - Target: pdos-zarch C32 kernel and native application contexts
 - Observation: The conformance recipe now encodes bounded UTF-8 script commands into IBM1047 raw U/18452 records with hex-15 delimiters. It rejects unsupported manifest geometry and overlong lines, then checks exact batch readback.
 - Evidence: [4 October host and guest result](qualification/STEP1-2026-10-04.md); [operator guide](user/CONFORMANCE.md).
@@ -115,7 +117,7 @@ CMS services remain separate work.
 ## PD-005: Command-length diagnostics
 
 - Type: defect
-- Status: Done in current source; unreleased
+- Status: Done in 0.1.1
 - Target: pdos-zarch C32 kernel and native application contexts
 - Observation: A trailing `&` joins 3270 field entries at `MORE>` up to 198 characters. Console and batch records beyond that limit are rejected without dispatch.
 - Evidence: [PCOMM boundary control](../tests/pcomm-operator.crexx) checks both routes at 198/199 characters; the [guest result](qualification/STEP1-2026-10-04.md) includes a human entry beyond 80 columns.
@@ -124,7 +126,7 @@ CMS services remain separate work.
 ## PD-006: Console input and prompts
 
 - Type: defect
-- Status: Done in current source; unreleased
+- Status: Done in 0.1.1
 - Target: pdos-zarch C32 kernel and native application contexts
 - Observation: The 3270 writer now keeps a row and column across fragmented writes, wraps output above the editable field and presents a distinct `MORE>` continuation prompt.
 - Evidence: [ASAN/UBSAN console control](../tests/io-repair.c) and the [guest operator result](qualification/STEP1-2026-10-04.md).
@@ -133,7 +135,7 @@ CMS services remain separate work.
 ## PD-007: Results and scrollback
 
 - Type: improvement
-- Status: Done in current source; unreleased
+- Status: Done in 0.1.1
 - Target: pdos-zarch C32 kernel and native application contexts
 - Observation: External commands now print numbered BEGIN/END markers with RC. The runner requires a fresh prompt, captures a complete ScreenTrace and judges ordered results against the locked manifest; a missing expected output fails.
 - Evidence: [4 October fresh and deliberately corrupted trace results](qualification/STEP1-2026-10-04.md).
@@ -142,7 +144,7 @@ CMS services remain separate work.
 ## PD-008: Operator diagnostics
 
 - Type: improvement
-- Status: Done in current source; unreleased
+- Status: Done in 0.1.1
 - Target: pdos-zarch C32 kernel and native application contexts
 - Observation: The kernel hides expected missing PCOMM `.BAT` allocation probes, while a present invalid dataset and other allocation failures remain visible. `HELP TSO`, `HELP CMS` and `VERSION` explain the command boundary and build identity. The direct loader already announces unsupported addressing/residence.
 - Evidence: [4 October guest result](qualification/STEP1-2026-10-04.md), [operator guide](user/README.md) and prior [0.1 qualification](qualification/QUALIFICATION.md).
@@ -151,7 +153,7 @@ CMS services remain separate work.
 ## PD-009: Temporary package lifecycle
 
 - Type: improvement
-- Status: Done for the bounded conformance flow; unreleased
+- Status: Done for the bounded conformance flow in 0.1.1
 - Target: pdos-zarch C32 kernel and native application contexts
 - Observation: Preparation creates a fresh disposable candidate from an untouched base, checks it offline, and documents selection, stop, readback and removal. Three local guest candidates were selected only while stopped and removed after returning to the accepted image.
 - Evidence: [operator guide](user/CONFORMANCE.md) and [4 October handback](qualification/STEP1-2026-10-04.md).
@@ -162,8 +164,8 @@ CMS services remain separate work.
 - Type: qualification
 - Status: Done
 - Target: Fresh base-OS CCKD delivery built on the Linux GitHub runner
-- Observation: The distro converter expands the 100-cylinder disk to the full 1,113-cylinder device by default. Conversion now specifies `-cyls 100` explicitly. The transport checker also retains identical legacy zero serial bytes, while still rejecting non-digit serial changes and all guest-byte changes. The 0.1.0 Linux release job completed source-to-image, loader/dataset/compression checks and image packaging. Packaged host checks do not establish fresh guest execution.
-- Evidence: [Release run 37103970675](https://github.com/adesutherland/z-pdos/actions/runs/37103970675), source `3394771ee4d1c62054ae4f052a502bec2ba93ace`, and the published `z-pdos-0.1.0-pdos-image.zip`; [release guide](../../doc/BUILD-AND-RELEASE.md).
+- Observation: The distro converter expands the 100-cylinder disk to the full 1,113-cylinder device by default. Conversion now specifies `-cyls 100` explicitly. The transport checker also retains identical legacy zero serial bytes, while still rejecting non-digit serial changes and all guest-byte changes. The 0.1.1 Linux release job completed source-to-image, loader/dataset/compression checks and image packaging. Packaged host checks do not establish fresh guest execution.
+- Evidence: [0.1.1 release run 37308481475](https://github.com/adesutherland/z-pdos/actions/runs/37308481475), source `69b638d38dc4221cbed399d8fde5bf4883673901`, and the published `z-pdos-0.1.1-pdos-image.zip`; [release guide](../../doc/BUILD-AND-RELEASE.md).
 - Acceptance: Linux builds the fresh disk from source, passes loader/dataset/compression controls, records its actual utility identities and delivers an archive whose extracted files match their inventory. Keep any new guest qualification explicitly separate.
 
 ## PD-011: Region-first table padding
@@ -178,7 +180,7 @@ CMS services remain separate work.
 ## PD-012: Direct executable reads need an extent boundary
 
 - Type: robustness issue found by source review
-- Status: Done in current source; unreleased
+- Status: Done in 0.1.1
 - Target: Disk path in `pdosLoadExe`
 - Observation: The direct loader now validates a single selected extent, bounds track reads and requires an EOF before accepting the image. A malformed RXC64 executable without EOF was rejected; a following PCOMM command ran normally.
 - Evidence: [Current source](../src/pdos.c), `pdosLoadExe` and [4 October malformed-disk guest result](qualification/STEP1-2026-10-04.md).
@@ -187,9 +189,9 @@ CMS services remain separate work.
 ## PD-013: Repeatable program conformance run
 
 - Type: improvement
-- Status: Done in current source; unreleased
+- Status: Done in 0.1.1
 - Target: z/PDOS operator commands, package staging, PCOMM batch execution and result capture
-- Observation: The product-level manifest and cREXX recipe now stage checked native programs, simple VB members and raw batch on a fresh disk, read them back, run a leased 3270 script with live replies, and emit per-command and overall PASS/FAIL. A check may judge a silent command by its RC and may reuse an output phrase in another check because the judge searches each numbered command interval separately. The published 0.1.0 base image still has no application package or this runner.
+- Observation: The product-level manifest and cREXX recipe now stage checked native programs, simple VB members and raw batch on a fresh disk, read them back, run a leased 3270 script with live replies, and emit per-command and overall PASS/FAIL. A check may judge a silent command by its RC and may reuse an output phrase in another check because the judge searches each numbered command interval separately. The 0.1.1 base image has no application package or in-guest runner; the host recipe is in the source archive.
 - Evidence: [4 October qualification](qualification/STEP1-2026-10-04.md), [operator guide](user/CONFORMANCE.md), and the [product recipe](../scripts/conformance.crexx).
 - Acceptance: From an untouched base image, a checked native program package and a declarative test script, provide one documented product-level flow that creates a disposable candidate, loads the program without changing its native bytes, runs ordered commands and reports each command's identity, return code, expected result and overall PASS/FAIL. Verify fresh output rather than accepting stale data; retain input/output hashes and guest evidence in a portable receipt. Demonstrate a positive and an intentionally failing cREXX case, an interactive-input case, a command longer than 80 columns, and cleanup that preserves the base image. Do not require a private Lab path or manual interpretation of a screen snapshot.
 
@@ -234,7 +236,7 @@ CMS services remain separate work.
 - Type: qualification
 - Status: Done
 - Target: unchanged CMS24 and CMS31 cREXX MODULE packages and the z/PDOS loader/service boundary
-- Observation: The current source pins the unchanged beta 3 CMS24/CMS31 MODULE bytes, record and relocation contracts, and distinct CMS service surfaces. Checked exchange-disk staging and `CMS CHECK` reject malformed format and address inputs before dispatch. This local proof is not a released image.
+- Observation: The 0.1.1 source pins the unchanged beta 3 CMS24/CMS31 MODULE bytes, record and relocation contracts, and distinct CMS service surfaces. Checked exchange-disk staging and `CMS CHECK` reject malformed format and address inputs before dispatch. The local guest proof names its own installed image; the downloadable base image was built separately.
 - Evidence: [Stage 3 local guest qualification](qualification/STAGE3-2026-10-05.md), `pdos/scripts/cms.crexx`, `pdos/scripts/cms-module.py`, and Mainframe Lab's tagged beta 3 CMS qualification.
 - Acceptance: Pin the exact unchanged CMS cREXX package bytes and inventory their loader records, address/mode, entry/return, SVC/CMSCALL/DIAGNOSE, file naming/record, console and storage requirements against current z/PDOS behavior. Run a bounded loader/service probe with explicit rejection of unsupported operations. Record the selected adapter or environment design, its owner and the specific prerequisites for PD-016 and PD-017; do not treat a repackaged or recompiled TSO executable as a CMS pass.
 
@@ -243,7 +245,7 @@ CMS services remain separate work.
 - Type: improvement
 - Status: Done
 - Target: `cms20-esa31-v1` cREXX MODULEs on the selected z/PDOS machine
-- Observation: The unchanged CMS31 RXVM/RXAS/RXC MODULEs run through the checked current-source guest path. Supplied and fresh IOQUAL, live input, library/imports, bounded heap, failure cases and exact stopped-disk outputs passed locally. This has not been published as a z/PDOS image.
+- Observation: The unchanged CMS31 RXVM/RXAS/RXC MODULEs run through the checked 0.1.1 guest path. Supplied and fresh IOQUAL, live input, library/imports, bounded heap, failure cases and exact stopped-disk outputs passed locally. The downloadable base image contains the adapter, but was not the exact image booted for this result.
 - Evidence: [Stage 3 local guest qualification](qualification/STAGE3-2026-10-05.md), the pinned PD-015 contract and complete private 3270 traces.
 - Acceptance: On a named z/PDOS build and machine, load the unchanged CMS31 RXVM MODULE and run supplied and fresh cREXX bytecode with the selected console and file fixtures, exact outputs and return codes. Then qualify unchanged CMS31 RXAS and RXC through a fresh RXC → RXAS → RXVM chain with the required library/import cases, bounded heap and failure controls. Preserve the separate CMS 20 result and identify unsupported CMS services explicitly.
 
@@ -252,6 +254,6 @@ CMS services remain separate work.
 - Type: improvement
 - Status: Done
 - Target: `vm370-4381-v1` cREXX MODULEs on a separately qualified low-address z/PDOS path
-- Observation: The unchanged fixed-origin CMS24 RXVM MODULE ran the library-free IO24 subset at `0x20000`, with live input and exact stopped-disk output. Missing-file and invalid-mode controls returned expected errors; an altered-origin MODULE was rejected with RC 8. Native TSO24 loading remains open under PD-001. The local CMS24 result has not been published as an image.
+- Observation: The unchanged fixed-origin CMS24 RXVM MODULE ran the library-free IO24 subset at `0x20000`, with live input and exact stopped-disk output. Missing-file and invalid-mode controls returned expected errors; an altered-origin MODULE was rejected with RC 8. Native TSO24 loading remains open under PD-001. The downloadable base image contains this adapter, but the local CMS24 proof names its own installed image.
 - Evidence: [Stage 3 local guest qualification](qualification/STAGE3-2026-10-05.md), the pinned PD-015 contract, and [PD-001](#pd-001-amode24rmode24-application-loading).
 - Acceptance: After PD-015, load the unchanged historical CMS24 RXVM MODULE at its required origin and run its qualified library-free IO24 subset with actual input, exact binary/text readback, expected return codes and negative service/address controls. Keep its constrained heap separate from the wider profiles. The distinct native TSO24 path remains PD-001; a full historical CMS24 compiler chain requires separate evidence and is not implied by this subset.

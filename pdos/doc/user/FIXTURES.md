@@ -1,10 +1,9 @@
 # Checked CMS and TSO fixtures
 
-The current source build can move a bounded set of logical tape fixtures onto
-a disposable 3390 exchange volume and export exact guest results. The
-published 0.1.0 image predates this route. Keep the release ZIP and its tape
-images unchanged. The ZIP member bytes must equal the extracted tape image,
-and the manifest pins both SHA-256 values.
+The 0.1.1 source recipe can move a bounded set of logical tape fixtures onto
+a disposable 3390 exchange volume and export exact guest results. Keep the
+release ZIP and its tape images unchanged. The ZIP member bytes must equal the
+extracted tape image, and the manifest pins both SHA-256 values.
 
 ## Supported input
 

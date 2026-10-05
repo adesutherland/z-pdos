@@ -1,9 +1,9 @@
 # Exchange disks and tape records
 
-This guide describes the current source build of z/PDOS. The published 0.1.0
-image predates these commands. Use a disposable image and keep the original
-disk and distribution tapes unchanged. A Hercules attachment is a host action;
-`MOUNT` and `TAPE MOUNT` register an already attached device inside z/PDOS.
+This guide describes the z/PDOS 0.1.1 media commands. Use a disposable image
+and keep the original disk and distribution tapes unchanged. A Hercules
+attachment is a host action; `MOUNT` and `TAPE MOUNT` register an already
+attached device inside z/PDOS.
 Stop the guest before changing a Hercules disk or tape image.
 
 ## Exchange CKD volume
