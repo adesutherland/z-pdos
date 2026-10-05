@@ -43,7 +43,7 @@ def run(args):
         raw = result_path.read_bytes()
         reference = core.read_bytes()
         try:
-            judged = judge(raw[:0xf000], log)
+            judged = judge(raw[:0x14000], log)
             checks = judged["checks"]
             report = struct.unpack_from(">8I", raw, 0x4080)
             _, stage, launch, kpool, upool, kbytes, ubytes, real_bytes = report
@@ -52,7 +52,8 @@ def run(args):
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
                 real_bytes == 0x1000000 and stage >= 0x400000 and
                 stage + 0x200000 <= launch and launch + 4096 <= real_bytes and
-                (kpool, upool, kbytes, ubytes) == (0x100000, 0x140000, 139264, 94208))
+                (kpool, upool, kbytes, ubytes) ==
+                (0x100000, 0x140000, 200704, 94208))
             checks["guest_dat_unmap_remap_ptlb"] = struct.unpack_from(">I",raw,0x40a0)[0] == 2
             judged["handover"] = {"stage_real": hex(stage),
                                   "launcher_real": hex(launch),

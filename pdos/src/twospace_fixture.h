@@ -10,6 +10,8 @@
 #define TSF_REAL_BYTES 0x1000000U
 #define TSF_KPOOL_VA 0x05000000U
 #define TSF_UPOOL_VA 0x05040000U
+#define TSF_KAPERTURE_VA 0x08000000U
+#define TSF_SERVICE_PAGES 5U
 #include "twospace_dat.h"
 
 typedef struct {

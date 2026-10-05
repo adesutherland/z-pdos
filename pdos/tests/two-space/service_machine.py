@@ -20,6 +20,8 @@ KCORE = 0x0100000000000000
 LOW_REQUEST = 0x21000
 HIGH_REQUEST = 0x110001000
 REPLY = 0x2468ACE0
+# DAT, key, problem state and AMODE bits; condition code is not a mode.
+MODE_MASK = 0x048f0001fc000000
 
 
 def load_elf(path):
@@ -29,15 +31,16 @@ def load_elf(path):
     hdr = struct.unpack_from(">HHIQQQIHHHHHH", raw, 16)
     typ, machine, version, entry, phoff, _, flags, ehsize, phsize, phnum = hdr[:10]
     if (typ, machine, version, entry, flags, ehsize, phsize, phnum) != (
-            2, 22, 1, 0x1000, 0, 64, 56, 12):
+            2, 22, 1, 0x1000, 0, 64, 56, 13):
         raise ValueError("unexpected ELF machine, entry or segment count")
     if phoff + phnum * phsize > len(raw):
         raise ValueError("truncated ELF program headers")
     expected = {(0, 0), (0x1000, 0x1000), (0x2000, 0x2000), (0x4000, 0x4000),
                 (0x20000, 0x5000), (0x110000000, 0x6000),
                 (0x21000, 0x7000), (0x22000, 0x8000),
-                (KCORE, 0x9000), (0x02001000, 0xb000),
-                (0x02000000, 0xd000), (HIGH_REQUEST, 0xe000)}
+                (KCORE, 0x9000), (0x02005000, 0xf000),
+                (0x02000000, 0x11000), (HIGH_REQUEST, 0x12000),
+                (0x110002000, 0x13000)}
     core = bytearray(0x200000)
     actual = set()
     for i in range(phnum):
@@ -59,26 +62,28 @@ def load_elf(path):
 def make_core(elf, classic, dat_emit, out):
     core = load_elf(elf)
     service = Path(classic).read_bytes()
-    if not 0 < len(service) <= 4096:
-        raise ValueError("Classic C service must fit one page")
+    if not 0 < len(service) <= 5 * 4096:
+        raise ValueError("Classic C service exceeds five reserved pages")
     core[0xa000:0xa000 + len(service)] = service
     # Classic PDPPRLG uses R13's 76-byte slot as the next frame pointer.
-    struct.pack_into(">I", core, 0xc04c, 0x03000100)
-    struct.pack_into(">I", core, 0xc060, 0x03000080)
+    struct.pack_into(">I", core, 0x1004c, 0x03000100)
+    struct.pack_into(">I", core, 0x10060, 0x03000080)
     kernel = {0: 0, 0x1000: 0x1000, 0x2000: 0x2000,
               0x3000: 0x3000, 0x4000: 0x4000,
-              0x02000000: 0xa000, 0x02001000: 0xb000,
-              0x03000000: 0xc000, 0x04000000: 0x7000,
-              0x04001000: 0xe000, KCORE: 0x9000}
+              0x02005000: 0xf000, 0x03000000: 0x10000,
+              KCORE: 0x9000}
+    kernel.update({0x02000000 + 4096 * i: 0xa000 + 4096 * i
+                   for i in range(5)})
     application = {0x20000: 0x5000, 0x21000: 0x7000,
-                   0x02000000: 0xd000, 0x110000000: 0x6000,
-                   HIGH_REQUEST: 0xe000}
+                   0x02000000: 0x11000, 0x110000000: 0x6000,
+                   HIGH_REQUEST: 0x12000, 0x110002000: 0x13000}
     pools = ((0x100000, 0x140000), (0x140000, 0x180000))
     if any(lo <= pa < hi for pa in (*kernel.values(), *application.values())
            for lo, hi in pools):
         raise ValueError("DAT real pool overlaps image backing")
     private_kernel_frames = {0, 0x1000, 0x2000, 0x3000, 0x4000,
-                             0x9000, 0xa000, 0xb000, 0xc000}
+                             0x9000, 0xa000, 0xb000, 0xc000,
+                             0xd000, 0xe000, 0xf000, 0x10000}
     if private_kernel_frames.intersection(application.values()):
         raise ValueError("U maps private K real frame")
     image = out / "image.core"
@@ -99,7 +104,7 @@ def make_core(elf, classic, dat_emit, out):
             qword(built_core, 0x140000 + 8 * 8) != 0x20:
         raise ValueError("high K R1 entry or U isolation absent")
     kstats = {"table_bytes": kbytes, "table_4k_frames": kbytes // 4096,
-              "mapped_pages": len(kernel) + 2 * 0x40000 // 4096}
+              "mapped_pages": len(kernel) + 4096 + 2 * 0x40000 // 4096}
     ustats = {"table_bytes": ubytes, "table_4k_frames": ubytes // 4096,
               "mapped_pages": len(application)}
     return {"kernel_asce": hex(kasce), "application_asce": hex(uasce),
@@ -108,6 +113,7 @@ def make_core(elf, classic, dat_emit, out):
             "application_mappings": {hex(k): hex(v) for k, v in application.items()},
             "kernel_table_aliases": {"kernel": ["0x5000000", "0x503ffff"],
                                      "application_tables": ["0x5040000", "0x507ffff"]},
+            "kernel_real_aperture": ["0x8000000", "0x8ffffff"],
             "kernel_pages_in_application_low_virtual": 0,
             "application_low_virtual_bytes": sum(4096 for va in application if va < 0x1000000),
             "application_low_unmapped_bytes": 0x1000000 - sum(4096 for va in application if va < 0x1000000),
@@ -115,34 +121,61 @@ def make_core(elf, classic, dat_emit, out):
 
 
 def judge(raw, log):
-    if len(raw) != 0xf000 or raw[0x2000:0x2008] != b"PD2NEXT1":
+    if len(raw) != 0x14000 or raw[0x2000:0x2008] != b"PD2NEXT1":
         raise ValueError("missing/malformed result core")
-    expected_masks = (0x0481000000000000, 0x0481000080000000,
-                      0x0481000180000000, 0x0481000180000000)
-    expected_pointers = (LOW_REQUEST, LOW_REQUEST, HIGH_REQUEST, 0x100021000)
-    checks = {"four_svc_entries": qword(raw, 0x2008) == 4,
+    expected_masks = (0x0481000000000000, 0x0481000080000000) + \
+                     (0x0481000180000000,) * 7
+    expected_pointers = (LOW_REQUEST, LOW_REQUEST, HIGH_REQUEST, 0x100021000,
+                         0x110001ffe, 0x110001024, 0x20000,
+                         0xffffffffffffffff, HIGH_REQUEST)
+    checks = {"nine_service_entries": qword(raw, 0x2008) == 9,
               "completion_marker": qword(raw, 0x2010) == 1,
+              "nested_kernel_svc": qword(raw, 0x2018) == 1,
+              "nested_kernel_psw_key_zero": qword(raw, 0x2160) &
+                    0x048f000000000000 == 0x0400000000000000,
+              "nested_kernel_asce": qword(raw, 0x2168) == 0x10000f,
+              "context_depth_bounded_at_exit": qword(raw, 0x710) == 0x3100,
+              "recoverable_u_program_fault": qword(raw, 0x2180) == 1 and
+                    struct.unpack_from(">I",raw,0x12014)[0] == 0xfffffffc,
+              "no_fatal_interrupt": qword(raw, 0x2188) == 0,
+              "external_entry_returned": qword(raw, 0x2190) == 1,
+              "io_entry_returned": qword(raw, 0x2198) == 1,
               "kcore_above_region_third_range": qword(raw, 0x2020) == KCORE,
               "k_can_read_own_dat_pool": qword(raw, 0x2028) == 0x10400f,
               "k_can_read_u_dat_pool": qword(raw, 0x2030) == 0x14400f,
               "expected_isolation_fault": raw[0x8e:0x90] == b"\0\x11",
-              "fault_in_problem_amode64": qword(raw, 0x150) & 0xFFFFFFFFFC000000 == 0x0481000180000000,
+              "fault_in_problem_amode64": qword(raw, 0x150) & MODE_MASK ==
+                    0x0481000180000000,
               "unmapped_kernel_entry_page": qword(raw, 0xa8) & ~4095 == 0x1000}
+    entries = [qword(raw, at) for at in (0x1b8,0x1c8,0x1d8,0x1e8,0x1f8)]
+    checks["all_five_new_psws_installed"] = len(set(entries)) == 5 and all(
+        0x1000 <= at < 0x2000 for at in entries)
     observed = []
     for i, (mask, ptr) in enumerate(zip(expected_masks, expected_pointers)):
         record = [qword(raw, 0x2040 + i * 32 + 8 * j) for j in range(3)]
         observed.append([hex(x) for x in record])
-        checks[f"svc_{i}_mode"] = record[0] & 0xFFFFFFFFFC000000 == mask
+        checks[f"svc_{i}_mode"] = record[0] & MODE_MASK == mask
         checks[f"svc_{i}_pointer"] = record[2] == ptr
         checks[f"svc_{i}_app_pc"] = (0x110000000 <= record[1] < 0x110001000
                                      if i >= 2 else
                                      (0x02000000 <= record[1] < 0x02001000 if i == 1
                                       else 0x20000 <= record[1] < 0x21000))
-    checks["classic_c24_result"] = struct.unpack_from(">I", raw, 0x7008)[0] == REPLY
+        saved = [qword(raw,0x2200+i*128+j*8) for j in range(16)]
+        sentinels = [((j-5) * 0x11111111 << 32) | j for j in range(6,14)]
+        checks[f"svc_{i}_full_gprs"] = (saved[0] == (257 if i == 8 else 4) and
+            saved[1] == ptr and saved[2] == (2 if i in (5,6) else 1) and
+            saved[6:14] == sentinels)
+    checks["classic_cms24_result"] = struct.unpack_from(">I", raw, 0x7008)[0] == 0x20202020
     checks["nested_return_code"] = struct.unpack_from(">I", raw, 0x700c)[0] == 0x1357
-    checks["nested_classic_result"] = struct.unpack_from(">I", raw, 0x7010)[0] == REPLY
-    checks["classic_c64_result"] = struct.unpack_from(">I", raw, 0xe008)[0] == REPLY
-    checks["forged_high_pointer_rejected"] = struct.unpack_from(">I", raw, 0xe00c)[0] == 0xfffffffd
+    checks["nested_cms31_result"] = struct.unpack_from(">I", raw, 0x7010)[0] == 0x20420420
+    checks["classic_c64_result"] = struct.unpack_from(">I", raw, 0x12008)[0] == REPLY
+    checks["forged_high_pointer_rejected"] = struct.unpack_from(">I", raw, 0x1200c)[0] == 0xfffffffd
+    checks["cross_page_copy"] = struct.unpack_from(">I",raw,0x12010)[0] == REPLY
+    checks["write_to_u_data"] = (struct.unpack_from(">I",raw,0x12018)[0] == 0x77777777 and
+                                  struct.unpack_from(">I",raw,0x12024)[0] == 0x55667788)
+    checks["write_to_u_code_denied"] = struct.unpack_from(">I",raw,0x1201c)[0] == 0xfffffffc
+    checks["wrapped_u_address_rejected"] = struct.unpack_from(">I",raw,0x12020)[0] == 0xfffffffd
+    checks["oversized_u_length_rejected"] = struct.unpack_from(">I",raw,0x12028)[0] == 0xfffffffd
     errors = [x for x in log.splitlines() if re.search(r"HHC\d{5}E\b", x)]
     checks["no_hercules_error"] = not errors
     return {"pass": all(checks.values()), "checks": checks,
@@ -160,11 +193,12 @@ def run(args):
     manifest["source_sha256"] = {
         "pdos/tests/two-space/" + name: digest(src / name)
         for name in ("service.S", "service.ld", "service_machine.py", "machine.py")}
-    for name in ("twospace_service.c", "twospace_dat.c", "twospace_dat.h",
+    for name in ("twospace_service.c", "twospace_gate.c", "twospace_gate.h",
+                 "twospace_dat.c", "twospace_dat.h",
                  "twospace_fixture.c", "twospace_fixture.h",
                  "twospace_placement.c", "twospace_placement.h"):
         manifest["source_sha256"]["pdos/src/" + name] = digest(src.parent.parent / "src" / name)
-    for name in ("dat.c", "dat_emit.c", "placement.c"):
+    for name in ("dat.c", "dat_emit.c", "placement.c", "gate.c"):
         manifest["source_sha256"]["pdos/tests/two-space/" + name] = digest(src / name)
     manifest["source_sha256"]["pdos/scripts/two-space-next.crexx"] = digest(src.parent.parent / "scripts/two-space-next.crexx")
     manifest["elf_sha256"] = digest(args.elf)
@@ -177,7 +211,7 @@ def run(args):
     out.joinpath("run.rc").write_text(
         f"sysclear\narchlvl esame\nloadcore \"{out / 'image.core'}\"\n"
         f"runtest 0.5\nstopall\npsw\ngpr\ncr\n"
-        f"savecore \"{out / 'result.core'}\" 0 efff\nquit\n")
+        f"savecore \"{out / 'result.core'}\" 0 13fff\nquit\n")
     cmd = [str(Path(args.hercules).resolve()), "-t", "-f", str(out / "machine.cnf"),
            "-r", str(out / "run.rc")]
     try:
@@ -195,6 +229,84 @@ def run(args):
     else:
         result = {"pass": False, "checks": {"result_core_present": False}}
     result["pass"] &= proc is not None and proc.returncode == 0
+    # A separate synthetic machine-check entry exercises the bounded
+    # fail-stop route; it is deliberately not reported as a hardware MCHK.
+    negative = bytearray(out.joinpath("image.core").read_bytes())
+    struct.pack_into(">I", negative, 0x40a8, 1)
+    alternate = out / "machine-check-synthetic.core"
+    alternate.write_bytes(negative)
+    out.joinpath("machine-check.rc").write_text(
+        f"sysclear\narchlvl esame\nloadcore \"{alternate}\"\n"
+        f"runtest 0.5\nstopall\npsw\n"
+        f"savecore \"{out / 'machine-check-result.core'}\" 0 13fff\nquit\n")
+    negative_cmd = [str(Path(args.hercules).resolve()), "-t", "-f",
+                    str(out / "machine.cnf"), "-r",
+                    str(out / "machine-check.rc")]
+    try:
+        negative_proc = subprocess.run(negative_cmd, cwd=out,
+                                       capture_output=True, text=True,
+                                       timeout=15)
+        negative_log = negative_proc.stdout + negative_proc.stderr
+    except subprocess.TimeoutExpired as exc:
+        negative_proc = None
+        negative_log = (exc.stdout or b"").decode(errors="replace") + \
+                       (exc.stderr or b"").decode(errors="replace")
+    out.joinpath("machine-check.log").write_text(negative_log)
+    negative_path = out / "machine-check-result.core"
+    negative_raw = negative_path.read_bytes() if negative_path.exists() else b""
+    negative_ok = (negative_proc is not None and negative_proc.returncode == 0
+                   and len(negative_raw) == 0x14000 and
+                   qword(negative_raw, 0x2188) == 5 and
+                   qword(negative_raw, 0x2010) == 1 and
+                   qword(negative_raw, 0x2008) == 9 and
+                   "HHC00803I" not in negative_log and
+                   not re.search(r"HHC\d{5}E\b", negative_log))
+    result["checks"]["synthetic_machine_check_failstop"] = negative_ok
+    result["pass"] &= negative_ok
+    manifest["synthetic_machine_check"] = {
+        "control": "K exit branches to MCHK entry; no hardware MCHK injected",
+        "core_sha256": digest(alternate),
+        "host_exit_code": negative_proc.returncode if negative_proc else None,
+        "fatal_marker": hex(qword(negative_raw, 0x2188))
+                        if len(negative_raw) == 0x14000 else None}
+    fault_image = bytearray(out.joinpath("image.core").read_bytes())
+    struct.pack_into(">I", fault_image, 0x1202c, 1)
+    fault_core = out / "unexpected-fault.core"
+    fault_core.write_bytes(fault_image)
+    out.joinpath("unexpected-fault.rc").write_text(
+        f"sysclear\narchlvl esame\nloadcore \"{fault_core}\"\n"
+        f"runtest 0.5\nstopall\npsw\n"
+        f"savecore \"{out / 'unexpected-fault-result.core'}\" 0 13fff\nquit\n")
+    fault_cmd = [str(Path(args.hercules).resolve()), "-t", "-f",
+                 str(out / "machine.cnf"), "-r",
+                 str(out / "unexpected-fault.rc")]
+    try:
+        fault_proc = subprocess.run(fault_cmd, cwd=out, capture_output=True,
+                                    text=True, timeout=15)
+        fault_log = fault_proc.stdout + fault_proc.stderr
+    except subprocess.TimeoutExpired as exc:
+        fault_proc = None
+        fault_log = (exc.stdout or b"").decode(errors="replace") + \
+                    (exc.stderr or b"").decode(errors="replace")
+    out.joinpath("unexpected-fault.log").write_text(fault_log)
+    fault_path = out / "unexpected-fault-result.core"
+    fault_raw = fault_path.read_bytes() if fault_path.exists() else b""
+    fault_ok = (fault_proc is not None and fault_proc.returncode == 0 and
+                len(fault_raw) == 0x14000 and
+                qword(fault_raw, 0x2008) == 9 and
+                qword(fault_raw, 0x2010) == 0 and
+                qword(fault_raw, 0x2188) == 0xffffffffffffffff and
+                fault_raw[0x8e:0x90] == b"\0\x11" and
+                "HHC00803I" not in fault_log and
+                not re.search(r"HHC\d{5}E\b", fault_log))
+    result["checks"]["unexpected_u_fault_failstop"] = fault_ok
+    result["pass"] &= fault_ok
+    manifest["unexpected_u_fault"] = {
+        "control": "alternate U fault PC, page translation code 0x11",
+        "core_sha256": digest(fault_core),
+        "host_exit_code": fault_proc.returncode if fault_proc else None,
+        "fatal_marker": hex(qword(fault_raw, 0x2188))
+                        if len(fault_raw) == 0x14000 else None}
     manifest["result"] = result
     out.joinpath("receipt.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps({"pass": result["pass"], "checks": result["checks"]}))

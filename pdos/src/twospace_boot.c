@@ -174,10 +174,11 @@ int main(int argc, char **argv)
     if (be32(core+0x2000U) != 0x5044324eU ||
         !zeroes(core+0x4000U,16U) ||
         !zeroes(core+0x100000U,0x80000U)) FAIL(29);
-    /* Reserve every supplied final image page before choosing DAT pools. */
+    /* The real interruption/context island and all mapped service slots are
+       owned even when their initial bytes are zero and omitted from disk. */
     if (TSRINIT(&final_core,CORE_SIZE) != TSR_OK) FAIL(30);
     for (i=0U; i<CORE_SIZE/PAGE; ++i)
-        if (seen[i>>3] & (1U<<(i&7U)))
+        if (i < 0x14U || (seen[i>>3] & (1U<<(i&7U))))
             if (TSRRESERVE(&final_core,100U+i,i*PAGE,PAGE,TSR_RUN) != TSR_OK)
                 FAIL(31);
     if (TSRALLOC(&final_core,3U,TSF_POOL_BYTES,0x100000U,

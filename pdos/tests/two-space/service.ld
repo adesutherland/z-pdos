@@ -7,6 +7,7 @@ PHDRS {
  appdata PT_LOAD FLAGS(6); kerneldata PT_LOAD FLAGS(6);
  kcore PT_LOAD FLAGS(5); ktramp PT_LOAD FLAGS(5);
  appb PT_LOAD FLAGS(5); apphighdata PT_LOAD FLAGS(6);
+ apphighdata2 PT_LOAD FLAGS(6);
 }
 SECTIONS {
  .lowcore 0 : { KEEP(*(.lowcore)) } :low
@@ -18,9 +19,10 @@ SECTIONS {
  .appdata 0x21000 : AT(0x7000) { *(.appdata) } :appdata
  .kerneldata 0x22000 : AT(0x8000) { *(.kerneldata) } :kerneldata
  .kcore 0x0100000000000000 : AT(0x9000) { *(.kcore) } :kcore
- .ktramp 0x02001000 : AT(0xb000) { *(.ktramp) } :ktramp
- .appb 0x02000000 : AT(0xd000) { *(.appb) } :appb
- .apphighdata 0x110001000 : AT(0xe000) { *(.apphighdata) } :apphighdata
+ .ktramp 0x02005000 : AT(0xf000) { *(.ktramp) } :ktramp
+ .appb 0x02000000 : AT(0x11000) { *(.appb) } :appb
+ .apphighdata 0x110001000 : AT(0x12000) { *(.apphighdata) } :apphighdata
+ .apphighdata2 0x110002000 : AT(0x13000) { *(.apphighdata2) } :apphighdata2
  /DISCARD/ : { *(.comment) *(.note*) }
  ASSERT(SIZEOF(.boot) <= 0x1000, "real entry exceeds one page")
  ASSERT(SIZEOF(.kcore) <= 0x1000, "K64 core exceeds one page")

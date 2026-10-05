@@ -183,3 +183,39 @@ int TSDUNMAP(TSDSTATE *s, TSPADDR va, TSPADDR *old_pa)
     if (s->live) s->purge(s->purge_context);
     return TSD_OK;
 }
+
+int TSDLOOKUP(const TSDSTATE *s, TSPADDR va, TSPADDR *real)
+{
+    unsigned int indexes[5], origin, next, i, bytes, low;
+    const unsigned char *p;
+    if (!s || !s->pool || !s->asce_lo || !real) return TSD_BAD;
+    indexes[0] = va.hi >> 21;
+    indexes[1] = (va.hi >> 10) & 2047U;
+    indexes[2] = ((va.hi & 1023U) << 1) | (va.lo >> 31);
+    indexes[3] = (va.lo >> 20) & 2047U;
+    indexes[4] = (va.lo >> 12) & 255U;
+    origin = s->asce_lo & ~4095U;
+    for (i = 0U; i < 5U; ++i) {
+        bytes = i == 4U ? 4096U : 16384U;
+        if (origin < s->pool_real || (origin & 4095U) ||
+            s->used < bytes || origin - s->pool_real > s->used - bytes)
+            return TSD_BAD;
+        p = s->pool + origin - s->pool_real + indexes[i] * 8U;
+        if (read32(p) != 0U) return TSD_BAD;
+        low = read32(p + 4);
+        if (i == 4U) {
+            if (low == 0x400U) return TSD_MISSING;
+            if (low & 4095U) return TSD_BAD;
+            real->hi = 0U;
+            real->lo = low + (va.lo & 4095U);
+            return real->lo < low ? TSD_BAD : TSD_OK;
+        }
+        if (low == (i == 3U ? 0x400U : 0x20U)) return TSD_MISSING;
+        if ((low & 4095U) != (i == 0U ? 0x0fU :
+                               i == 1U ? 0x0bU : i == 2U ? 0x07U : 0U))
+            return TSD_BAD;
+        next = low & ~4095U;
+        origin = next;
+    }
+    return TSD_BAD;
+}

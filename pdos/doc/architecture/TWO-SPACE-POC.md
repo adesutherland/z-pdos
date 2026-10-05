@@ -119,19 +119,32 @@ an independently reserved K-accessible real pool, with 4 KiB pages and
 big-endian 64-bit entries. Both table pools and backing frames must be
 reserved before translation is enabled. Page-table storage and low channel
 buffers consume real memory but **no U virtual addresses below 16 MiB**.
-Live table mutation will need translation invalidation; this builder is for
-bootstrap construction only.
+The guest builds the tables during bootstrap. A checked single-CPU map/unmap
+API and `PTLB` callback exist, but DAT-on runtime mutation remains an
+integration gate.
 
-The SVC entry remains a real, DAT-off interruption island. It saves full
-registers and the old PSW, loads the K ASCE with `LCTLG`, then branches to
-the high K nucleus. That nucleus checks the full U pointer, copies a bounded
-request through a K alias into a K-owned C31 buffer, and invokes a Classic
-C service through a low K trampoline. It rejects a forged pointer whose low
-32 bits match a valid address. This fixture's aliases are fixed to two known
-pages; a general service gate will need checked page walks, lengths, overflow,
-write direction, access rights and fault recovery. The service returns in
-the caller's original 24, 31 or 64-bit mode and key 8. K code/data and DAT
-tables are not mapped in U.
+The real, DAT-off island now has SVC, program, external, I/O and machine-check
+new PSWs. It keeps two bounded context frames, each with all 16 full-width
+GPRs, the exact old PSW, the full CR1 and an interruption class. The nucleus
+loads K's ASCE, enters K64, and returns through the real island to the saved
+ASCE, PSW and key. A nested SVC while K DAT is enabled returns to its outer
+service. One selected U translation fault resumes at an explicit U recovery
+address with a result code; unknown program faults and machine checks enter a
+bounded wait rather than retrying the faulting instruction. External and I/O
+entry paths were exercised with planted old PSWs; real asynchronous device
+delivery and acknowledgement remain unqualified.
+
+The C31 gate walks U's full-width region-first translation through a K-only
+table alias, validates every page and its access direction, rejects range
+wrap, and preflights a transfer of at most 256 bytes before copying through
+K-owned storage. K has a `0x08000000`–`0x08ffffff` virtual aperture to the
+named 16 MiB real profile; U cannot address that aperture. The Classic C31
+service receives a K descriptor, never a raw U pointer. It dispatches SVC
+202 and 204 as separate CMS fixture personalities and SVC 1 as the TSO
+fixture personality. These return values are probe values, not IBM API
+implementations. A forged high pointer, unwritable code page, oversized
+request and wrapped address are refused. Valid read/write transfers cross
+U pages. K code, data, tables and the real aperture are absent from U.
 
 One AMODE24 application calls a different AMODE31 application directly in U.
 The callee invokes the same SVC and returns a code; the caller survives and
@@ -147,12 +160,12 @@ dispatcher.
 
 | PoC resource | Real backing | Virtual placement |
 | --- | --- | --- |
-| K DAT tables | 135,168 bytes, 33 real 4 KiB frames | No U mapping |
+| K DAT tables | 200,704 bytes, 49 real 4 KiB frames | No U mapping |
 | U DAT tables | 94,208 bytes, 23 real 4 KiB frames | No U mapping |
 | K64 nucleus | One real code page in the fixture | `0x0100000000000000` in K |
-| Classic C31 service and trampoline | Two real pages | `0x02000000`–`0x02001fff` in K |
+| Classic C31 service and trampoline | Five reserved service slots, two populated code pages, and one trampoline page | `0x02000000`–`0x02005fff` in K |
 | U application pages below 16 MiB | Two real pages | `0x20000` and `0x21000` in U |
-| Other U application pages | Three real pages | `0x02000000`, `0x110000000`, `0x110001000` in U |
+| Other U application pages | Four real pages | `0x02000000`, `0x110000000`, `0x110001000`, `0x110002000` in U |
 
 The current fixture leaves 16,769,024 of 16,777,216 low U virtual bytes
 unmapped. A production CMS `0x14` compatibility page, images, stacks, heaps
@@ -168,7 +181,9 @@ can use distinct adapters there. U holds applications and any in-space call
 protocol. No IBM TSO or CMS API is implied merely by this boundary.
 
 The [Step 3/4 qualification note](../qualification/TWO-SPACE-STEPS3-4-2026-10-05.md)
-records the actual Classic tool and Hercules checks.
+records the original machine gate. The subsequent
+[production slices 3/4 record](../qualification/TWO-SPACE-SLICES3-4-2026-10-05.md)
+records the interruption and transfer extension.
 
 ## Step 5: bounded 3390 IPL and remaining integration gate
 
@@ -193,11 +208,9 @@ records the exact image and guest result. The dataset names and fixed real
 addresses are fixture details, not a compatibility or ABI commitment.
 
 At this Step 5 checkpoint the tables were prebuilt by product C source on the
-host. The later guest-construction checkpoint is described below. The remaining
-OS integration needs program, external, I/O and machine-check entries, nesting
-and recovery, a bounded general U-buffer copier, service personality adapters,
-and collision-checked CMS/TSO module loading. The boot crossing does not by
-itself establish a replacement operating system.
+host. The later guest-construction and interruption/service checkpoints are
+described here. The boot crossing does not by itself establish a replacement
+operating system.
 
 ## Production slices 1 and 2: checked handover and guest DAT
 
@@ -223,14 +236,14 @@ are dead before the launcher overwrites their real frames. The linked fixture
 still chooses the final real destination at zero; the transient staging
 locations are allocated, not built into the package or launcher.
 
-A second ledger reserves every supplied final-core page, then allocates
+A second ledger reserves every supplied final-core page, including mapped
+zero-filled interruption, context and service frames, then allocates
 separate contiguous K/U DAT table pools in unused final-core frames. The C31
 guest stage runs the product sparse region-first builder there and writes both
 ASCEs into the core control page. In the checked 16 MiB profile the chosen
-pool origins are real `0x100000` and `0x140000`. The base mappings use 33 K
+pool origins are real `0x100000` and `0x140000`. The current mappings use 49 K
 and 23 U 4 KiB table frames. K-only C31 virtual aliases at `0x05000000` and
-`0x05040000` make both completed pools reachable after DAT is enabled; the
-aliases add one K table frame, so the current K total is 34 frames. The K64
+`0x05040000` make both completed pools reachable after DAT is enabled. The K64
 entry still runs at virtual `0x0100000000000000`, while U has no K or table
 mappings. `TSDATTACH` can reopen a completed pool through its K alias using the
 recorded real origin, ASCE and used size. A source-level map/unmap API
@@ -242,8 +255,8 @@ is a separate integration check before services depend on it.
 
 The exact fresh IPL, host comparison and deliberately damaged-package result
 are in the [slices 1/2 qualification record](../qualification/TWO-SPACE-SLICES1-2-2026-10-05.md).
-The first two slices do not migrate the OS service, loader or interruption
-paths. The active release kernel remains the one-ASCE C32 system.
+Slices 3/4 add the bounded interruption and service gate described above.
+The active release kernel remains the one-ASCE C32 system.
 
 ## Primary architecture and compatibility references
 

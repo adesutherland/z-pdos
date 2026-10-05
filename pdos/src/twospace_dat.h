@@ -41,6 +41,10 @@ int TSDMAPTABLE(TSDSTATE *state, TSPADDR virtual_page,
                 TSPADDR real_page);
 int TSDUNMAP(TSDSTATE *state, TSPADDR virtual_page,
              TSPADDR *old_real_page);
+/* Translate a complete U address through a K-accessible table alias. The
+ * result is a real byte address, never a directly usable C31 U pointer. */
+int TSDLOOKUP(const TSDSTATE *state, TSPADDR virtual_byte,
+              TSPADDR *real_byte);
 int TSDLIVE(TSDSTATE *state, TSDPURGE purge, void *context);
 
 #endif

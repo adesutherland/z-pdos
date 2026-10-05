@@ -25,27 +25,33 @@ main: procedure = .int
   object = out || "/TWOSVC.obj"
   binary = out || "/TWOSVC.bin"
   map = out || "/TWOSVC.map"
+  gateasm = out || "/TSG.asm"; gateobj = out || "/TSG.obj"
+  datasm = out || "/TSD.asm"; datobj = out || "/TSD.obj"
+  datmap = out || "/TSD.map"; datbin = out || "/TSD.bin"
   address crexx "cd pdos/src"
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. -I../../pdpclib/src -DUSE_MEMMGR twospace_service.c -o :compiled"
+  if rc <> 0 then return rc
+  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_gate.c -o :gateasm"
+  if rc <> 0 then return rc
+  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_dat.c -o :datasm"
   if rc <> 0 then return rc
   address crexx "cd :root"
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :compiled :object"
   if rc <> 0 then return rc
-  address crexx "run :classicld --oformat binary --image-base 33554432 -e P0D3PCAA -Map :map -o :binary :object"
+  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :gateasm :gateobj"
   if rc <> 0 then return rc
-  datasm = out || "/TSD.asm"; datobj = out || "/TSD.obj"
-  datmap = out || "/TSD.map"; datbin = out || "/TSD.bin"
+  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :datasm :datobj"
+  if rc <> 0 then return rc
+  address crexx "run :classicld --oformat binary --image-base 33554432 -e P0D3PCAA -Map :map -o :binary :object :gateobj :datobj"
+  if rc <> 0 then return rc
   placeasm = out || "/TSP.asm"; placeobj = out || "/TSP.obj"
   placemap = out || "/TSP.map"; placebin = out || "/TSP.bin"
   dattest = out || "/dat-test"; placetest = out || "/placement-test"
+  gatetest = out || "/gate-test"
   address crexx "cd pdos/src"
-  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_dat.c -o :datasm"
-  if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_placement.c -o :placeasm"
   if rc <> 0 then return rc
   address crexx "cd :root"
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :datasm :datobj"
-  if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :placeasm :placeobj"
   if rc <> 0 then return rc
   address crexx "run :classicld --oformat binary --image-base 50331648 -e TSDINIT -Map :datmap -o :datbin :datobj"
@@ -59,6 +65,10 @@ main: procedure = .int
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_placement.c pdos/tests/two-space/placement.c -o :placetest"
   if rc <> 0 then return rc
   address crexx "run :placetest"
+  if rc <> 0 then return rc
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_dat.c pdos/src/twospace_fixture.c pdos/src/twospace_gate.c pdos/tests/two-space/gate.c -o :gatetest"
+  if rc <> 0 then return rc
+  address crexx "run :gatetest"
   if rc <> 0 then return rc
   datemit = out || "/dat-emit"
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src pdos/src/twospace_dat.c pdos/src/twospace_fixture.c pdos/src/twospace_placement.c pdos/tests/two-space/dat_emit.c -o :datemit"
