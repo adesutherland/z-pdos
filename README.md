@@ -51,10 +51,10 @@ application execution. It implements the MVS-style services needed by the
 qualified workloads; it is not a general replacement for z/OS or TSO.
 
 The [0.1.1 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.1)
-provides macOS Apple Silicon and Intel packages, Linux x64 tools, Windows x64
-packages, a source archive and a base OS disk image. All four host builds and
-relocated compiler/assembler/linker checks passed. The downloadable base image
-passed host loader and disk checks; the separate local operator acceptance
+provides macOS Apple Silicon and Intel packages, Linux x64 tools, signed
+Windows x64 packages, a source archive and a base OS disk image. All four host
+builds and relocated compiler/assembler/linker checks passed. The downloadable
+base image passed host loader and disk checks; the separate local operator acceptance
 does not claim that exact release-image ZIP was booted.
 
 Native TSO24 AMODE24/RMODE24 direct loading, broader file semantics and parts

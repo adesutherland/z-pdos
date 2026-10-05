@@ -8,8 +8,9 @@ The [release workflow](https://github.com/adesutherland/z-pdos/actions/runs/3730
 passed for source `69b638d38dc4221cbed399d8fde5bf4883673901`: both compiler
 variants, the required host suite and a relocated compile/assemble/link check
 on all four hosts, plus the Linux source-to-image checks. macOS packages were
-signed and notarized. Windows downloads are initially unsigned pending the
-separate local signing step. The
+signed and notarized. CI built the Windows packages unsigned; the separate
+local signing step completed for 0.1.1. The published Windows ZIP and installer
+are Authenticode signed and timestamped. The
 [local operator acceptance](../pdos/doc/qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
 and downloadable Linux-built base image have distinct image identities.
 The released image receipt pins the same PLOAD, PDOS, PCOMM and CONFIG payload
@@ -23,7 +24,7 @@ hash and was not itself used for that guest run.
 | macOS Apple Silicon | `macos-arm64-signed.pkg` or `macos-arm64-signed.zip` | PKG installer or portable directory. |
 | macOS Intel | `macos-x86_64-signed.pkg` or `macos-x86_64-signed.zip` | PKG installer or portable directory. |
 | Linux x64 | `linux-x64.zip` | Extract and use the `bin` directory. |
-| Windows x64 | `windows-x64-unsigned-setup.exe` or `windows-x64-unsigned.zip` | Per-user installer or portable directory; local signing pending. |
+| Windows x64 | `windows-x64-signed-setup.exe` or `windows-x64-signed.zip` | Signed per-user installer or portable directory. |
 | Run the operating system | `pdos-image.zip` | Follow the [OS boot guide](../pdos/doc/user/README.md). |
 | Inspect or rebuild the release | `source.tar.gz` | Corresponding maintained source and recipes. |
 
@@ -171,17 +172,19 @@ without re-entering the running cREXX release orchestrator.
 ## Maintainer reference: Windows signing
 
 CI initially produces unsigned Windows packages. A separate local operation
-signs and publishes them; this step completed for 0.1.0. The 0.1.1 Windows
-downloads remain unsigned until that operation succeeds. No Windows signing
-key is uploaded to GitHub.
+signs and publishes them; this step completed for 0.1.0 and 0.1.1. For 0.1.1,
+the script verified the Authenticode signatures and timestamps, uploaded the
+signed ZIP and installer, refreshed `SHA256SUMS`, and removed the unsigned
+downloads. No Windows signing key is uploaded to GitHub.
 
 The local signing route requires a logged-in SimplySign token, cREXX, `jsign`,
 `osslsigncode`, NSIS, CMake and authenticated `gh`. Set `PROVIDER` to the PKCS11
 configuration and `CERTUM_ALIAS` to the token's actual certificate alias.
 `TSA_URL` optionally selects the timestamp service.
 
-The following command **uploads to an existing release and replaces its
-unsigned Windows downloads**. Use it only for an authorized release:
+The 0.1.1 operation used the following command, which **uploads to an existing
+release and replaces its unsigned Windows downloads**. Use it for another
+release only with that release's own input ZIP, version and authorization:
 
 ```sh
 export PROVIDER=/absolute/path/provider.macos.cfg
