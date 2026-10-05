@@ -66,3 +66,5 @@ parsed relocation records or loaded CMS/TSO modules. It does not boot from
 or prove full CMS/TSO API compatibility. [PD-003](../BACKLOG.md#pd-003-two-space-supervisor-and-shared-application-memory)
 retains those acceptance gates. The [architecture contract](../architecture/TWO-SPACE-POC.md)
 sets out the boot migration and 24-bit budget.
+The subsequent [Step 5 proof](TWO-SPACE-STEP5-2026-10-05.md) boots this same
+bounded fixture from a checked 3390 image; it does not qualify CMS/TSO binaries.

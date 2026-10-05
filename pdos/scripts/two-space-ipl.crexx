@@ -1,0 +1,147 @@
+/* SPDX-License-Identifier: MIT
+ * Source-built, disposable 3390 IPL of the two-space successor fixture.
+ * This is a boot-path proof, not a replacement for the released PDOS image.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i = .int
+  if args.0 <> 5 then return usage()
+  work = args.1; core = args.2; gnuas = args.3; gnuld = args.4; hercdir = args.5
+  call require left(work,11) = "build/pdos/" & length(work) > 11 & pos("..",work) = 0, "fresh owned build path"
+  call require left(hercdir,1) = "/", "absolute Hercules tools path"
+  address crexx "run test ! -e :work"
+  call require rc = 0, "new output directory required"
+  locations = .string[]
+  address crexx "pwd" output locations
+  root = strip(locations.1); out = root || "/" || work
+  address crexx "run cmake -E make_directory :out"
+  call require rc = 0, "create output"
+  base = work || "/base"
+  call runlog "crexx -nokeep pdos/scripts/image.crexx --args " || shellquote(base) || " " || shellquote(hercdir), out || "/base-build.log"
+  classiccc = root || "/build/compiler/mvs/gcc/mf-classic-cc"
+  classicas = root || "/build/tools/assembler/mf-classic-as"
+  classicld = root || "/build/tools/linker/mf-classic-ld"
+  asm = out || "/boot.asm"; obj = out || "/boot.obj"
+  module = out || "/boot.mvs"; mapfile = out || "/boot.map"
+  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src -I pdpclib/src -DUSE_MEMMGR pdos/src/twospace_boot.c -o :asm"
+  call require rc = 0, "Classic C31 IPL stage"
+  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :obj"
+  call require rc = 0, "Classic assembler IPL stage"
+  c = out || "/base/c/objects"; support = out || "/base/support"
+  objects = .string[]
+  objects[1] = support || "/SAPSTART.obj"
+  objects[2] = c || "/START.obj"
+  objects[3] = support || "/SAPSUPA.obj"
+  common = "STDIO STDLIB CTYPE STRING TIME ERRNO ASSERT LOCALE MATH SETJMP SIGNAL MEMMGR"
+  do i = 1 to words(common)
+    objects[i+3] = c || "/" || word(common,i) || ".obj"
+  end
+  count = words(common)+4
+  objects[count] = obj
+  objects[count+1] = support || "/PLOADSUP.obj"
+  objects[count+2] = c || "/PDOSUTIL.obj"
+  address crexx "run :classicld --oformat mvs --image-base 0 --amode 31 --rmode 24 -e @@MAIN -Map :mapfile -o :module :objects[]"
+  call require rc = 0, "native C31 IPL stage link"
+  launchobj = out || "/launch.o"; launchbin = out || "/launch.bin"
+  address crexx "run :gnuas -m64 -march=z900 pdos/tests/two-space/launch.S -o :launchobj"
+  call require rc = 0, "real launch stub assembly"
+  address crexx "run :gnuld -m elf64_s390 --oformat binary -Ttext 0x800000 -e launch :launchobj -o :launchbin"
+  call require rc = 0, "real launch stub link"
+  media = out || "/media"
+  address crexx "run cmake -E make_directory :media"
+  call require rc = 0, "media output"
+  pload = media || "/pload.sys"; pdos = media || "/pdos.sys"
+  package = media || "/command.exe"; config = media || "/config.sys"
+  from = out || "/base/linked/PLOAD-0.bin"
+  address crexx "run cmake -E copy :from :pload"
+  call require rc = 0, "source-built PLOAD"
+  address crexx "run cmake -E copy :module :pdos"
+  call require rc = 0, "successor IPL stage"
+  call runlog "env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pack_core.py " || shellquote(core) || " " || shellquote(launchbin) || " " || shellquote(package), out || "/package.log"
+  call put_binary config,'F0F0F0F940F3F2F7F015'x
+  ctl = media || "/ctl.txt"
+  call lineout ctl,"PDOS00 3390-1 100"
+  call lineout ctl,"PLOAD.SYS SEQ pload.sys TRK 10 1 0 PS F 18452 18452"
+  call lineout ctl,"SYSVTOC VTOC CYL 2"
+  call lineout ctl,"PDOS.SYS SEQ pdos.sys CYL 1 1 0 PS F 18452 18452"
+  call lineout ctl,"CONFIG.SYS SEQ config.sys CYL 1 1 0 PS F 10 10"
+  call lineout ctl,"COMMAND.EXE SEQ command.exe CYL 1 1 0 PS F 18452 18452"
+  call lineout ctl
+  installer = out || "/base/install-ipl"
+  address crexx "cd :media"
+  call runlog shellquote(hercdir || "/dasdload") || " -bz2 ctl.txt datasets.cckd", media || "/dasdload.log"
+  call runlog shellquote(hercdir || "/cckd2ckd") || " -q -cyls 100 datasets.cckd datasets.ckd", media || "/cckd2ckd.log"
+  call runlog shellquote(installer) || " datasets.ckd pdos00.ckd pload.sys pdos.sys command.exe config.sys", media || "/ipl-check.log"
+  call runlog shellquote(hercdir || "/ckd2cckd") || " -q -bz2 -cyls 100 pdos00.ckd pdos00.cckd", media || "/ckd2cckd.log"
+  call runlog shellquote(hercdir || "/cckd2ckd") || " -q -cyls 100 pdos00.cckd readback.ckd", media || "/readback.log"
+  call runlog shellquote(installer) || " --compare pdos00.ckd readback.ckd pload.sys pdos.sys command.exe config.sys", media || "/roundtrip-check.log"
+  address crexx "cd :root"
+  inputs = .string[]
+  inputs[1] = "pdos/src/twospace_boot.c"
+  inputs[2] = "pdos/tests/two-space/launch.S"
+  inputs[3] = "pdos/tests/two-space/pack_core.py"
+  inputs[4] = "pdos/tests/two-space/ipl_machine.py"
+  inputs[5] = "pdos/scripts/two-space-ipl.crexx"
+  inputs[6] = core; inputs[7] = gnuas; inputs[8] = gnuld
+  inputs[9] = classiccc; inputs[10] = classicas; inputs[11] = classicld
+  inputs[12] = hercdir || "/hercules"
+  manifest = out || "/inputs.sha256"
+  address system "shasum -a 256 " || quoted(inputs) || " > " || shellquote(manifest)
+  call require rc = 0, "successor IPL producer identities"
+  outputs = .string[]
+  outputs[1] = module; outputs[2] = launchbin; outputs[3] = package
+  outputs[4] = media || "/pdos00.ckd"; outputs[5] = media || "/pdos00.cckd"
+  manifest = out || "/outputs.sha256"
+  address system "shasum -a 256 " || quoted(outputs) || " > " || shellquote(manifest)
+  call require rc = 0, "successor IPL output identities"
+  disk = media || "/pdos00.cckd"; hercules = hercdir || "/hercules"
+  runout = out || "/run"
+  call runlog "env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/ipl_machine.py " || shellquote(disk) || " " || shellquote(core) || " " || shellquote(hercules) || " " || shellquote(runout), out || "/ipl-machine.log"
+  say "Fresh checked 3390 IPL and two-space successor machine gate pass."
+  return 0
+
+runlog: procedure = .int
+  arg command = .string, log = .string
+  address system "( " || command || " ) > " || shellquote(log) || " 2>&1"
+  result = rc
+  if result <> 0 then address crexx "run tail -n 40 :log"
+  call require result = 0, "command; see " || log
+  return 0
+
+shellquote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'", value, "'\''") || "'"
+
+quoted: procedure = .string
+  arg values = .string[]
+  result = ""
+  do i = 1 to values.0
+    result = result || " " || shellquote(values[i])
+  end
+  return result
+
+put_binary: procedure = .int
+  arg path = .string, data = .binary
+  file_id = 0; mode = "wb"
+  assembler fopen file_id,path,mode
+  call require file_id <> 0, "open " || path
+  assembler fwriteb file_id,data
+  write_status = 0; close_status = 0
+  assembler ferror write_status,file_id
+  assembler fclose close_status,file_id
+  call require write_status = 0 & close_status = 0, "complete write " || path
+  return 0
+
+require: procedure = .int
+  arg condition = .int, detail = .string
+  if condition <> 1 then do
+    say "FAILED:" detail
+    exit 1
+  end
+  return 0
+
+usage: procedure = .int
+  say "usage: crexx -nokeep pdos/scripts/two-space-ipl.crexx --args NEW-build/pdos/output core-image GNU_AS GNU_LD HERCULES_BIN_DIR"
+  return 2

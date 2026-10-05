@@ -12,8 +12,8 @@ synchronous application execution. A native 64-bit C kernel is a separate goal.
 
 The [two-space successor proof](doc/architecture/TWO-SPACE-POC.md) exercises
 an AMODE64 assembler nucleus, protected Classic C31 services and applications
-sharing a separate 64-bit address space. It is a diskless machine result;
-the booted release kernel has not adopted it.
+sharing a separate 64-bit address space. A separate [3390 IPL proof](doc/qualification/TWO-SPACE-STEP5-2026-10-05.md)
+boots that bounded fixture; the release kernel has not adopted it.
 
 The recorded source-built milestone runs unchanged cREXX TSO31, TSO64 ANY and
 TSO64 HIGH packages, including compiler, assembler, terminal and file workloads.

@@ -170,25 +170,40 @@ protocol. No IBM TSO or CMS API is implied merely by this boundary.
 The [Step 3/4 qualification note](../qualification/TWO-SPACE-STEPS3-4-2026-10-05.md)
 records the actual Classic tool and Hercules checks.
 
-## Step 5: boot integration gate
+## Step 5: bounded 3390 IPL and remaining integration gate
 
-The current PLOAD reads a native `PDOS.SYS` load module into a fixed one-MiB
-slot at real 2 MiB, allocates its heap at real 1 MiB, and enters a one-ASCE
-C32 kernel. Its heap overlaps the checked fixed CMS24 RXVM image. Replacing
-`PDOS.SYS` with a flat core is not an IPL path: the successor fixture is
-currently installed with Hercules `loadcore` and has prebuilt real pages.
+The existing PLOAD reads a native `PDOS.SYS` load module into a fixed one-MiB
+slot at real 2 MiB and allocates its heap at real 1 MiB. The first successor
+IPL proof uses that loader unchanged, with a small Classic C31 staging module
+as `PDOS.SYS`. The stage reads a compact sparse bundle from the image's
+`COMMAND.EXE` dataset into real 4–6 MiB and puts a position-independent
+launch stub at real 8 MiB. After all disk I/O completes, that stub copies the
+2 MiB bootstrap core to real zero and enters its DAT-off AMODE64 PSW. The
+copy overwrites PLOAD and its former heap only after neither runs again.
+This is safe lifetime reuse of real frames in the fixture; it is not a
+general physical-frame allocator or the final image layout. The U virtual
+`0x20000` CMS24/application range remains independent of those real addresses.
 
-The successor boot route must load a compact image into independently
-reserved real frames, protect K frames and tables, construct K/U region-first
-ASCEs, and enter the K64 nucleus from a real DAT-off island. It must give the
-C31 service body a K virtual home below 2 GiB, give U no kernel virtual
+The checked 100-cylinder 3390 IPL uses the normal source-built PLOAD, the
+Classic C31 staging module, existing IPL vectors and a 19-record/350,588-byte
+sparse package. It boots the same K64/C31/shared-U fixture that previously
+ran through `loadcore`, and all machine checks pass after actual disk IPL.
+The [Step 5 qualification note](../qualification/TWO-SPACE-STEP5-2026-10-05.md)
+records the exact image and guest result. The dataset names and fixed real
+addresses are fixture details, not a compatibility or ABI commitment.
+
+The production successor boot route must reserve real frames, construct and
+protect K/U region-first tables in the guest, and enter the K64 nucleus from
+a real DAT-off island. This proof boots tables prebuilt by the product C DAT
+source on the host, so live guest construction is still open. The route must
+give the C31 service body a K virtual home below 2 GiB, give U no kernel virtual
 mapping, and keep channel-command buffers reachable by 24-bit real addresses.
 It then needs program, external, I/O and machine-check entries, nesting and
 recovery, a bounded general U-buffer copier, service personality adapters,
 and collision-checked CMS/TSO module loading. Finally the normal 3390 image
 builder and fresh IPL qualification must select that route explicitly and run
-CMS24/CMS31 and TSO31/TSO64 binaries. Until then, Steps 3/4 are a machine
-proof and target component build, not a booted replacement kernel.
+CMS24/CMS31 and TSO31/TSO64 binaries. The current disk proof establishes
+the boot crossing, not a booted replacement operating system.
 
 ## Primary architecture and compatibility references
 
