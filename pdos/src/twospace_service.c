@@ -52,9 +52,10 @@ static TSISTATE cms_inputs;
 typedef struct {
     unsigned char id[18];
     unsigned int real, length, cursor, records, source_bytes;
-    unsigned int closed, profile;
+    unsigned int closed, profile, token;
 } CMSOUTPUT;
 static CMSOUTPUT cms_outputs[CMS_OUTPUT_SLOTS];
+#define CMS_OUTPUT_HANDLE_BASE 0x100U
 void TSFPURGE(void *unused);
 void TSKEYSET(unsigned int real_page, unsigned int key);
 
@@ -961,16 +962,29 @@ static int native_clean(unsigned int token, const TSVRESOURCE *resource,
     (void)token;
     if (!frame || !resource) return 1;
     if (resource->kind==TSV_FILE) {
-        TSIINPUT *input;
         unsigned int owner;
-        if (resource->handle>TSI_SLOTS) return 1;
-        input=&cms_inputs.slot[resource->handle-1U];
-        owner=TSIOWNER(&cms_inputs,input,CMS_FILE_OWNER+16U);
-        if (!input->real || input->token!=frame->token || !owner ||
-            TSRRELEASE(&storage.real,owner,input->real)!=TSR_OK)
-            return 1;
-        TSICLEAR(input);
-        return 0;
+        if (resource->handle>=1U && resource->handle<=TSI_SLOTS) {
+            TSIINPUT *input=&cms_inputs.slot[resource->handle-1U];
+            owner=TSIOWNER(&cms_inputs,input,CMS_FILE_OWNER+16U);
+            if (!input->real || input->token!=frame->token || !owner ||
+                TSRRELEASE(&storage.real,owner,input->real)!=TSR_OK)
+                return 1;
+            TSICLEAR(input);
+            return 0;
+        }
+        if (resource->handle>CMS_OUTPUT_HANDLE_BASE &&
+            resource->handle<=CMS_OUTPUT_HANDLE_BASE+CMS_OUTPUT_SLOTS) {
+            unsigned int slot=resource->handle-CMS_OUTPUT_HANDLE_BASE-1U;
+            CMSOUTPUT *out=&cms_outputs[slot];
+            if (!out->real || out->token!=frame->token || out->closed ||
+                TSRRELEASE(&storage.real,CMS_FILE_OWNER+slot+1U,
+                           out->real)!=TSR_OK) return 1;
+            out->real=out->length=out->cursor=0U;
+            out->records=out->source_bytes=out->closed=0U;
+            out->profile=out->token=0U;
+            return 0;
+        }
+        return 1;
     }
     if (resource->kind!=TSV_ALLOCATION) return 1;
     for (i=0U; i<TSM_ALLOCS; ++i)
@@ -1248,12 +1262,13 @@ static unsigned int cms_file_close(TSIINPUT *input)
 }
 
 static CMSOUTPUT *cms_output_find(const unsigned char id[18],
-                                  unsigned int profile)
+                                  unsigned int profile, unsigned int token)
 {
     unsigned int slot, i;
     for (slot=0U; slot<CMS_OUTPUT_SLOTS; ++slot) {
         if (!cms_outputs[slot].real ||
-            cms_outputs[slot].profile!=profile) continue;
+            cms_outputs[slot].profile!=profile ||
+            cms_outputs[slot].token!=token) continue;
         for (i=0U; i<18U && cms_outputs[slot].id[i]==id[i]; ++i) {}
         if (i==18U) return &cms_outputs[slot];
     }
@@ -1261,7 +1276,7 @@ static CMSOUTPUT *cms_output_find(const unsigned char id[18],
 }
 
 static CMSOUTPUT *cms_output_create(const unsigned char id[18],
-                                    unsigned int profile)
+                                    unsigned int profile, unsigned int token)
 {
     unsigned int slot, real, i;
     CMSOUTPUT *out;
@@ -1273,15 +1288,20 @@ static CMSOUTPUT *cms_output_create(const unsigned char id[18],
         TSRALLOC(&storage.real,CMS_FILE_OWNER+slot+1U,
                  CMS_OUTPUT_BYTES,TSF_CORE_BYTES,TSF_REAL_BYTES,
                  TSR_RUN,&real)!=TSR_OK) return 0;
+    if (token && TSVOWN(&native_invocations,token,TSV_FILE,
+                        CMS_OUTPUT_HANDLE_BASE+slot+1U)!=TSV_OK) {
+        TSRRELEASE(&storage.real,CMS_FILE_OWNER+slot+1U,real);
+        return 0;
+    }
     out=&cms_outputs[slot];
     for (i=0U; i<18U; ++i) out->id[i]=id[i];
     out->real=real; out->length=out->cursor=64U;
     out->records=out->source_bytes=out->closed=0U;
-    out->profile=profile;
+    out->profile=profile; out->token=token;
     return out;
 }
 
-static unsigned int cms_output_erase(CMSOUTPUT *out)
+static unsigned int cms_output_discard(CMSOUTPUT *out)
 {
     unsigned int slot;
     if (!out) return 12U;
@@ -1290,7 +1310,25 @@ static unsigned int cms_output_erase(CMSOUTPUT *out)
         TSRRELEASE(&storage.real,CMS_FILE_OWNER+slot+1U,
                    out->real)!=TSR_OK) return 12U;
     out->real=out->length=out->cursor=0U;
-    out->records=out->source_bytes=out->closed=out->profile=0U;
+    out->records=out->source_bytes=out->closed=out->profile=out->token=0U;
+    return 0U;
+}
+
+static unsigned int cms_output_erase(CMSOUTPUT *out)
+{
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
+    unsigned int slot, handle, token, live;
+    if (!out || !frame || out->token!=frame->token) return 12U;
+    slot=(unsigned int)(out-cms_outputs);
+    if (slot>=CMS_OUTPUT_SLOTS) return 12U;
+    handle=CMS_OUTPUT_HANDLE_BASE+slot+1U;
+    token=out->token;
+    live=!out->closed;
+    if (live && TSVHAS(&native_invocations,token,TSV_FILE,handle)
+        !=TSV_OK) return 12U;
+    if (cms_output_discard(out)!=0U) return 12U;
+    if (live && TSVFORGET(&native_invocations,token,TSV_FILE,handle)
+        !=TSV_OK) return 12U;
     return 0U;
 }
 
@@ -1891,7 +1929,7 @@ static unsigned int cms_native_service(TSGREQUEST *request,
         copy.address.lo=request->address.lo+28U;
         copy.length=4U; copy.direction=TSG_WRITE;
         if (TSGPROBE(&gate,&copy)!=TSG_OK) return 12U;
-        file=cms_output_find(plist+8U,profile);
+        file=cms_output_find(plist+8U,profile,frame->token);
         if (file) records=file->records;
         else {
             result=cms_file_open(plist+8U,profile,&input);
@@ -1921,7 +1959,7 @@ static unsigned int cms_native_service(TSGREQUEST *request,
         copy.address.lo=request->address.lo+40U;
         copy.length=4U; copy.direction=TSG_WRITE;
         if (TSGPROBE(&gate,&copy)!=TSG_OK) return 12U;
-        file=cms_output_find(plist+8U,profile);
+        file=cms_output_find(plist+8U,profile,frame->token);
         if (file) {
             real=file->real;
             cursor=(plist[26U]==0U && plist[27U]==1U) ?
@@ -1977,14 +2015,18 @@ static unsigned int cms_native_service(TSGREQUEST *request,
         copy.length=length;
         if (TSGCOPY(&gate,&copy,message,sizeof message)!=TSG_OK)
             return 12U;
-        file=cms_output_find(plist+8U,profile);
+        file=cms_output_find(plist+8U,profile,frame->token);
         if (!file) {
             result=cms_file_open(plist+8U,profile,&input);
             if (result!=28U) return 12U;
-            file=cms_output_create(plist+8U,profile);
+            file=cms_output_create(plist+8U,profile,frame->token);
             if (!file) return 4U;
         }
-        if (file->closed || file->records>=65535U ||
+        if (file->closed ||
+            TSVHAS(&native_invocations,frame->token,TSV_FILE,
+                   CMS_OUTPUT_HANDLE_BASE+
+                   (unsigned int)(file-cms_outputs)+1U)!=TSV_OK ||
+            file->records>=65535U ||
             file->length>CMS_OUTPUT_BYTES-length-2U) return 12U;
         ((unsigned char *)TSF_KAPERTURE_VA+file->real)[file->length++]=
             (unsigned char)(length>>8);
@@ -1999,14 +2041,22 @@ static unsigned int cms_native_service(TSGREQUEST *request,
     }
     for (i=0U; i<8U && plist[i]==finis[i]; ++i) {}
     if (i==8U) {
-        file=cms_output_find(plist+8U,profile);
+        file=cms_output_find(plist+8U,profile,frame->token);
         if (file) {
+            unsigned int slot=(unsigned int)(file-cms_outputs);
+            unsigned int handle=CMS_OUTPUT_HANDLE_BASE+slot+1U;
+            if (!file->closed &&
+                TSVHAS(&native_invocations,frame->token,TSV_FILE,handle)
+                    !=TSV_OK) return 12U;
             if (!file->records) {
                 ((unsigned char *)TSF_KAPERTURE_VA+file->real)[64U]=0U;
                 ((unsigned char *)TSF_KAPERTURE_VA+file->real)[65U]=1U;
                 ((unsigned char *)TSF_KAPERTURE_VA+file->real)[66U]=0x40U;
                 file->length=67U; file->records=file->source_bytes=1U;
             }
+            if (!file->closed &&
+                TSVFORGET(&native_invocations,frame->token,TSV_FILE,handle)
+                    !=TSV_OK) return 12U;
             file->closed=1U;
             return 0U;
         }
@@ -2016,7 +2066,7 @@ static unsigned int cms_native_service(TSGREQUEST *request,
     }
     for (i=0U; i<8U && plist[i]==erase[i]; ++i) {}
     if (i==8U) {
-        file=cms_output_find(plist+8U,profile);
+        file=cms_output_find(plist+8U,profile,frame->token);
         return file ? cms_output_erase(file) : 28U;
     }
     {
@@ -2075,7 +2125,7 @@ static unsigned int cms_file_audit(const TSGREQUEST *request,
     unsigned int slot, i, count=0U, hash, result=0U;
     CMSOUTPUT *out;
     if (request->length || request->address.hi || request->address.lo ||
-        request->direction) return 8U;
+        request->direction || TSVTOP(&native_invocations)) return 8U;
     for (slot=0U; slot<CMS_OUTPUT_SLOTS; ++slot) {
         out=&cms_outputs[slot];
         if (!out->real || out->profile!=profile) continue;
@@ -2090,7 +2140,7 @@ static unsigned int cms_file_audit(const TSGREQUEST *request,
         *(volatile unsigned int *)(receipt+slot*32U+24U)=out->source_bytes;
         *(volatile unsigned int *)(receipt+slot*32U+28U)=hash;
         ++count;
-        if (cms_output_erase(out)!=0U) result=12U;
+        if (cms_output_discard(out)!=0U) result=12U;
     }
     *(volatile unsigned int *)(TSF_KAPERTURE_VA+
         (profile==24U ? 0x254f4U : 0x254f0U))=count;

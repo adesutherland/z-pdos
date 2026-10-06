@@ -190,6 +190,10 @@ The [CMS input ownership check](qualification/TWO-SPACE-INVOCATION-FILES-2026-10
 keys open cursors by invocation token and reaps unclosed input buffers on
 normal return. A nested same-file guest control and output ownership remain
 open.
+The [CMS output ownership check](qualification/TWO-SPACE-INVOCATION-OUTPUT-2026-10-06.md)
+keys transient output buffers by invocation, reaps unfinished buffers, and
+keeps FINIS-closed data in a K diagnostic store. Durable output and nested
+same-name guest controls remain open.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and
