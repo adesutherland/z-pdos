@@ -7,7 +7,7 @@ import rxfnsb
 main: procedure = .int
   arg args = .string[]
   i = .int
-  if args.0 <> 5 & args.0 <> 6 & args.0 <> 7 & args.0 <> 8 & args.0 <> 9 & args.0 <> 10 & args.0 <> 11 then return usage()
+  if args.0 <> 5 & args.0 <> 6 & args.0 <> 7 & args.0 <> 8 & args.0 <> 9 & args.0 <> 10 & args.0 <> 11 & args.0 <> 12 then return usage()
   work = args.1; core = args.2; gnuas = args.3; gnuld = args.4; hercdir = args.5
   cms24 = ""
   cms24media = ""
@@ -21,6 +21,8 @@ main: procedure = .int
   cms24filemedia = ""
   tso31 = ""
   tso31media = ""
+  tso64 = ""
+  tso64media = ""
   if args.0 >= 6 then do
     cms24 = args.6
     call require left(cms24,1) = "/", "absolute checked CMS24 stage path"
@@ -66,7 +68,7 @@ main: procedure = .int
     address crexx "run shasum -a 256 :cms24file" output hashes
     call require rc = 0 & word(hashes.1,1) = "1c26a211d061f5b41d1b457d80f1493e9d641592c036b8ade03ded86a76b6b78", "pinned CMS24 IO24 RXBIN stage"
   end
-  if args.0 = 11 then do
+  if args.0 >= 11 then do
     tso31 = args.11
     call require left(tso31,1) = "/", "absolute checked TSO31 stage path"
     address crexx "run test -f :tso31"
@@ -74,6 +76,15 @@ main: procedure = .int
     tsohashes = .string[]
     address crexx "run shasum -a 256 :tso31" output tsohashes
     call require rc = 0 & word(tsohashes.1,1) = "9fffaba3c586c1f361c7ecb87167fb1b8acbb569c267b621187fe95305bce506", "pinned unchanged TSO31 record stage"
+  end
+  if args.0 = 12 then do
+    tso64 = args.12
+    call require left(tso64,1) = "/", "absolute checked TSO64 ANY stage path"
+    address crexx "run test -f :tso64"
+    call require rc = 0, "TSO64 ANY stage exists"
+    tso64hashes = .string[]
+    address crexx "run shasum -a 256 :tso64" output tso64hashes
+    call require rc = 0 & word(tso64hashes.1,1) = "bdc2d14439f1a3c90409313a9693672c61187b78277197d4dc2b5634dc19bdd6", "pinned unchanged TSO64 ANY record stage"
   end
   call require left(work,11) = "build/pdos/" & length(work) > 11 & pos("..",work) = 0, "fresh owned build path"
   call require left(hercdir,1) = "/", "absolute Hercules tools path"
@@ -195,6 +206,12 @@ main: procedure = .int
     call require rc = 0, "checked TSO31 stage copy"
     call lineout ctl,"TSO31.RXVM SEQ tso31-rxvm.bin CYL 3 1 0 PS F 18452 18452"
   end
+  if tso64 <> "" then do
+    tso64media = media || "/tso64-rxvm.bin"
+    address crexx "run cmake -E copy :tso64 :tso64media"
+    call require rc = 0, "checked TSO64 ANY stage copy"
+    call lineout ctl,"TSO64.RXVM SEQ tso64-rxvm.bin CYL 2 1 0 PS F 18452 18452"
+  end
   call lineout ctl
   installer = out || "/base/install-ipl"
   address crexx "cd :media"
@@ -231,6 +248,7 @@ main: procedure = .int
   if cmslibrary <> "" then inputs[27] = cmslibrary
   if cms24file <> "" then inputs[28] = cms24file
   if tso31 <> "" then inputs[29] = tso31
+  if tso64 <> "" then inputs[30] = tso64
   manifest = out || "/inputs.sha256"
   address system "shasum -a 256 " || quoted(inputs) || " > " || shellquote(manifest)
   call require rc = 0, "successor IPL producer identities"
@@ -244,6 +262,7 @@ main: procedure = .int
   if cmslibrary <> "" then outputs[10] = cmslibrarymedia
   if cms24file <> "" then outputs[11] = cms24filemedia
   if tso31 <> "" then outputs[12] = tso31media
+  if tso64 <> "" then outputs[13] = tso64media
   manifest = out || "/outputs.sha256"
   address system "shasum -a 256 " || quoted(outputs) || " > " || shellquote(manifest)
   call require rc = 0, "successor IPL output identities"
@@ -256,6 +275,7 @@ main: procedure = .int
   if cmslibrary <> "" then check = check || " cmslibrary"
   if cms24file <> "" then check = check || " cms24file"
   if tso31 <> "" then check = check || " tso31"
+  if tso64 <> "" then check = check || " tso64"
   call runlog "env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/ipl_machine.py " || shellquote(disk) || " " || shellquote(core) || " " || shellquote(hercules) || " " || shellquote(runout) || check, out || "/ipl-machine.log"
   say "Fresh checked 3390 IPL and two-space successor machine gate pass."
   return 0
@@ -301,5 +321,5 @@ require: procedure = .int
   return 0
 
 usage: procedure = .int
-  say "usage: crexx -nokeep pdos/scripts/two-space-ipl.crexx --args NEW-build/pdos/output core-image GNU_AS GNU_LD HERCULES_BIN_DIR [PINNED_CMS24_STAGE [PINNED_CMS31_STAGE [PINNED_CMS31_IOQUAL_STAGE [PINNED_CMS31_LIBRARY_STAGE [PINNED_CMS24_IO24_STAGE [PINNED_TSO31_STAGE]]]]]]"
+  say "usage: crexx -nokeep pdos/scripts/two-space-ipl.crexx --args NEW-build/pdos/output core-image GNU_AS GNU_LD HERCULES_BIN_DIR [PINNED_CMS24_STAGE [PINNED_CMS31_STAGE [PINNED_CMS31_IOQUAL_STAGE [PINNED_CMS31_LIBRARY_STAGE [PINNED_CMS24_IO24_STAGE [PINNED_TSO31_STAGE [PINNED_TSO64_ANY_STAGE]]]]]]]"
   return 2

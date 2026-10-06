@@ -61,7 +61,7 @@ int main(int argc, char **argv)
     unsigned char *raw, *image, *mutated;
     unsigned int bytes, bytes64, stage_bytes;
     TSTINFO info;
-    if (argc!=4) return 2;
+    if (argc!=5) return 2;
     raw=(unsigned char *)malloc(TST_MAX_RAW+1U);
     mutated=(unsigned char *)malloc(TST_MAX_RAW+1U);
     image=(unsigned char *)malloc(TST_MAX_IMAGE);
@@ -137,6 +137,22 @@ int main(int argc, char **argv)
                         767727U,&info)==TST_BAD);
     CHECK(TSTIMAGE64ANY(raw,bytes64-1U,0x09000000U,image,
                         TST_MAX_IMAGE,&info)==TST_BAD);
+    stage_bytes=read_file(argv[4],raw);
+    CHECK(stage_bytes==45U*TST_BLOCK);
+    CHECK(TSTSTAGEHEADER64(raw,stage_bytes,&bytes,&bytes64)==TST_OK &&
+          bytes==821446U && bytes64==45U);
+    CHECK(TSTSTAGEVALIDATE(raw,stage_bytes,64U,&info)==TST_OK &&
+          info.raw_bytes==821446U && info.records==425U);
+    CHECK(TSTSTAGEVALIDATE(raw,stage_bytes,31U,&info)==TST_BAD);
+    memcpy(mutated,raw,stage_bytes);
+    mutated[64U+100U]^=1U;
+    CHECK(TSTSTAGEVALIDATE(mutated,stage_bytes,64U,&info)==TST_BAD);
+    memcpy(mutated,raw,stage_bytes);
+    mutated[stage_bytes-1U]=1U;
+    CHECK(TSTSTAGEVALIDATE(mutated,stage_bytes,64U,&info)==TST_BAD);
+    memcpy(mutated,raw,stage_bytes);
+    mutated[6U]=0x31U;
+    CHECK(TSTSTAGEVALIDATE(mutated,stage_bytes,64U,&info)==TST_BAD);
     stage_bytes=read_file(argv[3],raw);
     CHECK(stage_bytes==76U*TST_BLOCK);
     CHECK(TSTSTAGEVALIDATE(raw,stage_bytes,31U,&info)==TST_OK &&

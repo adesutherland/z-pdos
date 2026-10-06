@@ -164,8 +164,10 @@ real `ADDRESS`/LINK application calls and conflicting-module qualification.
 Slice 7 still needs TSO64/native TSO24 and the explicitly selected normal
 successor image with full regression and failure controls.
 The [TSO64 ANY loader-core check](qualification/TWO-SPACE-TSO64-ANY-LOADER-2026-10-06.md)
-also passes a two-base host comparison and Classic C31 target link. Guest
-staging, U mapping and execution are the next TSO64 acceptance boundaries.
+also passes a two-base host comparison and Classic C31 target link.
+The [TSO64 ANY fresh-IPL map](qualification/TWO-SPACE-TSO64-ANY-MAP-2026-10-06.md)
+now closes the selected transport and placement checkpoint. Native 64-bit
+entry and service behavior remain open.
 
 The [6 October K channel checkpoint](qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
 adds a reserved 64 KiB low-real K workspace and a bounded post-handover

@@ -869,6 +869,13 @@ cms24_io_done:
     lg %r2, 0(%r2)
     st %r15, 0x2f0(%r2)
 tso31_call_done:
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 232                 /* checked TSO64 ANY image into shared U */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x2f4(%r2)
     brasl %r14, wide_heap_workload
     larl %r3, high_data_va
     lg %r3, 0(%r3)
@@ -1045,6 +1052,8 @@ trace_not_cms_fst:
     chi %r2, 230
     je storage_no_record
     chi %r2, 231
+    je storage_no_record
+    chi %r2, 232
     je storage_no_record
     chi %r2, 93
     je storage_no_record

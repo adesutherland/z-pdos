@@ -207,7 +207,7 @@ def run(args):
                            cmsfile=bool(args.cmsfile),
                            cmslibrary=bool(args.cmslibrary),
                            cms24file=bool(args.cms24file),
-                           tso31=bool(args.tso31))
+                           tso31=bool(args.tso31), tso64=bool(args.tso64))
             judged["checks"]["ipl_subchannel_handover"] = (
                 0x10000 <= struct.unpack_from(">I",raw,0x40bc)[0] < 0x10100)
             judged["checks"]["independent_disk_console_channel_workspaces"] = (
@@ -455,6 +455,22 @@ def run(args):
                     raw[0x4710:0x4710+tso_length].decode("cp037") and
                     "crexx-1.0.0-beta.3 (Bytecode Mode)" in
                     application_screen)
+            if args.tso64:
+                tso_real, tso_bytes, tso_entry, tso_blocks, tso_input_fnv = \
+                    struct.unpack_from(">5I",raw,0x4640)
+                tso_pages = (tso_bytes+4095)//4096
+                tso_hash = 0x811c9dc5
+                if tso_real and tso_real+tso_bytes <= len(raw):
+                    for value in raw[tso_real:tso_real+tso_bytes]:
+                        tso_hash = ((tso_hash ^ value)*0x01000193) & 0xffffffff
+                checks["tso64_any_checked_image_in_shared_u"] = (
+                    struct.unpack_from(">I",raw,0x122f4)[0] == 0 and
+                    tso_real >= 0x400000 and tso_bytes == 767728 and
+                    tso_entry == 0x09000000 and tso_blocks == 45 and
+                    tso_input_fnv == 0x007eda54 and
+                    tso_hash == 0x94d5943a and
+                    all(page_real(raw,0x28000f,0x09000000+i*4096) ==
+                        tso_real+i*4096 for i in range(tso_pages)))
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
                 real_bytes == 0x10000000 and stage >= 0x400000 and
                 stage + 0x400000 <= launch and launch + 4096 <= real_bytes and
@@ -511,6 +527,7 @@ def main():
     p.add_argument("cmslibrary", nargs="?", choices=("cmslibrary",))
     p.add_argument("cms24file", nargs="?", choices=("cms24file",))
     p.add_argument("tso31", nargs="?", choices=("tso31",))
+    p.add_argument("tso64", nargs="?", choices=("tso64",))
     try:
         return run(p.parse_args())
     except (OSError, ValueError) as exc:

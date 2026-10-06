@@ -499,6 +499,14 @@ bases, byte-for-byte against the released loader. It has not entered the
 guest or exercised a 64-bit native service. RMODE HIGH's 64-bit relocation
 format remains distinct.
 
+The [TSO64 ANY fresh-IPL map](../qualification/TWO-SPACE-TSO64-ANY-MAP-2026-10-06.md)
+now carries that checked member through a separate disk envelope and K
+stage, then maps it at low U `0x09000000` beside CMS and TSO31. Its complete
+unexecuted image and 188 page translations match the host result. A native
+AMODE64 entry and service ABI are the next execution gate. The C31 fixture
+slot is near capacity; any expansion belongs in K storage, never the low
+24-bit U placement gap.
+
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
 SVC through K, returns `0x3456` to a U64 caller, restores the parent PTEs,
