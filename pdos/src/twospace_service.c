@@ -6,10 +6,12 @@
 #include "twospace_gate.h"
 #include "twospace_fixture.h"
 #include "twospace_memory.h"
+#include "twospace_channel.h"
 
 static unsigned int user_rights(unsigned int frame, void *unused);
 static TSDSTATE u_tables;
 static TSMSTATE storage;
+static TSCSTATE channel;
 static unsigned int storage_ready;
 void TSFPURGE(void *unused);
 void TSKEYSET(unsigned int real_page, unsigned int key);
@@ -33,7 +35,9 @@ static int attach(void)
                   *(volatile const unsigned int *)0x400cU) != TSD_OK ||
         TSDLIVE(&u_tables,purge,0) != TSD_OK ||
         TSMINIT(&storage,&u_tables,(unsigned char *)TSF_KAPERTURE_VA,
-                TSF_REAL_BYTES,TSF_CORE_BYTES,set_key,0) != TSM_OK)
+                TSF_REAL_BYTES,TSF_CORE_BYTES,set_key,0) != TSM_OK ||
+        TSCINIT(&channel,(unsigned char *)TSF_KAPERTURE_VA,
+                TSF_REAL_BYTES,TSF_CHANNEL_REAL) != TSC_OK)
         return -1;
     at.hi=0U; at.lo=0x20000U;
     if (TSMRESERVE(&storage,1U,24U,at,0x2000U) != TSP_OK)
@@ -46,6 +50,29 @@ static int attach(void)
         return -1;
     storage_ready=1U;
     return 0;
+}
+
+int TSCIO(unsigned int subchannel, unsigned char *orb,
+          unsigned char *irb);
+
+/* This is a K-only post-handover channel proof. A dataset service can use
+ * the same real-buffer path once its extent and record policy is installed. */
+static unsigned int volume_service(const TSGREQUEST *request)
+{
+    const unsigned char *label;
+    unsigned int count, subchannel;
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    subchannel=*(volatile const unsigned int *)0x40bcU;
+    if (!subchannel) return 0xfffffffbU;
+    if (TSCBUILDREAD(&channel,0U,0U,3U,0x0eU,80U) != TSC_OK ||
+        TSCIO(subchannel,TSCORB(&channel),TSCIRB(&channel)) != 0 ||
+        TSCCHECKREAD(&channel,80U,&count) != TSC_OK || count < 24U)
+        return 12U;
+    label=TSCDATA(&channel);
+    if (label[4] != 0xe5U || label[5] != 0xd6U ||
+        label[6] != 0xd3U || label[7] != 0xf1U) return 8U;
+    return 0U;
 }
 
 /* The current fixture's SVC 120 path uses the active conditional GETMAIN
@@ -98,6 +125,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (*(volatile const unsigned int *)0x3000U != 0U)
         return request->svc == 120U ? 8U : 0xfffffffdU;
     if (request->svc == 120U) return storage_service(request);
+    if (request->svc == 206U) return volume_service(request);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
         return 0xfffffffbU;

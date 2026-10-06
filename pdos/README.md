@@ -17,6 +17,9 @@ sharing a separate 64-bit address space. The
 boots its bounded interruption and U-buffer gate through a fresh 3390 IPL;
 the [storage and overlay checkpoint](doc/qualification/TWO-SPACE-STORAGE-OVERLAY-2026-10-05.md)
 adds live K-owned U allocation and a reversible fixed-origin backing swap.
+The [K channel checkpoint](doc/qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
+adds a bounded post-handover 3390 record read through K-owned low-real
+buffers.
 The release kernel has not adopted this successor. It does not yet run
 unchanged CMS/TSO binaries or provide their file, terminal and command APIs.
 

@@ -163,7 +163,8 @@ dispatcher.
 | K DAT tables | 200,704 bytes, 49 real 4 KiB frames | No U mapping |
 | U DAT tables | 94,208 bytes, 23 real 4 KiB frames | No U mapping |
 | K64 nucleus | One real code page in the fixture | `0x0100000000000000` in K |
-| Classic C31 service and trampoline | Five reserved service slots, two populated code pages, and one trampoline page | `0x02000000`–`0x02005fff` in K |
+| Classic C31 service and trampoline | Six backed service pages, one separate trampoline page | `0x02000000`–`0x02006fff` in K |
+| K-only channel workspace | 64 KiB below 16 MiB real, outside both DAT pools | K real aperture alias; no U mapping |
 | U application pages below 16 MiB | Two real pages | `0x20000` and `0x21000` in U |
 | Other U application pages | Four real pages | `0x02000000`, `0x110000000`, `0x110001000`, `0x110002000` in U |
 
@@ -298,8 +299,22 @@ post-run U table state separately. This avoids mistaking a legitimate live
 map/unmap for a bad bootstrap. The fresh fixture IPL passes 79 checks. The
 successor is still a selectable test dataset on its own disposable disk, not
 the normal `PDOS.SYS` replacement selected for CMS/TSO applications. The
-service endpoint also lacks channel/dataset, terminal and command handlers;
-those are the main integration work in slices 5–7.
+service endpoint still lacks dataset, terminal and command handlers; those
+are the main integration work in slices 5–7.
+
+## Post-handover K channel checkpoint
+
+The [6 October channel result](../qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
+adds a K-only 64 KiB workspace at real `0x180000`–`0x18ffff`. Guest bootstrap
+reserves it before assigning DAT pools. Its K alias is part of the existing
+real aperture; U never maps it. The Classic C31 endpoint builds a format-1
+3390 read chain with real CCW/data addresses, submits it through a bounded
+Classic-assembled `SSCH`/`TSCH` helper, and checks the IRB and `VOL1` record.
+The 3390 IPL ran this service after K64 had entered its separate ASCE. The
+fixture's C31 endpoint now uses six K-only pages; its trampoline is at K
+virtual `0x02006000`. This did not take any virtual address from a 24-bit
+application. Dataset extent traversal, terminal and command services and
+unchanged CMS/TSO execution remain open.
 
 ## Primary architecture and compatibility references
 

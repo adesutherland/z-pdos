@@ -10,7 +10,8 @@ The separate [two-space successor](TWO-SPACE-POC.md) uses
 core, Classic C31 endpoint and disposable `KCORE.BIN` IPL disk. Those inputs
 are outside the active three-link `image.crexx` route below. The latest
 [storage checkpoint](../qualification/TWO-SPACE-STORAGE-OVERLAY-2026-10-05.md)
-qualifies that fixture, not a replacement `PDOS.SYS` image.
+and [K channel checkpoint](../qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
+qualify that fixture, not a replacement `PDOS.SYS` image.
 
 ## Source inputs
 

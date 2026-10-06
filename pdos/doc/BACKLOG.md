@@ -146,6 +146,12 @@ relocation and REXX `ADDRESS` calls. Slice 7 still needs an explicitly selected
 normal replacement image and unchanged CMS/TSO guest qualification. The
 release route remains the one-ASCE kernel.
 
+The [6 October K channel checkpoint](qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
+adds a reserved 64 KiB low-real K workspace and a bounded post-handover
+`VOL1` read through real-addressed CCWs. This removes the virtual-equals-real
+assumption for that one channel operation, but the remaining slice 5 service
+and application-budget criteria above stay open.
+
 ## PD-004: Batch-file delivery
 
 - Type: improvement

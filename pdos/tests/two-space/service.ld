@@ -19,7 +19,7 @@ SECTIONS {
  .appdata 0x21000 : AT(0x7000) { *(.appdata) } :appdata
  .kerneldata 0x22000 : AT(0x8000) { *(.kerneldata) } :kerneldata
  .kcore 0x0100000000000000 : AT(0x9000) { *(.kcore) } :kcore
- .ktramp 0x02005000 : AT(0xf000) { *(.ktramp) } :ktramp
+ .ktramp 0x02006000 : AT(0xf000) { *(.ktramp) } :ktramp
  .appb 0x02000000 : AT(0x11000) { *(.appb) } :appb
  .apphighdata 0x110001000 : AT(0x12000) { *(.apphighdata) } :apphighdata
  .apphighdata2 0x110002000 : AT(0x13000) { *(.apphighdata2) } :apphighdata2

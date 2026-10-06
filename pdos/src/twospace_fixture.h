@@ -11,7 +11,9 @@
 #define TSF_KPOOL_VA 0x05000000U
 #define TSF_UPOOL_VA 0x05040000U
 #define TSF_KAPERTURE_VA 0x08000000U
-#define TSF_SERVICE_PAGES 5U
+#define TSF_SERVICE_PAGES 6U
+#define TSF_CHANNEL_REAL 0x180000U
+#define TSF_CHANNEL_BYTES 0x10000U
 #include "twospace_dat.h"
 
 typedef struct {

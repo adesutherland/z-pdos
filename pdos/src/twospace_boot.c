@@ -181,6 +181,9 @@ int main(int argc, char **argv)
         if (i < 0x14U || (seen[i>>3] & (1U<<(i&7U))))
             if (TSRRESERVE(&final_core,100U+i,i*PAGE,PAGE,TSR_RUN) != TSR_OK)
                 FAIL(31);
+    /* Reserved K-only low-real channel workspace. It is never U mapped. */
+    if (TSRRESERVE(&final_core,700U,TSF_CHANNEL_REAL,
+                   TSF_CHANNEL_BYTES,TSR_RUN) != TSR_OK) FAIL(31);
     if (TSRALLOC(&final_core,3U,TSF_POOL_BYTES,0x100000U,
                  CORE_SIZE,TSR_RUN,&kpool) != TSR_OK ||
         TSRALLOC(&final_core,4U,TSF_POOL_BYTES,0x100000U,
@@ -195,6 +198,7 @@ int main(int argc, char **argv)
     put32(core+0x4094U,dat.kbytes); put32(core+0x4098U,dat.ubytes);
     put32(core+0x409cU,TSF_REAL_BYTES);
     put32(core+0x40a0U,purges);
+    put32(core+0x40bcU,(unsigned int)device);
     /* Preserve the guest-built boot snapshot before K performs live U map
        changes. The runtime updates 0x4098 with its current U table use. */
     put32(core+0x40b0U,crc32_bytes(core+kpool,TSF_POOL_BYTES));

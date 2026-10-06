@@ -62,7 +62,11 @@ def run(args):
         raw = result_path.read_bytes()
         reference = core.read_bytes()
         try:
-            judged = judge(raw[:0x14000], log)
+            judged = judge(raw[:0x14000], log, ipl=True)
+            judged["checks"]["ipl_subchannel_handover"] = (
+                struct.unpack_from(">I",raw,0x40bc)[0] == 0x10000)
+            judged["checks"]["k_real_channel_buffer_vol1"] = (
+                raw[0x181004:0x181008] == bytes((0xe5,0xd6,0xd3,0xf1)))
             checks = judged["checks"]
             report = struct.unpack_from(">8I", raw, 0x4080)
             _, stage, launch, kpool, upool, kbytes, ubytes, real_bytes = report

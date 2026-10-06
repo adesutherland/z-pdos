@@ -38,7 +38,7 @@ def load_elf(path):
     expected = {(0, 0), (0x1000, 0x1000), (0x2000, 0x2000), (0x4000, 0x4000),
                 (0x20000, 0x5000), (0x110000000, 0x6000),
                 (0x21000, 0x7000), (0x22000, 0x8000),
-                (KCORE, 0x9000), (0x02005000, 0xf000),
+                (KCORE, 0x9000), (0x02006000, 0xf000),
                 (0x02000000, 0x11000), (HIGH_REQUEST, 0x12000),
                 (0x110002000, 0x13000)}
     core = bytearray(0x200000)
@@ -62,18 +62,20 @@ def load_elf(path):
 def make_core(elf, classic, dat_emit, out):
     core = load_elf(elf)
     service = Path(classic).read_bytes()
-    if not 0 < len(service) <= 5 * 4096:
-        raise ValueError("Classic C service exceeds five reserved pages")
-    core[0xa000:0xa000 + len(service)] = service
+    if not 0 < len(service) <= 6 * 4096:
+        raise ValueError("Classic C service exceeds six reserved pages")
+    core[0xa000:0xf000] = service[:5 * 4096].ljust(5 * 4096, b"\0")
+    core[0x14000:0x14000 + max(0, len(service) - 5 * 4096)] = service[5 * 4096:]
     # Classic PDPPRLG uses R13's 76-byte slot as the next frame pointer.
     struct.pack_into(">I", core, 0x1004c, 0x03000100)
     struct.pack_into(">I", core, 0x10060, 0x03000080)
     kernel = {0: 0, 0x1000: 0x1000, 0x2000: 0x2000,
               0x3000: 0x3000, 0x4000: 0x4000,
-              0x02005000: 0xf000, 0x03000000: 0x10000,
+              0x02006000: 0xf000, 0x03000000: 0x10000,
               KCORE: 0x9000}
-    kernel.update({0x02000000 + 4096 * i: 0xa000 + 4096 * i
-                   for i in range(5)})
+    kernel.update({0x02000000 + 4096 * i:
+                   (0xa000 + 4096 * i if i < 5 else 0x14000)
+                   for i in range(6)})
     application = {0x20000: 0x5000, 0x21000: 0x7000,
                    0x02000000: 0x11000, 0x110000000: 0x6000,
                    HIGH_REQUEST: 0x12000, 0x110002000: 0x13000}
@@ -83,9 +85,11 @@ def make_core(elf, classic, dat_emit, out):
         raise ValueError("DAT real pool overlaps image backing")
     private_kernel_frames = {0, 0x1000, 0x2000, 0x3000, 0x4000,
                              0x9000, 0xa000, 0xb000, 0xc000,
-                             0xd000, 0xe000, 0xf000, 0x10000}
+                             0xd000, 0xe000, 0xf000, 0x10000, 0x14000}
     if private_kernel_frames.intersection(application.values()):
         raise ValueError("U maps private K real frame")
+    if any(0x180000 <= pa < 0x190000 for pa in application.values()):
+        raise ValueError("U maps low-real K channel buffer")
     image = out / "image.core"
     image.write_bytes(core)
     built = subprocess.run([str(Path(dat_emit).resolve()), str(image)],
@@ -120,20 +124,20 @@ def make_core(elf, classic, dat_emit, out):
             "classic_service_size": len(service), "real_memory_bytes": REAL}
 
 
-def judge(raw, log):
+def judge(raw, log, ipl=False):
     if len(raw) != 0x14000 or raw[0x2000:0x2008] != b"PD2NEXT1":
         raise ValueError("missing/malformed result core")
     expected_masks = (0x0481000000000000, 0x0481000080000000) + \
-                     (0x0481000180000000,) * 7
+                     (0x0481000180000000,) * 8
     expected_pointers = (LOW_REQUEST, LOW_REQUEST, HIGH_REQUEST, 0x100021000,
                          0x110001ffe, 0x110001024, 0x20000,
-                         0xffffffffffffffff, HIGH_REQUEST)
-    checks = {"nine_service_entries": qword(raw, 0x2008) == 9,
+                         0xffffffffffffffff, HIGH_REQUEST, 0)
+    checks = {"ten_service_entries": qword(raw, 0x2008) == 10,
               "completion_marker": qword(raw, 0x2010) == 1,
               "nested_kernel_svc": qword(raw, 0x2018) == 1,
-              "nested_kernel_psw_key_zero": qword(raw, 0x2160) &
+              "nested_kernel_psw_key_zero": qword(raw, 0x21a0) &
                     0x048f000000000000 == 0x0400000000000000,
-              "nested_kernel_asce": qword(raw, 0x2168) == 0x10000f,
+              "nested_kernel_asce": qword(raw, 0x21a8) == 0x10000f,
               "context_depth_bounded_at_exit": qword(raw, 0x710) == 0x3100,
               "recoverable_u_program_fault": qword(raw, 0x2180) == 1 and
                     struct.unpack_from(">I",raw,0x12014)[0] == 0xfffffffc,
@@ -162,8 +166,8 @@ def judge(raw, log):
                                       else 0x20000 <= record[1] < 0x21000))
         saved = [qword(raw,0x2200+i*128+j*8) for j in range(16)]
         sentinels = [((j-5) * 0x11111111 << 32) | j for j in range(6,14)]
-        checks[f"svc_{i}_full_gprs"] = (saved[0] == (257 if i == 8 else 4) and
-            saved[1] == ptr and saved[2] == (2 if i in (5,6) else 1) and
+        checks[f"svc_{i}_full_gprs"] = (saved[0] == (257 if i == 8 else 0 if i == 9 else 4) and
+            saved[1] == ptr and saved[2] == (2 if i in (5,6) else 0 if i == 9 else 1) and
             saved[6:14] == sentinels)
     checks["classic_cms24_result"] = struct.unpack_from(">I", raw, 0x7008)[0] == 0x20202020
     checks["nested_return_code"] = struct.unpack_from(">I", raw, 0x700c)[0] == 0x1357
@@ -189,6 +193,9 @@ def judge(raw, log):
     checks["full_width_storage_length_rejected"] = (
         struct.unpack_from(">I",raw,0x1204c)[0] == 8 and
         qword(raw,0x12050) == 0)
+    checks["k_channel_vol1_read"] = (
+        struct.unpack_from(">I",raw,0x1205c)[0] ==
+        (0 if ipl else 0xfffffffb))
     checks["live_dat_mutations_purged"] = (
         struct.unpack_from(">I",raw,0x40ac)[0] == 4 and
         0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x40000)
@@ -216,9 +223,12 @@ def run(args):
                  "twospace_fixture.c", "twospace_fixture.h",
                  "twospace_placement.c", "twospace_placement.h",
                  "twospace_memory.c", "twospace_memory.h",
-                 "twospace_real.c", "twospace_real.h"):
+                 "twospace_real.c", "twospace_real.h",
+                 "twospace_channel.c", "twospace_channel.h",
+                 "twospace_channel.asm"):
         manifest["source_sha256"]["pdos/src/" + name] = digest(src.parent.parent / "src" / name)
-    for name in ("dat.c", "dat_emit.c", "placement.c", "gate.c", "memory.c"):
+    for name in ("dat.c", "dat_emit.c", "placement.c", "gate.c", "memory.c",
+                 "channel.c"):
         manifest["source_sha256"]["pdos/tests/two-space/" + name] = digest(src / name)
     manifest["source_sha256"]["pdos/scripts/two-space-next.crexx"] = digest(src.parent.parent / "scripts/two-space-next.crexx")
     manifest["elf_sha256"] = digest(args.elf)
@@ -278,7 +288,7 @@ def run(args):
                    and len(negative_raw) == 0x14000 and
                    qword(negative_raw, 0x2188) == 5 and
                    qword(negative_raw, 0x2010) == 1 and
-                   qword(negative_raw, 0x2008) == 9 and
+                   qword(negative_raw, 0x2008) == 10 and
                    "HHC00803I" not in negative_log and
                    not re.search(r"HHC\d{5}E\b", negative_log))
     result["checks"]["synthetic_machine_check_failstop"] = negative_ok
@@ -313,7 +323,7 @@ def run(args):
     fault_raw = fault_path.read_bytes() if fault_path.exists() else b""
     fault_ok = (fault_proc is not None and fault_proc.returncode == 0 and
                 len(fault_raw) == 0x14000 and
-                qword(fault_raw, 0x2008) == 9 and
+                qword(fault_raw, 0x2008) == 10 and
                 qword(fault_raw, 0x2010) == 0 and
                 qword(fault_raw, 0x2188) == 0xffffffffffffffff and
                 fault_raw[0x8e:0x90] == b"\0\x11" and

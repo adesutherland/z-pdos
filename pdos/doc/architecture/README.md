@@ -26,8 +26,13 @@ real storage. The first actual service subset is conditional SVC 120
 GETMAIN/FREEMAIN. A host-checked overlay primitive can preserve a suspended
 fixed-origin caller while child frames occupy the same U address. See the
 [exact checkpoint](../qualification/TWO-SPACE-STORAGE-OVERLAY-2026-10-05.md).
+The next [K channel checkpoint](../qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
+reads one 3390 record after the K handover using a K-owned low-real channel
+workspace and explicit real CCW addresses. It leaves U's low virtual range
+free for applications.
 The successor still lacks the format loaders, CMS/TSO service adapters,
-device I/O and command dispatch needed to become the selected OS.
+dataset and terminal I/O and command dispatch needed to become the selected
+OS.
 
 ## The system at a glance
 

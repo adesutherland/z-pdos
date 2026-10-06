@@ -6,7 +6,7 @@ typedef struct { unsigned int vhi, vlo, real; } TSFMAPPING;
 static const TSFMAPPING kmaps[] = {
     {0U,0U,0U}, {0U,0x1000U,0x1000U}, {0U,0x2000U,0x2000U},
     {0U,0x3000U,0x3000U}, {0U,0x4000U,0x4000U},
-    {0U,0x02005000U,0xf000U}, {0U,0x03000000U,0x10000U},
+    {0U,0x02006000U,0xf000U}, {0U,0x03000000U,0x10000U},
     {0x01000000U,0U,0x9000U}
 };
 static const TSFMAPPING umaps[] = {
@@ -46,7 +46,13 @@ int TSFBUILD(unsigned char *core, unsigned int kpool, unsigned int upool,
         kpool > TSF_CORE_BYTES - TSF_POOL_BYTES ||
         upool > TSF_CORE_BYTES - TSF_POOL_BYTES ||
         (kpool < upool + TSF_POOL_BYTES &&
-         upool < kpool + TSF_POOL_BYTES)) return -1;
+         upool < kpool + TSF_POOL_BYTES) ||
+        (kpool <= 0x14000U && 0x14000U < kpool+TSF_POOL_BYTES) ||
+        (upool <= 0x14000U && 0x14000U < upool+TSF_POOL_BYTES) ||
+        (kpool < TSF_CHANNEL_REAL+TSF_CHANNEL_BYTES &&
+         TSF_CHANNEL_REAL < kpool+TSF_POOL_BYTES) ||
+        (upool < TSF_CHANNEL_REAL+TSF_CHANNEL_BYTES &&
+         TSF_CHANNEL_REAL < upool+TSF_POOL_BYTES)) return -1;
     for (i = 0U; i < sizeof kmaps / sizeof kmaps[0]; ++i)
         if ((kmaps[i].real >= kpool && kmaps[i].real < kpool + TSF_POOL_BYTES) ||
             (kmaps[i].real >= upool && kmaps[i].real < upool + TSF_POOL_BYTES))
@@ -71,7 +77,7 @@ int TSFBUILD(unsigned char *core, unsigned int kpool, unsigned int upool,
     }
     for (i = 0U; i < TSF_SERVICE_PAGES; ++i) {
         va.hi=0U; va.lo=0x02000000U+i*4096U;
-        pa.hi=0U; pa.lo=0xa000U+i*4096U;
+        pa.hi=0U; pa.lo=i<5U ? 0xa000U+i*4096U : 0x14000U;
         if (TSDMAP(&k,va,pa) != TSD_OK) return -1;
     }
     /* K31 can revisit both table pools after the real bootstrap is gone.

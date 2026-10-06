@@ -317,6 +317,13 @@ app_high:
     lg %r2, 0(%r2)
     st %r15, 76(%r2)
     stg %r1, 80(%r2)
+    lghi %r0, 0             /* K reads VOL1 through its real channel buffer */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 206
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 92(%r2)
     larl %r3, high_data_va
     lg %r3, 0(%r3)
     l %r3, 44(%r3)
@@ -447,11 +454,11 @@ nested_svc:
     lghi %r1, 0x3100
     lg %r2, 0x80(%r1)
     lghi %r1, 0x2000
-    stg %r2, 0x160(%r1)
+    stg %r2, 0x1a0(%r1)
     lghi %r1, 0x3100
     lg %r2, 0x90(%r1)
     lghi %r1, 0x2000
-    stg %r2, 0x168(%r1)
+    stg %r2, 0x1a8(%r1)
     lghi %r1, 0x2018
     lg %r2, 0(%r1)
     aghi %r2, 1
@@ -542,7 +549,7 @@ k_table_alias_va: .quad 0x05000000
 u_table_alias_va: .quad 0x05040000
 bounce_va: .quad 0x03000080
 c_result_va: .quad 0x030000a0
-c_trampoline_va: .quad 0x02005000
+c_trampoline_va: .quad 0x02006000
 resume_va: .quad resume
 
 .section .ktramp,"ax"
