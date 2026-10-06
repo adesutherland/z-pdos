@@ -902,17 +902,33 @@ static unsigned int native_begin(TSGREQUEST *request)
 static int native_clean(unsigned int token, const TSVRESOURCE *resource,
                         void *context)
 {
-    (void)token; (void)resource; (void)context;
-    /* A live native allocation is a failed unwind, never silent success. */
+    const TSVFRAME *frame=(const TSVFRAME *)context;
+    unsigned int i;
+    (void)token;
+    if (!frame || !resource || resource->kind!=TSV_ALLOCATION) return 1;
+    for (i=0U; i<TSM_ALLOCS; ++i)
+        if (storage.allocations[i].handle==resource->handle) {
+            if (storage.allocations[i].task!=frame->runtime_owner ||
+                TSMFREE(&storage,frame->runtime_owner,
+                        storage.allocations[i].address)!=TSM_OK) return 1;
+            *(volatile unsigned int *)0x4098U=u_tables.used;
+            return 0;
+        }
+    /* Never call a stale or foreign handle successfully cleaned. */
     return 1;
 }
 
 static unsigned int native_end(const TSGREQUEST *request)
 {
+    const TSVFRAME *frame;
     int rc;
     if (request->length || request->direction || request->address.hi ||
         !request->address.lo) return 8U;
-    rc=TSVEND(&native_invocations,request->address.lo,native_clean,0);
+    frame=native_invocations.depth ?
+        &native_invocations.frame[native_invocations.depth-1U] : 0;
+    if (!frame || frame->token!=request->address.lo) return 12U;
+    rc=TSVEND(&native_invocations,request->address.lo,native_clean,
+              (void *)frame);
     return rc==TSV_OK ? 0U : 12U;
 }
 
@@ -925,6 +941,33 @@ static unsigned int allocation_handle(unsigned int task, TSPADDR address)
             storage.allocations[i].address.hi==address.hi &&
             storage.allocations[i].address.lo==address.lo)
             return storage.allocations[i].handle;
+    return 0U;
+}
+
+/* Diagnostic K-only leak fixture: give an active TSO31 invocation one
+ * ordinary allocation, then let native_end reclaim it. SVC 237 is private
+ * to the machine proof, never an application storage interface. */
+static unsigned int native_reap_probe(TSGREQUEST *request)
+{
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
+    TSPADDR minimum, maximum, base;
+    unsigned int handle, rc;
+    if (!frame || frame->personality!=TSV_TSO || frame->amode!=31U ||
+        request->length || request->direction || request->address.hi ||
+        request->address.lo) return 8U;
+    minimum.hi=maximum.hi=0U;
+    minimum.lo=0x02010000U; maximum.lo=0x7fffffffU;
+    rc=TSMALLOC(&storage,frame->runtime_owner,31U,minimum,maximum,
+               4096U,0,&base);
+    if (rc!=TSM_OK) return rc==TSM_NOMEM ? 4U : 8U;
+    handle=allocation_handle(frame->runtime_owner,base);
+    if (!handle || TSVOWN(&native_invocations,frame->token,
+                          TSV_ALLOCATION,handle)!=TSV_OK) {
+        if (TSMFREE(&storage,frame->runtime_owner,base)!=TSM_OK) return 12U;
+        return 4U;
+    }
+    request->address=base;
+    *(volatile unsigned int *)0x4098U=u_tables.used;
     return 0U;
 }
 
@@ -1968,6 +2011,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
                8U : 0xfffffffdU;
     if (request->svc == 235U) return native_begin(request);
     if (request->svc == 236U) return native_end(request);
+    if (request->svc == 237U) return native_reap_probe(request);
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 223U) return high_storage_service(request);
     if (request->svc == 233U) return iarv64_service(request);

@@ -437,6 +437,10 @@ def run(args):
                     raw[0x20008:0x20008+len(version)] == version and
                     struct.unpack_from(">I",raw,0x4510)[0] == 0)
             if args.tso31:
+                reap_address = struct.unpack_from(">Q",raw,0x12390)[0]
+                checks["native_reap_page_unmapped_after_return"] = (
+                    0x02010000 <= reap_address < 0x80000000 and
+                    page_unmapped(raw,0x28000f,reap_address))
                 tso_real, tso_bytes, tso_entry, tso_blocks, tso_input_fnv = \
                     struct.unpack_from(">5I",raw,0x4600)
                 tso_pages = (tso_bytes+4095)//4096

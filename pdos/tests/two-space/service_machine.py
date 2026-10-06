@@ -207,6 +207,13 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
         checks["native_invocation_tokens_unique"] = len({
             struct.unpack_from(">I",raw,p)[0]
             for p in (0x1235c,0x12368,0x12374)}) == 3
+    if tso31:
+        begin, token, allocated = struct.unpack_from(">III",raw,0x12380)
+        address = qword(raw,0x12390)
+        ended = struct.unpack_from(">I",raw,0x12398)[0]
+        checks["k_reaps_live_native_allocation"] = (
+            begin == allocated == ended == 0 and token != 0 and
+            0x02010000 <= address < 0x80000000 and not address % 4096)
     checks["no_low_fallback_on_real_exhaustion"] = (
         struct.unpack_from(">I",raw,0x12040)[0] == 4 and
         qword(raw,0x12044) == 0)
@@ -280,8 +287,10 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
          (((4238296 + 4095) // 4096) +
           2 * ((struct.unpack_from(">I",raw,0x4514)[0] + 4095) // 4096)
           if cmslibrary else 0) +
+         # The guest invocation probe maps and reaps one extra page.
          (((1094960 + 4095) // 4096) +
           2 * ((0x04000000 // 4096) + (0x00100000 // 4096) + 2)
+          + 2
           if tso31 else 0) +
          (((767728 + 4095) // 4096) +
           (2 * ((0x08000000 // 4096) + (0x00100000 // 4096) +

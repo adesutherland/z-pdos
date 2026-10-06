@@ -172,8 +172,11 @@ module in the diskless fixture. The subsequent [fresh-IPL invocation
 gate](qualification/TWO-SPACE-INVOCATION-GATE-2026-10-06.md) executes the
 descriptor around unchanged TSO24/31/64 ANY RXVM calls and assigns SVC 120,
 IARV64 and TPUT to that active owner. P0 remains incomplete. The private U
-fixture still requests entry, fault cleanup and general resource lifetimes
-are absent, and neither checkpoint closes P1 or qualifies P2–P6.
+fixture still requests entry. A further [fresh-IPL allocation unwind
+check](qualification/TWO-SPACE-INVOCATION-REAP-2026-10-06.md) proves that K
+releases a live TSO31 page on end. Fault-triggered unwind, pending I/O and
+other resource lifetimes remain open; these checkpoints do not close P1 or
+qualify P2–P6.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and

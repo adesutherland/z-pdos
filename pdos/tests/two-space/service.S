@@ -1077,6 +1077,36 @@ tso24_release_page:
     lg %r2, 0(%r2)
     st %r15, 0x330(%r2)
 tso24_call_done:
+    lghi %r0, 31
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 235                 /* start one K-owned cleanup probe */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x380(%r2)
+    st %r1, 0x384(%r2)
+    chi %r15, 0
+    jne native_reap_probe_done
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 237                 /* K allocates and owns a deliberately live page */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x388(%r2)
+    stg %r1, 0x390(%r2)
+    chi %r15, 0
+    jne native_reap_probe_end
+    mvi 0(%r1), 0x5a       /* prove the page was really mapped in U */
+native_reap_probe_end:
+    lghi %r0, 0
+    llgf %r1, 0x384(%r2)
+    lghi %r2, 0
+    svc 236                 /* K unwinds the still-owned allocation */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x398(%r2)
+native_reap_probe_done:
     brasl %r14, wide_heap_workload
     larl %r3, high_data_va
     lg %r3, 0(%r3)
@@ -1266,6 +1296,8 @@ trace_not_cms_fst:
     je storage_no_record
     chi %r2, 236
     je storage_no_record
+    chi %r2, 237
+    je storage_no_record
     chi %r2, 93
     je storage_no_record
     lghi %r1, 0x2000
@@ -1345,6 +1377,8 @@ no_cms24_inline:
     chi %r2, 223
     je copy_storage_address
     chi %r2, 235
+    je copy_storage_address
+    chi %r2, 237
     jne no_storage_address
 copy_storage_address:
     llgf %r2, 0(%r6)
