@@ -16,6 +16,8 @@ IPL, bounded interruption/service gate, live storage, K-owned channel and
 terminal operations, CMS and TSO image maps, native version calls and wide
 heaps are in
 [the two-space PoC contract](TWO-SPACE-POC.md).
+The [successor ABI inventory](TWO-SPACE-ABI.md) names the unchanged CMS/TSO
+binary inputs, selected calls, low-U measurements and open compatibility gates.
 Its [architecture decisions](TWO-SPACE-POC.md#architecture-decisions-for-the-first-replacement)
 retain one shared U ASCE, place the PDOS command processor and reusable C
 3270 presentation library in U, and keep the C31 C terminal driver and

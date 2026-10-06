@@ -223,6 +223,12 @@ addresses to Classic C. High U pointers require a 64-bit entry contract;
 silently truncating them to a C32 pointer is forbidden. This contract does
 not assert that every IBM service is already implemented.
 
+The [executable ABI inventory](TWO-SPACE-ABI.md) records the pinned
+unchanged CMS and TSO inputs, observed placement, selected service ownership,
+positive and negative controls, and remaining P0 gates. It is updated from
+actual binary and guest evidence before new K service or invocation forms
+are added.
+
 Applications share one U map. They can coexist whenever appropriate virtual
 intervals and real backing are available; simultaneous residency of every
 possible application is a storage-capacity question, not a prohibition. The
