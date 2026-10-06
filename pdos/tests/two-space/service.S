@@ -19,6 +19,9 @@
 .section .boot,"ax"
 .global boot
 boot:
+    stctg %c0, %c0, 0x720
+    oi 0x725, 0x04           /* CR0 bit45: AFP register/FPC control */
+    lctlg %c0, %c0, 0x720
     lghi %r1, 0x80              /* application writable frames use key 8 */
     lghi %r2, 0x7000
     sske %r1, %r2
@@ -65,18 +68,44 @@ io_entry:
 machine_entry:
     mvi 0x708, 5
 interrupt_enter:
+    stg %r2, 0x718
     stg %r1, 0x700
     lghi %r1, 0x710
     lg %r1, 0(%r1)
     chi %r1, 0x3000
-    je context_slot_ok
-    chi %r1, 0x3100
+    jl fatal_real
+    chi %r1, 0x4000
+    jhe fatal_real
+    lgr %r2, %r1
+    nill %r2, 0x01ff
+    chi %r2, 0
     jne fatal_real
 context_slot_ok:
     stmg %r0, %r15, 0(%r1)
     lg %r2, 0x700
     stg %r2, 8(%r1)
+    lg %r2, 0x718
+    stg %r2, 16(%r1)
     stctg %c1, %c1, 0x90(%r1)
+    stam %a0, %a15, 0x130(%r1)
+    stfpc 0x170(%r1)
+    std %f0, 0xb0(%r1)
+    std %f1, 0xb8(%r1)
+    std %f2, 0xc0(%r1)
+    std %f3, 0xc8(%r1)
+    std %f4, 0xd0(%r1)
+    std %f5, 0xd8(%r1)
+    std %f6, 0xe0(%r1)
+    std %f7, 0xe8(%r1)
+    std %f8, 0xf0(%r1)
+    std %f9, 0xf8(%r1)
+    std %f10, 0x100(%r1)
+    std %f11, 0x108(%r1)
+    std %f12, 0x110(%r1)
+    std %f13, 0x118(%r1)
+    std %f14, 0x120(%r1)
+    std %f15, 0x128(%r1)
+
     llgc %r2, 0x708
     stg %r2, 0x98(%r1)
     lghi %r3, 0x140
@@ -103,7 +132,7 @@ old_psw_selected:
     st %r4, 0xa0(%r1)
 svc_code_saved:
     lghi %r3, 0x710
-    la %r4, 0x100(%r1)
+    la %r4, 0x200(%r1)
     stg %r4, 0(%r3)
     lghi %r1, 0x4000
     lctlg %c1, %c1, 0(%r1)
@@ -122,7 +151,7 @@ resume:
     ssm 0x603
     lghi %r1, 0x710
     lg %r1, 0(%r1)
-    aghi %r1, -0x100
+    aghi %r1, -0x200
     lghi %r2, 0x710
     stg %r1, 0(%r2)
     lg %r2, 0x80(%r1)
@@ -130,6 +159,24 @@ resume:
     lg %r2, 0x88(%r1)
     stg %r2, 0x748
     lctlg %c1, %c1, 0x90(%r1)
+    lam %a0, %a15, 0x130(%r1)
+    lfpc 0x170(%r1)
+    ld %f0, 0xb0(%r1)
+    ld %f1, 0xb8(%r1)
+    ld %f2, 0xc0(%r1)
+    ld %f3, 0xc8(%r1)
+    ld %f4, 0xd0(%r1)
+    ld %f5, 0xd8(%r1)
+    ld %f6, 0xe0(%r1)
+    ld %f7, 0xe8(%r1)
+    ld %f8, 0xf0(%r1)
+    ld %f9, 0xf8(%r1)
+    ld %f10, 0x100(%r1)
+    ld %f11, 0x108(%r1)
+    ld %f12, 0x110(%r1)
+    ld %f13, 0x118(%r1)
+    ld %f14, 0x120(%r1)
+    ld %f15, 0x128(%r1)
     lmg %r0, %r15, 0(%r1)
     lpswe 0x740
 fatal_real:
@@ -167,6 +214,14 @@ synthetic_io_psw:
 .section .app,"ax"
 .global app_a
 app_a:
+.ifdef PCOMM_LAUNCH
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 247
+    sam64
+    svc 0
+.else
     larl %r3, sentinel_gprs
     lmg %r6, %r13, 0(%r3)
     larl %r1, app_data_va
@@ -206,6 +261,7 @@ app_a:
     larl %r2, app_high_va
     lg %r2, 0(%r2)
     br %r2
+.endif
 .balign 8
 app_data_va: .quad 0x21000
 app_b_va: .quad 0x02000000
@@ -255,6 +311,9 @@ cms31_skip_fst_probe:
     st %r10, 0x264(%r2)
     st %r0, 0x268(%r2)
     st %r1, 0x26c(%r2)
+    chi %r10, 0
+    jne cms31_skip_fst_record
+    mvc 0x280(40,%r2),0(%r1) /* capture the FST under its owning invocation */
 cms31_skip_fst_record:
     lgr %r14, %r12
     br %r14
@@ -298,17 +357,54 @@ app_b_tso64_call:
     br %r14
 tso64_entry_va32: .long 0x09000000
 
+/* P1 owned read is actually submitted, then a child program fault unwinds it. */
+.org 0xd00
+controlled_child_io_fault:
+    lghi %r0,0
+    lghi %r1,0
+    lghi %r2,0
+    svc 237
+    lghi %r0,4
+    lghi %r1,0
+    lghi %r2,0
+    svc 208
+    lghi %r0,0
+    svc 209
+controlled_child_io_wait:
+    lghi %r0,256
+    larl %r1,controlled_io_buffer
+    lg %r1,0(%r1)
+    lghi %r2,2
+    svc 210
+    lghi %r0,0
+    lghi %r1,0
+    lghi %r2,0
+    svc 241
+    chi %r15,2
+    jne controlled_child_io_wait
+    lghi %r1,0x1000
+    lg %r2,0(%r1)
+controlled_io_buffer: .quad 0x110001700
+
 /* Private K-controlled entries linked into the checked U code page. */
 .org 0xe00
 controlled_child_normal:
     lghi %r3, 0
     lghi %r4, 0
+    ldr %f8, %f0
+    ldr %f14, %f0
+    sar %a5, %r3
+    sfpc %r3
     lghi %r15, 0x2468
     br %r14
 .org 0xe20
 controlled_child_fault:
     lghi %r3, 0
     lghi %r4, 0
+    ldr %f8, %f0
+    ldr %f14, %f0
+    sar %a5, %r3
+    sfpc %r3
     lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0
@@ -568,6 +664,13 @@ nested_lowcore_done:
     br %r14
 controlled_call_probe:
     lgr %r12, %r14
+    larl %r1, controlled_floating_values
+    ld %f8, 0(%r1)
+    ld %f14, 8(%r1)
+    lghi %r5, 0x1234
+    sar %a5, %r5
+    lghi %r5, 2
+    sfpc %r5
     lghi %r3, 0x1357
     lghi %r4, 0x2468
     lghi %r0, 1            /* K-registered normal child entry */
@@ -581,6 +684,11 @@ controlled_normal_continuation:
     st %r15, 0x4a0(%r2)
     st %r3, 0x4b8(%r2)
     st %r4, 0x4bc(%r2)
+    std %f8, 0x600(%r2)
+    std %f14, 0x608(%r2)
+    ear %r5, %a5
+    st %r5, 0x610(%r2)
+    stfpc 0x614(%r2)
     lghi %r3, 0x3579
     lghi %r4, 0x468a
     lghi %r0, 2            /* K-registered faulting child entry */
@@ -594,6 +702,11 @@ controlled_fault_continuation:
     st %r15, 0x4a8(%r2)
     st %r3, 0x4c0(%r2)
     st %r4, 0x4c4(%r2)
+    std %f8, 0x620(%r2)
+    std %f14, 0x628(%r2)
+    ear %r5, %a5
+    st %r5, 0x630(%r2)
+    stfpc 0x634(%r2)
     lghi %r0, 15
     lghi %r1, 0
     lghi %r2, 0
@@ -601,7 +714,55 @@ controlled_fault_continuation:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x4ac(%r2)
+    lghi %r3,0x579b
+    lghi %r4,0x68ac
+    lghi %r0,3
+    lghi %r1,0
+    lghi %r2,0
+    svc 245
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r0,0x650(%r2)
+    st %r15,0x654(%r2)
+    st %r3,0x658(%r2)
+    st %r4,0x65c(%r2)
+    lghi %r0,5
+    lghi %r1,0
+    lghi %r2,0
+    svc 235
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r15,0x660(%r2)
+    st %r1,0x664(%r2)
+    chi %r15,0
+    jne controlled_io_probe_done
+    lghi %r0,0
+    lghi %r1,0
+    lghi %r2,0
+    svc 209
+    lghi %r0,0
+    svc 248
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r15,0x668(%r2)
+    lghi %r0,0
+    lghi %r1,0
+    lghi %r2,0
+    svc 240
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r15,0x66c(%r2)
+    lghi %r0,0
+    llgf %r1,0x664(%r2)
+    lghi %r2,0
+    svc 236
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r15,0x670(%r2)
+controlled_io_probe_done:
     br %r12
+.balign 8
+controlled_floating_values: .quad 0x3ff0000000000000,0x4000000000000000
 terminal_owner_probe:
     lghi %r0, 5            /* parent owns the pending terminal lease */
     lghi %r1, 0
@@ -1182,8 +1343,6 @@ cms31_overlay_done:
     l %r3, 0x264(%r2)
     chi %r3, 0              /* IOQUAL staged only in positive FST IPL */
     jne cms31_native_release
-    l %r1, 0x26c(%r2)
-    mvc 0x280(40,%r2),0(%r1) /* preserve catalogue FST before STATE */
     lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0
@@ -1418,6 +1577,7 @@ tso31_release_page:
     st %r15, 0x2f0(%r2)
 tso31_call_done:
     brasl %r14, terminal_owner_probe
+    brasl %r14, controlled_call_probe
     lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0
@@ -1589,7 +1749,6 @@ tso24_release_page:
     st %r15, 0x330(%r2)
 tso24_call_done:
     brasl %r14, nested_lowcore_probe
-    brasl %r14, controlled_call_probe
     lghi %r0, 7            /* no K image record: deterministic failure */
     lghi %r1, 0
     lghi %r2, 0
@@ -1725,9 +1884,9 @@ kcore:
     /* All addresses here are K virtual. No 31-bit C pointer reaches here. */
     lghi %r1, 0x710
     lg %r1, 0(%r1)
-    chi %r1, 0x3200
+    chi %r1, 0x3400
     je nested_svc
-    aghi %r1, -0x100
+    aghi %r1, -0x200
     l %r2, 0xa0(%r1)
     chi %r2, 0
     je application_exit
@@ -1737,8 +1896,22 @@ kcore:
     jne initial_nested_done
     svc 1                    /* K-on-DAT nested entry, then exact return */
 initial_nested_done:
+    lghi %r3, 0x4f48
+    l %r4, 0(%r3)
+    chi %r4, 0
+    jne storage_no_record     /* PCOMM uses native calls, not trace fixtures */
     lghi %r3, 0x3000
     l %r2, 0xa0(%r3)
+    chi %r2, 247
+    je storage_no_record
+    chi %r2, 3
+    je storage_no_record
+    chi %r2, 42
+    je storage_no_record
+    chi %r2, 62
+    je storage_no_record
+    chi %r2, 10
+    je storage_no_record
     chi %r2, 120
     je storage_no_record
     chi %r2, 202
@@ -1857,6 +2030,8 @@ trace_not_cms_fst:
     lg %r7, 0(%r6)           /* K31-addressable U DAT pool */
     stg %r7, 48(%r1)
     lg %r2, 8(%r1)
+    chi %r2, 10
+    jhe unhandled_interrupt   /* never overwrite another K result/frame */
     sllg %r4, %r2, 5
     la %r4, 64(%r4,%r1)
     lghi %r3, 0x3000
@@ -1895,6 +2070,12 @@ kcore_after_c:
     larl %r6, bounce_va
     lg %r6, 0(%r6)
     l %r2, 16(%r6)
+    chi %r2, 247
+    je controlled_launch_result
+    chi %r2, 42
+    je controlled_launch_result
+    chi %r2, 3
+    je controlled_finish_result
     chi %r2, 245
     je controlled_launch_result
     chi %r2, 246
@@ -1976,11 +2157,11 @@ controlled_finish_result:
     jne unhandled_interrupt
     j return_app
 nested_svc:
-    lghi %r1, 0x3100
+    lghi %r1, 0x3200
     lg %r2, 0x80(%r1)
     lghi %r1, 0x2000
     stg %r2, 0x1a0(%r1)
-    lghi %r1, 0x3100
+    lghi %r1, 0x3200
     lg %r2, 0x90(%r1)
     lghi %r1, 0x2000
     stg %r2, 0x1a8(%r1)
@@ -2007,7 +2188,7 @@ synthetic_machine_check:
 kinterrupt:
     lghi %r1, 0x710
     lg %r1, 0(%r1)
-    aghi %r1, -0x100
+    aghi %r1, -0x200
     lg %r2, 0x98(%r1)
     chi %r2, 2
     je application_program_fault
@@ -2019,12 +2200,31 @@ kinterrupt:
     je machine_failstop
     j return_app
 count_external:
+    ni 0x82(%r1), 0xfd       /* event resumes an enabled K wait */
+    lghi %r3, 0x2710
+    llgh %r2, 0x86
+    st %r2, 0(%r3)
+    chi %r2, 0x1004
+    jne external_event_ready
+    stctg %c0, %c0, 0x720
+    ni 0x726, 0xf7           /* acknowledge comparator watchdog */
+    lctlg %c0, %c0, 0x720
+external_event_ready:
     lghi %r1, 0x2190
     lg %r2, 0(%r1)
     aghi %r2, 1
     stg %r2, 0(%r1)
     j return_app
 count_io:
+    ni 0x82(%r1), 0xfd
+    ni 0x80(%r1), 0xfd       /* C consumes status before rearming I/O */
+    lghi %r3, 0x2700
+    l %r2, 0xb8
+    st %r2, 0(%r3)
+    l %r2, 0xbc
+    st %r2, 4(%r3)
+    l %r2, 0xc0
+    st %r2, 8(%r3)
     lghi %r1, 0x2198
     lg %r2, 0(%r1)
     aghi %r2, 1

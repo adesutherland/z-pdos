@@ -73,7 +73,8 @@ def make_core(elf, classic, dat_emit, out):
     kernel = {0: 0, 0x1000: 0x1000, 0x2000: 0x2000,
               0x3000: 0x3000, 0x4000: 0x4000,
               0x02020000: 0xf000, 0x03000000: 0x10000,
-              KCORE: 0x9000}
+              0x03001000: 0x92000, 0x03002000: 0x93000,
+              0x03003000: 0x94000, KCORE: 0x9000}
     kernel.update({0x02000000 + 4096 * i:
                    (0xa000 + 4096 * i if i < 5 else
                     0x14000 + (i - 5) * 4096 if i < 16 else
@@ -91,7 +92,7 @@ def make_core(elf, classic, dat_emit, out):
                              0x9000, 0xa000, 0xb000, 0xc000,
                              0xd000, 0xe000, 0xf000, 0x10000,
                              *(0x14000 + i * 4096 for i in range(11)),
-                             *(0x80000 + i * 4096 for i in range(18))}
+                             *(0x80000 + i * 4096 for i in range(21))}
     if private_kernel_frames.intersection(application.values()):
         raise ValueError("U maps private K real frame")
     if any(0x3e0000 <= pa < 0x400000 for pa in application.values()):
@@ -146,12 +147,12 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
               "nested_kernel_psw_key_zero": qword(raw, 0x21a0) &
                     0x048f000000000000 == 0x0400000000000000,
               "nested_kernel_asce": qword(raw, 0x21a8) == 0x10000f,
-              "context_depth_bounded_at_exit": qword(raw, 0x710) == 0x3100,
+              "context_depth_bounded_at_exit": qword(raw, 0x710) == 0x3200,
               "recoverable_u_program_fault": qword(raw, 0x2180) == 1 and
                     struct.unpack_from(">I",raw,0x12014)[0] == 0xfffffffc,
               "no_fatal_interrupt": qword(raw, 0x2188) == 0,
-              "external_entry_returned": qword(raw, 0x2190) == 1,
-              "io_entry_returned": qword(raw, 0x2198) == 1,
+              "external_entry_returned": qword(raw, 0x2190) >= 1,
+              "io_entry_returned": qword(raw, 0x2198) >= 1,
               "kcore_above_region_third_range": qword(raw, 0x2020) == KCORE,
               "k_can_read_own_dat_pool": qword(raw, 0x2028) == 0x10400f,
               "k_can_read_u_dat_pool": qword(raw, 0x2030) == 0x28400f,
@@ -306,6 +307,17 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
          fault_rc==8 and lease_after==fault_page==0 and
          restored==(0x1357,0x2468,0x3579,0x468a) and
          struct.unpack_from(">I",raw,0x4f00)[0]==0))
+    checks["physical_io_interrupt_wakeup"] = (qword(raw,0x2198)>1 and
+        0x10000<=struct.unpack_from(">I",raw,0x2700)[0]<0x10100) if ipl else True
+    checks["child_fault_cancels_real_owned_io"] = (
+        struct.unpack_from(">4I",raw,0x12650)==(12,0xffffffff,0x579b,0x68ac) and
+        struct.unpack_from(">I",raw,0x12660)[0]==0 and
+        struct.unpack_from(">III",raw,0x12668)==(0,0,0)) if tso31 else (
+        struct.unpack_from(">4I",raw,0x12650)==(3,8,0x579b,0x68ac))
+    checks["floating_access_and_fpc_context_restored"] = all(
+        struct.unpack_from(">QQII",raw,offset)==(
+            0x3ff0000000000000,0x4000000000000000,0x1234,2)
+        for offset in (0x12600,0x12620))
     lease_begin, lease_parent, lease_start, lease_child_begin, lease_child, \
         child_cancel, lease_child_end, lease_parent_end, lease_retry, \
         lease_finish = struct.unpack_from(">10I",raw,0x12414)
@@ -369,11 +381,11 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
          (((4238296 + 4095) // 4096) +
           2 * ((struct.unpack_from(">I",raw,0x4514)[0] + 4095) // 4096)
           if cmslibrary else 0) +
-         # The invocation and controlled child-fault probes each map and
-         # reap one extra page through the checked K allocator.
+         # The invocation, plain child-fault and pending-I/O child-fault
+         # probes each map and reap one checked K allocation page.
          (((1094960 + 4095) // 4096) +
           2 * ((0x04000000 // 4096) + (0x00100000 // 4096) + 2)
-          + (4 if ipl else 2)
+          + (6 if ipl else 2)
           if tso31 else 0) +
          (((767728 + 4095) // 4096) +
           (2 * ((0x08000000 // 4096) + (0x00100000 // 4096) +
@@ -416,7 +428,8 @@ def run(args):
                  "twospace_cmsfile.c", "twospace_cmsfile.h",
                  "twospace_cmscursor.c", "twospace_cmscursor.h",
                  "twospace_tso.c", "twospace_tso.h",
-                 "twospace_invocation.c", "twospace_invocation.h"):
+                 "twospace_invocation.c", "twospace_invocation.h",
+                 "twospace_command.inc", "twospace_abi.h"):
         manifest["source_sha256"]["pdos/src/" + name] = digest(src.parent.parent / "src" / name)
     for name in ("dat.c", "dat_emit.c", "placement.c", "gate.c", "memory.c",
                  "channel.c", "dataset.c", "cms.c", "cmsfile.c",

@@ -35,6 +35,12 @@ int main(void)
         parent_context.gpr[i].lo=0x1000U+i;
         child_context.gpr[i].hi=i+16U;
         child_context.gpr[i].lo=0x2000U+i;
+        parent_context.fpr[i].hi=0x3ff00000U+i;
+        parent_context.fpr[i].lo=0x12345678U+i;
+        parent_context.access[i]=0x11110000U+i;
+        child_context.fpr[i].hi=0x40000000U+i;
+        child_context.fpr[i].lo=0x87654321U+i;
+        child_context.access[i]=0x22220000U+i;
     }
     parent_context.psw.hi=0x80000000U;
     parent_context.psw.lo=0x3000000U;
@@ -50,10 +56,16 @@ int main(void)
     child_context.asce.hi=0U;
     child_context.asce.lo=0x4000U;
     child_context.key=8U;
+    parent_context.fpc=0x00080000U; child_context.fpc=0x00100000U;
     trace.count=0U;
     assert(TSVTOP(&stack)==0);
     assert(TSVBEGIN(&stack,TSV_CMS,64U,1U,2U,&parent_context,
                     &parent)==TSV_BAD);
+    assert(TSVBEGIN(&stack,TSV_PDOS,31U,20U,20U,&parent_context,
+                    &parent)==TSV_OK);
+    assert(TSVTOP(&stack)->personality==TSV_PDOS);
+    assert(TSVEND(&stack,parent,clean_owned,&trace)==TSV_OK);
+    assert(TSVTOP(&stack)==0);
     assert(TSVBEGIN(&stack,TSV_CMS,31U,1U,2U,&parent_context,
                     &parent)==TSV_OK);
     top=TSVTOP(&stack);
@@ -61,6 +73,10 @@ int main(void)
            top->caller.gpr[15].lo==0x100fU && top->caller.key==8U &&
            top->caller.psw_address.hi==1U &&
            top->caller.psw_address.lo==0x23456780U);
+    assert(top->caller.fpr[15].hi==0x3ff0000fU &&
+           top->caller.fpr[15].lo==0x12345687U &&
+           top->caller.access[15]==0x1111000fU &&
+           top->caller.fpc==0x00080000U);
     assert(TSVOWN(&stack,parent,TSV_FILE,100U)==TSV_OK);
     assert(TSVHAS(&stack,parent,TSV_FILE,100U)==TSV_OK);
     assert(TSVHAS(&stack,parent,TSV_FILE,200U)==TSV_STALE);

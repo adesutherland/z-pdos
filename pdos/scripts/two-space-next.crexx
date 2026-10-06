@@ -4,10 +4,11 @@ options levelb
 import rxfnsb
 main: procedure = .int
   arg args = .string[]
-  if args.0 <> 7 then do
+  if args.0 <> 7 & args.0 <> 8 then do
     say "Usage: crexx -nokeep pdos/scripts/two-space-next.crexx --args FRESH_BUILD_DIR GNU_AS GNU_LD CLASSIC_CC CLASSIC_AS CLASSIC_LD HERCULES"
     return 2
   end
+  if args.0 = 8 then if args.8 <> "pcomm" then return 2
   work = args.1
   gnuas = args.2; gnuld = args.3
   classiccc = args.4; classicas = args.5; classicld = args.6
@@ -169,10 +170,12 @@ main: procedure = .int
   if rc <> 0 then return rc
   asobject = out || "/service.o"
   elf = out || "/service.elf"
-  address crexx "run :gnuas -m64 -march=z900 pdos/tests/two-space/service.S -o :asobject"
+  if args.0 = 8 then address crexx "run :gnuas -m64 -march=z900 --defsym PCOMM_LAUNCH=1 pdos/tests/two-space/service.S -o :asobject"
+  else address crexx "run :gnuas -m64 -march=z900 pdos/tests/two-space/service.S -o :asobject"
   if rc <> 0 then return rc
   address crexx "run :gnuld -m elf64_s390 -T pdos/tests/two-space/service.ld :asobject -o :elf"
   if rc <> 0 then return rc
   runout = out || "/run"
-  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/service_machine.py :elf :binary :runout :gnuas :gnuld :classiccc :classicas :classicld :herctool :datemit"
+  if args.0 = 8 then address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pcomm_core.py :elf :binary :datemit :runout"
+  else address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/service_machine.py :elf :binary :runout :gnuas :gnuld :classiccc :classicas :classicld :herctool :datemit"
   return rc

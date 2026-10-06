@@ -1,0 +1,135 @@
+/* SPDX-License-Identifier: MIT
+ * Approved PCOMM/ATTACH launch migration, on a disposable diagnostic IPL.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 6 & args.0 <> 7 then do
+    say "usage: crexx -nokeep pdos/scripts/two-space-pcomm.crexx --args NEW-build/pdos/output GNU_AS GNU_LD HERCULES_BIN CMS_MEDIA_DIR TSO_MEDIA_DIR [corrupt]"
+    return 2
+  end
+  if args.0 = 7 then if args.7 <> "corrupt" then return 2
+  work = args.1
+  if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
+  address crexx "run test ! -e :work"
+  if rc <> 0 then return 2
+  locations = .string[]
+  address crexx "pwd" output locations
+  root = strip(locations.1); out = root || "/" || work
+  address crexx "run mkdir -p :out"
+  if rc <> 0 then return rc
+  cc = root || "/build/compiler/mvs/gcc/mf-classic-cc"
+  classicas = root || "/build/tools/assembler/mf-classic-as"
+  ld = root || "/build/tools/linker/mf-classic-ld"
+  gnuas = args.2; gnuld = args.3; hercdir = args.4
+  cms = args.5; tso = args.6
+  do i = 2 to 6
+    if left(args[i],1) <> "/" then return 2
+  end
+  cms = cms || "/"; tso = tso || "/"
+  base = work || "/base"
+  address crexx "run crexx -nokeep pdos/scripts/image.crexx --args :base :hercdir"
+  if rc <> 0 then return rc
+  source = root || "/" || base || "/check/source/pdpclib/stdio.c"
+  nativec = out || "/pcomm-console.asm"; nativeobj = out || "/pcomm-console.obj"
+  stdioc = out || "/pcomm-stdio.asm"; stdioobj = out || "/pcomm-stdio.obj"
+  entryobj = out || "/pcomm-entry.obj"
+  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdpclib/src -DUSE_MEMMGR -D__aopen=tsuopen -D__aread=tsuread -D__awrite=tsuwrite -D__aclose=tsuclose -D__dynal=tsudyn :source -o :stdioc"
+  if rc <> 0 then return rc
+  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdpclib/src pdos/src/twospace_pcomm.c -o :nativec"
+  if rc <> 0 then return rc
+  sources = .string[]; objects = .string[]
+  sources[1] = stdioc; sources[2] = nativec; sources[3] = "pdos/src/twospace_pcomm.asm"
+  objects[1] = stdioobj; objects[2] = nativeobj; objects[3] = entryobj
+  do i = 1 to 3
+    from = sources[i]; target = objects[i]
+    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :from :target"
+    if rc <> 0 then return rc
+  end
+  linkobjects = .string[]
+  linkobjects[1] = entryobj
+  linkobjects[2] = root || "/" || base || "/c/objects/START.obj"
+  linkobjects[3] = root || "/" || base || "/support/MVSSUPA.obj"
+  linkobjects[4] = stdioobj; linkobjects[5] = nativeobj
+  common = "STDLIB CTYPE STRING TIME ERRNO ASSERT LOCALE MATH SETJMP SIGNAL MEMMGR PCOMM"
+  do i = 1 to words(common)
+    linkobjects[i+5] = root || "/" || base || "/c/objects/" || word(common,i) || ".obj"
+  end
+  module = out || "/PCOMM.mvs"; map = out || "/PCOMM.map"
+  address crexx "run :ld --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@MAIN -Map :map -o :module :linkobjects[]"
+  if rc <> 0 then return rc
+  pack = out || "/pack-tso"; stage = out || "/PCOMM.stage"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src pdos/src/twospace_tso.c pdos/tests/two-space/tso_pack.c -o :pack"
+  if rc <> 0 then return rc
+  address crexx "run :pack :module :stage classic31"
+  if rc <> 0 then return rc
+  flat1 = out || "/PCOMM-b.bin"; flat2 = out || "/PCOMM-c.bin"
+  address crexx "run :ld --oformat binary --image-base 184549376 -e @@MAIN -o :flat1 :linkobjects[]"
+  if rc <> 0 then return rc
+  address crexx "run :ld --oformat binary --image-base 201326592 -e @@MAIN -o :flat2 :linkobjects[]"
+  if rc <> 0 then return rc
+  loadercheck = out || "/pcomm-load-test"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_tso.c pdos/tests/two-space/pcomm_load.c -o :loadercheck"
+  if rc <> 0 then return rc
+  address crexx "run :loadercheck :stage :flat1 :flat2"
+  if rc <> 0 then return rc
+  consolecheck = out || "/pcomm-console-test"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer pdos/src/twospace_pcomm.c pdos/tests/two-space/pcomm_console.c -o :consolecheck"
+  if rc <> 0 then return rc
+  address crexx "run :consolecheck"
+  if rc <> 0 then return rc
+  childobj = out || "/PDTEST.obj"; childmodule = out || "/PDTEST.mvs"
+  childstage = out || "/PDTEST.stage"
+  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/tests/two-space/pcomm_child.asm :childobj"
+  if rc <> 0 then return rc
+  address crexx "run :ld --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@MAIN -o :childmodule :childobj"
+  if rc <> 0 then return rc
+  address crexx "run :pack :childmodule :childstage classic31"
+  if rc <> 0 then return rc
+  corework = work || "/core"
+  hercules = hercdir || "/hercules"
+  address crexx "run crexx -nokeep pdos/scripts/two-space-next.crexx --args :corework :gnuas :gnuld :cc :classicas :ld :hercules pcomm"
+  if rc <> 0 then return rc
+  core = out || "/core/run/image.core"
+  cms24 = cms || "cms24-RXVM.bin"; cms31 = cms || "cms31-RXVM.bin"
+  cmsfile = cms || "cms31-IOQUAL-RXBIN.bin"; cmslib = cms || "cms31-LIBRARY-RXBIN.bin"
+  cms24file = cms || "cms24-IO24-RXBIN.bin"
+  tso31 = tso || "tso31-rxvm.bin"; tso64 = tso || "tso64-rxvm.bin"; tso24 = tso || "tso24-rxvm.bin"
+  iplwork = work || "/ipl"
+  address crexx "run crexx -nokeep pdos/scripts/two-space-ipl.crexx --args :iplwork :core :gnuas :gnuld :hercdir :cms24 :cms31 :cmsfile :cmslib :cms24file :tso31 :tso64 :tso24 :stage :childstage"
+  if rc <> 0 then return rc
+  /* Invalid-binary qualification is a separate, explicit option. */
+  if args.0 = 6 then return 0
+  negative = work || "/corrupt"; negout = root || "/" || negative
+  address crexx "run mkdir -p :negout"
+  if rc <> 0 then return rc
+  positive = root || "/" || iplwork || "/media"
+  files = "ctl.txt pload.sys pdos.sys command.exe config.sys kcore.bin cms24-rxvm.bin cms31-ioqual-rxbin.bin cms31-library-rxbin.bin cms24-io24-rxbin.bin tso31-rxvm.bin tso64-rxvm.bin tso24-rxvm.bin u-command.bin pdtest.bin"
+  do i = 1 to words(files)
+    from = positive || "/" || word(files,i); target = negout || "/" || word(files,i)
+    address crexx "run cmake -E copy :from :target"
+    if rc <> 0 then return rc
+  end
+  original = positive || "/cms31-rxvm.bin"; corrupted = negout || "/cms31-rxvm.bin"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pcomm_core.py corrupt :original :corrupted"
+  if rc <> 0 then return rc
+  installer = root || "/" || iplwork || "/base/install-ipl"
+  dasdload = hercdir || "/dasdload"; toflat = hercdir || "/cckd2ckd"; tocompressed = hercdir || "/ckd2cckd"
+  address crexx "cd :negout"
+  address crexx "run :dasdload -bz2 ctl.txt datasets.cckd"
+  if rc <> 0 then return rc
+  address crexx "run :toflat -q -cyls 100 datasets.cckd datasets.ckd"
+  if rc <> 0 then return rc
+  address crexx "run :installer datasets.ckd pdos00.ckd pload.sys pdos.sys command.exe config.sys kcore.bin"
+  if rc <> 0 then return rc
+  address crexx "run :tocompressed -q -bz2 -cyls 100 pdos00.ckd pdos00.cckd"
+  if rc <> 0 then return rc
+  address crexx "run :toflat -q -cyls 100 pdos00.cckd readback.ckd"
+  if rc <> 0 then return rc
+  address crexx "run :installer --compare pdos00.ckd readback.ckd pload.sys pdos.sys command.exe config.sys kcore.bin"
+  if rc <> 0 then return rc
+  address crexx "cd :root"
+  negative_disk = negout || "/pdos00.cckd"; negative_run = negout || "/run"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pcomm_machine.py :negative_disk :core :hercules :negative_run corrupt"
+  return rc

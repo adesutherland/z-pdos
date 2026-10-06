@@ -11,32 +11,71 @@
          ENTRY TSCPOLL
          ENTRY TSCCLEAR
 TSCIO    DS    0H
-         STM   2,8,28(13)
+         STM   2,10,28(13)
+* No armed wait state until SSCH succeeds
+         SR    8,8
          L     2,0(,1)
          L     3,4(,1)
          L     4,8(,1)
          LR    1,2
-         TSCH  0(4)             Clear any prior pending status
+         TSCH  0(4)
          SSCH  0(3)
          BRCL  7,TSCREJ
-         LA    5,128(4)         Two aligned TOD slots after the IRB
+         SR    9,9
+TSCARM   LA    5,128(4)
          STCK  0(5)
          BRCL  7,TSCFAIL
-         L     6,0(5)           Upper TOD word; wrap-safe subtraction
-TSCWAIT  TSCH  0(4)
+* Save clock-comparator and CR0 policy; only this synchronous K operation
+* arms the watchdog. All scratch is before the separate CCW region.
+* STCKC 224(R4)
+         DC    X'B20740E0'
+* STCTG C0,C0,184(R4)
+         DC    X'EB0040B80025'
+         MVC   208(8,4),184(4)
+* CR0 bit52 enables the clock-comparator interruption.
+         OI    214(4),X'08'
+* LCTLG C0,C0,208(R4)
+         DC    X'EB0040D0002F'
+         MVC   176(8,4),128(4)
+         L     6,176(4)
+         LA    7,64
+         AR    6,7
+         ST    6,176(4)
+* SCKC 176(R4)
+         DC    X'B20640B0'
+* EPSW R6,R7
+         DC    X'B98D0067'
+         STM   6,7,192(4)
+         MVC   160(8,4),192(4)
+* Enable I/O and external interruption
+         OI    160(4),X'03'
+* Enabled WAIT; interruption entry clears it
+         OI    162(4),X'02'
+         XC    168(4,4),168(4)
+         BASR  10,0
+         USING *,10
+         L     10,=A(TSCWAIT)
+         DROP  10
+         ST    10,172(4)
+         LA    8,1
+* First completion is delivered through the real I/O interruption path.
+         DC    X'B2B240A0'
+TSCWAIT  LR    1,2
+         TSCH  0(4)
          BRCL  8,TSCDONE
          BRCL  4,TSCNOST
-* TSCH CC3 is not operational; CC2 is architecturally undefined here.
-* Neither can become success by waiting for a clock deadline.
          BRCL  15,TSCFAIL
-TSCNOST  DS    0H
-         STCK  8(5)
+TSCNOST  STCK  8(5)
          BRCL  7,TSCFAIL
          L     7,8(5)
+         L     6,0(5)
          SR    7,6
-         LA    8,64
-         CR    7,8              About 67 seconds: failure watchdog only
-         BRCL  4,TSCWAIT
+         LA    10,64
+         CR    7,10
+* Deadline only reports a stalled operation
+         BRCL  10,TSCFAIL
+* Wake only on an actual interruption event
+         DC    X'B2B240A0'
 TSCFAIL  SR    15,15
          BCTR  15,0
          BCTR  15,0
@@ -46,9 +85,21 @@ TSCREJ   SR    15,15
          BCTR  15,0
          BCTR  15,0
          BRCL  15,TSCRET
-TSCDONE  SR    15,15
-TSCRET   LM    2,8,28(13)
+TSCDONE  LTR   9,9
+         BRCL  8,TSCOK
+* Clear completion is required before a cancelled workspace can be reused.
+         TM    2(4),X'10'
+         BRCL  8,TSCNOST
+TSCOK    SR    15,15
+TSCRET   LTR   8,8
+         BRCL  8,TSCREST
+* Restore saved clock comparator
+         DC    X'B20640E0'
+* LCTLG C0,C0,184(R4)
+         DC    X'EB0040B8002F'
+TSCREST  LM    2,10,28(13)
          BR    14
+         LTORG
 TSCDEV   DS    0H
          STM   2,3,28(13)
          L     2,0(,1)
@@ -114,37 +165,17 @@ TSPRET   LM    2,3,28(13)
 * CSCH is asynchronous. Do not recycle this real workspace until TSCH
 * reports the clear-function completion bit in the returned SCSW.
 TSCCLEAR DS    0H
-         STM   2,8,28(13)
+         STM   2,10,28(13)
+         SR    8,8
          L     2,0(,1)
-         L     3,4(,1)
+         L     4,4(,1)
          LR    1,2
-         DC    X'B2300000'       CSCH (no storage operand)
-         BRCL  8,TCLINIT
-         SR    15,15
+* CSCH (no storage operand). Share the interruption-woken completion wait.
+         DC    X'B2300000'
+         BRCL  7,TCLREJ
+         LA    9,1
+         BRCL  15,TSCARM
+TCLREJ   SR    15,15
          BCTR  15,0
-         BRCL  15,TCLRET
-TCLINIT  LA    5,128(3)
-         STCK  0(5)
-         BRCL  7,TCLFAIL
-         L     6,0(5)
-TCLWAIT  TSCH  0(3)
-         BRCL  8,TCLSTAT
-         BRCL  4,TCLNOST
-         BRCL  15,TCLFAIL
-TCLSTAT  TM    2(3),X'10'
-         BRCL  7,TCLDONE
-TCLNOST  STCK  8(5)
-         BRCL  7,TCLFAIL
-         L     7,8(5)
-         SR    7,6
-         LA    8,64
-         CR    7,8
-         BRCL  4,TCLWAIT
-TCLFAIL  SR    15,15
-         BCTR  15,0
-         BCTR  15,0
-         BRCL  15,TCLRET
-TCLDONE  SR    15,15
-TCLRET   LM    2,8,28(13)
-         BR    14
+         BRCL  15,TSCRET
          END   TSCIO

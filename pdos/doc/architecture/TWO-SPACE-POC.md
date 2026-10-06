@@ -22,6 +22,12 @@ or failure isolation that the shared map cannot provide at acceptable
 complexity. Such a change would need fresh DAT, context and service-gate
 qualification; the present proof would not establish it.
 
+P0 and P1 now have accepted results in the [completion plan](../BACKLOG.md#pd-003-completion-plan-6-october-2026).
+The [P1 fresh IPL](../qualification/TWO-SPACE-P1-2026-10-06.md) closes active
+invocation ownership, full architectural caller state and interruption-driven
+completion/cancellation. Native application calls, complete services, display
+models and the normal image remain P2–P6 work.
+
 ## Architecture decisions for the first replacement
 
 These are design choices for the successor, not claims about the released

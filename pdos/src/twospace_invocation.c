@@ -34,7 +34,8 @@ int TSVBEGIN(TSVSTACK *stack, unsigned int personality, unsigned int amode,
     TSVFRAME *frame;
     unsigned int i;
     if (!stack || !caller || !token || !image_owner || !runtime_owner ||
-        (personality!=TSV_CMS && personality!=TSV_TSO) ||
+        (personality!=TSV_CMS && personality!=TSV_TSO &&
+         personality!=TSV_PDOS) ||
         !valid_mode(amode) || (personality==TSV_CMS && amode==64U))
         return TSV_BAD;
     if (stack->depth>=TSV_MAX_DEPTH || !stack->next_token)
@@ -57,6 +58,11 @@ int TSVBEGIN(TSVSTACK *stack, unsigned int personality, unsigned int amode,
     frame->caller.psw_address=caller->psw_address;
     frame->caller.asce=caller->asce;
     frame->caller.key=caller->key;
+    for (i=0U; i<16U; ++i) {
+        frame->caller.fpr[i]=caller->fpr[i];
+        frame->caller.access[i]=caller->access[i];
+    }
+    frame->caller.fpc=caller->fpc;
     ++stack->depth;
     *token=frame->token;
     return TSV_OK;

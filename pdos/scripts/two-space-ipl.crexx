@@ -7,8 +7,15 @@ import rxfnsb
 main: procedure = .int
   arg args = .string[]
   i = .int
-  if args.0 <> 5 & args.0 <> 6 & args.0 <> 7 & args.0 <> 8 & args.0 <> 9 & args.0 <> 10 & args.0 <> 11 & args.0 <> 12 & args.0 <> 13 then return usage()
+  if args.0 <> 5 & args.0 <> 6 & args.0 <> 7 & args.0 <> 8 & args.0 <> 9 & args.0 <> 10 & args.0 <> 11 & args.0 <> 12 & args.0 <> 13 & args.0 <> 14 & args.0 <> 15 then return usage()
   work = args.1; core = args.2; gnuas = args.3; gnuld = args.4; hercdir = args.5
+  pcomm = ""
+  if args.0 >= 14 then do
+    pcomm = args.14
+    call require left(pcomm,1) = "/", "absolute PCOMM native stage"
+    address crexx "run test -f :pcomm"
+    call require rc = 0, "PCOMM native stage exists"
+  end
   cms24 = ""
   cms24media = ""
   cms31 = ""
@@ -88,7 +95,7 @@ main: procedure = .int
     address crexx "run shasum -a 256 :tso64" output tso64hashes
     call require rc = 0 & word(tso64hashes.1,1) = "bdc2d14439f1a3c90409313a9693672c61187b78277197d4dc2b5634dc19bdd6", "pinned unchanged TSO64 ANY record stage"
   end
-  if args.0 = 13 then do
+  if args.0 >= 13 then do
     tso24 = args.13
     call require left(tso24,1) = "/", "absolute checked TSO24 stage path"
     address crexx "run test -f :tso24"
@@ -229,6 +236,19 @@ main: procedure = .int
     call require rc = 0, "checked TSO24 stage copy"
     call lineout ctl,"TSO24.RXVM SEQ tso24-rxvm.bin CYL 3 1 0 PS F 18452 18452"
   end
+  if pcomm <> "" then do
+    pcommmedia = media || "/u-command.bin"
+    address crexx "run cmake -E copy :pcomm :pcommmedia"
+    call require rc = 0, "U PCOMM native stage"
+    call lineout ctl,"U.COMMAND SEQ u-command.bin TRK 10 1 0 PS F 18452 18452"
+  end
+  if args.0 = 15 then do
+    childstage = args.15; childmedia = media || "/pdtest.bin"
+    call require left(childstage,1) = "/", "absolute native diagnostic member"
+    address crexx "run cmake -E copy :childstage :childmedia"
+    call require rc = 0, "native test member stage"
+    call lineout ctl,"TSO31.PDTEST SEQ pdtest.bin CYL 1 1 0 PS F 18452 18452"
+  end
   call lineout ctl
   installer = out || "/base/install-ipl"
   address crexx "cd :media"
@@ -296,7 +316,12 @@ main: procedure = .int
   if tso31 <> "" then check = check || " tso31"
   if tso64 <> "" then check = check || " tso64"
   if tso24 <> "" then check = check || " tso24"
-  call runlog "env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/ipl_machine.py " || shellquote(disk) || " " || shellquote(core) || " " || shellquote(hercules) || " " || shellquote(runout) || check, out || "/ipl-machine.log"
+  adapter = "pdos/tests/two-space/ipl_machine.py"
+  if pcomm <> "" then do
+    adapter = "pdos/tests/two-space/pcomm_machine.py"
+    check = ""
+  end
+  call runlog "env PYTHONDONTWRITEBYTECODE=1 python3 " || adapter || " " || shellquote(disk) || " " || shellquote(core) || " " || shellquote(hercules) || " " || shellquote(runout) || check, out || "/ipl-machine.log"
   say "Fresh checked 3390 IPL and two-space successor machine gate pass."
   return 0
 

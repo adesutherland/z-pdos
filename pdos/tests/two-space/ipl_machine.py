@@ -215,6 +215,14 @@ def run(args):
                             owner_entered.returncode == 0)
         if not owner_input_sent:
             raise RuntimeError("3270 owned-read PING entry failed")
+        if args.tso31:
+            def child_fault_screen():
+                observed=terminal_action(script_port,"Ascii()")
+                return observed.stdout if observed.returncode==0 and "K CHILD FAULT READY" in observed.stdout else None
+            fault_view=await_condition(child_fault_screen,30,"P1 child fault/read prompt")
+            out.joinpath("terminal.child-fault-screen").write_text(fault_view)
+            if terminal_action(script_port,'String("PING")').returncode or terminal_action(script_port,"Enter()").returncode:
+                raise RuntimeError("child owned-read input failed")
         await_wait_state(events, proc, out / "console.log")
         shown = terminal_action(script_port, "Ascii()")
         if shown.returncode == 0:

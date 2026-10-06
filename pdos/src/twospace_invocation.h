@@ -19,6 +19,7 @@
 
 #define TSV_CMS 1U
 #define TSV_TSO 2U
+#define TSV_PDOS 3U
 #define TSV_ACTIVE 1U
 #define TSV_SUSPENDED 2U
 #define TSV_REAPING 3U
@@ -43,6 +44,9 @@ typedef struct {
     TSVWORD64 psw_address;
     TSVWORD64 asce;
     unsigned int key;
+    TSVWORD64 fpr[16];
+    unsigned int fpc;
+    unsigned int access[16];
 } TSVCONTEXT;
 
 typedef struct {

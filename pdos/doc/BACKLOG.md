@@ -179,8 +179,8 @@ decision. Required failure controls stay bounded to the named plan cases.
 | Current checkpoint | Status | Accepted result / next gate |
 | --- | --- | --- |
 | P0 | Done | [Frozen native contract and inventory](architecture/TWO-SPACE-ABI.md), [P0 source/object qualification](qualification/TWO-SPACE-P0-2026-10-06.md), native call fixtures and versioned PDOS I/O/result byte layouts. |
-| P1 | In progress | Existing descriptor, DAT, channel and PCOMM proofs are inputs. Close complete ownership, interruption/completion and real return/fault cleanup before expanding the service surface. |
-| P2 | Open | Complete all frozen CMS/TSO storage, file, input and command forms with durable output/readback. |
+| P1 | Done | [Complete ownership, caller context and interruption-driven return/fault cleanup](qualification/TWO-SPACE-P1-2026-10-06.md); 159-check fresh IPL, including a child fault with a submitted owned read and clean retry. |
+| P2 | In progress | Complete all frozen CMS/TSO storage, file, input and command forms with durable output/readback. |
 | P3 | Open | General native loading and unchanged same-personality parent/child calls, including selected modes and caller restoration. |
 | P4 | Open | Four 3270 models, C presentation, monitor/line primary and transcript/input-handoff gates. |
 | P5 | Open | Explicit normal successor image with independent K emergency output and shutdown. |

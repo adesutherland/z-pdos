@@ -25,15 +25,29 @@ int main(int argc, char **argv)
     if (argc!=3 && argc!=4) return 2;
     mode=argc==4 && strcmp(argv[3],"64")==0 ? 64U :
          argc==4 && strcmp(argv[3],"24")==0 ? 24U : 31U;
-    if (argc==4 && mode==31U) return 2;
+    if (argc==4 && mode==31U && strcmp(argv[3],"classic31")!=0) return 2;
     raw=(unsigned char *)malloc(TST_MAX_RAW+1U);
     if (!raw) return 3;
     input=fopen(argv[1],"rb");
     if (!input) { free(raw); return 4; }
     read_bytes=fread(raw,1,TST_MAX_RAW+1U,input);
     if (!read_bytes || read_bytes>TST_MAX_RAW || ferror(input) ||
-        !feof(input) || fclose(input)!=0 ||
-        TSTHEADER(raw,(unsigned int)read_bytes,mode,&info)!=TST_OK) {
+        !feof(input) || fclose(input)!=0) {
+        free(raw); return 5;
+    }
+    /* Classic Linker terminates its native stream with the EOM RLD.
+     * The selected XMIT extraction adds a 16-byte transport EOF record.
+     * Add that record explicitly for the source-built PCOMM profile; no
+     * instruction, relocation or directory bytes are changed. */
+    if (argc==4 && strcmp(argv[3],"classic31")==0) {
+        unsigned char *larger;
+        if (read_bytes>TST_MAX_RAW-16U) { free(raw); return 5; }
+        larger=(unsigned char *)realloc(raw,read_bytes+16U);
+        if (!larger) { free(raw); return 3; }
+        raw=larger; memset(raw+read_bytes,0,16U);
+        raw[read_bytes+1U]=16U; read_bytes+=16U;
+    }
+    if (TSTHEADER(raw,(unsigned int)read_bytes,mode,&info)!=TST_OK) {
         free(raw); return 5;
     }
     blocks=((unsigned int)read_bytes+64U+TST_BLOCK-1U)/TST_BLOCK;
