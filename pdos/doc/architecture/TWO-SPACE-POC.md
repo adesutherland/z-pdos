@@ -35,6 +35,14 @@ one-ASCE kernel or completed implementation.
 | Command processor | PCOMM, or its successor, is a U application placed above 16 MiB with its stack and heap there when its ABI permits. It is the neutral PDOS command entry point and may ask K to launch either personality with a copied command and receive its return code. K retains boot, fault and emergency console output plus checked terminal and invocation services. The command processor is not part of K merely to remain resident. |
 | Terminal and 3270 ownership | K owns the devices, interrupt/completion state, bounded data transfer, one foreground screen owner, one input owner and compatibility line input/output services. The K driver and 3270 data-stream encoder are C31 C, with assembler limited to privileged channel operations. A reusable U presentation library is C, with only target-specific linkage at its boundary. It provides an application header, footer, scrollable output and editable entry area through checked K screen/input requests. PCOMM should use it first. Wrapped applications redraw after a nested child returns. Existing unmodified line-oriented CMS/TSO programs continue through their native terminal calls; the wrapper does not silently impose a full-screen layout on them. A separately attached line monitor can receive the same logical line output while the 3270 remains the primary display. |
 
+The maintained one-ASCE PDOS already accepts PCOMM commands, resolves CMS
+MODULEs and TSO load members, enters them and returns their results through
+`pdosCmsCommand`, `pdosLoadExe` and the existing ATTACH/completion path in
+`pdos/src/pdos.c`. P3 carries that behavior into the K/U translation and
+ownership model. The private successor SVC 235/236 and 245/246 fixtures
+exercise pieces of that migration; they are not a new command ABI or a
+reason to design another launcher.
+
 The terminal contract must distinguish line output from a full-screen lease.
 K serializes channel operations and rejects an invalid owner or buffer before
 I/O. The U C library owns field layout, scrolling, command history and display
