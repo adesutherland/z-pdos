@@ -203,7 +203,9 @@ def run(args):
         reference = core.read_bytes()
         try:
             judged = judge(raw[:0x14000], log, ipl=True,
-                           cms24=bool(args.cms24), cms31=bool(args.cms31))
+                           cms24=bool(args.cms24), cms31=bool(args.cms31),
+                           cmsfile=bool(args.cmsfile),
+                           cmslibrary=bool(args.cmslibrary))
             judged["checks"]["ipl_subchannel_handover"] = (
                 0x10000 <= struct.unpack_from(">I",raw,0x40bc)[0] < 0x10100)
             judged["checks"]["independent_disk_console_channel_workspaces"] = (
@@ -213,7 +215,11 @@ def run(args):
             judged["checks"]["k_terminal_screen_observed"] = (
                 "K SERVICE READY" in (out / "terminal.screen").read_text())
             judged["checks"]["terminal_input_sent"] = input_sent
-            if args.cms24 or args.cms31:
+            if args.cmslibrary:
+                judged["checks"]["cms_ioqual_summary_on_3270"] = (
+                    "SUMMARY: PASS=8 FAIL=0 SKIP=3" in
+                    application_screen)
+            elif args.cms24 or args.cms31:
                 judged["checks"]["cms_version_on_3270"] = (
                     "crexx-1.0.0-beta.3 (Bytecode Mode)" in
                     application_screen)
@@ -307,12 +313,51 @@ def run(args):
                 fst_rc, fst_cursor, fst_address = struct.unpack_from(
                     ">3I",raw,0x12264)
                 if args.cmsfile:
-                    fst = raw[lowcore_real+0x300:lowcore_real+0x328]
+                    fst = raw[0x12280:0x122a8]
+                    expected_id = "IOQUAL  RXBIN   "
                     checks["cms31_fst_catalogue_result"] = (
                         (fst_rc,fst_cursor,fst_address) == (0,1,0x300) and
-                        fst[:16] == "IOQUAL  RXBIN   ".encode("cp037") and
+                        fst[:16] == expected_id.encode("cp037") and
                         fst[24:26] == b"\xc1\xf1" and
                         fst[32:36] == b"\x00\x00\x01\x00")
+                    if args.cmslibrary:
+                        second_real, second_entry, second_bytes, second_blocks = \
+                            struct.unpack_from(">4I",raw,0x4120)
+                        checks["cms31_second_relocated_image"] = (
+                            struct.unpack_from(">I",raw,0x12278)[0] == 0 and
+                            struct.unpack_from(">I",raw,0x12274)[0] == 0 and
+                            second_entry == 0x05000000 and
+                            second_bytes == image_bytes and
+                            second_blocks == blocks and
+                            0x400000 <= second_real < 0x10000000 and
+                            (real+pages*4096 <= second_real or
+                             second_real+pages*4096 <= real) and
+                            all(page_real(raw,0x28000f,0x05000000+i*4096) ==
+                                second_real+i*4096 for i in range(pages)))
+                        checks["cms31_ioqual_native_result"] = (
+                            struct.unpack_from(">2I",raw,0x12270) == (0,0) and
+                            struct.unpack_from(">I",raw,0x1227c)[0] == 0 and
+                            struct.unpack_from(">I",raw,0x254f0)[0] == 3 and
+                            struct.unpack_from(">I",raw,0x4514)[0] ==
+                                0x04000000 and
+                            struct.unpack_from(">I",raw,0x20000)[0] == 21 and
+                            raw[0x20004+20*136+4:0x20004+20*136+33] ==
+                                "SUMMARY: PASS=8 FAIL=0 SKIP=3".encode("cp037"))
+                        expected_files = (
+                            ("T       TXT     A1",3,21,0x98faeef8),
+                            ("B       BIN     A1",1,256,0xb5884564),
+                            ("E       TXT     A1",1,1,0x64aee20e))
+                        checks["cms31_output_records_verified_and_released"] = all(
+                            raw[0x25500+i*32:0x25500+i*32+18] ==
+                                name.encode("cp037") and
+                            struct.unpack_from(">3I",raw,0x25500+i*32+20) ==
+                                (records,source_bytes,checksum)
+                            for i,(name,records,source_bytes,checksum)
+                            in enumerate(expected_files))
+                    else:
+                        checks["cms31_library_absent_skips_invocation"] = (
+                            struct.unpack_from(">I",raw,0x12278)[0] == 4 and
+                            struct.unpack_from(">I",raw,0x4120)[0] == 0)
                 else:
                     checks["cms31_fst_veneer_absent_result"] = (
                         (fst_rc,fst_cursor,fst_address) ==
@@ -334,9 +379,9 @@ def run(args):
                     0x01000000 <= plist < 0x80000000 and
                     allocated == rxvm_rc == released == 0 and
                     page_unmapped(raw,0x28000f,plist) and
-                    struct.unpack_from(">I",raw,0x4200)[0] == 1 and
-                    struct.unpack_from(">I",raw,0x4204)[0] == len(version) and
-                    raw[0x4208:0x4208+len(version)] == version and
+                    struct.unpack_from(">I",raw,0x20000)[0] >= 1 and
+                    struct.unpack_from(">I",raw,0x20004)[0] == len(version) and
+                    raw[0x20008:0x20008+len(version)] == version and
                     struct.unpack_from(">I",raw,0x4510)[0] == 0)
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
                 real_bytes == 0x10000000 and stage >= 0x400000 and
@@ -391,6 +436,7 @@ def main():
     p.add_argument("cms24", nargs="?", choices=("cms24",))
     p.add_argument("cms31", nargs="?", choices=("cms31",))
     p.add_argument("cmsfile", nargs="?", choices=("cmsfile",))
+    p.add_argument("cmslibrary", nargs="?", choices=("cmslibrary",))
     try:
         return run(p.parse_args())
     except (OSError, ValueError) as exc:

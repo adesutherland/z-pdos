@@ -253,6 +253,17 @@ cms31_skip_fst_record:
 .balign 4
 cms31_child_va32: .long 0x03000000
 cms31_probe_high_data: .quad 0x110001000
+.balign 8
+app_b_cms31_second_call:
+    lgr %r12, %r14
+    larl %r3, cms31_second_va32
+    l %r3, 0(%r3)
+    sam31
+    basr %r14, %r3
+    sam64
+    lgr %r14, %r12
+    br %r14
+cms31_second_va32: .long 0x05000000
 
 .section .apphigh,"ax"
 app_high:
@@ -660,6 +671,51 @@ cms31_overlay_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x22c(%r2)
+    l %r3, 0x264(%r2)
+    chi %r3, 0              /* IOQUAL staged only in positive FST IPL */
+    jne cms31_native_release
+    l %r1, 0x26c(%r2)
+    mvc 0x280(40,%r2),0(%r1) /* preserve catalogue FST before STATE */
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 225                 /* require pinned LIBRARY before full run */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x278(%r2)
+    chi %r15, 0
+    jne cms31_native_release
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 224                 /* fresh relocated CMS31 invocation image */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x274(%r2)
+    chi %r15, 0
+    jne cms31_native_release
+    lg %r10, 0x220(%r2)
+    larl %r4, cms31_ioqual_plist_bytes
+    mvc 0(80,%r10),0(%r4)
+    mvi 80(%r10), 0xff
+    mvc 81(47,%r10),80(%r10)
+    xc 256(72,%r10),256(%r10)
+    la %r13, 256(%r10)
+    lgr %r1, %r10
+    larl %r3, cms31_second_trampoline_va
+    lg %r3, 0(%r3)
+    basr %r14, %r3
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x270(%r2)
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 226                 /* snapshot and release K file buffers */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x27c(%r2)
+cms31_native_release:
     lghi %r0, 4096
     lgr %r1, %r10
     lghi %r15, 0x30
@@ -708,6 +764,7 @@ input_data_va: .quad 0x110001080
 cms31_image_va: .quad 0x03000000
 cms24_image_va: .quad 0x20000
 cms31_trampoline_va: .quad app_b_cms31_call
+cms31_second_trampoline_va: .quad app_b_cms31_second_call
 forged_va: .quad 0x100021000
 cross_va: .quad 0x110001ffe
 write_va: .quad 0x110001024
@@ -715,6 +772,17 @@ denied_va: .quad 0x20000
 cms31_plist_bytes:
 .byte 0xd9,0xe7,0xe5,0xd4,0x40,0x40,0x40,0x40
 .byte 0x60,0xa5,0x40,0x40,0x40,0x40,0x40,0x40
+cms31_ioqual_plist_bytes:
+.byte 0xd9,0xe7,0xe5,0xd4,0x40,0x40,0x40,0x40
+.byte 0xc9,0xd6,0xd8,0xe4,0xc1,0xd3,0x40,0x40
+.ascii "\x60\xc1\x40\x40\x40\x40\x40\x40"
+.ascii "\xc1\xe4\xe3\xd6\x40\x40\x40\x40"
+.ascii "\xe3\x4b\xe3\xe7\xe3\x40\x40\x40"
+.ascii "\xc2\x4b\xc2\xc9\xd5\x40\x40\x40"
+.ascii "\xc5\x4b\xe3\xe7\xe3\x40\x40\x40"
+.ascii "\xd4\x4b\xe3\xe7\xe3\x40\x40\x40"
+.ascii "\xc3\xd4\xe2\x40\x40\x40\x40\x40"
+.ascii "\xc3\xd4\xe2\xd9\xc5\xc3\x40\x40"
 
 .section .appdata,"aw"
 .long 0xa1b2c3d4, 0
@@ -765,6 +833,8 @@ trace_not_cms24:
     srlg %r4, %r4, 24
     chi %r4, 3              /* live CMS31 image at 0x03000000 */
     je storage_no_record
+    chi %r4, 5              /* second relocated CMS31 image */
+    je storage_no_record
 trace_not_cms31:
     chi %r2, 205
     jne trace_not_cms_fst
@@ -804,6 +874,12 @@ trace_not_cms_fst:
     chi %r2, 222
     je storage_no_record
     chi %r2, 223
+    je storage_no_record
+    chi %r2, 224
+    je storage_no_record
+    chi %r2, 225
+    je storage_no_record
+    chi %r2, 226
     je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore

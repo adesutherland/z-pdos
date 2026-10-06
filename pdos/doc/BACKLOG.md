@@ -259,8 +259,13 @@ lowcore behavior remain open.
 The [CMS31 FST checkpoint](qualification/TWO-SPACE-CMS-FST-2026-10-06.md)
 adds a bounded VTOC lookup through that veneer. Separate fresh IPLs check
 the absent result and the pinned IOQUAL RXBIN FST with exact R0/R1/R15
-handoff. RXVM file-open/read, record data, writes and command dispatch
-remain open.
+handoff. The [later IOQUAL checkpoint](qualification/TWO-SPACE-CMS31-IOQUAL-2026-10-06.md)
+runs a fresh second CMS31 RXVM relocation on pinned IOQUAL and LIBRARY.
+Selected checked file reads and transient K-owned writes yield
+`PASS=8 FAIL=0 SKIP=3`, RC 0, in a fresh IPL; a separate run proves
+that absent LIBRARY prevents second-app dispatch. Persistent output,
+CMS24 file services, full TSO binaries in the successor, interapplication
+`ADDRESS` and the normal replacement image remain open.
 
 ## PD-004: Batch-file delivery
 

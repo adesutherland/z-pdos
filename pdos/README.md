@@ -33,6 +33,10 @@ The [CMS31 lowcore check](doc/qualification/TWO-SPACE-CMS31-LOWCORE-2026-10-06.m
 adds a separately backed U compatibility page for the SDK SYSREF pointer.
 The [FST lookup check](doc/qualification/TWO-SPACE-CMS-FST-2026-10-06.md)
 exercises that veneer against an actual staged CMS31 dataset.
+The [CMS31 IOQUAL check](doc/qualification/TWO-SPACE-CMS31-IOQUAL-2026-10-06.md)
+runs a second unchanged RXVM copy on staged IOQUAL and LIBRARY, with
+checked file records and transient K-owned output. It does not select the
+successor as the release kernel or persist those output records to disk.
 
 The recorded source-built milestone runs unchanged cREXX TSO31, TSO64 ANY and
 TSO64 HIGH packages, including compiler, assembler, terminal and file workloads.

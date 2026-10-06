@@ -51,7 +51,8 @@ service and cross-personality qualification.
 The later [CMS31 FST result](../qualification/TWO-SPACE-CMS-FST-2026-10-06.md)
 calls the veneer in U, scans a bounded K VTOC catalogue and returns an
 FST through U lowcore storage. Absent and present cases pass fresh IPL;
-file record operations and personality switching remain separate work.
+the [later CMS31 IOQUAL run](../qualification/TWO-SPACE-CMS31-IOQUAL-2026-10-06.md)
+adds selected record operations. Personality switching remains separate work.
 The checked CMS24 RXVM is fixed at `0x20000`–`0x1ba6c0` (1,681,088 image
 bytes, 1,683,456 page-rounded bytes). It must not collide with a kernel
 virtual mapping or a second fixed module. Its usable heap must be measured
@@ -424,21 +425,30 @@ preserves the same permanent low placement gap after releasing its one
 page. The separate SVC 202 path checks CMS24's flagged 24-bit line
 address and skips its inline four-byte continuation on return. Both
 unchanged RXVM images execute in the same U ASCE in that diagnostic IPL.
-This is evidence of a narrow coexistence case; file/input services,
-application commands and TSO binaries have not yet been exercised together.
+This is evidence of a narrow coexistence case; application commands and
+TSO binaries have not yet been exercised together.
 The [live-screen checkpoint](../qualification/TWO-SPACE-CMS-LIVE-SCREEN-2026-10-06.md)
 connects those selected CMS line-write requests to K's real-addressed
 3270 workspace. The final version line is observed after guest completion;
 the general CMS terminal and file APIs remain open.
+The [CMS31 IOQUAL result](../qualification/TWO-SPACE-CMS31-IOQUAL-2026-10-06.md)
+reads staged IOQUAL and LIBRARY records through K's checked U gate, then
+runs IOQUAL from an independently backed second RXVM relocation at U
+`0x05000000`. The guest observes `PASS=8 FAIL=0 SKIP=3` and RC 0 with
+the earlier CMS24 and CMS31 RXVM images still mapped. Selected output
+records use transient K real buffers and are checked and released at
+completion. The positive IPL proves this noncolliding second invocation;
+disk persistence, cross-personality `ADDRESS` calls and arbitrary
+fixed-origin coexistence remain to be qualified.
 
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
 SVC through K, returns `0x3456` to a U64 caller, restores the parent PTEs,
 and verifies its bytes again. Each live page-table replacement is purged on
 the one CPU. This proves a mixed-mode memory and gate transition. The later
-CMS31 `-v` check runs after the parent image is restored; CMS lowcore,
-file and command services and actual REXX
-`ADDRESS` behavior remain to be implemented. The IPL harness waits for the
+CMS31 `-v` check runs after the parent image is restored; broader CMS file
+and command services and actual REXX `ADDRESS` behavior remain to be
+implemented. The IPL harness waits for the
 3270 ready screen and guest disabled-wait event; time limits only detect
 stalls.
 

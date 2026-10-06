@@ -33,10 +33,13 @@ fixed-origin child backing is also exercised in the guest.
 K reads checked CKD records through separate low-real disk and console
 workspaces, writes and reads the 3270, and validates and maps the pinned
 CMS24/CMS31 RXVM MODULEs. None of this places K storage in U's 24-bit
-virtual range. The successor still lacks general CMS/TSO file and command
-adapters, execution of the unchanged RXVM programs, REXX `ADDRESS` calls
-and the explicitly selected replacement image. A post-qualification review
-will decide whether CMS and TSO continue to share one U ASCE.
+virtual range. Both unchanged RXVM `-v` programs run in this diagnostic
+IPL. A [selected CMS31 file result](../qualification/TWO-SPACE-CMS31-IOQUAL-2026-10-06.md)
+also runs IOQUAL with LIBRARY through checked K file records and transient
+output. The successor still lacks persistent output, general CMS/TSO file
+and command adapters, REXX `ADDRESS` calls and the explicitly selected
+replacement image. A post-qualification review will decide whether CMS
+and TSO continue to share one U ASCE.
 
 ## The system at a glance
 
