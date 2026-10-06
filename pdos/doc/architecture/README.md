@@ -46,6 +46,9 @@ still lacks persistent output, general CMS/TSO file
 and command adapters, REXX `ADDRESS` calls and the explicitly selected
 replacement image. A post-qualification review will decide whether CMS
 and TSO continue to share one U ASCE.
+The [native TSO loader-core check](../qualification/TWO-SPACE-TSO-LOADER-2026-10-06.md)
+matches the existing TSO31 materialized image at two bases; guest staging,
+mapping and TSO execution remain open.
 
 ## The system at a glance
 

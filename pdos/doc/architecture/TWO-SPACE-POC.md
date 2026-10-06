@@ -465,6 +465,14 @@ the fixture completion gate releases any remainder. This supports a
 necessary file-state condition for nested calls, but a real `ADDRESS` call
 has not run.
 
+The [native TSO loader-core checkpoint](../qualification/TWO-SPACE-TSO-LOADER-2026-10-06.md)
+adds a C89 AMODE31/RMODE ANY record and relocation path for K-private
+staging. Its output matches the released loader on the unchanged TSO31 RXVM
+at two selected U bases. Directory inspection accepts the selected TSO64
+ANY header, but high image relocation, K dataset staging, shared-U mapping,
+TSO SVC services and actual TSO execution remain integration work. This
+host/target-build result does not count as TSO coexistence in the guest.
+
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
 SVC through K, returns `0x3456` to a U64 caller, restores the parent PTEs,

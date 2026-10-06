@@ -287,6 +287,13 @@ holds two actual CMS31 files open at once, verifies distinct cursors and real
 owners, and reruns unchanged CMS24/CMS31 workloads. It prepares nested file
 use but does not qualify an `ADDRESS` call or TSO execution in the successor.
 
+The [native TSO loader-core checkpoint](qualification/TWO-SPACE-TSO-LOADER-2026-10-06.md)
+materializes the pinned unchanged TSO31 load-module bytes at two bases with
+the same image hashes as the released loader, under host sanitizers, and
+builds the code with Classic C31. It validates the pinned TSO64 ANY directory
+but does not materialize or run that image. K staging, U mapping, TSO service
+dispatch and fresh guest execution remain open.
+
 ## PD-004: Batch-file delivery
 
 - Type: improvement

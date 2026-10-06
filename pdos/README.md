@@ -40,6 +40,9 @@ successor as the release kernel or persist those output records to disk.
 The [CMS input cursor check](doc/qualification/TWO-SPACE-CMS-CURSORS-2026-10-06.md)
 holds two actual staged files open concurrently without disturbing either
 cursor.
+The [native TSO loader-core check](doc/qualification/TWO-SPACE-TSO-LOADER-2026-10-06.md)
+reproduces the selected TSO31 load image at two bases in K-private host
+staging; successor guest execution is still unqualified.
 
 The recorded source-built milestone runs unchanged cREXX TSO31, TSO64 ANY and
 TSO64 HIGH packages, including compiler, assembler, terminal and file workloads.
