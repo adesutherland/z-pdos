@@ -12,6 +12,7 @@
 #include "twospace_cmsfile.h"
 #include "twospace_cmscursor.h"
 #include "twospace_tso.h"
+#include "twospace_invocation.h"
 
 static unsigned int user_rights(unsigned int frame, void *unused);
 static unsigned int cms_word(const unsigned char *p);
@@ -20,6 +21,7 @@ static TSDSTATE u_tables;
 static TSMSTATE storage;
 static TSCSTATE channel;
 static TSCSTATE console_channel;
+static TSVSTACK native_invocations;
 static unsigned int storage_ready;
 static unsigned int console_ssid;
 static unsigned int console_read_phase;
@@ -93,6 +95,7 @@ static int attach(void)
     at.lo=0x00f00000U;
     if (TSMRESERVE(&storage,7U,24U,at,0x100000U) != TSP_OK)
         return -1;
+    TSVINIT(&native_invocations);
     storage_ready=1U;
     return 0;
 }
@@ -832,6 +835,99 @@ static unsigned int absent_channel_probe(const TSGREQUEST *request)
     return 0U;
 }
 
+/* Diagnostic native-entry gate. The real launcher will call this from K
+ * before transferring to U; the current machine fixture uses SVC 235/236
+ * around its unchanged entry to exercise the same K-owned descriptor. */
+static unsigned int native_image_base(unsigned int mode)
+{ return mode==24U ? 0x00400000U :
+         mode==31U ? 0x07000000U : 0x09000000U; }
+
+static unsigned int native_receipt_base(unsigned int mode)
+{ return mode==24U ? 0x4680U :
+         mode==31U ? 0x4600U : 0x4640U; }
+
+static unsigned int native_loaded(unsigned int mode)
+{ return mode==24U ? tso24_loaded :
+         mode==31U ? tso31_loaded : tso64_loaded; }
+
+static const TSVFRAME *native_caller(unsigned int pc)
+{
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
+    unsigned int base, bytes, mask_hi, mask_lo;
+    if (!frame || frame->personality!=TSV_TSO ||
+        !native_loaded(frame->amode)) return 0;
+    base=native_image_base(frame->amode);
+    bytes=*(volatile const unsigned int *)(native_receipt_base(
+        frame->amode)+4U);
+    mask_hi=*(volatile const unsigned int *)0x3080U;
+    mask_lo=*(volatile const unsigned int *)0x3084U;
+    if (!bytes || pc<base || pc-base>=bytes ||
+        (frame->amode==64U ?
+            (!(mask_hi&1U) && !(mask_lo&0x80000000U)) :
+            (mask_hi&1U)) ||
+        (frame->amode==24U && (mask_lo&0x80000000U)) ||
+        (frame->amode==31U && !(mask_lo&0x80000000U))) return 0;
+    return frame;
+}
+
+static unsigned int native_begin(TSGREQUEST *request)
+{
+    TSVCONTEXT caller;
+    unsigned int i, mode=request->length, token;
+    volatile const unsigned int *saved=(volatile const unsigned int *)0x3000U;
+    int rc;
+    if (request->address.hi || request->address.lo || request->direction ||
+        (mode!=24U && mode!=31U && mode!=64U) || !native_loaded(mode) ||
+        !*(volatile const unsigned int *)(native_receipt_base(mode)+4U))
+        return 8U;
+    for (i=0U; i<16U; ++i) {
+        caller.gpr[i].hi=saved[2U*i];
+        caller.gpr[i].lo=saved[2U*i+1U];
+    }
+    caller.psw.hi=saved[0x80U/4U];
+    caller.psw.lo=saved[0x84U/4U];
+    caller.asce.hi=saved[0x90U/4U];
+    caller.asce.lo=saved[0x94U/4U];
+    caller.key=(caller.psw.hi>>20)&15U;
+    rc=TSVBEGIN(&native_invocations,TSV_TSO,mode,
+                mode==31U ? 15U : mode==24U ? 18U : 17U,
+                mode==31U ? 16U : mode==24U ? 18U : 17U,
+                &caller,&token);
+    if (rc!=TSV_OK) return rc==TSV_FULL ? 4U : 8U;
+    request->address.hi=0U;
+    request->address.lo=token;
+    return 0U;
+}
+
+static int native_clean(unsigned int token, const TSVRESOURCE *resource,
+                        void *context)
+{
+    (void)token; (void)resource; (void)context;
+    /* A live native allocation is a failed unwind, never silent success. */
+    return 1;
+}
+
+static unsigned int native_end(const TSGREQUEST *request)
+{
+    int rc;
+    if (request->length || request->direction || request->address.hi ||
+        !request->address.lo) return 8U;
+    rc=TSVEND(&native_invocations,request->address.lo,native_clean,0);
+    return rc==TSV_OK ? 0U : 12U;
+}
+
+static unsigned int allocation_handle(unsigned int task, TSPADDR address)
+{
+    unsigned int i;
+    for (i=0U; i<TSM_ALLOCS; ++i)
+        if (storage.allocations[i].handle &&
+            storage.allocations[i].task==task &&
+            storage.allocations[i].address.hi==address.hi &&
+            storage.allocations[i].address.lo==address.lo)
+            return storage.allocations[i].handle;
+    return 0U;
+}
+
 /* The current fixture's SVC 120 path uses the active conditional GETMAIN
  * register convention: R0 length, R1 zero to allocate or base to free, R15
  * X'10' below-line or X'30' above-line. The old PSW belongs to K's saved
@@ -839,20 +935,18 @@ static unsigned int absent_channel_probe(const TSGREQUEST *request)
  */
 static unsigned int storage_service(TSGREQUEST *request)
 {
+    const TSVFRAME *frame;
     unsigned int mask_hi, mask_lo, flags, mode, storage_mode, result, task, pc;
+    unsigned int handle;
     TSPADDR minimum, maximum, base;
     mask_hi=*(volatile const unsigned int *)0x3080U;
     mask_lo=*(volatile const unsigned int *)0x3084U;
     flags=*(volatile const unsigned int *)0x307cU;
     mode=(mask_hi & 1U) ? 64U : (mask_lo & 0x80000000U) ? 31U : 24U;
     pc=*(volatile const unsigned int *)0x308cU;
-    task=tso24_loaded && pc>=0x00400000U &&
-         pc-0x00400000U<*(volatile const unsigned int *)0x4684U ?
-         18U : tso31_loaded && pc>=0x07000000U &&
-         pc-0x07000000U<*(volatile const unsigned int *)0x4604U ?
-         16U : tso64_loaded && pc>=0x09000000U &&
-         pc-0x09000000U<*(volatile const unsigned int *)0x4644U ?
-         17U : 1U;
+    frame=native_caller(pc);
+    if (TSVTOP(&native_invocations) && !frame) return 8U;
+    task=frame ? frame->runtime_owner : 1U;
     if (request->address.hi == 0U && request->address.lo == 0U) {
         if ((flags & 0x30U) == 0x30U) {
             if (mode == 24U) return 4U;
@@ -867,6 +961,14 @@ static unsigned int storage_service(TSGREQUEST *request)
         result=TSMALLOC(&storage,task,storage_mode,minimum,maximum,
                         request->length,0,&base);
         if (result != TSM_OK) return result == TSM_NOMEM ? 4U : 8U;
+        if (frame) {
+            handle=allocation_handle(task,base);
+            if (!handle || TSVOWN(&native_invocations,frame->token,
+                                  TSV_ALLOCATION,handle)!=TSV_OK) {
+                if (TSMFREE(&storage,task,base)!=TSM_OK) return 12U;
+                return 4U;
+            }
+        }
         request->address=base;
         if (task==18U) {
             volatile unsigned int *receipt=(volatile unsigned int *)0x4cc0U;
@@ -880,8 +982,12 @@ static unsigned int storage_service(TSGREQUEST *request)
         *(volatile unsigned int *)0x4098U=u_tables.used;
         return 0U;
     }
+    handle=frame ? allocation_handle(task,request->address) : 0U;
+    if (frame && !handle) return 8U;
     result=TSMFREE(&storage,task,request->address);
     if (result != TSM_OK) return 8U;
+    if (frame && TSVFORGET(&native_invocations,frame->token,
+                           TSV_ALLOCATION,handle)!=TSV_OK) return 12U;
     if (task==18U) ++*(volatile unsigned int *)0x4cc4U;
     *(volatile unsigned int *)0x4098U=u_tables.used;
     return 0U;
@@ -919,13 +1025,15 @@ static unsigned int high_storage_service(TSGREQUEST *request)
  * accepted. Nothing from U is dereferenced as a K pointer. */
 static unsigned int iarv64_service(const TSGREQUEST *request)
 {
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
     TSGCONTEXT gate;
     TSGREQUEST copy;
     TSPADDR minimum, maximum, base;
     unsigned char plist[88], result_bytes[8];
-    unsigned int segments, status, opcode;
+    unsigned int segments, status, opcode, handle;
     volatile unsigned int *receipt=(volatile unsigned int *)0x4e00U;
-    if (!tso64_loaded ||
+    if (!tso64_loaded || !frame || frame->personality!=TSV_TSO ||
+        frame->amode!=64U || frame->runtime_owner!=17U ||
         (*(volatile const unsigned int *)0x3080U&1U) ||
         !(*(volatile const unsigned int *)0x3084U&0x80000000U) ||
         *(volatile const unsigned int *)0x308cU!=0x402U ||
@@ -952,10 +1060,18 @@ static unsigned int iarv64_service(const TSGREQUEST *request)
         status=TSMALLOC(&storage,17U,64U,minimum,maximum,
                        segments*0x100000U,0,&base);
         if (status!=TSM_OK) return status==TSM_NOMEM ? 4U : 8U;
+        handle=allocation_handle(17U,base);
+        if (!handle || TSVOWN(&native_invocations,frame->token,
+                              TSV_ALLOCATION,handle)!=TSV_OK) {
+            if (TSMFREE(&storage,17U,base)!=TSM_OK) return 12U;
+            return 4U;
+        }
         cms_put_word(result_bytes,base.hi);
         cms_put_word(result_bytes+4U,base.lo);
         if (TSGCOPY(&gate,&copy,result_bytes,sizeof result_bytes)!=TSG_OK) {
             if (TSMFREE(&storage,17U,base)!=TSM_OK) return 0xfffffff0U;
+            if (TSVFORGET(&native_invocations,frame->token,
+                          TSV_ALLOCATION,handle)!=TSV_OK) return 12U;
             return 8U;
         }
         receipt[3U]=base.hi; receipt[4U]=base.lo;
@@ -965,8 +1081,11 @@ static unsigned int iarv64_service(const TSGREQUEST *request)
     if (opcode==3U) {
         base.hi=cms_word(plist+56U);
         base.lo=cms_word(plist+60U);
-        if (base.hi!=1U || base.lo<0x20000000U ||
+        handle=allocation_handle(17U,base);
+        if (base.hi!=1U || base.lo<0x20000000U || !handle ||
             TSMFREE(&storage,17U,base)!=TSM_OK) return 8U;
+        if (TSVFORGET(&native_invocations,frame->token,
+                      TSV_ALLOCATION,handle)!=TSV_OK) return 12U;
         receipt[5U]+=1U;
         *(volatile unsigned int *)0x4098U=u_tables.used;
         return 0U;
@@ -1406,17 +1525,17 @@ static unsigned int cms_line_screen(const unsigned char *message,
  * input is a separate service, so never interpret that flag as a U address. */
 static unsigned int tso_terminal_service(TSGREQUEST *request)
 {
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
     TSGCONTEXT gate;
     TSGREQUEST copy;
     unsigned char message[132];
     unsigned int i, status, mask_hi, mask_lo, mode24;
-    unsigned int pc=*(volatile const unsigned int *)0x308cU;
-    unsigned int receipt_base=pc>=0x09000000U ? 0x4d00U :
-                              pc>=0x07000000U ? 0x4700U : 0x4c00U;
+    unsigned int receipt_base=frame && frame->amode==64U ? 0x4d00U :
+                              frame && frame->amode==31U ? 0x4700U : 0x4c00U;
     volatile unsigned char *receipt=(volatile unsigned char *)(receipt_base+16U);
     mask_hi=*(volatile const unsigned int *)0x3080U;
     mask_lo=*(volatile const unsigned int *)0x3084U;
-    mode24=receipt_base==0x4c00U;
+    mode24=frame && frame->amode==24U;
     *(volatile unsigned int *)(receipt_base+0xa0U)+=1U;
     *(volatile unsigned int *)(receipt_base+0xa4U)=request->length;
     *(volatile unsigned int *)(receipt_base+0xa8U)=request->address.hi;
@@ -1824,29 +1943,31 @@ static unsigned int cms_file_audit(const TSGREQUEST *request,
 unsigned int pdosTwoSpaceService(TSGREQUEST *request)
 {
     TSGCONTEXT gate;
+    const TSVFRAME *native_frame;
     unsigned char bytes[TSG_MAX_COPY];
     unsigned int value, native_tso, caller_pc;
     int result;
     if (!request) return 0xffffffffU;
     if (attach()) return 0xfffffffaU;
     caller_pc=*(volatile const unsigned int *)0x308cU;
-    native_tso=(tso24_loaded && caller_pc>=0x00400000U &&
-                caller_pc-0x00400000U<*(volatile const unsigned int *)0x4684U) ||
-               (tso31_loaded && caller_pc>=0x07000000U &&
-                caller_pc-0x07000000U<*(volatile const unsigned int *)0x4604U) ||
-               (tso64_loaded && caller_pc>=0x09000000U &&
-                caller_pc-0x09000000U<*(volatile const unsigned int *)0x4644U);
+    native_frame=native_caller(caller_pc);
+    native_tso=native_frame!=0;
     /* The descriptor stores a 32-bit length. R0 is not an argument for the
        selected AMODE31 TPUT or IARV64 PC entry. Both routes validate their
        R1 arguments independently before touching U storage. */
     if (*(volatile const unsigned int *)0x3000U != 0U &&
         !((request->svc==93U && native_tso &&
            !(*(volatile const unsigned int *)0x3080U&1U)) ||
-          (request->svc==233U && tso64_loaded && caller_pc==0x402U &&
+          (request->svc==233U && native_frame==0 &&
+           TSVTOP(&native_invocations) &&
+           TSVTOP(&native_invocations)->amode==64U &&
+           caller_pc==0x402U &&
            !(*(volatile const unsigned int *)0x3080U&1U) &&
            (*(volatile const unsigned int *)0x3084U&0x80000000U))))
         return request->svc == 120U || request->svc == 223U ?
                8U : 0xfffffffdU;
+    if (request->svc == 235U) return native_begin(request);
+    if (request->svc == 236U) return native_end(request);
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 223U) return high_storage_service(request);
     if (request->svc == 233U) return iarv64_service(request);

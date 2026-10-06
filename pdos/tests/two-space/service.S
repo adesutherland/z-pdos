@@ -874,6 +874,16 @@ cms24_io_done:
     mvi 67(%r10), 0xa5
     xc 256(72,%r10),256(%r10)
     la %r13, 256(%r10)
+    lghi %r0, 31
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 235                 /* diagnostic K-owned TSO31 invocation */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x358(%r2)
+    st %r1, 0x35c(%r2)
+    chi %r15, 0
+    jne tso31_release_page
     lgr %r1, %r10
     larl %r4, tso31_trampoline_va
     lg %r4, 0(%r4)
@@ -881,6 +891,14 @@ cms24_io_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x2ec(%r2)
+    lghi %r0, 0
+    llgf %r1, 0x35c(%r2)
+    lghi %r2, 0
+    svc 236
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x360(%r2)
+tso31_release_page:
     lghi %r0, 4096
     lgr %r1, %r10
     lghi %r15, 0x30
@@ -917,6 +935,16 @@ tso31_call_done:
     mvi 67(%r10), 0xa5
     xc 256(144,%r10),256(%r10)
     la %r13, 256(%r10)
+    lghi %r0, 64
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 235                 /* diagnostic K-owned TSO64 invocation */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x364(%r2)
+    st %r1, 0x368(%r2)
+    chi %r15, 0
+    jne tso64_release_page
     lgr %r1, %r10
     larl %r4, tso64_trampoline_va
     lg %r4, 0(%r4)
@@ -924,6 +952,14 @@ tso31_call_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x304(%r2)
+    lghi %r0, 0
+    llgf %r1, 0x368(%r2)
+    lghi %r2, 0
+    svc 236
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x36c(%r2)
+tso64_release_page:
     lghi %r0, 4096
     lgr %r1, %r10
     lghi %r15, 0x30
@@ -1006,6 +1042,16 @@ tso24_collision_done:
     larl %r4, cms24_bridge
     mvc 512(16,%r10),0(%r4)
     la %r13, 256(%r10)
+    lghi %r0, 24
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 235                 /* diagnostic K-owned TSO24 invocation */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x370(%r2)
+    st %r1, 0x374(%r2)
+    chi %r15, 0
+    jne tso24_release_page
     lgr %r1, %r10
     larl %r3, tso24_image_va
     lg %r3, 0(%r3)
@@ -1015,6 +1061,14 @@ tso24_collision_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x32c(%r2)
+    lghi %r0, 0
+    llgf %r1, 0x374(%r2)
+    lghi %r2, 0
+    svc 236
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x378(%r2)
+tso24_release_page:
     lghi %r0, 4096
     lgr %r1, %r10
     lghi %r15, 0x10
@@ -1208,6 +1262,10 @@ trace_not_cms_fst:
     je storage_no_record
     chi %r2, 234
     je storage_no_record
+    chi %r2, 235
+    je storage_no_record
+    chi %r2, 236
+    je storage_no_record
     chi %r2, 93
     je storage_no_record
     lghi %r1, 0x2000
@@ -1285,6 +1343,8 @@ no_cms24_inline:
     chi %r2, 205
     je copy_storage_address
     chi %r2, 223
+    je copy_storage_address
+    chi %r2, 235
     jne no_storage_address
 copy_storage_address:
     llgf %r2, 0(%r6)

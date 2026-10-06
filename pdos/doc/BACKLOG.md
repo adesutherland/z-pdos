@@ -168,9 +168,12 @@ The [P0 ABI inventory](architecture/TWO-SPACE-ABI.md) now pins the selected
 unchanged inputs and names the untraced forms. The first [P1 invocation
 component check](qualification/TWO-SPACE-INVOCATION-2026-10-06.md) proves
 token and cleanup ordering on the host and a linked, uncalled Classic C31
-module in the diskless fixture. P0 remains incomplete and the actual K
-dispatch still uses saved-PC personality inference; neither checkpoint
-closes P1 or qualifies P2–P6.
+module in the diskless fixture. The subsequent [fresh-IPL invocation
+gate](qualification/TWO-SPACE-INVOCATION-GATE-2026-10-06.md) executes the
+descriptor around unchanged TSO24/31/64 ANY RXVM calls and assigns SVC 120,
+IARV64 and TPUT to that active owner. P0 remains incomplete. The private U
+fixture still requests entry, fault cleanup and general resource lifetimes
+are absent, and neither checkpoint closes P1 or qualifies P2–P6.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and

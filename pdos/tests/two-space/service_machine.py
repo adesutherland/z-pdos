@@ -194,6 +194,19 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
         qword(raw,0x12030) == 0x02010000 and
         struct.unpack_from(">II",raw,0x12038) == (0,0) and
         struct.unpack_from(">I",raw,0x12058)[0] == 0xa5)
+    if tso31:
+        begin, token, end = struct.unpack_from(">III",raw,0x12358)
+        checks["tso31_k_invocation"] = begin == end == 0 and token != 0
+    if tso64:
+        begin, token, end = struct.unpack_from(">III",raw,0x12364)
+        checks["tso64_k_invocation"] = begin == end == 0 and token != 0
+    if tso24:
+        begin, token, end = struct.unpack_from(">III",raw,0x12370)
+        checks["tso24_k_invocation"] = begin == end == 0 and token != 0
+    if tso31 and tso64 and tso24:
+        checks["native_invocation_tokens_unique"] = len({
+            struct.unpack_from(">I",raw,p)[0]
+            for p in (0x1235c,0x12368,0x12374)}) == 3
     checks["no_low_fallback_on_real_exhaustion"] = (
         struct.unpack_from(">I",raw,0x12040)[0] == 4 and
         qword(raw,0x12044) == 0)
@@ -310,7 +323,8 @@ def run(args):
                  "twospace_dataset.h", "twospace_cms.c", "twospace_cms.h",
                  "twospace_cmsfile.c", "twospace_cmsfile.h",
                  "twospace_cmscursor.c", "twospace_cmscursor.h",
-                 "twospace_tso.c", "twospace_tso.h"):
+                 "twospace_tso.c", "twospace_tso.h",
+                 "twospace_invocation.c", "twospace_invocation.h"):
         manifest["source_sha256"]["pdos/src/" + name] = digest(src.parent.parent / "src" / name)
     for name in ("dat.c", "dat_emit.c", "placement.c", "gate.c", "memory.c",
                  "channel.c", "dataset.c", "cms.c", "cmsfile.c",
