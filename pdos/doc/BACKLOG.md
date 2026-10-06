@@ -198,6 +198,11 @@ The [subchannel clear check](qualification/TWO-SPACE-CHANNEL-CLEAR-2026-10-06.md
 adds event-verified CSCH/TSCH completion and an absent-device failure path.
 An in-flight terminal cancellation and late-completion retry are still P1
 gates.
+The [nested lowcore check](qualification/TWO-SPACE-INVOCATION-LOWCORE-2026-10-06.md)
+saves the parent's U compatibility page in K real storage and restores it on
+child return. Its fresh IPL also caught and corrected an overbroad top-level
+reset that erased a prepared CMS FST. Unchanged native parent/child calls,
+fault unwind and independent top-level personality transitions remain open.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and

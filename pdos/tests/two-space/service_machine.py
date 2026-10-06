@@ -265,6 +265,14 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
     checks["k_terminal_clear_completion"] = (
         struct.unpack_from(">I",raw,0x123f0)[0] ==
         (0 if ipl else 8))
+    parent_begin, parent_token, child_begin, child_token, child_initial, \
+        child_end, parent_restored, parent_end = struct.unpack_from(
+            ">8I",raw,0x123f4)
+    checks["nested_invocation_lowcore_restored"] = (
+        (parent_begin == child_begin == child_initial ==
+         child_end == parent_end == 0 and parent_restored == 0x5a and
+         parent_token != 0 and child_token > parent_token)
+        if ipl else parent_begin == 8)
     checks["absent_subchannel_fails_without_wait"] = (
         struct.unpack_from(">I",raw,0x121c4)[0] == 0)
     checks["k_cms24_module_header"] = (

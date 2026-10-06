@@ -474,6 +474,53 @@ wide_heap_done:
     larl %r4, wide_heap_restore_gprs
     lmg %r8, %r9, 0(%r4)
     br %r14
+nested_lowcore_probe:
+    lghi %r0, 5            /* parent TSO31: nested lowcore must be private */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 235
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3f4(%r2)
+    st %r1, 0x3f8(%r2)
+    chi %r15, 0
+    jne nested_lowcore_done
+    lghi %r4, 0x3a0
+    mvi 0(%r4), 0x5a       /* parent-private lowcore byte */
+    lghi %r0, 5
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 235
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3fc(%r2)
+    st %r1, 0x400(%r2)
+    chi %r15, 0
+    jne nested_lowcore_parent_end
+    lghi %r4, 0x3a0
+    llgc %r3, 0(%r4)
+    st %r3, 0x404(%r2)    /* child sees clean template */
+    mvi 0(%r4), 0xa5
+    lghi %r0, 0
+    llgf %r1, 0x400(%r2)
+    lghi %r2, 0
+    svc 236
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x408(%r2)
+    lghi %r4, 0x3a0
+    llgc %r3, 0(%r4)
+    st %r3, 0x40c(%r2)    /* parent byte restored after child */
+nested_lowcore_parent_end:
+    lghi %r0, 0
+    llgf %r1, 0x3f8(%r2)
+    lghi %r2, 0
+    svc 236
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x410(%r2)
+nested_lowcore_done:
+    br %r14
 .section .apphigh,"ax"
 wide_heap_code_end:
     lghi %r0, 0             /* K reads VOL1 through its real channel buffer */
@@ -1174,6 +1221,7 @@ tso24_release_page:
     lg %r2, 0(%r2)
     st %r15, 0x330(%r2)
 tso24_call_done:
+    brasl %r14, nested_lowcore_probe
     lghi %r0, 7            /* no K image record: deterministic failure */
     lghi %r1, 0
     lghi %r2, 0

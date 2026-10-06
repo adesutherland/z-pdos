@@ -17,6 +17,8 @@
 static unsigned int user_rights(unsigned int frame, void *unused);
 static unsigned int cms_word(const unsigned char *p);
 static void cms_put_word(unsigned char *p, unsigned int value);
+static int native_clean(unsigned int token, const TSVRESOURCE *resource,
+                        void *context);
 static TSDSTATE u_tables;
 static TSMSTATE storage;
 static TSCSTATE channel;
@@ -33,6 +35,9 @@ static unsigned int tso31_loaded;
 static unsigned int tso64_loaded;
 static unsigned int tso24_loaded;
 static unsigned int cms31_lowcore_real;
+static unsigned char cms_lowcore_template[4096U];
+static unsigned int cms_lowcore_template_ready;
+#define CMS_LOWCORE_SAVE_OWNER 0x434d5353U
 #define CMS31_LINES_REAL 0x20000U
 #define CMS24_EXTRA_LINES_REAL 0x26000U
 typedef struct {
@@ -492,6 +497,8 @@ static unsigned int cms31_map_service(const TSGREQUEST *request)
     pc[0x100bU]=0xa0U;
     *(volatile unsigned int *)0x40f8U=lowcore_real;
     cms31_lowcore_real=lowcore_real;
+    for (i=0U; i<4096U; ++i) cms_lowcore_template[i]=lowcore[i];
+    cms_lowcore_template_ready=1U;
     *(volatile unsigned int *)0x40e0U=real;
     *(volatile unsigned int *)0x40e4U=entry;
     *(volatile unsigned int *)0x40e8U=info.image_bytes;
@@ -913,8 +920,10 @@ static const TSVFRAME *native_caller(unsigned int pc)
 static unsigned int native_begin(TSGREQUEST *request)
 {
     TSVCONTEXT caller;
-    unsigned int i, mode, token, personality, image_owner;
+    unsigned int i, mode, token, personality, image_owner, saved_real=0U;
     unsigned int runtime_owner;
+    unsigned char *lowcore=(unsigned char *)TSF_KAPERTURE_VA+
+                           cms31_lowcore_real;
     volatile const unsigned int *saved=(volatile const unsigned int *)0x3000U;
     int rc;
     /* The selector names a checked K image record. R0 never declares a
@@ -958,6 +967,28 @@ static unsigned int native_begin(TSGREQUEST *request)
                 image_owner,runtime_owner,
                 &caller,&token);
     if (rc!=TSV_OK) return rc==TSV_FULL ? 4U : 8U;
+    if (cms_lowcore_template_ready && native_invocations.depth>1U) {
+        if (TSRALLOC(&storage.real,CMS_LOWCORE_SAVE_OWNER,4096U,
+                     TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,
+                     &saved_real)!=TSR_OK) {
+            rc=TSVEND(&native_invocations,token,native_clean,
+                      &native_invocations.frame[
+                        native_invocations.depth-1U]);
+            return rc==TSV_OK ? 4U : 12U;
+        }
+        for (i=0U; i<4096U; ++i)
+            ((unsigned char *)TSF_KAPERTURE_VA+saved_real)[i]=lowcore[i];
+        if (TSVOWN(&native_invocations,token,TSV_LOWCORE,saved_real)
+            !=TSV_OK) {
+            if (TSRRELEASE(&storage.real,CMS_LOWCORE_SAVE_OWNER,
+                           saved_real)!=TSR_OK) return 12U;
+            rc=TSVEND(&native_invocations,token,native_clean,
+                      &native_invocations.frame[
+                        native_invocations.depth-1U]);
+            return rc==TSV_OK ? 4U : 12U;
+        }
+        for (i=0U; i<4096U; ++i) lowcore[i]=cms_lowcore_template[i];
+    }
     cms_heaps[native_invocations.depth-1U].address.hi=0U;
     cms_heaps[native_invocations.depth-1U].address.lo=0U;
     cms_heaps[native_invocations.depth-1U].bytes=0U;
@@ -974,6 +1005,18 @@ static int native_clean(unsigned int token, const TSVRESOURCE *resource,
     unsigned int i;
     (void)token;
     if (!frame || !resource) return 1;
+    if (resource->kind==TSV_LOWCORE) {
+        unsigned char *saved=(unsigned char *)TSF_KAPERTURE_VA+
+                             resource->handle;
+        unsigned char *lowcore=(unsigned char *)TSF_KAPERTURE_VA+
+                               cms31_lowcore_real;
+        if (!cms31_lowcore_real || !cms_lowcore_template_ready ||
+            resource->handle<TSF_CORE_BYTES ||
+            resource->handle>TSF_REAL_BYTES-4096U) return 1;
+        for (i=0U; i<4096U; ++i) lowcore[i]=saved[i];
+        return TSRRELEASE(&storage.real,CMS_LOWCORE_SAVE_OWNER,
+                          resource->handle)==TSR_OK ? 0 : 1;
+    }
     if (resource->kind==TSV_FILE) {
         unsigned int owner;
         if (resource->handle>=1U && resource->handle<=TSI_SLOTS) {

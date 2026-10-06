@@ -187,6 +187,11 @@ The [clear helper](../qualification/TWO-SPACE-CHANNEL-CLEAR-2026-10-06.md)
 has a guest-verified CSCH completion on an idle 3270 and a failing absent
 subchannel. Terminal-read cancellation during an active channel program and
 ownership transfer on nested invocation still need guest proof.
+The [nested lowcore gate](../qualification/TWO-SPACE-INVOCATION-LOWCORE-2026-10-06.md)
+stores a suspended parent's U compatibility page in a K-owned real frame,
+installs the child template, then restores the parent page on child end. It
+does not use another low U page. Separate top-level personality reset and
+abnormal-exit restoration remain open.
 
 ## Step 1: address and transition contract
 
