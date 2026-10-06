@@ -67,6 +67,9 @@ The later [released beta 3 TSO24 native result](../qualification/TWO-SPACE-TSO24
 enters the unchanged AMODE24 image, displays its EBCDIC version line and
 releases its stack, output buffer, heap and parameter page. This does not
 change the selected one-ASCE release kernel.
+The same result also verifies that an occupied fixed low interval makes the
+loader return RC 4 without publishing an image, and that release and retry
+allow the unchanged TSO24 program to run.
 
 ## The system at a glance
 

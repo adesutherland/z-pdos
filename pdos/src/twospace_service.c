@@ -1252,6 +1252,10 @@ static unsigned int tso_map_service(const TSGREQUEST *request,
     rc=TSMALLOC(&storage,task,mode,base,maximum,
                 info.image_bytes,1,&mapped);
     if (rc!=TSM_OK) {
+        if (mode==24U) {
+            *(volatile unsigned int *)0x4ce0U=receipt[0U];
+            *(volatile unsigned int *)0x4ce4U=tso24_loaded;
+        }
         failure=(rc==TSM_NOMEM || rc==TSM_COLLISION) ? 4 : 12;
         goto bad_image;
     }

@@ -193,6 +193,12 @@ parameter page. The full low-only demand returns RC 4 with no above-line
 fallback. This closes the selected native version-call and measured runtime
 budget gate. General TSO file/input and command services, REXX `ADDRESS`/LINK,
 and the normal successor image remain open.
+The same [beta 3 qualification](qualification/TWO-SPACE-TSO24-BETA3-NATIVE-2026-10-06.md)
+subsequently adds a guest loader-collision control: a live low allocation
+covering the fixed origin causes RC 4 with no image published; releasing it
+allows the unchanged member to load and run. The optional TSO24-absent IPL
+still passes. This directly exercises the rule that appropriate storage
+shortage is an error, not a reason to evict or move a 24-bit application.
 
 The [6 October K channel checkpoint](qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
 adds a reserved 64 KiB low-real K workspace and a bounded post-handover

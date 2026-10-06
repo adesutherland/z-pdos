@@ -274,6 +274,7 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
           (2 * ((0x08000000 // 4096) + (0x00100000 // 4096) +
                 (0x00010000 // 4096) + 1 + 1) if ipl else 0)
           if tso64 else 0) +
+         (2 * (0x00300000 // 4096) if ipl and tso64 else 0) +
          (((1096496 + 4095) // 4096) +
           (2 * (1 + (0x00100000 // 4096) + 1 +
                 (0x00400000 // 4096)) if ipl else 0)

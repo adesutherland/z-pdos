@@ -932,6 +932,39 @@ tso31_call_done:
     lg %r2, 0(%r2)
     st %r15, 0x308(%r2)
 tso64_call_done:
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    l %r3, 0x2f4(%r2)
+    chi %r3, 0
+    jne tso24_collision_done
+    lghi %r0, 3
+    sllg %r0, %r0, 20
+    lghi %r1, 0
+    lghi %r15, 0x10
+    svc 120                 /* occupy the fixed TSO24 low interval */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    stg %r1, 0x338(%r2)
+    st %r15, 0x340(%r2)
+    stg %r0, 0x350(%r2)
+    chi %r15, 0
+    jne tso24_collision_done
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 234                 /* normal loader must report collision */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x344(%r2)
+    lghi %r0, 3
+    sllg %r0, %r0, 20
+    lg %r1, 0x338(%r2)
+    lghi %r15, 0x10
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x348(%r2)
+tso24_collision_done:
     lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0

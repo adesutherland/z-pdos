@@ -506,6 +506,15 @@ def run(args):
                     "crexx-1.0.0-beta.3 (Bytecode Mode)" in
                     raw[0x4d10:0x4d10+tso_length].decode("cp037"))
             if args.tso24:
+                blocker, blocker_rc, denied_rc, release_rc = \
+                    struct.unpack_from(">Q3I",raw,0x12338)
+                checks["tso24_loader_rejects_low_collision_then_retries"] = (
+                    blocker_rc == release_rc == 0 and denied_rc == 4 and
+                    struct.unpack_from(">2I",raw,0x4ce0) == (0,0) and
+                    struct.unpack_from(">Q",raw,0x12350)[0] == 0x300000 and
+                    0x20000 <= blocker <= 0x400000 and
+                    blocker+0x300000 > 0x400000 and
+                    page_unmapped(raw,0x28000f,blocker))
                 t24_real, t24_bytes, t24_entry, t24_blocks, t24_input, \
                     t24_image = struct.unpack_from(">6I",raw,0x4680)
                 t24_pages = (t24_bytes+4095)//4096

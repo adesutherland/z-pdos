@@ -562,6 +562,12 @@ stack, 256-byte output buffer, 4 MiB heap and low parameter page. The
 diagnostic IPL also rejects a full 16 MiB low-only storage request with RC 4
 and no above-line fallback. This proves one bounded native execution case;
 general load, command and file behavior remain open.
+The later direct collision control places a temporary 3 MiB low allocation
+over TSO24's fixed origin. The load returns RC 4 without publishing the
+image, then succeeds after that allocation is released. The program's
+version call and low runtime storage still pass. The ordinary loader may
+keep programs resident when suitable space exists; it has no obligation to
+keep all applications loaded at once.
 
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its

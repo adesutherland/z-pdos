@@ -50,6 +50,14 @@ control separately covers low virtual exhaustion while 31-bit space remains
 free. Normal loading must preserve existing mappings when room exists and
 return an explicit error when suitable virtual or real storage does not.
 
+A subsequent direct loader control reserved a 3 MiB low-U interval beginning
+at `0x1bb000`, which covers the TSO24 fixed origin. The first SVC 234 load
+returned RC 4; its image receipt and loaded state remained zero. The caller
+released that blocker, retried the identical released image, then entered it
+normally with RC 0. Its stack, buffer, heap and parameter page were all
+released as before. This checks a real loader collision and successful reuse,
+without evicting another resident program or promoting storage above 16 MiB.
+
 The ASAN/UBSAN host materializer and Classic C31 build passed under
 `build/pdos/tso24-beta3-host/`. The source-built diskless gate passed 89/89
 checks at `build/pdos/tso24-native-build-final/run/receipt.json`. The fresh
@@ -64,6 +72,18 @@ before and after IPL. The profile was one model-2064 ESAME CPU, 256 MiB
 real storage, 3390 `01B9`, 3270 `0009`, local GNU binutils 2.47,
 maintained Classic C/Assembler/Linker and local Hercules. Guest completion
 events determined success; elapsed limits only detected stalls.
+
+With the direct collision control, the diskless gate passed 89/89 at
+`build/pdos/tso24-collision-build3/run/receipt.json`; the fresh TSO24 IPL
+passed 130/130 at `build/pdos/tso24-collision-ipl2/run/receipt.json`. The
+optional IPL without a TSO24 dataset passed 126/126 at
+`build/pdos/tso24-collision-optional-ipl/run/receipt.json`. Both IPLs used
+source core SHA-256
+`d860af6235cded0c56d45d84486735358aa0bbc1c5dc0d9b5f561ed3b453d18e`.
+The TSO24 IPL disk SHA-256 was
+`443f3562a81ed47ad9d1206eccb616dbc6958b8cd2966ce413078862fa620c3b`
+before and after boot. The same event-driven completion and stall watchdog
+policy applied.
 
 An earlier local TSO24 candidate, XMI SHA-256 `4159d4e6...`, returned RC 0
 but sent ASCII CLI version bytes directly to TPUT. It is not the released
