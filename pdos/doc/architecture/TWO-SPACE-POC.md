@@ -187,8 +187,11 @@ The [clear helper](../qualification/TWO-SPACE-CHANNEL-CLEAR-2026-10-06.md)
 has a guest-verified CSCH completion on an idle 3270 and a failing absent
 subchannel. The [terminal owner gate](../qualification/TWO-SPACE-TERMINAL-OWNER-2026-10-06.md)
 then binds a waiting read to its invocation, rejects child cancellation and
-clears the subchannel before transferring its lease. In-flight READ MODIFIED
-cancellation and late status isolation still need guest proof.
+clears the subchannel before transferring its lease. The
+[post-start retry gate](../qualification/TWO-SPACE-TERMINAL-RETRY-2026-10-06.md)
+clears after a real AID started READ MODIFIED and reads a second AID after a
+distinct screen event. A physically in-flight cancellation and injected late
+status after owner exit still need guest proof.
 The [nested lowcore gate](../qualification/TWO-SPACE-INVOCATION-LOWCORE-2026-10-06.md)
 stores a suspended parent's U compatibility page in a K-owned real frame,
 installs the child template, then restores the parent page on child end. It

@@ -262,6 +262,11 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
     checks["k_terminal_read_finish"] = (
         struct.unpack_from(">I",raw,0x1206c)[0] ==
         (0 if ipl else 0xfffffffb))
+    phase, cancelled, redrawn, restarted = struct.unpack_from(
+        ">4I",raw,0x1243c)
+    checks["post_start_cancel_clear_and_fresh_retry"] = (
+        (phase == 2 and cancelled == redrawn == restarted == 0)
+        if ipl else phase == cancelled == redrawn == restarted == 0)
     checks["k_terminal_clear_completion"] = (
         struct.unpack_from(">I",raw,0x123f0)[0] ==
         (0 if ipl else 8))

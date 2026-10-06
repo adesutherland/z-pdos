@@ -170,6 +170,21 @@ def run(args):
         input_sent = typed.returncode == 0 and entered.returncode == 0
         if not input_sent:
             raise RuntimeError("3270 PING entry failed")
+        def retry_screen():
+            try:
+                observed = terminal_action(script_port, "Ascii()")
+                return observed.stdout if observed.returncode == 0 and \
+                    "K RETRY READY" in observed.stdout else None
+            except subprocess.TimeoutExpired:
+                return None
+        retry_view = await_condition(retry_screen, 30, "post-clear retry screen")
+        out.joinpath("terminal.retry-screen").write_text(retry_view)
+        retry_typed = terminal_action(script_port, 'String("PING")')
+        retry_entered = terminal_action(script_port, "Enter()")
+        retry_input_sent = (retry_typed.returncode == 0 and
+                            retry_entered.returncode == 0)
+        if not retry_input_sent:
+            raise RuntimeError("3270 retry PING entry failed")
         await_wait_state(events, proc, out / "console.log")
         shown = terminal_action(script_port, "Ascii()")
         if shown.returncode == 0:
@@ -230,6 +245,7 @@ def run(args):
             judged["checks"]["k_terminal_screen_observed"] = (
                 "K SERVICE READY" in (out / "terminal.screen").read_text())
             judged["checks"]["terminal_input_sent"] = input_sent
+            judged["checks"]["terminal_retry_input_sent"] = retry_input_sent
             if args.cms24file and not args.tso31:
                 judged["checks"]["cms24_io24_summary_on_3270"] = (
                     "C24 SUMMARY: PASS=6 FAIL=0 SKIP=1" in

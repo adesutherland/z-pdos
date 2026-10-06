@@ -208,6 +208,11 @@ binds a pending read to its invocation, prevents a nested child from
 cancelling it, and clears the subchannel before giving it to another owner.
 The fresh IPL passes the waiting-for-attention case. In-flight cancellation,
 late completion and retry remain open.
+The [post-start cancellation check](qualification/TWO-SPACE-TERMINAL-RETRY-2026-10-06.md)
+now uses a real AID, clears after READ MODIFIED was submitted, redraws and
+reads a second AID. It caught and fixed repeated subchannel enable on redraw.
+Physical in-flight ordering, injected late completion after owner exit,
+failed start and child-fault unwind remain open P1 cases.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and

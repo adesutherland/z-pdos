@@ -719,11 +719,20 @@ static unsigned int terminal_service(const TSGREQUEST *request)
         0xd2U,0x40U,0xe2U,0xc5U,0xd9U,0xe5U,0xc9U,0xc3U,0xc5U,
         0x40U,0xd9U,0xc5U,0xc1U,0xc4U,0xe8U
     };
+    static const unsigned char retry_message[] = {
+        0xd2U,0x40U,0xd9U,0xc5U,0xe3U,0xd9U,0xe8U,0x40U,
+        0xd9U,0xc5U,0xc1U,0xc4U,0xe8U
+    };
+    const unsigned char *label;
+    unsigned int label_length;
     unsigned char *screen;
     unsigned int ssid, i;
     int io_result;
-    if (request->length || request->address.hi || request->address.lo ||
+    if (request->length>1U || request->address.hi || request->address.lo ||
         request->direction) return 8U;
+    label=request->length ? retry_message : message;
+    label_length=request->length ? (unsigned int)sizeof retry_message :
+                                   (unsigned int)sizeof message;
     if (*(volatile const unsigned int *)0x40bcU == 0U) return 0xfffffffbU;
     ssid=0U;
     for (i=0U; i<256U; ++i) {
@@ -738,12 +747,13 @@ static unsigned int terminal_service(const TSGREQUEST *request)
     for (i=0U; i<1773U; ++i) screen[i]=0x40U;
     screen[0]=0xc3U; screen[1]=0x11U; screen[2]=0x5dU;
     screen[3]=0x7fU; screen[4]=0x1dU; screen[5]=0xf0U;
-    for (i=0U; i<sizeof message; ++i) screen[6U+i]=message[i];
+    for (i=0U; i<label_length; ++i) screen[6U+i]=label[i];
     screen[1766]=0x1dU; screen[1767]=0U; screen[1768]=0x13U;
     screen[1769]=0x3cU; screen[1770]=0x5dU; screen[1771]=0x7fU;
     screen[1772]=0U;
     if (TSCBUILDCONSWRITE(&console_channel,1773U) != TSC_OK) return 20U;
-    if (TSCENABL(ssid,TSCSCHIB(&console_channel)) != 0) return 23U;
+    if (!console_ssid &&
+        TSCENABL(ssid,TSCSCHIB(&console_channel)) != 0) return 23U;
     io_result=TSCIO(ssid,TSCORB(&console_channel),TSCIRB(&console_channel));
     *(volatile unsigned int *)0x40c4U=(unsigned int)io_result;
     if (io_result != 0) return 21U;
@@ -895,6 +905,13 @@ static unsigned int terminal_cancel_probe(const TSGREQUEST *request)
     if (request->length || request->address.hi || request->address.lo ||
         request->direction) return 8U;
     return terminal_read_cancel(frame ? frame->token : 0U);
+}
+
+static unsigned int terminal_phase_probe(const TSGREQUEST *request)
+{
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    return console_read_phase;
 }
 
 /* Diagnostic selector only: an absent subchannel must fail immediately,
@@ -2309,6 +2326,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 237U) return native_reap_probe(request);
     if (request->svc == 239U) return terminal_clear_probe(request);
     if (request->svc == 240U) return terminal_cancel_probe(request);
+    if (request->svc == 241U) return terminal_phase_probe(request);
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 223U) return high_storage_service(request);
     if (request->svc == 233U) return iarv64_service(request);

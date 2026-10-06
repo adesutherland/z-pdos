@@ -589,29 +589,7 @@ terminal_owner_parent_end:
     st %r15, 0x438(%r2)
 terminal_owner_done:
     br %r14
-.section .apphigh,"ax"
-wide_heap_code_end:
-    lghi %r0, 0             /* K reads VOL1 through its real channel buffer */
-    lghi %r1, 0
-    lghi %r2, 0
-    svc 206
-    larl %r2, high_data_va
-    lg %r2, 0(%r2)
-    st %r15, 92(%r2)
-    lghi %r0, 0             /* K resolves KCORE.BIN in checked VTOC */
-    lghi %r1, 0
-    lghi %r2, 0
-    svc 207
-    larl %r2, high_data_va
-    lg %r2, 0(%r2)
-    st %r15, 96(%r2)
-    lghi %r0, 0             /* K writes a complete 3270 screen */
-    lghi %r1, 0
-    lghi %r2, 0
-    svc 208
-    larl %r2, high_data_va
-    lg %r2, 0(%r2)
-    st %r15, 100(%r2)
+terminal_inflight_probe:
     lghi %r0, 0             /* Begin asynchronous K-owned 3270 read */
     lghi %r1, 0
     lghi %r2, 0
@@ -635,11 +613,82 @@ terminal_read_poll:
     lghi %r2, 2
     svc 210
     chi %r15, 1
+    jne terminal_read_done
+    lghi %r0, 0             /* wait for a real AID to start READ MODIFIED */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 241
+    chi %r15, 1
     je terminal_read_poll
+    chi %r15, 2
+    jne terminal_read_done
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x43c(%r2)
+    lghi %r0, 0             /* cancel after SSCH, before consuming result */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 240
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x440(%r2)
+    chi %r15, 0
+    jne terminal_read_done
+    lghi %r0, 1             /* distinct screen is the retry input event */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 208
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x444(%r2)
+    chi %r15, 0
+    jne terminal_read_done
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 209
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x448(%r2)
+    chi %r15, 0
+    jne terminal_read_done
+terminal_retry_poll:
+    lghi %r0, 256
+    larl %r1, input_data_va
+    lg %r1, 0(%r1)
+    lghi %r2, 2
+    svc 210
+    chi %r15, 1
+    je terminal_retry_poll
 terminal_read_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 108(%r2)
+    br %r14
+.section .apphigh,"ax"
+wide_heap_code_end:
+    lghi %r0, 0             /* K reads VOL1 through its real channel buffer */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 206
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 92(%r2)
+    lghi %r0, 0             /* K resolves KCORE.BIN in checked VTOC */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 207
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 96(%r2)
+    lghi %r0, 0             /* K writes a complete 3270 screen */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 208
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 100(%r2)
+    brasl %r14, terminal_inflight_probe
     lghi %r0, 0             /* idle clear needs its own TSCH completion */
     lghi %r1, 0
     lghi %r2, 0
@@ -1529,6 +1578,8 @@ trace_not_cms_fst:
     chi %r2, 239
     je storage_no_record
     chi %r2, 240
+    je storage_no_record
+    chi %r2, 241
     je storage_no_record
     chi %r2, 93
     je storage_no_record
