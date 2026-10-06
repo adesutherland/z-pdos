@@ -171,9 +171,12 @@ entry and service behavior remain open.
 The [K service-capacity checkpoint](qualification/TWO-SPACE-K-SERVICE-CAPACITY-2026-10-06.md)
 reserves 32 K-only C31 pages with guest-built DAT and moves the K trampoline
 above them. It leaves the U 24-bit gap and U31 heap minimum unchanged.
-TSO64's native IARV64 stacking program call still needs a cross-space entry,
-checked U parameter handling and dynamically backed high U storage before
-native execution can count as qualified.
+The [native TSO64 ANY checkpoint](qualification/TWO-SPACE-TSO64-NATIVE-2026-10-06.md)
+now runs unchanged RXVM `-v` through the selected IARV64 stacking PC-cp and
+TPUT paths. K validates the U parameter list, owns its 128 MiB high-U heap,
+and observes its DETACH before a separate wide-heap workload. This closes
+the narrow version-call gate, not the broader TSO command/file service,
+RMODE HIGH, abnormal-exit cleanup or native TSO24 gates.
 
 The [6 October K channel checkpoint](qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
 adds a reserved 64 KiB low-real K workspace and a bounded post-handover

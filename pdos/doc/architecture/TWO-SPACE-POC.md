@@ -519,6 +519,17 @@ at this checkpoint, so the added capacity is a mapped and isolated budget,
 not an implemented program-call service. No U virtual page below 16 MiB is
 consumed.
 
+The [native TSO64 ANY checkpoint](../qualification/TWO-SPACE-TSO64-NATIVE-2026-10-06.md)
+now enters the unchanged RXVM `-v` image and returns RC 0. Its IARV64
+version-zero stacking program call uses U-owned CVT/SFT lowcore pointers,
+an U `SVC 233; PR` veneer, and K-owned ASTE/linkage-stack control storage.
+The AMODE64 nucleus handles the PC transition, while the Classic C31
+service validates and copies the 88-byte U parameter list and owns the
+128 MiB high-U mapping. The native DETACH releases it before a separate
+wide-heap workload; the checked U 24-bit gap is unchanged. This is a
+selected TSO64 service and version-call result, not general IARV64 or TSO
+compatibility. The K C31 service is 64,774 bytes in the 128 KiB slot.
+
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
 SVC through K, returns `0x3456` to a U64 caller, restores the parent PTEs,

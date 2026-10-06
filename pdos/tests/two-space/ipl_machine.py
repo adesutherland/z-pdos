@@ -183,8 +183,20 @@ def run(args):
         reader.join(timeout=2)
     except (TimeoutError, RuntimeError, subprocess.TimeoutExpired) as exc:
         if proc is not None and proc.poll() is None:
-            proc.kill()
-            proc.wait()
+            # A failed guest still leaves useful exact interruption and DAT
+            # state. Stop the disposable machine by event/control command;
+            # kill it only when that bounded diagnostic path cannot finish.
+            try:
+                if proc.stdin and not proc.stdin.closed:
+                    proc.stdin.write("stopall\npsw\ngpr\ncr\n"
+                        f"savecore \"{out / 'failure.core'}\" 0 fffffff\nquit\n")
+                    proc.stdin.flush()
+                    proc.stdin.close()
+                proc.wait(timeout=10)
+                reader.join(timeout=2)
+            except (BrokenPipeError, OSError, subprocess.TimeoutExpired):
+                proc.kill()
+                proc.wait()
         failure = str(exc)
     finally:
         terminal.terminate()
@@ -459,18 +471,38 @@ def run(args):
                 tso_real, tso_bytes, tso_entry, tso_blocks, tso_input_fnv = \
                     struct.unpack_from(">5I",raw,0x4640)
                 tso_pages = (tso_bytes+4095)//4096
-                tso_hash = 0x811c9dc5
-                if tso_real and tso_real+tso_bytes <= len(raw):
-                    for value in raw[tso_real:tso_real+tso_bytes]:
-                        tso_hash = ((tso_hash ^ value)*0x01000193) & 0xffffffff
+                tso_map_hash = struct.unpack_from(">I",raw,0x4654)[0]
                 checks["tso64_any_checked_image_in_shared_u"] = (
                     struct.unpack_from(">I",raw,0x122f4)[0] == 0 and
                     tso_real >= 0x400000 and tso_bytes == 767728 and
                     tso_entry == 0x09000000 and tso_blocks == 45 and
                     tso_input_fnv == 0x007eda54 and
-                    tso_hash == 0x94d5943a and
+                    tso_map_hash == 0x94d5943a and
                     all(page_real(raw,0x28000f,0x09000000+i*4096) ==
                         tso_real+i*4096 for i in range(tso_pages)))
+                tso_arg, tso_alloc, tso_rc, tso_free = struct.unpack_from(
+                    ">Q3I",raw,0x122f8)
+                tso_lines, tso_length, tso_unknown, _ = struct.unpack_from(
+                    ">4I",raw,0x4d00)
+                tso_attempts, tso_requested = struct.unpack_from(
+                    ">2I",raw,0x4da0)
+                iarv_calls, iarv_last_op, _, iarv_hi, iarv_lo, iarv_detaches = \
+                    struct.unpack_from(">6I",raw,0x4e00)
+                iarv_get_segments = struct.unpack_from(">I",raw,0x4e18)[0]
+                checks["tso64_any_native_rxvm_version"] = (
+                    0x01000000 <= tso_arg < 0x80000000 and
+                    tso_alloc == tso_rc == tso_free == 0 and
+                    page_unmapped(raw,0x28000f,tso_arg) and
+                    tso_attempts >= 1 and tso_requested <= 132 and
+                    (iarv_calls,iarv_last_op,iarv_hi,iarv_lo,iarv_detaches) ==
+                    (2,3,1,0x20000000,1) and
+                    iarv_get_segments == 128 and
+                    page_unmapped(raw,0x28000f,0x120000000) and
+                    page_unmapped(raw,0x28000f,0x127fff000) and
+                    tso_lines >= 1 and tso_unknown == 0 and
+                    0 < tso_length <= 132 and
+                    "crexx-1.0.0-beta.3 (Bytecode Mode)" in
+                    raw[0x4d10:0x4d10+tso_length].decode("cp037"))
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
                 real_bytes == 0x10000000 and stage >= 0x400000 and
                 stage + 0x400000 <= launch and launch + 4096 <= real_bytes and

@@ -90,7 +90,7 @@ def make_core(elf, classic, dat_emit, out):
                              0x9000, 0xa000, 0xb000, 0xc000,
                              0xd000, 0xe000, 0xf000, 0x10000,
                              *(0x14000 + i * 4096 for i in range(11)),
-                             *(0x80000 + i * 4096 for i in range(16))}
+                             *(0x80000 + i * 4096 for i in range(18))}
     if private_kernel_frames.intersection(application.values()):
         raise ValueError("U maps private K real frame")
     if any(0x3e0000 <= pa < 0x400000 for pa in application.values()):
@@ -270,7 +270,10 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
          (((1094960 + 4095) // 4096) +
           2 * ((0x04000000 // 4096) + (0x00100000 // 4096) + 2)
           if tso31 else 0) +
-         (((767728 + 4095) // 4096) if tso64 else 0)) and
+         (((767728 + 4095) // 4096) +
+          (2 * ((0x08000000 // 4096) + (0x00100000 // 4096) +
+                (0x00010000 // 4096) + 1 + 1) if ipl else 0)
+          if tso64 else 0)) and
         0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x160000)
     errors = [x for x in log.splitlines() if re.search(r"HHC\d{5}E\b", x)]
     checks["no_hercules_error"] = not errors

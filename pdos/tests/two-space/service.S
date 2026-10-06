@@ -41,6 +41,11 @@ after_synthetic_external:
     stg %r4, 0x178
     j io_entry                   /* hardware I/O needs a later device test */
 after_synthetic_io:
+    larl %r1, pc_control_words
+    lctlg %c3, %c3, 0(%r1)
+    lctlg %c5, %c5, 8(%r1)
+    lctlg %c13, %c13, 16(%r1)
+    lctlg %c15, %c15, 24(%r1)
     lghi %r1, 0x4008
     lctlg %c1, %c1, 0(%r1)
     lghi %r1, 0x4000
@@ -139,6 +144,9 @@ synthetic_machine_dispatch:
     j machine_entry
 .balign 8
 high_real_ptr: .quad 0x12000
+pc_control_words:
+.quad 0x00000000ffff0000, 0x0000000000090000
+.quad 0x000000000010000f, 0x0000000008091008
 synthetic_external_psw:
 .quad 0x0000000180000000, after_synthetic_external
 synthetic_io_psw:
@@ -277,6 +285,18 @@ app_b_tso31_call:
     lgr %r14, %r12
     br %r14
 tso31_entry_va32: .long 0x07000000
+
+.balign 8
+app_b_tso64_call:
+    lgr %r12, %r14
+    larl %r3, tso64_entry_va32
+    l %r3, 0(%r3)
+    lgr %r15, %r3
+    basr %r14, %r3       /* unchanged entry returns in AMODE31 */
+    sam64
+    lgr %r14, %r12
+    br %r14
+tso64_entry_va32: .long 0x09000000
 
 .section .apphigh,"ax"
 app_high:
@@ -876,6 +896,42 @@ tso31_call_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x2f4(%r2)
+    chi %r15, 0
+    jne tso64_call_done
+    lghi %r0, 4096
+    lghi %r1, 0
+    lghi %r15, 0x30
+    svc 120                 /* U31 parameter/save page for native TSO64 */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    stg %r1, 0x2f8(%r2)
+    st %r15, 0x300(%r2)
+    chi %r15, 0
+    jne tso64_call_done
+    lgr %r10, %r1
+    la %r4, 64(%r10)
+    st %r4, 0(%r10)
+    mvi 64(%r10), 0
+    mvi 65(%r10), 2
+    mvi 66(%r10), 0x60
+    mvi 67(%r10), 0xa5
+    xc 256(144,%r10),256(%r10)
+    la %r13, 256(%r10)
+    lgr %r1, %r10
+    larl %r4, tso64_trampoline_va
+    lg %r4, 0(%r4)
+    basr %r14, %r4
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x304(%r2)
+    lghi %r0, 4096
+    lgr %r1, %r10
+    lghi %r15, 0x30
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x308(%r2)
+tso64_call_done:
     brasl %r14, wide_heap_workload
     larl %r3, high_data_va
     lg %r3, 0(%r3)
@@ -918,6 +974,7 @@ cms24_image_va: .quad 0x20000
 cms31_trampoline_va: .quad app_b_cms31_call
 cms31_second_trampoline_va: .quad app_b_cms31_second_call
 tso31_trampoline_va: .quad app_b_tso31_call
+tso64_trampoline_va: .quad app_b_tso64_call
 forged_va: .quad 0x100021000
 cross_va: .quad 0x110001ffe
 write_va: .quad 0x110001024
@@ -1055,6 +1112,8 @@ trace_not_cms_fst:
     je storage_no_record
     chi %r2, 232
     je storage_no_record
+    chi %r2, 233
+    je storage_no_record
     chi %r2, 93
     je storage_no_record
     lghi %r1, 0x2000
@@ -1153,6 +1212,10 @@ no_fst_cursor:
     llgf %r2, 0(%r1)
     lghi %r3, 0x3000
     stg %r2, 120(%r3)       /* application R15 result */
+    l %r4, 0xa0(%r3)
+    chi %r4, 233
+    jne return_app
+    stg %r2, 0(%r3)         /* PC-cp also returns a reason code in R0 */
 return_app:
     larl %r1, resume_va
     lg %r1, 0(%r1)

@@ -13,7 +13,8 @@ for what has run.
 
 The two-address-space successor, its K64/C31/shared-U proofs, checked guest-DAT
 IPL, bounded interruption/service gate, live storage, K-owned channel and
-terminal operations, dual CMS image maps and wide heaps are in
+terminal operations, CMS and TSO image maps, native version calls and wide
+heaps are in
 [the two-space PoC contract](TWO-SPACE-POC.md).
 The current released disk-boot kernel described below has not yet adopted
 that layout.
@@ -41,18 +42,19 @@ uses a fresh fixed-origin overlay and profile-specific K file state, with its
 13,914,112-byte low U placement gap restored after the call. The successor
 also has [bounded per-file CMS input cursors](../qualification/TWO-SPACE-CMS-CURSORS-2026-10-06.md)
 in K real storage, so a second open input does not discard the first cursor.
-The successor
-still lacks persistent output, general CMS/TSO file
+The successor still lacks persistent output, general CMS/TSO file
 and command adapters, REXX `ADDRESS` calls and the explicitly selected
 replacement image. A post-qualification review will decide whether CMS
 and TSO continue to share one U ASCE.
 The [native TSO loader-core check](../qualification/TWO-SPACE-TSO-LOADER-2026-10-06.md)
-matches the existing TSO31 materialized image at two bases; guest staging,
-mapping and TSO execution were then separate gates. The
+matches the existing TSO31 materialized image at two bases. The
 [fresh-IPL TSO31 map](../qualification/TWO-SPACE-TSO31-MAP-2026-10-06.md)
 now places the unchanged native image at U `0x07000000` beside CMS24 and both
-CMS31 images without consuming the 24-bit U placement gap. TSO execution and
-MVS-style service compatibility remain open.
+CMS31 images without consuming the 24-bit U placement gap. Unchanged
+[TSO31](../qualification/TWO-SPACE-TSO31-NATIVE-2026-10-06.md) and
+[TSO64 ANY](../qualification/TWO-SPACE-TSO64-NATIVE-2026-10-06.md) RXVM
+version calls now run through selected MVS-style storage and terminal
+services. Broader TSO service compatibility remains open.
 
 ## The system at a glance
 

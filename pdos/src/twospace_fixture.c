@@ -55,6 +55,10 @@ int TSFBUILD(unsigned char *core, unsigned int kpool, unsigned int upool,
          TSF_SERVICE_MORE_REAL < kpool+TSF_KPOOL_BYTES) ||
         (upool < TSF_SERVICE_MORE_REAL+TSF_SERVICE_MORE_BYTES &&
          TSF_SERVICE_MORE_REAL < upool+TSF_UPOOL_BYTES) ||
+        (kpool < TSF_PC_REAL+TSF_PC_BYTES &&
+         TSF_PC_REAL < kpool+TSF_KPOOL_BYTES) ||
+        (upool < TSF_PC_REAL+TSF_PC_BYTES &&
+         TSF_PC_REAL < upool+TSF_UPOOL_BYTES) ||
         (kpool < TSF_CHANNEL_REAL+TSF_CHANNEL_BYTES &&
          TSF_CHANNEL_REAL < kpool+TSF_KPOOL_BYTES) ||
         (upool < TSF_CHANNEL_REAL+TSF_CHANNEL_BYTES &&

@@ -14,6 +14,8 @@
 #include "twospace_tso.h"
 
 static unsigned int user_rights(unsigned int frame, void *unused);
+static unsigned int cms_word(const unsigned char *p);
+static void cms_put_word(unsigned char *p, unsigned int value);
 static TSDSTATE u_tables;
 static TSMSTATE storage;
 static TSCSTATE channel;
@@ -411,7 +413,7 @@ static unsigned int cms31_map_service(const TSGREQUEST *request)
     TSHINFO info;
     unsigned int blocks, result, i, real=0U, entry, stage_real;
     unsigned int lowcore_real=0U;
-    unsigned char *lowcore;
+    unsigned char *lowcore, *pc;
     int allocation;
     if (request->length || request->address.hi || request->address.lo ||
         request->direction) return 8U;
@@ -447,18 +449,38 @@ static unsigned int cms31_map_service(const TSGREQUEST *request)
     }
     lowcore=(unsigned char *)TSF_KAPERTURE_VA+lowcore_real;
     for (i=0U; i<4096U; ++i) lowcore[i]=0U;
+    /* Both compatibility pointers live in U-owned lowcore backing. PC-cp
+       enters the U veneer, whose SVC transfers the checked plist to K. */
+    cms_put_word(lowcore+0x10U,0x500U);  /* PSA -> U CVT */
     lowcore[0x16U]=1U;       /* U 0x14 -> U SYSREF 0x100 */
     lowcore[0x10eU]=2U;      /* SYSREF+12 -> U veneer 0x200 */
     lowcore[0x200U]=0x0aU;  /* SVC 205, then BR R14 */
     lowcore[0x201U]=0xcdU;
     lowcore[0x202U]=0x07U;
     lowcore[0x203U]=0xfeU;
+    lowcore[0x400U]=0x0aU;  /* SVC 233, then stacking PROGRAM RETURN */
+    lowcore[0x401U]=0xe9U;
+    lowcore[0x402U]=0x01U;  /* PR; exact opcode checked against GNU as */
+    lowcore[0x403U]=0x01U;
+    cms_put_word(lowcore+0x804U,0xa00U); /* CVT+772 -> U SFT */
     TSKEYSET(lowcore_real,0x80U);
     base.hi=0U; base.lo=0U;
     lowcore_address.hi=0U; lowcore_address.lo=lowcore_real;
     if (TSDMAP(&u_tables,base,lowcore_address)!=TSD_OK) {
         result=12U; goto discard_lowcore;
     }
+    pc=(unsigned char *)TSF_KAPERTURE_VA+TSF_PC_REAL;
+    for (i=0U; i<TSF_PC_BYTES; ++i) pc[i]=0U;
+    cms_put_word(pc+24U,0x80000000U|TSF_PC_REAL+0x100U);
+    for (i=0U; i<32U; ++i)
+        cms_put_word(pc+0x100U+4U*i,0x80000000U);
+    cms_put_word(pc+0x100U,TSF_PC_REAL+0x200U|3U);
+    cms_put_word(pc+0x200U+14U*32U+4U,0x80000400U);
+    cms_put_word(pc+0x200U+14U*32U+8U,0xffff0000U);
+    cms_put_word(pc+0x200U+14U*32U+16U,0x80000000U);
+    pc[0x1008U]=0x09U;
+    pc[0x100aU]=0x0fU;
+    pc[0x100bU]=0xa0U;
     *(volatile unsigned int *)0x40f8U=lowcore_real;
     cms31_lowcore_real=lowcore_real;
     *(volatile unsigned int *)0x40e0U=real;
@@ -825,7 +847,9 @@ static unsigned int storage_service(TSGREQUEST *request)
     pc=*(volatile const unsigned int *)0x308cU;
     task=tso31_loaded && pc>=0x07000000U &&
          pc-0x07000000U<*(volatile const unsigned int *)0x4604U ?
-         16U : 1U;
+         16U : tso64_loaded && pc>=0x09000000U &&
+         pc-0x09000000U<*(volatile const unsigned int *)0x4644U ?
+         17U : 1U;
     if (request->address.hi == 0U && request->address.lo == 0U) {
         if ((flags & 0x30U) == 0x30U) {
             if (mode == 24U) return 4U;
@@ -874,6 +898,67 @@ static unsigned int high_storage_service(TSGREQUEST *request)
     }
     *(volatile unsigned int *)0x4098U=u_tables.used;
     return 0U;
+}
+
+/* The selected IARV64 macro uses a stacking PC-cp to a U veneer. The veneer
+ * invokes SVC 233; this K endpoint owns all translation and real backing.
+ * Only the pinned GETSTOR/DETACH plist subset and 32/128 segment sizes are
+ * accepted. Nothing from U is dereferenced as a K pointer. */
+static unsigned int iarv64_service(const TSGREQUEST *request)
+{
+    TSGCONTEXT gate;
+    TSGREQUEST copy;
+    TSPADDR minimum, maximum, base;
+    unsigned char plist[88], result_bytes[8];
+    unsigned int segments, status, opcode;
+    volatile unsigned int *receipt=(volatile unsigned int *)0x4e00U;
+    if (!tso64_loaded ||
+        (*(volatile const unsigned int *)0x3080U&1U) ||
+        !(*(volatile const unsigned int *)0x3084U&0x80000000U) ||
+        *(volatile const unsigned int *)0x308cU!=0x402U ||
+        request->address.hi || request->address.lo<0x09000000U ||
+        request->address.lo>=0x80000000U-88U) return 8U;
+    gate.u_tables=&u_tables;
+    gate.real_aperture=(unsigned char *)TSF_KAPERTURE_VA;
+    gate.real_bytes=TSF_REAL_BYTES;
+    gate.rights=user_rights;
+    gate.rights_context=0;
+    copy=*request; copy.length=sizeof plist; copy.direction=TSG_READ;
+    if (TSGCOPY(&gate,&copy,plist,sizeof plist)!=TSG_OK ||
+        plist[0]!=0U || !(plist[5]&0x80U) ||
+        cms_word(plist+8U)!=0U) return 8U;
+    opcode=plist[1]; segments=cms_word(plist+12U);
+    receipt[0U]+=1U; receipt[1U]=opcode; receipt[2U]=segments;
+    if (opcode==1U) {
+        if (segments!=32U && segments!=128U) return 8U;
+        receipt[6U]=segments;
+        copy.address.lo+=40U; copy.length=8U; copy.direction=TSG_WRITE;
+        if (TSGPROBE(&gate,&copy)!=TSG_OK) return 8U;
+        minimum.hi=maximum.hi=1U;
+        minimum.lo=0x20000000U; maximum.lo=0x7fffffffU;
+        status=TSMALLOC(&storage,17U,64U,minimum,maximum,
+                       segments*0x100000U,0,&base);
+        if (status!=TSM_OK) return status==TSM_NOMEM ? 4U : 8U;
+        cms_put_word(result_bytes,base.hi);
+        cms_put_word(result_bytes+4U,base.lo);
+        if (TSGCOPY(&gate,&copy,result_bytes,sizeof result_bytes)!=TSG_OK) {
+            if (TSMFREE(&storage,17U,base)!=TSM_OK) return 0xfffffff0U;
+            return 8U;
+        }
+        receipt[3U]=base.hi; receipt[4U]=base.lo;
+        *(volatile unsigned int *)0x4098U=u_tables.used;
+        return 0U;
+    }
+    if (opcode==3U) {
+        base.hi=cms_word(plist+56U);
+        base.lo=cms_word(plist+60U);
+        if (base.hi!=1U || base.lo<0x20000000U ||
+            TSMFREE(&storage,17U,base)!=TSM_OK) return 8U;
+        receipt[5U]+=1U;
+        *(volatile unsigned int *)0x4098U=u_tables.used;
+        return 0U;
+    }
+    return 8U;
 }
 
 static unsigned int cms_word(const unsigned char *p)
@@ -1085,6 +1170,7 @@ static unsigned int tso_map_service(const TSGREQUEST *request,
     unsigned char *stage, *image, *destination;
     unsigned int bytes, blocks, stage_span, stage_real=0U, image_real=0U;
     unsigned int cylinder, head, number, i, j, slot, mapped_real=0U;
+    unsigned int image_fnv=0x811c9dc5U;
     unsigned int task=mode==31U ? 15U : 17U;
     volatile unsigned int *receipt=(volatile unsigned int *)(
         mode==31U ? 0x4600U : 0x4640U);
@@ -1156,7 +1242,10 @@ static unsigned int tso_map_service(const TSGREQUEST *request,
         goto bad_image;
     }
     destination=(unsigned char *)TSF_KAPERTURE_VA+mapped_real;
-    for (i=0U; i<info.image_bytes; ++i) destination[i]=image[i];
+    for (i=0U; i<info.image_bytes; ++i) {
+        destination[i]=image[i];
+        image_fnv=(image_fnv^image[i])*0x01000193U;
+    }
     rc=TSRRELEASE(&storage.real,TSO_IMAGE_OWNER,image_real);
     found=TSRRELEASE(&storage.real,TSO_STAGE_OWNER,stage_real);
     if (rc!=TSR_OK || found!=TSR_OK) return 0xfffffff0U;
@@ -1165,6 +1254,7 @@ static unsigned int tso_map_service(const TSGREQUEST *request,
     receipt[2U]=base.lo+info.entry_offset;
     receipt[3U]=blocks;
     receipt[4U]=info.input_fnv;
+    receipt[5U]=image_fnv; /* Full mapped image, before its writable data runs. */
     if (mode==31U) tso31_loaded=1U;
     else tso64_loaded=1U;
     *(volatile unsigned int *)0x4098U=u_tables.used;
@@ -1281,22 +1371,24 @@ static unsigned int cms_line_screen(const unsigned char *message,
     return 0U;
 }
 
-/* Selected native TSO31 TPUT. R1's high bit denotes TGET in this ABI;
+/* Selected native TSO TPUT. R1's high bit denotes TGET in this ABI;
  * input is a separate service, so never interpret that flag as a U address. */
-static unsigned int tso31_terminal_service(TSGREQUEST *request)
+static unsigned int tso_terminal_service(TSGREQUEST *request)
 {
     TSGCONTEXT gate;
     TSGREQUEST copy;
     unsigned char message[132];
     unsigned int i, status, mask_hi, mask_lo;
-    volatile unsigned char *receipt=(volatile unsigned char *)0x4710U;
+    unsigned int pc=*(volatile const unsigned int *)0x308cU;
+    unsigned int receipt_base=pc>=0x09000000U ? 0x4d00U : 0x4700U;
+    volatile unsigned char *receipt=(volatile unsigned char *)(receipt_base+16U);
     mask_hi=*(volatile const unsigned int *)0x3080U;
     mask_lo=*(volatile const unsigned int *)0x3084U;
-    *(volatile unsigned int *)0x47a0U+=1U;
-    *(volatile unsigned int *)0x47a4U=request->length;
-    *(volatile unsigned int *)0x47a8U=request->address.hi;
-    *(volatile unsigned int *)0x47acU=request->address.lo;
-    *(volatile unsigned int *)0x47b0U=request->direction;
+    *(volatile unsigned int *)(receipt_base+0xa0U)+=1U;
+    *(volatile unsigned int *)(receipt_base+0xa4U)=request->length;
+    *(volatile unsigned int *)(receipt_base+0xa8U)=request->address.hi;
+    *(volatile unsigned int *)(receipt_base+0xacU)=request->address.lo;
+    *(volatile unsigned int *)(receipt_base+0xb0U)=request->direction;
     /* TPUT defines R0/R1; upper GPR halves and R2 are not arguments.
      * The saved PSW must say AMODE31 before reducing R1 to its 31 bits. */
     if ((mask_hi&1U) || !(mask_lo&0x80000000U) ||
@@ -1313,8 +1405,8 @@ static unsigned int tso31_terminal_service(TSGREQUEST *request)
     if (TSGCOPY(&gate,&copy,message,sizeof message)!=TSG_OK) return 8U;
     status=cms_line_screen(message,request->length);
     if (status) return status;
-    *(volatile unsigned int *)0x4700U+=1U;
-    *(volatile unsigned int *)0x4704U=request->length;
+    *(volatile unsigned int *)receipt_base+=1U;
+    *(volatile unsigned int *)(receipt_base+4U)=request->length;
     for (i=0U; i<request->length; ++i) receipt[i]=message[i];
     return 0U;
 }
@@ -1697,24 +1789,30 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
 {
     TSGCONTEXT gate;
     unsigned char bytes[TSG_MAX_COPY];
-    unsigned int value;
+    unsigned int value, native_tso, caller_pc;
     int result;
     if (!request) return 0xffffffffU;
     if (attach()) return 0xfffffffaU;
-    /* The descriptor stores a 32-bit length. Refuse a nonzero caller high
-       half except for selected AMODE31 TPUT, whose R0 high half is not an
-       argument; its low half is independently bounded below. */
+    caller_pc=*(volatile const unsigned int *)0x308cU;
+    native_tso=(tso31_loaded && caller_pc>=0x07000000U &&
+                caller_pc-0x07000000U<*(volatile const unsigned int *)0x4604U) ||
+               (tso64_loaded && caller_pc>=0x09000000U &&
+                caller_pc-0x09000000U<*(volatile const unsigned int *)0x4644U);
+    /* The descriptor stores a 32-bit length. R0 is not an argument for the
+       selected AMODE31 TPUT or IARV64 PC entry. Both routes validate their
+       R1 arguments independently before touching U storage. */
     if (*(volatile const unsigned int *)0x3000U != 0U &&
-        !(request->svc==93U && tso31_loaded &&
-          !(*(volatile const unsigned int *)0x3080U&1U) &&
-          (*(volatile const unsigned int *)0x3084U&0x80000000U) &&
-          *(volatile const unsigned int *)0x308cU>=0x07000000U &&
-          *(volatile const unsigned int *)0x308cU-0x07000000U<
-              *(volatile const unsigned int *)0x4604U))
+        !((request->svc==93U && native_tso &&
+           !(*(volatile const unsigned int *)0x3080U&1U) &&
+           (*(volatile const unsigned int *)0x3084U&0x80000000U)) ||
+          (request->svc==233U && tso64_loaded && caller_pc==0x402U &&
+           !(*(volatile const unsigned int *)0x3080U&1U) &&
+           (*(volatile const unsigned int *)0x3084U&0x80000000U))))
         return request->svc == 120U || request->svc == 223U ?
                8U : 0xfffffffdU;
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 223U) return high_storage_service(request);
+    if (request->svc == 233U) return iarv64_service(request);
     if (request->svc == 202U && cms24_loaded &&
         *(volatile const unsigned int *)0x308cU >= 0x20000U &&
         *(volatile const unsigned int *)0x308cU < 0x1ba6c0U)
@@ -1757,22 +1855,18 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 230U) return cms_cursor_guest_probe(request);
     if (request->svc == 231U) return tso_map_service(request,31U);
     if (request->svc == 232U) return tso_map_service(request,64U);
-    if (request->svc == 93U && tso31_loaded &&
-        *(volatile const unsigned int *)0x308cU>=0x07000000U &&
-        *(volatile const unsigned int *)0x308cU-0x07000000U<
-            *(volatile const unsigned int *)0x4604U)
-        return tso31_terminal_service(request);
+    if (request->svc == 93U && native_tso)
+        return tso_terminal_service(request);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
     {
-        if (tso31_loaded &&
-            *(volatile const unsigned int *)0x308cU>=0x07000000U &&
-            *(volatile const unsigned int *)0x308cU-0x07000000U<
-                *(volatile const unsigned int *)0x4604U &&
-            *(volatile unsigned int *)0x4708U==0U) {
-            *(volatile unsigned int *)0x4708U=request->svc;
-            *(volatile unsigned int *)0x470cU=
-                *(volatile const unsigned int *)0x308cU;
+        if (native_tso &&
+            *(volatile unsigned int *)(caller_pc>=0x09000000U ?
+                0x4d08U : 0x4708U)==0U) {
+            *(volatile unsigned int *)(caller_pc>=0x09000000U ?
+                0x4d08U : 0x4708U)=request->svc;
+            *(volatile unsigned int *)(caller_pc>=0x09000000U ?
+                0x4d0cU : 0x470cU)=caller_pc;
         }
         return 0xfffffffbU;
     }
