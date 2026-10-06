@@ -232,6 +232,14 @@ def run(args):
                     raw[real24:real24+16] == staged24[148:164] and
                     all(page_real(raw,0x14000f,0x20000+i*4096) ==
                         real24+i*4096 for i in range(pages24)))
+                parent24, push24, executed24, returned24, restored24, child24 = \
+                    struct.unpack_from(">6I", raw, 0x121a0)
+                checks["cms24_nested_backing_restored"] = (
+                    parent24 == int.from_bytes(staged24[148:152],"big") and
+                    push24 == 0 and child24 == 0x010c0adb and
+                    struct.unpack_from(">I",raw,0x4110)[0] == 24 and
+                    executed24 == 0x2468 and returned24 == executed24 and
+                    restored24 == parent24)
             if args.cms31:
                 real, entry, image_bytes, blocks = struct.unpack_from(">4I",raw,0x40e0)
                 staged = (disk.parent / "cms31-rxvm.bin").read_bytes()

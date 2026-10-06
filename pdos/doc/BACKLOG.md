@@ -183,6 +183,10 @@ return value to a U64 caller. It proves the mixed-mode memory and executable
 transition needed for a colliding nested call. Neither RXVM executes yet;
 full CMS linkage, general file/command services, REXX `ADDRESS`, TSO programs,
 wide heap budgets and normal successor selection remain unqualified.
+The [CMS24 child checkpoint](qualification/TWO-SPACE-CMS24-CHILD-2026-10-06.md)
+proves the same reversible collision at the fixed 24-bit RXVM origin,
+including a real AMODE24 SVC and return to a U64 caller. It remains a
+minimal instruction test, not an unchanged CMS24 application run.
 
 ## PD-004: Batch-file delivery
 

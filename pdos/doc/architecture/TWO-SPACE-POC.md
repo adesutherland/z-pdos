@@ -367,6 +367,13 @@ RXVM runs yet: CMS lowcore, file and command services and actual REXX
 3270 ready screen and guest disabled-wait event; time limits only detect
 stalls.
 
+The [CMS24 child check](../qualification/TWO-SPACE-CMS24-CHILD-2026-10-06.md)
+also overlays CMS24 RXVM at its fixed `0x20000` origin. A U64 caller branches
+to a small child that enters AMODE24, issues an SVC, returns to AMODE64 and
+propagates its value through K's pop service. K restores the original RXVM
+mapping. This proves the 24-bit mode transition and reversible low-address
+collision in the guest, without claiming RXVM execution.
+
 ## Primary architecture and compatibility references
 
 - IBM, *z/Architecture Principles of Operation*, SA22-7832-14:

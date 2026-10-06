@@ -19,6 +19,7 @@ static unsigned int console_ssid;
 static unsigned int console_read_phase;
 static unsigned int console_read_count;
 static unsigned int cms31_loaded;
+static unsigned int cms24_loaded;
 void TSFPURGE(void *unused);
 void TSKEYSET(unsigned int real_page, unsigned int key);
 
@@ -317,6 +318,7 @@ static unsigned int cms24_map_service(const TSGREQUEST *request)
     *(volatile unsigned int *)0x4108U=info.image_bytes;
     *(volatile unsigned int *)0x410cU=TSMLOWFREE(&storage);
     *(volatile unsigned int *)0x4098U=u_tables.used;
+    cms24_loaded=1U;
     result=0U; goto release;
 restore_reservation:
     if (TSMRESERVE(&storage,1U,24U,first,0x2000U) != TSP_OK)
@@ -421,6 +423,49 @@ static unsigned int cms31_child_probe(void)
                       (mask_lo & 0x80000000U) ? 31U : 24U;
     *(volatile unsigned int *)0x40f4U=mode;
     return mode == 31U ? 0U : 8U;
+}
+
+static unsigned int cms24_overlay_push(const TSGREQUEST *request)
+{
+    /* GNU s390 z900: SAM24; SVC 219; LGHI R15,0x2468; SAM64; BR R14. */
+    static const unsigned char child[] = {
+        0x01U,0x0cU,0x0aU,0xdbU,0xa7U,0xf9U,
+        0x24U,0x68U,0x01U,0x0eU,0x07U,0xfeU
+    };
+    TSPADDR base;
+    int result;
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    if (!cms24_loaded) return 4U;
+    base.hi=0U; base.lo=0x20000U;
+    result=TSMOVERLAYPUSH(&storage,5U,base,child,sizeof child);
+    if (result != TSM_OK) return result == TSM_NOMEM ? 4U : 12U;
+    *(volatile unsigned int *)0x4098U=u_tables.used;
+    return 0U;
+}
+
+static unsigned int cms24_overlay_pop(const TSGREQUEST *request)
+{
+    TSPADDR base;
+    unsigned int returned;
+    if (request->address.hi || request->address.lo || request->direction)
+        return 8U;
+    if (!cms24_loaded) return 4U;
+    base.hi=0U; base.lo=0x20000U;
+    if (TSMOVERLAYPOP(&storage,5U,base,request->length,&returned)
+        != TSM_OK) return 12U;
+    *(volatile unsigned int *)0x4098U=u_tables.used;
+    return returned;
+}
+
+static unsigned int cms24_child_probe(void)
+{
+    unsigned int mask_hi=*(volatile const unsigned int *)0x3080U;
+    unsigned int mask_lo=*(volatile const unsigned int *)0x3084U;
+    unsigned int mode=(mask_hi & 1U) ? 64U :
+                      (mask_lo & 0x80000000U) ? 31U : 24U;
+    *(volatile unsigned int *)0x4110U=mode;
+    return mode == 24U ? 0U : 8U;
 }
 
 static unsigned int terminal_service(const TSGREQUEST *request)
@@ -598,6 +643,9 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 216U) return cms31_overlay_pop(request);
     if (request->svc == 217U) return cms31_child_probe();
     if (request->svc == 218U) return cms24_map_service(request);
+    if (request->svc == 219U) return cms24_child_probe();
+    if (request->svc == 220U) return cms24_overlay_push(request);
+    if (request->svc == 221U) return cms24_overlay_pop(request);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
         return 0xfffffffbU;

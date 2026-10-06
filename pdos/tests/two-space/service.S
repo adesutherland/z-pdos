@@ -392,6 +392,41 @@ terminal_read_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 124(%r2)
+    chi %r15, 0
+    jne cms24_overlay_done
+    larl %r3, cms24_image_va
+    lg %r3, 0(%r3)
+    l %r4, 0(%r3)
+    st %r4, 416(%r2)
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 220                 /* child takes CMS24 fixed origin */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 420(%r2)
+    chi %r15, 0
+    jne cms24_overlay_done
+    larl %r3, cms24_image_va
+    lg %r3, 0(%r3)
+    l %r4, 0(%r3)
+    st %r4, 436(%r2)
+    basr %r14, %r3         /* child enters AMODE24 and returns U64 */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 424(%r2)
+    lgr %r0, %r15
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 221
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 428(%r2)
+    larl %r3, cms24_image_va
+    lg %r3, 0(%r3)
+    l %r4, 0(%r3)
+    st %r4, 432(%r2)
+cms24_overlay_done:
     lghi %r0, 0             /* K maps checked CMS31 image in shared U */
     lghi %r1, 0
     lghi %r2, 0
@@ -456,6 +491,7 @@ app_fault_resume:
 high_data_va: .quad 0x110001000
 input_data_va: .quad 0x110001080
 cms31_image_va: .quad 0x03000000
+cms24_image_va: .quad 0x20000
 cms31_trampoline_va: .quad app_b_cms31_call
 forged_va: .quad 0x100021000
 cross_va: .quad 0x110001ffe
@@ -518,6 +554,12 @@ initial_nested_done:
     chi %r2, 217
     je storage_no_record
     chi %r2, 218
+    je storage_no_record
+    chi %r2, 219
+    je storage_no_record
+    chi %r2, 220
+    je storage_no_record
+    chi %r2, 221
     je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore
