@@ -34,6 +34,37 @@ and repeating affected gates.
 | TSO64 ANY RXVM beta 3 stage `bdc2d14439f1a3c90409313a9693672c61187b78277197d4dc19bdd6` | AMODE64/RMODE ANY image at U `0x09000000`, 188 pages; U CVT/SFT and SVC 233 plus PR veneer for IARV64 stacking PC, 128 MiB high heap, SVC 93 TPUT. | [Fresh native IPL](../qualification/TWO-SPACE-TSO64-NATIVE-2026-10-06.md) returned RC 0 and exact output; GETSTOR/DETACH left no high-U mapping. Unsupported IARV64 forms return an error. File/input/call services remain open. |
 | TSO64 HIGH beta 3 compiler, assembler and VM pairs | [The six unchanged XMI and RDW hashes](../qualification/TWO-SPACE-TSO64-HIGH-BOUNDARY-2026-10-06.md) pin low AMODE64/RMODE ANY launchers `LAC65O`, `LAU65O`, `LAVM65O` (directory `0x11`) and high AMODE64/RMODE64 bodies `RXCH`, `RXASH`, `RXVMH` (directory `0x31`). All six entry offsets are zero. | [One-ASCE release qualification](../qualification/QUALIFICATION.md) ran HIGH compiler/assembler/VM and LOAD/DELETE. The successor [AL8 materializer](../qualification/TWO-SPACE-TSO64-HIGH-LOADER-2026-10-06.md) matches all three bodies on the host and the ANY parser rejects RMODE64. The source-backed bounded SVC 8/9 subset is below. No HIGH successor guest entry exists. Exact launcher-to-body parameter and return linkage remains open. |
 
+### CMS31 RXC and RXAS entry trace
+
+The original beta 3 CMS31 MODULEs in the checked
+`build/pdos/cms-module-contract-c.json` have the same linked origin and entry
+`0x02200000` as RXVM. RXC has 127 records and 132,588 relocation entries;
+RXAS has 69 records and 28,708. Their original MODULE SHA-256 values are
+`9d2ff332113a5a6c9adafb8e9b338f894492958ee3e871f276cb2b6d242a5f04`
+and `fdc5d5ef44fcd6ea75d345dffbaa4012ae850ed0f33d3f8b80d85b1f82a07a01`.
+The staged disk bytes have the separate hashes in the input table above.
+At offset 148 in each staged container, the first 64 image bytes of RXC,
+RXAS and RXVM have the same SHA-256,
+`207a7dbf62aa5f5ff0b060a3fe6a2b3739a22a41e7253fd5dec3e8193cd640f8`.
+This directly checks that the three unchanged images start with the same
+startup prologue; it does not establish their whole-file service behavior.
+
+The qualified one-ASCE `pdosCmsCommand` in `pdos/src/pdos.c` validates the
+MODULE and relocations, then builds a blank-padded, eight-byte-token PLIST
+with an `FF` fence. Its bounded PCOMM path allows at most 14 tokens in the
+child list, including the module name. It enters the child with R1=PLIST,
+R13=save area, R14=return and R15=relocated entry in AMODE31. The maintained
+`pdpclib/src/cmsstart.asm` startup source takes the PLIST and returns the C
+application result in R15 through its saved return linkage. The
+[one-ASCE fresh compiler chain](../qualification/STAGE3-2026-10-05.md) ran
+unchanged RXC, RXAS and RXVM at RC 0, including file and library use; its
+negative controls include malformed RXC source and malformed RXAS input.
+
+This establishes the selected entry shape and baseline behavior. It does
+not show that the successor can run RXC/RXAS. P2 must cover the compiler
+and assembler's reached CMSCALL/file verbs and exact record outputs; P3 must
+load each original module without moving a live image or its lowcore state.
+
 ### TSO64 HIGH SVC 8/9 source trace
 
 The maintained one-ASCE handler in `pdos/src/pdos.c` (`pdos64HighName`,
@@ -51,15 +82,45 @@ returns R15=4. The one-ASCE handler permits one live HIGH body globally; the
 successor's placement ledger must support coexistence when virtual and real
 storage fit, while preserving the caller-visible register/status contract.
 
+The release's frozen launcher objects are `LAC65O.obj`
+`4914828d08a646e4a7a114a584ace52495757d35f101d5a0098fa2b25a164d7e`,
+`LAU65O.obj`
+`a65328f4de99bf23b552632d9c2fb3278fa7f5bc54e7b289b0b10be81e05065d`
+and `LAVM65O.obj`
+`6e7b6408865f645c15f19948f4fbd9d3ad88c0f3f7f2ded71bee3cb7c770c177`.
+Their frozen source, Mainframe Lab
+`crexx-release/inputs/native/entry64-high.asm`, has SHA-256
+`49fcd9aaa2bb41adbeb482aef1de741f4afb211c5db85d0d85d09c3e4008a2d2`.
+The release recipe selected these objects as the three low launchers.
+The unchanged RDW members materialize under `TSTIMAGE64ANY` to 16,872-byte
+images, all with entry offset zero and the same first 48 instruction bytes.
+Each image contains exactly one EBCDIC `HIGHNAME` for its corresponding
+`RXCH`, `RXASH` or `RXVMH`, and none of the other two names. This connects the
+frozen source path to the selected unchanged launchers beyond a symbolic
+member name.
+
+The source saves the full caller GPRs, captures the entry PSW, switches to
+AMODE31 and obtains below-line TPUT/TGET storage plus a 64 KiB work area.
+It issues LOAD, checks the AMODE64 entry tag, dereferences the launcher's
+incoming parameter list and passes the target a halfword argument length
+and data pointer, plus a low service table. It switches to AMODE64 for BASR,
+then to AMODE31 for DELETE and work-area release. The target C result in R2
+is saved as the launcher's R15 result. LOAD or setup failures return 40 or
+20, a bad entry state returns 36, and a failed DELETE replaces the result
+with 44. The static launcher save areas forbid overlapping or nested
+execution of the *same* launcher image; P3 must preserve that constraint
+while allowing distinct live images to coexist when storage fits.
+
 The P2/P3 controls are: accept each unchanged launcher/body pair with exact
 entry, length and application RC; reject a high pointer or non-AMODE31 name,
 nonzero LOAD GPR1, malformed member name, missing/invalid member, failed
 AL8 relocation and cross-owner DELETE without publishing or deleting another
-image. Check caller registers and return after the high body exits, followed
-by owner cleanup. The byte-level launcher parameter transfer and body return
-sequence still need an unchanged-binary or source trace before P0 closes.
+image. Check the transferred halfword length/data pointer/service table,
+caller registers and R15 after the high body exits, followed by owner cleanup.
+The source and unchanged-member checks select this contract; the successor
+guest has not yet exercised it.
 
-### Native application-call linkage still to select
+### Selected native application-call linkage
 
 The maintained PDPCLIB `pdpclib/src/stdlib.c` has no CMS `system()` call:
 its `__CMS__` branch currently returns zero without launching a child. Its
@@ -71,15 +132,58 @@ selected SVC 42 ATTACH and SVC 3 child-completion path, but these source
 facts do not establish that either maintained `system()` branch supplies the
 required CMS-to-CMS or TSO-to-TSO contract on PDOS.
 
-Before P0 closes, choose and trace a native CMS command or program-call form
-and a native TSO application-call form that can be issued by an ordinary
-caller without a z/PDOS-only binary change. Pin their parameter lists,
-mode/address constraints, result status and child application RC separately.
-The P3 positive controls are one unchanged parent/child pair per personality,
-including a bounded parameter and a nonzero child RC. Negative controls are
-missing child, malformed or inaccessible parameters, occupied fixed origin,
-insufficient low storage, and child fault. A success-shaped CMS `system()`
-return from the current placeholder is specifically not a positive control.
+For the first replacement we select the following IBM-compatible application
+call forms. This selects an interface for P3; it does not claim that the
+successor already accepts it or that every IBM option is supported.
+
+| Caller | Selected call | Bounded K/U contract |
+| --- | --- | --- |
+| CMS24 | SVC 202 from below 16 MiB | R1 points to a 24-bit tokenized EBCDIC PLIST whose first eight-byte token names a CMS MODULE. K checks the complete list before selecting a CMS child. The child receives the CMS24 call-type byte and returns its application RC in R15. |
+| CMS31 | CMSCALL through SVC 204 | R1 points to a 31-bit tokenized EBCDIC PLIST. Select `CALLTYP=PROGRAM` with no extended PLIST; K checks the fence and permitted COPY/FENCE flags. A CMS31 caller may reach a CMS24 child with a checked, temporary below-line PLIST copy; if suitable low U storage is unavailable, the call fails without entering the child. The child returns its application RC in R15. |
+| TSO24/31 | LINK through SVC 6 | The first subset names a load member by EPLOC and passes a checked parameter-address list through R1, with an optional ERRET. K selects the native image, enters it synchronously in its declared AMODE and returns to the caller's AMODE. |
+| TSO64 | LINKX through SVC 6 | The same bounded member and parameter semantics apply. The service accepts an AMODE64 caller but requires control parameter addresses and passed addresses below 2 GiB for this first compatibility subset. A high RMODE64 body still uses its separate checked LOAD/DELETE route when requested by its unchanged launcher. |
+
+IBM's [CMSCALL reference](https://www.ibm.com/docs/SSB27U_7.2.0/com.ibm.zvm.v720.dmsa6/cmscall.htm)
+describes user MODULE invocation, 31-bit PLIST addressing and the COPY path
+for a 24-bit target. Its `CALLTYP=PROGRAM` form has no extended PLIST; forms
+with EPLIST remain outside this first call subset. The [CMS register convention](https://www.ibm.com/docs/en/zvm/7.2.0?topic=control-register-usage)
+and [CMSRET](https://www.ibm.com/docs/en/zvm/7.2.0?topic=instructions-cmsret)
+put the application result in R15. IBM's [LINK/LINKX reference](https://www.ibm.com/docs/en/zos/3.1.0?topic=module-link-linkx-description)
+specifies synchronous entry, target AMODE selection, caller AMODE restoration,
+optional parameters and ERRET; [SVC 6](https://www.ibm.com/docs/en/zos/3.1.0?topic=descriptions-svc-6-0a06)
+is their supervisor route. These primary sources define the compatibility
+shape; the selected private-disk member lookup remains z/PDOS-specific.
+
+K records **OS status** separately from the child's **application RC**. A
+normal native call exposes the child's R15 by the selected CMS or TSO
+convention. For missing modules, malformed or inaccessible arguments and
+capacity failure, K must not publish a partial image. IBM CMSCALL returns
+R15 `-3` for a missing command and `-4` for LOADMOD failure; insufficient
+save-area or PLIST-copy storage is the documented `0F0` abend, which this
+successor must confine to the active invocation and report to PCOMM as an
+OS failure. A call into an AMODE24 module with a high PLIST and COPY=NO is
+the documented `1CC` failure. The selected implementation must retain the
+distinct normal child R15 and failure category, even if both appear in the
+native R15 convention.
+
+For LINK/LINKX, IBM's ERRET receives control for an error that would have
+abended the task; it does **not** receive input-parameter errors. In the
+documented 64-bit register view, the high word of R1 carries the abend
+reason and the low word carries the abend code; R15 addresses ERRET. K must
+validate the saved ERRET address before branching. Without a valid ERRET,
+K terminates only the active application invocation and returns OS failure
+to PCOMM, preserving the supervisor and other live U images. P3 must pin
+the exact selected missing-member abend/reason and bad-parameter result with
+an unchanged LINK/LINKX caller fixture before accepting that handler.
+
+P3 needs one fixed unchanged parent/child binary pair for CMS and another for
+TSO, each passing a bounded parameter and observing a nonzero child RC. The
+negative controls are missing child, malformed or inaccessible parameters,
+occupied fixed origin, insufficient low storage, and child fault. A
+success-shaped CMS `system()` return from the current placeholder is not a
+positive control. The PDPCLIB `system()` convenience route can be repaired
+separately after the macro-level contract passes, without making it the
+kernel's only application-call API.
 
 ## Service and ownership table
 
@@ -100,7 +204,7 @@ evidence but do not validate an untraced application ABI.
 | TSO SVC 93 line output | K validates the U buffer and owns the terminal channel and active invocation. | Selected TPUT `-v` on TSO24/31/64 ANY. TGET, full-screen forms, capability queries and wider line policy remain open. |
 | Diagnostic native invocation SVC 235/236/237 and 244 | K resolves a loaded-image selector to CMS or TSO personality, AMODE, image and runtime owners, then records all full-width GPRs, both old-PSW halves, ASCE, key, nonreused token and owned resources. The U fixture surrounds selected RXVM entries; SVC 237 deliberately leaves one page live for K cleanup. Private SVC 244 reads the saved continuation while its frame is active. | [TSO entry IPL](../qualification/TWO-SPACE-INVOCATION-GATE-2026-10-06.md) proves TSO24/31/64 ANY owner-based SVC 120, IARV64 and TPUT. [Cleanup IPL](../qualification/TWO-SPACE-INVOCATION-REAP-2026-10-06.md) proves a live TSO31 page is released. [CMS entry IPL](../qualification/TWO-SPACE-CMS-INVOCATION-2026-10-06.md) proves CMS24/31 native and relocated image selection and the FST veneer. [Full-PSW IPL](../qualification/TWO-SPACE-CALLER-PSW-2026-10-06.md) compares the saved address with the actual post-SVC label and rejects a query after return. These private controls are not an application ABI; normal K-controlled launch of unchanged native applications remains open. |
 | Diagnostic K-controlled call SVC 245/246 | K selects a registered U entry, validates the interrupted U state, owns the invocation and its resources, enters through the saved PSW, then restores caller GPRs except result registers, PSW and ASCE on normal return or a U fault. R0 reports OS status separately from the R15 application RC. The current two entries and return trampoline belong to the diagnostic fixture. | [Fresh IPL](../qualification/TWO-SPACE-CONTROLLED-CALL-2026-10-06.md) checks normal RC, fault status, caller GPR restoration, child-page unmap, zero image leases and intact DAT checksums. Native CMS/TSO entry and return linkage, nested controlled calls and fault cleanup with pending I/O remain open. |
-| CMS and TSO program invocation | K owns the loader and invocation stack, with copied parameters, OS status and application RC; U PCOMM presents results. | Loader placement/collision and diagnostic overlays pass. The maintained C library's CMS `system()` is a placeholder, and its TSO CP request is rejected on PDOS; see the call-linkage audit above. The selected IBM-compatible call form and unchanged CMS-to-CMS and TSO-to-TSO parent/child controls remain open. |
+| CMS and TSO program invocation | K owns the loader and invocation stack, with copied parameters, OS status and application RC; U PCOMM presents results. | Loader placement/collision and diagnostic overlays pass. The bounded CMSCALL/SVC 202 and LINK/LINKX forms above are selected, not implemented. The maintained C library's CMS `system()` is a placeholder, and its TSO CP request is rejected on PDOS. Unchanged CMS-to-CMS and TSO-to-TSO parent/child controls remain open. |
 | CMS/TSO files and persistent output | K owns dataset extents and disk channel buffers. CMS input cursors and transient output buffers are keyed by the active invocation token. Open handles are reaped on return; FINIS transfers closed output to K's diagnostic store. | CMS selected read/write and transient output pass. The [input](../qualification/TWO-SPACE-INVOCATION-FILES-2026-10-06.md) and [output](../qualification/TWO-SPACE-INVOCATION-OUTPUT-2026-10-06.md) ownership checks passed unchanged IPL; nested same-name guest controls remain open. TSO file services, durable commits and stopped-disk readback remain open. |
 | 3270 display and optional 3215 monitor | K owns device capability, channel completion, screen and input leases; U C presentation builds fields and command events. | Selected 3270 line output/input, [invocation-owned waiting-read](../qualification/TWO-SPACE-TERMINAL-OWNER-2026-10-06.md), [post-start clear and retry](../qualification/TWO-SPACE-TERMINAL-RETRY-2026-10-06.md), and [retired ledger completion under a new owner](../qualification/TWO-SPACE-LATE-COMPLETION-2026-10-06.md) pass. Physical late-channel status remains open. [P4](../BACKLOG.md#pd-003-completion-plan-6-october-2026), [PD-021](../BACKLOG.md#pd-021-reusable-3270-application-presentation) and [PD-022](../BACKLOG.md#pd-022-attached-operator-line-view-and-transcript) own model, transcript and line-only gates. |
 

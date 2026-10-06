@@ -104,11 +104,49 @@ static void compare_member(const char *path, unsigned int expected_bytes,
     free(relocs); free(released); free(other); free(image); free(raw);
 }
 
+static void compare_launcher(const char *path, const unsigned char name[8])
+{
+    static const unsigned char prologue[18]={
+        0xe3U,0x0dU,0x00U,0x10U,0x00U,0x24U,
+        0xe3U,0x1dU,0x00U,0x18U,0x00U,0x24U,
+        0xc0U,0x10U,0x00U,0x00U,0x03U,0x12U};
+    unsigned char *raw=(unsigned char *)malloc(TST_MAX_RAW+1U);
+    unsigned char *image=(unsigned char *)malloc(TST_MAX_IMAGE);
+    unsigned int bytes, i, matches=0U;
+    TSTINFO info;
+    CHECK(raw && image);
+    bytes=read_file(path,raw);
+    CHECK(bytes==19414U);
+    CHECK(TSTHEADER(raw,bytes,64U,&info)==TST_OK);
+    CHECK(TSTIMAGE64ANY(raw,bytes,0x09000000U,image,TST_MAX_IMAGE,
+                        &info)==TST_OK);
+    CHECK(info.mode==64U && info.flags==0x11U &&
+          info.entry_offset==0U && info.image_bytes==16872U);
+    CHECK(memcmp(image,prologue,sizeof prologue)==0);
+    for (i=0U; i+8U<=info.image_bytes; ++i)
+        if (memcmp(image+i,name,8U)==0) ++matches;
+    CHECK(matches==1U);
+    printf("%s: raw %u, image %u, entry %u, one selected HIGHNAME\n",
+           path,bytes,info.image_bytes,info.entry_offset);
+    free(image); free(raw);
+}
+
 int main(int argc, char **argv)
 {
-    if (argc!=4) return 2;
+    static const unsigned char rxc[8]={
+        0xd9U,0xe7U,0xc3U,0xc8U,0x40U,0x40U,0x40U,0x40U};
+    static const unsigned char rxas[8]={
+        0xd9U,0xe7U,0xc1U,0xe2U,0xc8U,0x40U,0x40U,0x40U};
+    static const unsigned char rxvm[8]={
+        0xd9U,0xe7U,0xe5U,0xd4U,0xc8U,0x40U,0x40U,0x40U};
+    if (argc!=4 && argc!=7) return 2;
     compare_member(argv[1],4196266U,3916064U);
     compare_member(argv[2],1842322U,1775648U);
     compare_member(argv[3],1860542U,1799472U);
+    if (argc==7) {
+        compare_launcher(argv[4],rxc);
+        compare_launcher(argv[5],rxas);
+        compare_launcher(argv[6],rxvm);
+    }
     return 0;
 }

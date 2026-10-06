@@ -46,3 +46,12 @@ This is a host materializer and selected-regression result. The HIGH bodies
 are not yet staged on the diagnostic disk, mapped by K, entered through the
 unchanged launchers or unloaded through native LOAD/DELETE. The normal
 successor image and HIGH guest qualification remain P3/P5/P6 work.
+
+The later P0 linkage check extended the same recipe with the three pinned
+AMODE64/RMODE ANY launchers. Under the same host sanitizers, `LAC65O`,
+`LAU65O` and `LAVM65O` each parsed and materialized to 16,872 bytes at
+U `0x09000000`, with entry offset zero and the frozen prologue. Each image
+contained exactly one expected EBCDIC high-body name. The six-member run
+under ignored `build/pdos/high-launcher-check-1/` returned zero; the Classic
+C31 loader object also assembled and linked. This checks unchanged package
+bytes and the selected source linkage, without claiming a HIGH guest entry.

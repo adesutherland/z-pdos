@@ -169,7 +169,15 @@ ASCE is not part of this plan unless the recorded shared-U review trigger is
 met.
 
 The [P0 ABI inventory](architecture/TWO-SPACE-ABI.md) now pins the selected
-unchanged inputs and names the untraced forms. The first [P1 invocation
+unchanged inputs and names the untraced forms.
+The later [HIGH launcher linkage check](qualification/TWO-SPACE-TSO64-HIGH-LOADER-2026-10-06.md)
+ties all three frozen low launchers to their corresponding high bodies and
+records their source-level parameter and return path. P0 still needs the
+normal application-call fixture and the remaining selected terminal/file
+forms. Its completion does not require a successor guest pass, which belongs
+to P2/P3.
+
+The first [P1 invocation
 component check](qualification/TWO-SPACE-INVOCATION-2026-10-06.md) proves
 token and cleanup ordering on the host and a linked, uncalled Classic C31
 module in the diskless fixture. The subsequent [fresh-IPL invocation

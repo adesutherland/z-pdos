@@ -6,12 +6,13 @@ options levelb
 import rxfnsb
 main: procedure = .int
   arg args = .string[]
-  if args.0 <> 7 then do
-    say "usage: crexx -nokeep pdos/scripts/two-space-tso-high.crexx --args FRESH-build/pdos/work PINNED_RXCH_RDW PINNED_RXASH_RDW PINNED_RXVMH_RDW CLASSIC_CC CLASSIC_AS CLASSIC_LD"
+  if args.0 <> 7 & args.0 <> 10 then do
+    say "usage: crexx -nokeep pdos/scripts/two-space-tso-high.crexx --args FRESH-build/pdos/work PINNED_RXCH_RDW PINNED_RXASH_RDW PINNED_RXVMH_RDW CLASSIC_CC CLASSIC_AS CLASSIC_LD [PINNED_LAC65O_RDW PINNED_LAU65O_RDW PINNED_LAVM65O_RDW]"
     return 2
   end
   work = args.1; compiler = args.2; asmbody = args.3; vm = args.4
   classiccc = args.5; classicas = args.6; classicld = args.7
+  launchc = .string; launcha = .string; launchv = .string
   if left(work,11) <> "build/pdos/" | length(work) <= 11 | pos("..",work) > 0 then do
     say "fresh build/pdos/ output path required"
     return 2
@@ -42,6 +43,25 @@ main: procedure = .int
       return 2
     end
   end
+  if args.0 = 10 then do
+    launchc = args.8; launcha = args.9; launchv = args.10
+    inputs.4 = launchc; inputs.5 = launcha; inputs.6 = launchv
+    expected.4 = "0037a2ef67e59e0db0e1ac054c592c0feb00601a211b8882bc2b1c2e897f91ae"
+    expected.5 = "b2d7f4e0dfc070065664dceca2f003be187e309803f1f2ef5067ca57fb7ac8ba"
+    expected.6 = "cd87b17f540952745240462f9c847011a449996e0e08725bc0dee286c4b3e527"
+    do j = 4 to 6
+      candidate = inputs.j
+      if left(candidate,1) <> "/" then return 2
+      address crexx "run test -f :candidate"
+      if rc <> 0 then return 2
+      hashes = .string[]
+      address crexx "run shasum -a 256 :candidate" output hashes
+      if rc <> 0 | word(hashes.1,1) <> expected.j then do
+        say "pinned HIGH launcher mismatch" candidate
+        return 2
+      end
+    end
+  end
   lines = .string[]
   address crexx "pwd" output lines
   out = strip(lines.1) || "/" || work
@@ -57,7 +77,8 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_tso.c pdos/tests/two-space/tso_high.c :legacy -o :host"
   if rc <> 0 then return rc
-  address crexx "run :host :compiler :asmbody :vm"
+  if args.0 = 10 then address crexx "run :host :compiler :asmbody :vm :launchc :launcha :launchv"
+  else address crexx "run :host :compiler :asmbody :vm"
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src pdos/src/twospace_tso.c -o :asm"
   if rc <> 0 then return rc
@@ -67,5 +88,6 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run test -s :binary"
   if rc <> 0 then return rc
-  say "Pinned TSO64 HIGH AL8 images match the released loader; Classic C31 object linked."
+  if args.0 = 10 then say "Pinned TSO64 HIGH bodies and launchers match their native contracts; Classic C31 object linked."
+  else say "Pinned TSO64 HIGH AL8 images match the released loader; Classic C31 object linked."
   return 0
