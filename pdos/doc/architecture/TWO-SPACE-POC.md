@@ -33,17 +33,47 @@ one-ASCE kernel or completed implementation.
 | Personality state | Each invocation carries its CMS or TSO service profile, file handles and lowcore contract. K installs the applicable U compatibility page or state on entry and restores the previous state on return; a dormant module's profile does not define the active lowcore. A failed transition leaves the caller's map and profile intact. |
 | Application calls | The required contract is a synchronous CMS-to-CMS or TSO-to-TSO application call, with bounded parameters, a return code and restored caller state. The selected native linkage for each personality must be qualified separately. An in-space pointer is usable only when both programs' ABI and address modes permit it. A REXX `ADDRESS` operation is not a requirement of the mainframe cREXX builds. CMS-to-TSO or TSO-to-CMS application calls are optional only if a simple copied-parameter and return-code gate suffices; they cannot rely on shared raw pointers or become a prerequisite for replacement. |
 | Command processor | PCOMM, or its successor, is a U application placed above 16 MiB with its stack and heap there when its ABI permits. It is the neutral PDOS command entry point and may ask K to launch either personality with a copied command and receive its return code. K retains boot, fault and emergency console output plus checked terminal and invocation services. The command processor is not part of K merely to remain resident. |
-| 3270 ownership | K owns the device, interrupt/completion state, bounded data transfer, one foreground screen owner and compatibility line input/output services. A reusable U presentation library can provide an application header, footer, scrollable output and editable entry area through checked K screen/input requests. PCOMM should use it first. Wrapped applications redraw after a nested child returns. Existing unmodified line-oriented CMS/TSO programs continue through their native terminal calls; the wrapper does not silently impose a full-screen layout on them. |
+| Terminal and 3270 ownership | K owns the device, interrupt/completion state, bounded data transfer, one foreground screen owner and compatibility line input/output services. The K driver and 3270 data-stream encoder are C31 C, with assembler limited to privileged channel operations. A reusable U presentation library is C, with only target-specific linkage at its boundary. It provides an application header, footer, scrollable output and editable entry area through checked K screen/input requests. PCOMM should use it first. Wrapped applications redraw after a nested child returns. Existing unmodified line-oriented CMS/TSO programs continue through their native terminal calls; the wrapper does not silently impose a full-screen layout on them. |
 
 The terminal contract must distinguish line output from a full-screen lease.
 K serializes channel operations and rejects an invalid owner or buffer before
-I/O. The U library owns field layout, scrolling, command history and display
-text conversion. A screen lease follows the foreground invocation stack and
-returns to its caller, which repaints its frame. This allows a legacy child to
+I/O. The U C library owns field layout, scrolling, command history and display
+text conversion. K accepts bounded logical screen and field requests and
+encodes their device data stream in C; it does not execute an unchecked raw U
+stream. A screen lease follows the foreground invocation stack and returns to
+its caller, which repaints its frame. This allows a legacy child to
 use its normal terminal calls without corrupting a suspended U renderer's
 state. A bounded output queue or an explicit busy result is required for any
 output that cannot be displayed while another owner holds the screen; the
 policy must be selected and tested before asynchronous output is enabled.
+
+The release console's `22*80` output buffer and the successor's 2 KiB console
+write limit are implementation limits, not the 3270 architecture. The first
+expanded driver target is the standard display models 2 (24×80), 3 (32×80),
+4 (43×80) and 5 (27×132), in their qualified default or alternate screen
+modes. K exposes a versioned terminal-capability result: device class, usable
+rows and columns, active/default/alternate geometry, buffer-address format,
+and supported attributes. Optional color and highlighting are used only when
+reported; the basic layout works without them. K obtains the result from a
+checked device query where the channel terminal supports one; otherwise it
+uses an explicit, validated terminal configuration. A 24×80 default is valid
+for configured models that support it. It must not stand in for an unknown
+active or alternate geometry. U computes output rows, input field and scroll region
+from the reported geometry and fails a layout that cannot fit. K checks each
+field, address, encoded length, input capacity and low-real channel buffer
+capacity before submission. The present 256-byte input limit is a fixture
+limit, not a general modified-field capacity. Wider or extended displays,
+such as 62×160, require separately qualified addressing and device-query
+support. Non-3270 line consoles use a separate backend behind the same
+terminal service boundary, not fictitious 3270 rows and columns. The disk and
+terminal retain independent K-owned channel workspaces and event-driven
+completion.
+
+IBM's [screen-size definitions](https://www.ibm.com/docs/en/gddm?topic=network-pservic-operand-modeent-macro)
+give the standard model dimensions. Its [3270 screen-size control](https://www.ibm.com/docs/en/personal-communications/15.0.0?topic=operations-3270-session-screen-size-control)
+and [buffer-address description](https://www.ibm.com/docs/en/cics-ts/5.6?topic=stream-set-buffer-address-order)
+are reference inputs for the capability and address-encoding checks; the
+Hercules channel device still needs its own qualification.
 
 Before selecting the replacement image, qualify the native call parameter and
 return conventions separately for CMS and TSO, including mixed address modes,

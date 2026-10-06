@@ -17,8 +17,11 @@ terminal operations, CMS and TSO image maps, native version calls and wide
 heaps are in
 [the two-space PoC contract](TWO-SPACE-POC.md).
 Its [architecture decisions](TWO-SPACE-POC.md#architecture-decisions-for-the-first-replacement)
-retain one shared U ASCE, place the PDOS command processor and reusable 3270
-presentation library in U, and keep device and checked service handling in K.
+retain one shared U ASCE, place the PDOS command processor and reusable C
+3270 presentation library in U, and keep the C31 C terminal driver and
+checked service handling in K. The next terminal target includes 3270 models
+2–5 with geometry and capabilities supplied by a checked query or explicit
+configuration; the present fixed 24×80 layout is a source limitation.
 Required application calls are within the same CMS or TSO personality, with
 parameters and a return code. Mainframe cREXX does not require a REXX
 `ADDRESS` operation or a CMS-to-TSO application call.
