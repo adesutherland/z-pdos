@@ -45,7 +45,7 @@ def drain_output(stream, lines, events):
 
 
 def await_wait_state(events, proc, console_log):
-    end = time.monotonic() + 60
+    end = time.monotonic() + 180
     while time.monotonic() < end:
         if proc.poll() is not None:
             raise RuntimeError("Hercules exited before guest completion")
@@ -79,7 +79,7 @@ def page_unmapped(raw, root, virtual):
         if entry == (0x400 if level == 3 else 0x20):
             return True
         origin = entry & ~4095
-        if origin < 0x180000 or origin >= 0x1e0000:
+        if origin < 0x280000 or origin >= 0x3e0000:
             return False
     return False
 
@@ -91,7 +91,7 @@ def page_real(raw, root, virtual):
                (lo >> 20) & 2047, (lo >> 12) & 255)
     origin = root & ~4095
     for level, index in enumerate(indexes):
-        if origin < 0x180000 or origin >= 0x1e0000:
+        if origin < 0x280000 or origin >= 0x3e0000:
             return None
         entry = struct.unpack_from(">Q", raw, origin + index * 8)[0]
         if entry == (0x400 if level >= 3 else 0x20):
@@ -116,7 +116,7 @@ def run(args):
     while script_port == console_port:
         script_port = unused_loopback_port()
     out.joinpath("machine.cnf").write_text(
-        "ARCHLVL ESAME\nMAINSIZE 64\nNUMCPU 1\nCPUMODEL 2064\n"
+        "ARCHLVL ESAME\nMAINSIZE 256\nNUMCPU 1\nCPUMODEL 2064\n"
         "DIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\n"
         f"CNSLPORT 127.0.0.1:{console_port}\n"
         f"01B9 3390 {disk}\n0009 3270\n")
@@ -171,10 +171,10 @@ def run(args):
             raise RuntimeError("3270 PING entry failed")
         await_wait_state(events, proc, out / "console.log")
         proc.stdin.write("stopall\npsw\ngpr\ncr\n"
-        f"savecore \"{out / 'result.core'}\" 0 3ffffff\nquit\n")
+        f"savecore \"{out / 'result.core'}\" 0 fffffff\nquit\n")
         proc.stdin.flush()
         proc.stdin.close()
-        proc.wait(timeout=20)
+        proc.wait(timeout=60)
         reader.join(timeout=2)
     except (TimeoutError, RuntimeError, subprocess.TimeoutExpired) as exc:
         if proc is not None and proc.poll() is None:
@@ -193,7 +193,7 @@ def run(args):
         (out / "console.log").exists() else "".join(lines)
     out.joinpath("hercules.log").write_text(log)
     result_path = out / "result.core"
-    if result_path.exists() and result_path.stat().st_size == 0x4000000:
+    if result_path.exists() and result_path.stat().st_size == 0x10000000:
         raw = result_path.read_bytes()
         reference = core.read_bytes()
         try:
@@ -202,9 +202,9 @@ def run(args):
             judged["checks"]["ipl_subchannel_handover"] = (
                 0x10000 <= struct.unpack_from(">I",raw,0x40bc)[0] < 0x10100)
             judged["checks"]["independent_disk_console_channel_workspaces"] = (
-                struct.unpack_from(">I",raw,0x1e0008)[0] == 0x1e0200 and
-                struct.unpack_from(">I",raw,0x1f0008)[0] == 0x1f0200 and
-                raw[0x1e0200:0x1e0208] != raw[0x1f0200:0x1f0208])
+                struct.unpack_from(">I",raw,0x3e0008)[0] == 0x3e0200 and
+                struct.unpack_from(">I",raw,0x3f0008)[0] == 0x3f0200 and
+                raw[0x3e0200:0x3e0208] != raw[0x3f0200:0x3f0208])
             judged["checks"]["k_terminal_screen_observed"] = (
                 "K SERVICE READY" in (out / "terminal.screen").read_text())
             judged["checks"]["terminal_input_sent"] = input_sent
@@ -214,23 +214,23 @@ def run(args):
             checks["guest_built_asces"] = raw[0x4000:0x4010] == reference[0x4000:0x4010]
             checks["guest_built_dat_tables"] = (
                 struct.unpack_from(">I",raw,0x40b0)[0] ==
-                    zlib.crc32(reference[0x100000:0x180000]) and
+                    zlib.crc32(reference[0x100000:0x280000]) and
                 struct.unpack_from(">I",raw,0x40b4)[0] ==
-                    zlib.crc32(reference[0x180000:0x1e0000]) and
-                raw[0x100000:0x180000] == reference[0x100000:0x180000])
+                    zlib.crc32(reference[0x280000:0x3e0000]) and
+                raw[0x100000:0x280000] == reference[0x100000:0x280000])
             checks["runtime_u_pages_released"] = (
-                (bool(args.cms24) or page_unmapped(raw, 0x18000f, 0x22000)) and
-                page_unmapped(raw, 0x18000f, 0x02010000) and
+                (bool(args.cms24) or page_unmapped(raw, 0x28000f, 0x22000)) and
+                page_unmapped(raw, 0x28000f, 0x02010000) and
                 (bool(args.cms24) or bool(args.cms31) or
-                 raw[0x180000:0x1e0000] == reference[0x180000:0x1e0000]))
+                 raw[0x280000:0x3e0000] == reference[0x280000:0x3e0000]))
             wide31 = struct.unpack_from(">Q",raw,0x121d0)[0]
             wide64 = struct.unpack_from(">Q",raw,0x121e8)[0]
             checks["wide_heap_endpoints_unmapped_after_free"] = (
-                0x02010000 <= wide31 <= 0x7f000000 and
+                0x02010000 <= wide31 <= 0x7c000000 and
                 wide64 == 0x0000000120000000 and
-                all(page_unmapped(raw,0x18000f,at) for at in
-                    (wide31,wide31+0x00fff000,
-                     wide64,wide64+0x01fff000)))
+                all(page_unmapped(raw,0x28000f,at) for at in
+                    (wide31,wide31+0x03fff000,
+                     wide64,wide64+0x07fff000)))
             if args.cms24:
                 real24, entry24, image24, low_free = struct.unpack_from(
                     ">4I", raw, 0x4100)
@@ -238,19 +238,19 @@ def run(args):
                 pages24 = (image24 + 4095) // 4096
                 checks["cms24_u_fixed_image_contract"] = (
                     entry24 == 0x20000 and image24 == 1681088 and
-                    0x200000 <= real24 < 0x4000000 and
-                    real24 + pages24 * 4096 <= 0x4000000 and
+                    0x400000 <= real24 < 0x10000000 and
+                    real24 + pages24 * 4096 <= 0x10000000 and
                     low_free == 0x00f00000 - 0x20000 - pages24 * 4096 and
                     raw[real24:real24+16] == staged24[148:164] and
-                    all(page_real(raw,0x18000f,0x20000+i*4096) ==
+                    all(page_real(raw,0x28000f,0x20000+i*4096) ==
                         real24+i*4096 for i in range(pages24)))
                 stack_real, stack_bytes = struct.unpack_from(">2I",raw,0x4114)
                 checks["cms24_guarded_backed_stack"] = (
                     stack_bytes == 0xff000 and
-                    0x200000 <= stack_real < 0x4000000 and
-                    stack_real + stack_bytes <= 0x4000000 and
-                    page_unmapped(raw,0x18000f,0xf00000) and
-                    all(page_real(raw,0x18000f,0xf01000+i*4096) ==
+                    0x400000 <= stack_real < 0x10000000 and
+                    stack_real + stack_bytes <= 0x10000000 and
+                    page_unmapped(raw,0x28000f,0xf00000) and
+                    all(page_real(raw,0x28000f,0xf01000+i*4096) ==
                         stack_real+i*4096 for i in range(stack_bytes//4096)) and
                     raw[stack_real+stack_bytes-4096] == 0x5a)
                 parent24, push24, executed24, returned24, restored24, child24 = \
@@ -266,11 +266,11 @@ def run(args):
                 staged = (disk.parent / "cms31-rxvm.bin").read_bytes()
                 pages = (image_bytes + 4095) // 4096
                 checks["cms31_u_image_contract"] = (
-                    0x200000 <= real < 0x4000000 and
+                    0x400000 <= real < 0x10000000 and
                     entry == 0x03000000 and image_bytes == 4238296 and
-                    blocks == 239 and real + pages * 4096 <= 0x4000000 and
+                    blocks == 239 and real + pages * 4096 <= 0x10000000 and
                     raw[real:real+16] == staged[148:164] and
-                    all(page_real(raw,0x18000f,0x03000000+i*4096) ==
+                    all(page_real(raw,0x28000f,0x03000000+i*4096) ==
                         real+i*4096 for i in range(pages)))
                 if args.cms24:
                     checks["cms_images_independent_real_backing"] = (
@@ -284,12 +284,12 @@ def run(args):
                     and struct.unpack_from(">I",raw,0x40f4)[0] == 31
                     and returned == executed and restored == parent)
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
-                real_bytes == 0x4000000 and stage >= 0x400000 and
-                stage + 0x200000 <= launch and launch + 4096 <= real_bytes and
-                kpool == 0x100000 and upool == 0x180000 and
-                200704 < kbytes <= 0x80000 and
+                real_bytes == 0x10000000 and stage >= 0x400000 and
+                stage + 0x400000 <= launch and launch + 4096 <= real_bytes and
+                kpool == 0x100000 and upool == 0x280000 and
+                200704 < kbytes <= 0x180000 and
                 struct.unpack_from(">I",raw,0x40b8)[0] == 94208 and
-                (94208 < ubytes <= 0x60000 if args.cms24 or args.cms31
+                (94208 < ubytes <= 0x160000 if args.cms24 or args.cms31
                  else ubytes == 94208))
             checks["guest_dat_unmap_remap_ptlb"] = struct.unpack_from(">I",raw,0x40a0)[0] == 2
             judged["handover"] = {"stage_real": hex(stage),

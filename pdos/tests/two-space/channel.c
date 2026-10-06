@@ -19,23 +19,23 @@ int main(void)
     real=(unsigned char *)malloc(0x4000000U);
     if (!real) return 1;
     memset(real,0xa5,0x4000000U);
-    if (TSCINIT(&channel,real,0x4000000U,0x1e0000U) != TSC_OK ||
+    if (TSCINIT(&channel,real,0x4000000U,0x3e0000U) != TSC_OK ||
         TSCINIT(&channel,real,0x4000000U,0xff1000U) != TSC_BAD ||
-        TSCINIT(&channel,real,0x4000000U,0x1e0001U) != TSC_BAD)
+        TSCINIT(&channel,real,0x4000000U,0x3e0001U) != TSC_BAD)
         return 2;
     if (TSCBUILDREAD(&channel,0U,0U,3U,0x0eU,80U) != TSC_OK)
         return 3;
-    base=real+0x1e0000U;
+    base=real+0x3e0000U;
     if (word(base+4U) != 0x0080ff00U ||
-        word(base+8U) != 0x1e0200U ||
-        memcmp(base+0x200U,"\x07\x40\x00\x06\x00\x1e\x03\x00",8U) ||
-        memcmp(base+0x208U,"\x31\x40\x00\x05\x00\x1e\x03\x10",8U) ||
-        memcmp(base+0x210U,"\x08\x00\x00\x00\x00\x1e\x02\x08",8U) ||
-        memcmp(base+0x218U,"\x0e\x20\x00\x50\x00\x1e\x10\x00",8U) ||
+        word(base+8U) != 0x3e0200U ||
+        memcmp(base+0x200U,"\x07\x40\x00\x06\x00\x3e\x03\x00",8U) ||
+        memcmp(base+0x208U,"\x31\x40\x00\x05\x00\x3e\x03\x10",8U) ||
+        memcmp(base+0x210U,"\x08\x00\x00\x00\x00\x3e\x02\x08",8U) ||
+        memcmp(base+0x218U,"\x0e\x20\x00\x50\x00\x3e\x10\x00",8U) ||
         base[0x310U] || base[0x311U] || base[0x312U] ||
         base[0x313U] || base[0x314U] != 3U ||
-        base[0x1000U] != 0U || real[0x1dffffU] != 0xa5U ||
-        real[0x1f0000U] != 0xa5U)
+        base[0x1000U] != 0U || real[0x3dffffU] != 0xa5U ||
+        real[0x3f0000U] != 0xa5U)
         return 4;
     if (TSCBUILDREAD(&channel,0U,15U,3U,0x0eU,80U) != TSC_BAD ||
         TSCBUILDREAD(&channel,0U,0U,0U,0x0eU,80U) != TSC_BAD ||
@@ -44,7 +44,7 @@ int main(void)
         return 5;
     irb=TSCIRB(&channel);
     irb[8]=0x0cU; irb[9]=0U; irb[10]=0U; irb[11]=16U;
-    irb[4]=0U; irb[5]=0x1eU; irb[6]=0x02U; irb[7]=0x20U;
+    irb[4]=0U; irb[5]=0x3eU; irb[6]=0x02U; irb[7]=0x20U;
     if (TSCCHECKREAD(&channel,80U,&got) != TSC_OK || got != 64U)
         return 6;
     irb[9]=1U;
@@ -55,28 +55,28 @@ int main(void)
     if (TSCBUILDCONSWRITE(&channel,1773U) != TSC_OK ||
         TSCBUILDCONSWRITE(&channel,2049U) != TSC_BAD ||
         word(base+4U) != 0x0080ff00U ||
-        word(base+8U) != 0x1e0200U ||
-        memcmp(base+0x200U,"\x01\x20\x06\xed\x00\x1e\x10\x00",8U) ||
+        word(base+8U) != 0x3e0200U ||
+        memcmp(base+0x200U,"\x01\x20\x06\xed\x00\x3e\x10\x00",8U) ||
         TSCDATA(&channel)[0] != 0xd2U ||
         TSCSCHIB(&channel) != base+0x400U)
         return 9;
     irb[8]=0x0cU; irb[9]=0U; irb[10]=0U; irb[11]=0U;
-    irb[4]=0U; irb[5]=0x1eU; irb[6]=0x02U; irb[7]=0x08U;
+    irb[4]=0U; irb[5]=0x3eU; irb[6]=0x02U; irb[7]=0x08U;
     if (TSCCHECKWRITE(&channel) != TSC_OK) return 10;
     irb[11]=1U;
     if (TSCCHECKWRITE(&channel) != TSC_IO) return 11;
     if (TSCBUILDCONSREAD(&channel,252U) != TSC_OK ||
         TSCBUILDCONSREAD(&channel,257U) != TSC_BAD ||
-        memcmp(base+0x200U,"\x06\x20\x00\xfc\x00\x1e\x10\x00",8U) ||
+        memcmp(base+0x200U,"\x06\x20\x00\xfc\x00\x3e\x10\x00",8U) ||
         TSCDATA(&channel)[0] != 0U)
         return 12;
     irb[8]=0x0cU; irb[9]=0U; irb[10]=0U; irb[11]=244U;
-    irb[4]=0U; irb[5]=0x1eU; irb[6]=0x02U; irb[7]=0x08U;
+    irb[4]=0U; irb[5]=0x3eU; irb[6]=0x02U; irb[7]=0x08U;
     if (TSCCHECKCONSREAD(&channel,252U,&got) != TSC_OK || got != 8U)
         return 13;
     irb[9]=1U;
     if (TSCCHECKCONSREAD(&channel,252U,&got) != TSC_IO) return 14;
-    if (TSCINIT(&console,real,0x4000000U,0x1f0000U) != TSC_OK ||
+    if (TSCINIT(&console,real,0x4000000U,0x3f0000U) != TSC_OK ||
         TSCBUILDCONSREAD(&console,252U) != TSC_OK) return 15;
     TSCDATA(&console)[0]=0xc1U;
     TSCIRB(&console)[8U]=0x0cU;
@@ -84,14 +84,14 @@ int main(void)
     TSCIRB(&console)[10U]=0U;
     TSCIRB(&console)[11U]=251U;
     TSCIRB(&console)[4U]=0U;
-    TSCIRB(&console)[5U]=0x1fU;
+    TSCIRB(&console)[5U]=0x3fU;
     TSCIRB(&console)[6U]=0x02U;
     TSCIRB(&console)[7U]=0x08U;
     if (TSCBUILDREAD(&channel,0U,0U,3U,0x0eU,80U) != TSC_OK ||
         TSCCHECKCONSREAD(&console,252U,&got) != TSC_OK || got != 1U ||
         TSCDATA(&console)[0] != 0xc1U ||
-        word(TSCORB(&console)+8U) != 0x1f0200U ||
-        word(TSCORB(&channel)+8U) != 0x1e0200U) return 16;
+        word(TSCORB(&console)+8U) != 0x3f0200U ||
+        word(TSCORB(&channel)+8U) != 0x3e0200U) return 16;
     free(real);
     return 0;
 }

@@ -26,8 +26,8 @@ static int test(unsigned char *real)
     unsigned char root_entry[8];
     TSPADDR address;
     unsigned int i;
-    if (TSFBUILD(real,0x100000U,0x180000U,&built,0,0) ||
-        TSDATTACH(&tables,real+0x180000U,0x180000U,TSF_UPOOL_BYTES,
+    if (TSFBUILD(real,TSF_KPOOL_REAL,TSF_UPOOL_REAL,&built,0,0) ||
+        TSDATTACH(&tables,real+TSF_UPOOL_REAL,TSF_UPOOL_REAL,TSF_UPOOL_BYTES,
                   built.ubytes,built.uasce) != TSD_OK) return 1;
     gate.u_tables=&tables; gate.real_aperture=real;
     gate.real_bytes=TSF_REAL_BYTES; gate.rights=rights;
@@ -79,13 +79,13 @@ static int test(unsigned char *real)
     address.hi=0U; address.lo=0x20000U;
     if (TSDLOOKUP(&tables,address,&address) != TSD_OK ||
         address.hi != 0U || address.lo != 0x5000U) return 12;
-    memcpy(root_entry,real+0x180000U,sizeof root_entry);
-    real[0x180004U]=0x7fU; real[0x180005U]=0xffU;
-    real[0x180006U]=0x00U; real[0x180007U]=0x0fU;
+    memcpy(root_entry,real+TSF_UPOOL_REAL,sizeof root_entry);
+    real[TSF_UPOOL_REAL+4U]=0x7fU; real[TSF_UPOOL_REAL+5U]=0xffU;
+    real[TSF_UPOOL_REAL+6U]=0x00U; real[TSF_UPOOL_REAL+7U]=0x0fU;
     address.hi=1U; address.lo=0x10001000U;
     if (TSDLOOKUP(&tables,address,&address) != TSD_BAD) return 16;
-    memcpy(real+0x180000U,root_entry,sizeof root_entry);
-    if (TSFBUILD(real,0xa000U,0x180000U,&built,0,0) == 0) return 13;
+    memcpy(real+TSF_UPOOL_REAL,root_entry,sizeof root_entry);
+    if (TSFBUILD(real,0xa000U,TSF_UPOOL_REAL,&built,0,0) == 0) return 13;
     return 0;
 }
 

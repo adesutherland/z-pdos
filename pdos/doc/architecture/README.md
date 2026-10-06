@@ -25,9 +25,9 @@ backs it with real frames outside the core, zeroes them and changes the live
 U DAT with a single-CPU purge. It can return a low U address backed by high
 real storage. The selected conditional SVC 120 GETMAIN/FREEMAIN subset and
 an internal high-U diagnostic entry allocate, touch and release simultaneous
-16 MiB U31 and 32 MiB U64 heaps while CMS24/CMS31 RXVM images are mapped.
-The [wide-heap result](../qualification/TWO-SPACE-WIDE-HEAPS-2026-10-06.md)
-measures 319,488 U table bytes in the 64 MiB real profile. Reversible
+64 MiB U31 and 128 MiB U64 heaps while CMS24/CMS31 RXVM images are mapped.
+The [256 MiB profile result](../qualification/TWO-SPACE-256M-HEAPS-2026-10-06.md)
+measures 909,312 U table bytes in that guest. Reversible
 fixed-origin child backing is also exercised in the guest.
 
 K reads checked CKD records through separate low-real disk and console

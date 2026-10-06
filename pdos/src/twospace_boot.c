@@ -173,7 +173,8 @@ int main(int argc, char **argv)
         crc32_bytes(stub,launch_len) != launch_crc) FAIL(28);
     if (be32(core+0x2000U) != 0x5044324eU ||
         !zeroes(core+0x4000U,16U) ||
-        !zeroes(core+0x100000U,0xe0000U)) FAIL(29);
+        !zeroes(core+TSF_KPOOL_REAL,
+                TSF_CHANNEL_REAL-TSF_KPOOL_REAL)) FAIL(29);
     /* The real interruption/context island and all mapped service slots are
        owned even when their initial bytes are zero and omitted from disk. */
     if (TSRINIT(&final_core,CORE_SIZE) != TSR_OK) FAIL(30);
@@ -197,9 +198,9 @@ int main(int argc, char **argv)
                    TSF_CHANNEL_BYTES,TSR_RUN) != TSR_OK) FAIL(31);
     if (TSRRESERVE(&final_core,701U,TSF_CONSOLE_REAL,
                    TSF_CHANNEL_BYTES,TSR_RUN) != TSR_OK) FAIL(31);
-    if (TSRALLOC(&final_core,3U,TSF_KPOOL_BYTES,0x100000U,
+    if (TSRALLOC(&final_core,3U,TSF_KPOOL_BYTES,TSF_KPOOL_REAL,
                  CORE_SIZE,TSR_RUN,&kpool) != TSR_OK) FAIL(32);
-    if (TSRALLOC(&final_core,4U,TSF_UPOOL_BYTES,0x100000U,
+    if (TSRALLOC(&final_core,4U,TSF_UPOOL_BYTES,TSF_KPOOL_REAL,
                  CORE_SIZE,TSR_RUN,&upool) != TSR_OK) FAIL(34);
     if (TSFBUILD(core,kpool,upool,&dat,purge_callback,0)) FAIL(35);
     if (purges != 2U) FAIL(36);

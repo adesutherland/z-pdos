@@ -41,7 +41,7 @@ def load_elf(path):
                 (KCORE, 0x9000), (0x02010000, 0xf000),
                 (0x02000000, 0x11000), (HIGH_REQUEST, 0x12000),
                 (0x110002000, 0x13000)}
-    core = bytearray(0x200000)
+    core = bytearray(0x400000)
     actual = set()
     for i in range(phnum):
         kind, perms, off, va, pa, filesz, memsz, align = struct.unpack_from(
@@ -79,7 +79,7 @@ def make_core(elf, classic, dat_emit, out):
     application = {0x20000: 0x5000, 0x21000: 0x7000,
                    0x02000000: 0x11000, 0x110000000: 0x6000,
                    HIGH_REQUEST: 0x12000, 0x110002000: 0x13000}
-    pools = ((0x100000, 0x180000), (0x180000, 0x1e0000))
+    pools = ((0x100000, 0x280000), (0x280000, 0x3e0000))
     if any(lo <= pa < hi for pa in (*kernel.values(), *application.values())
            for lo, hi in pools):
         raise ValueError("DAT real pool overlaps image backing")
@@ -89,7 +89,7 @@ def make_core(elf, classic, dat_emit, out):
                              *(0x14000 + i * 4096 for i in range(11))}
     if private_kernel_frames.intersection(application.values()):
         raise ValueError("U maps private K real frame")
-    if any(0x1e0000 <= pa < 0x200000 for pa in application.values()):
+    if any(0x3e0000 <= pa < 0x400000 for pa in application.values()):
         raise ValueError("U maps low-real K channel buffer")
     image = out / "image.core"
     image.write_bytes(core)
@@ -101,28 +101,28 @@ def make_core(elf, classic, dat_emit, out):
         kasce, kbytes, uasce, ubytes = map(int, built.stdout.split())
     except ValueError as exc:
         raise ValueError("malformed DAT builder result") from exc
-    if (kasce, uasce) != (0x10000f, 0x18000f) or \
-            kbytes > 0x80000 or ubytes > 0x60000:
+    if (kasce, uasce) != (0x10000f, 0x28000f) or \
+            kbytes > 0x180000 or ubytes > 0x160000:
         raise ValueError("DAT builder returned unexpected ASCE or size")
     built_core = image.read_bytes()
     if qword(built_core, 0x100000 + 8 * 8) == 0x20 or \
-            qword(built_core, 0x180000 + 8 * 8) != 0x20:
+            qword(built_core, 0x280000 + 8 * 8) != 0x20:
         raise ValueError("high K R1 entry or U isolation absent")
     kstats = {"table_bytes": kbytes, "table_4k_frames": kbytes // 4096,
-              "mapped_pages": len(kernel) + 16384 + 0xe0000 // 4096}
+              "mapped_pages": len(kernel) + 65536 + 0x2e0000 // 4096}
     ustats = {"table_bytes": ubytes, "table_4k_frames": ubytes // 4096,
               "mapped_pages": len(application)}
     return {"kernel_asce": hex(kasce), "application_asce": hex(uasce),
             "kernel_dat": kstats, "application_dat": ustats,
             "kernel_mappings": {hex(k): hex(v) for k, v in kernel.items()},
             "application_mappings": {hex(k): hex(v) for k, v in application.items()},
-            "kernel_table_aliases": {"kernel": ["0x5000000", "0x507ffff"],
-                                     "application_tables": ["0x5080000", "0x50dffff"]},
-            "kernel_real_aperture": ["0x8000000", "0xbffffff"],
+            "kernel_table_aliases": {"kernel": ["0x5000000", "0x517ffff"],
+                                     "application_tables": ["0x5180000", "0x52dffff"]},
+            "kernel_real_aperture": ["0x8000000", "0x17ffffff"],
             "kernel_pages_in_application_low_virtual": 0,
             "application_low_virtual_bytes": sum(4096 for va in application if va < 0x1000000),
             "application_low_unmapped_bytes": 0x1000000 - sum(4096 for va in application if va < 0x1000000),
-            "classic_service_size": len(service), "real_memory_bytes": 0x4000000}
+            "classic_service_size": len(service), "real_memory_bytes": 0x10000000}
 
 
 def judge(raw, log, ipl=False, cms24=False, cms31=False):
@@ -147,7 +147,7 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False):
               "io_entry_returned": qword(raw, 0x2198) == 1,
               "kcore_above_region_third_range": qword(raw, 0x2020) == KCORE,
               "k_can_read_own_dat_pool": qword(raw, 0x2028) == 0x10400f,
-              "k_can_read_u_dat_pool": qword(raw, 0x2030) == 0x18400f,
+              "k_can_read_u_dat_pool": qword(raw, 0x2030) == 0x28400f,
               "expected_isolation_fault": raw[0x8e:0x90] == b"\0\x11",
               "fault_in_problem_amode64": qword(raw, 0x150) & MODE_MASK ==
                     0x0481000180000000,
@@ -197,7 +197,7 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False):
     wide31 = qword(raw,0x121d0)
     wide64 = qword(raw,0x121e8)
     checks["simultaneous_wide_heaps_touched_and_released"] = (
-        0x02010000 <= wide31 <= 0x7f000000 and
+        0x02010000 <= wide31 <= 0x7c000000 and
         wide64 == 0x0000000120000000 and
         struct.unpack_from(">3I",raw,0x121d8) == (0,0x31,0x32) and
         struct.unpack_from(">4I",raw,0x121f0) == (0,0x61,0x62,0) and
@@ -251,10 +251,10 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False):
             b"\xd7\xc9\xd5\xc7" in raw[0x12084:0x12084+count])
     checks["live_dat_mutations_purged"] = (
         struct.unpack_from(">I",raw,0x40ac)[0] ==
-        (4 + 24576 +
+        (4 + 98304 +
          (2 + 5 * ((1681088 + 4095) // 4096) + 255 if cms24 else 0) +
          (5 * ((4238296 + 4095) // 4096) if cms31 else 0)) and
-        0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x60000)
+        0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x160000)
     errors = [x for x in log.splitlines() if re.search(r"HHC\d{5}E\b", x)]
     checks["no_hercules_error"] = not errors
     return {"pass": all(checks.values()), "checks": checks,
@@ -293,16 +293,16 @@ def run(args):
     manifest["tools_sha256"] = {name: digest(getattr(args, name)) for name in
                                 ("assembler", "linker", "classic_cc", "classic_as", "classic_ld", "hercules", "dat_emit")}
     out.joinpath("machine.cnf").write_text(
-        "ARCHLVL ESAME\nMAINSIZE 64\nNUMCPU 1\nCPUMODEL 2064\n"
+        "ARCHLVL ESAME\nMAINSIZE 256\nNUMCPU 1\nCPUMODEL 2064\n"
         "DIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\n")
     out.joinpath("run.rc").write_text(
         f"sysclear\narchlvl esame\nloadcore \"{out / 'image.core'}\"\n"
-        f"runtest 60\nstopall\npsw\ngpr\ncr\n"
+        f"runtest 180\nstopall\npsw\ngpr\ncr\n"
         f"savecore \"{out / 'result.core'}\" 0 13fff\nquit\n")
     cmd = [str(Path(args.hercules).resolve()), "-t", "-f", str(out / "machine.cnf"),
            "-o", str(out / "console.log"), "-r", str(out / "run.rc")]
     try:
-        proc = subprocess.run(cmd, cwd=out, capture_output=True, text=True, timeout=75)
+        proc = subprocess.run(cmd, cwd=out, capture_output=True, text=True, timeout=195)
         log = proc.stdout + proc.stderr
     except subprocess.TimeoutExpired as exc:
         log = (exc.stdout or b"").decode(errors="replace") + (exc.stderr or b"").decode(errors="replace")
@@ -329,7 +329,7 @@ def run(args):
     alternate.write_bytes(negative)
     out.joinpath("machine-check.rc").write_text(
         f"sysclear\narchlvl esame\nloadcore \"{alternate}\"\n"
-        f"runtest 60\nstopall\npsw\n"
+        f"runtest 180\nstopall\npsw\n"
         f"savecore \"{out / 'machine-check-result.core'}\" 0 13fff\nquit\n")
     negative_cmd = [str(Path(args.hercules).resolve()), "-t", "-f",
                     str(out / "machine.cnf"), "-o", str(out / "machine-check-console.log"), "-r",
@@ -337,7 +337,7 @@ def run(args):
     try:
         negative_proc = subprocess.run(negative_cmd, cwd=out,
                                        capture_output=True, text=True,
-                                       timeout=75)
+                                       timeout=195)
         negative_log = negative_proc.stdout + negative_proc.stderr
     except subprocess.TimeoutExpired as exc:
         negative_proc = None
@@ -370,14 +370,14 @@ def run(args):
     fault_core.write_bytes(fault_image)
     out.joinpath("unexpected-fault.rc").write_text(
         f"sysclear\narchlvl esame\nloadcore \"{fault_core}\"\n"
-        f"runtest 60\nstopall\npsw\n"
+        f"runtest 180\nstopall\npsw\n"
         f"savecore \"{out / 'unexpected-fault-result.core'}\" 0 13fff\nquit\n")
     fault_cmd = [str(Path(args.hercules).resolve()), "-t", "-f",
                  str(out / "machine.cnf"), "-o", str(out / "unexpected-fault-console.log"), "-r",
                  str(out / "unexpected-fault.rc")]
     try:
         fault_proc = subprocess.run(fault_cmd, cwd=out, capture_output=True,
-                                    text=True, timeout=75)
+                                    text=True, timeout=195)
         fault_log = fault_proc.stdout + fault_proc.stderr
     except subprocess.TimeoutExpired as exc:
         fault_proc = None

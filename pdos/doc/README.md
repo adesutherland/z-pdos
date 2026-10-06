@@ -7,7 +7,7 @@ and an application's service call.
 - [Architecture](architecture/README.md): boot, C32/64-bit boundaries, storage,
   program loading, datasets and terminal services.
 - [Two-space successor](architecture/TWO-SPACE-POC.md): K64/C31/shared-U
-  contract and bounded implementation; the [wide-heap result](qualification/TWO-SPACE-WIDE-HEAPS-2026-10-06.md)
+  contract and bounded implementation; the [256 MiB heap result](qualification/TWO-SPACE-256M-HEAPS-2026-10-06.md)
   records the latest combined CMS-image and memory proof, with the remaining
   compatibility gates in the [backlog](BACKLOG.md).
 - [Source-to-image dependencies](architecture/DEPENDENCIES.md): selected inputs,

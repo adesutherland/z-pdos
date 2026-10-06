@@ -392,6 +392,17 @@ retains its existing below/above-line register convention. The CMS images
 are not yet executed, and these sizes do not define a maximum application
 heap policy.
 
+The [256 MiB diagnostic profile](../qualification/TWO-SPACE-256M-HEAPS-2026-10-06.md)
+widens the final core to 4 MiB and its K/U pools to 1.5/1.375 MiB. K's
+C31 real aperture maps the named 256 MiB profile while its DAT tables
+remain K-only. The checked guest builds those tables after IPL, maps both
+RXVM images and the CMS24 stack, then allocates, touches and frees a
+64 MiB U31 heap and a 128 MiB U64 heap simultaneously. K uses 1,191,936
+DAT bytes and U reaches 909,312. The low U24 placement gap stays
+13,914,112 bytes. This addresses the SDK's default heap *sizes* with
+real-frame and DAT headroom on that profile; it does not run the unchanged
+SDK programs, exercise the CMS31 C stack, or establish the service ABI.
+
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
 SVC through K, returns `0x3456` to a U64 caller, restores the parent PTEs,

@@ -222,11 +222,14 @@ endpoint pages unmapped after free. Internal SVC 223 is only a provisional
 high-U fixture entry; actual application storage and CMS/TSO service ABI
 qualification remain open.
 The maintained SDK defaults are 64 MiB for CMS31/TSO31 and 128 MiB for
-TSO64, with a further 3 MiB CMS31 stack. The current 64 MiB real fixture
-cannot qualify those unchanged workloads. The next memory gate needs a
-larger named real profile, enough K/U DAT capacity and real-frame headroom
-while keeping the 24-bit U virtual placement unchanged. The heap defaults
-are recorded by the owning Mainframe ELF SDK in `docs/compiler/SDK.md`.
+TSO64, with a further 3 MiB CMS31 stack. The earlier 64 MiB real fixture
+could not qualify those unchanged workloads. The
+[256 MiB memory checkpoint](qualification/TWO-SPACE-256M-HEAPS-2026-10-06.md)
+now supplies enough K/U DAT capacity and real-frame headroom for simultaneous
+64/128 MiB *diagnostic* heaps while keeping 24-bit U placement unchanged.
+The SDK defaults are recorded by the owning Mainframe ELF SDK in
+`docs/compiler/SDK.md`. The CMS31 C stack, unchanged application runs and
+their service ABIs still need qualification.
 
 ## PD-004: Batch-file delivery
 

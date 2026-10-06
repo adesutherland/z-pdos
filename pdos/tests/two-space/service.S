@@ -310,8 +310,8 @@ app_high:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 60(%r2)
-    lghi %r0, 4096          /* 64 MiB exceeds the whole named real profile */
-    sllg %r0, %r0, 14
+    lghi %r0, 4096          /* 256 MiB exceeds the whole named real profile */
+    sllg %r0, %r0, 16
     lghi %r1, 0
     lghi %r15, 0x30
     svc 120
@@ -331,8 +331,8 @@ app_high:
     stg %r1, 80(%r2)
     j wide_heap_code_end
 wide_heap_workload:
-    lghi %r0, 4096          /* concurrent 16 MiB U31 heap */
-    sllg %r0, %r0, 12
+    lghi %r0, 4096          /* concurrent 64 MiB U31 heap */
+    sllg %r0, %r0, 14
     lghi %r1, 0
     lghi %r15, 0x30
     svc 120
@@ -347,14 +347,14 @@ wide_heap_workload:
     llgc %r4, 0(%r8)
     st %r4, 0x1dc(%r2)
     lghi %r5, 4096
-    sllg %r5, %r5, 12
+    sllg %r5, %r5, 14
     aghi %r5, -1
     agr %r5, %r8
     mvi 0(%r5), 0x32
     llgc %r4, 0(%r5)
     st %r4, 0x1e0(%r2)
-    lghi %r0, 4096          /* concurrent 32 MiB U64 heap */
-    sllg %r0, %r0, 13
+    lghi %r0, 4096          /* concurrent 128 MiB U64 heap */
+    sllg %r0, %r0, 15
     lghi %r1, 0
     svc 223                 /* provisional internal high-U selector */
     larl %r2, high_data_va
@@ -368,21 +368,21 @@ wide_heap_workload:
     llgc %r4, 0(%r9)
     st %r4, 0x1f4(%r2)
     lghi %r5, 4096
-    sllg %r5, %r5, 13
+    sllg %r5, %r5, 15
     aghi %r5, -1
     agr %r5, %r9
     mvi 0(%r5), 0x62
     llgc %r4, 0(%r5)
     st %r4, 0x1f8(%r2)
     lghi %r0, 4096
-    sllg %r0, %r0, 13
+    sllg %r0, %r0, 15
     lgr %r1, %r9
     svc 223
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x1fc(%r2)
     lghi %r0, 4096
-    sllg %r0, %r0, 13
+    sllg %r0, %r0, 15
     lgr %r1, %r9
     svc 223                 /* a second free cannot claim another allocation */
     larl %r2, high_data_va
@@ -390,7 +390,7 @@ wide_heap_workload:
     st %r15, 0x210(%r2)
 wide64_done:
     lghi %r0, 4096
-    sllg %r0, %r0, 12
+    sllg %r0, %r0, 14
     lgr %r1, %r8
     lghi %r15, 0x30
     svc 120
@@ -833,7 +833,7 @@ fault_pc: .quad isolation_fault
 recovery_pc: .quad app_fault_resume
 synthetic_machine_va: .quad synthetic_machine_dispatch
 k_table_alias_va: .quad 0x05000000
-u_table_alias_va: .quad 0x05080000
+u_table_alias_va: .quad 0x05180000
 bounce_va: .quad 0x03000080
 c_result_va: .quad 0x030000a0
 c_trampoline_va: .quad 0x02010000
