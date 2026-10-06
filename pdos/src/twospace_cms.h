@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * Bounded first-block inspection of a checked staged CMS MODULE. Full
- * record/hash verification and loading are separate gates.
+ * Bounded staged CMS MODULE inspection and image materialization.
  */
 #ifndef PDOS_TWO_SPACE_CMS_H
 #define PDOS_TWO_SPACE_CMS_H
@@ -23,5 +22,9 @@ int TSHHEADER(const unsigned char *block, unsigned int length,
               unsigned int expected_profile, TSHINFO *info);
 int TSHVALIDATE(const unsigned char *staged, unsigned int length,
                 unsigned int expected_profile, TSHINFO *info);
+int TSHIMAGE(const unsigned char *staged, unsigned int length,
+             unsigned int expected_profile, unsigned int base,
+             unsigned char *destination, unsigned int capacity,
+             unsigned int *entry);
 
 #endif

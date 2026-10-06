@@ -90,7 +90,7 @@ int TSHVALIDATE(const unsigned char *staged, unsigned int length,
     unsigned int image_count, remaining, fnv=0x811c9dc5U, previous, address;
     unsigned int old, expected, module_end;
     TSHINFO parsed;
-    if (!staged || !info || length < 146U ||
+    if (!staged || !info || length < 146U || length > 9U*1024U*1024U ||
         TSHHEADER(staged,length < 18452U ? length : 18452U,
                   expected_profile,&parsed) != TSH_OK ||
         parsed.module_bytes > length-64U) return TSH_BAD;
@@ -103,6 +103,9 @@ int TSHVALIDATE(const unsigned char *staged, unsigned int length,
     if (fnv != word(staged+56U) ||
         record(module,parsed.module_bytes,&cursor,&at,&size) != TSH_OK ||
         size != 80U) return TSH_BAD;
+    if (expected_profile == 24U)
+        for (i=16U; i<80U; ++i)
+            if (i != 43U && module[at+i]) return TSH_BAD;
     ++count;
     image_count=(parsed.image_bytes+65534U)/65535U;
     if (image_count > 129U) return TSH_BAD;
@@ -146,5 +149,53 @@ int TSHVALIDATE(const unsigned char *staged, unsigned int length,
     if (count != parsed.records || cursor != parsed.module_bytes)
         return TSH_BAD;
     *info=parsed;
+    return TSH_OK;
+}
+
+static void put_word(unsigned char *p, unsigned int value)
+{
+    p[0]=(unsigned char)(value>>24); p[1]=(unsigned char)(value>>16);
+    p[2]=(unsigned char)(value>>8); p[3]=(unsigned char)value;
+}
+
+int TSHIMAGE(const unsigned char *staged, unsigned int length,
+             unsigned int expected_profile, unsigned int base,
+             unsigned char *destination, unsigned int capacity,
+             unsigned int *entry)
+{
+    const unsigned char *module;
+    unsigned int at, size, cursor=0U, count, i, j, offset=0U, address, old;
+    TSHINFO info;
+    if (!destination || !entry ||
+        TSHVALIDATE(staged,length,expected_profile,&info) != TSH_OK ||
+        capacity < info.image_bytes ||
+        (expected_profile == 24U && base != info.origin) ||
+        (expected_profile == 31U &&
+         ((base & 7U) || base < 0x1000000U ||
+          base > 0x7fffffffU-info.image_bytes))) return TSH_BAD;
+    module=staged+64U;
+    if (record(module,info.module_bytes,&cursor,&at,&size) != TSH_OK)
+        return TSH_BAD;
+    count=(info.image_bytes+65534U)/65535U;
+    for (i=0U; i<count; ++i) {
+        if (record(module,info.module_bytes,&cursor,&at,&size) != TSH_OK)
+            return TSH_BAD;
+        for (j=0U; j<size; ++j) destination[offset+j]=module[at+j];
+        offset+=size;
+    }
+    if (expected_profile == 31U) {
+        if (record(module,info.module_bytes,&cursor,&at,&size) != TSH_OK)
+            return TSH_BAD;
+        for (i=0U; i<info.relocation_records; ++i) {
+            if (record(module,info.module_bytes,&cursor,&at,&size) != TSH_OK)
+                return TSH_BAD;
+            for (j=0U; j<size; j+=5U) {
+                address=word(module+at+j+1U)-info.origin;
+                old=word(destination+address);
+                put_word(destination+address,base+old-info.origin);
+            }
+        }
+    }
+    *entry=base+info.entry-info.origin;
     return TSH_OK;
 }

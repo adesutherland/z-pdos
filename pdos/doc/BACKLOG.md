@@ -169,6 +169,10 @@ reads and validates all 92 records of the v2 CMS24 stage under K and uses
 observable guest completion rather than a fixed IPL pause. U mapping,
 relocation, command dispatch and actual CMS/TSO execution remain slice 6/7
 work. Full-stage validation cannot stand in for application compatibility.
+The [image materialization checkpoint](qualification/TWO-SPACE-CMS-IMAGE-2026-10-06.md)
+adds a C89 fixed CMS24 copy and CMS31 relocation pass over validated staged
+MODULE bytes. U page allocation, executable entry and application-call
+integration are still required for slice 6.
 
 ## PD-004: Batch-file delivery
 

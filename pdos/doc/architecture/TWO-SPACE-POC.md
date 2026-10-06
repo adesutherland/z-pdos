@@ -363,6 +363,12 @@ the image in U. The IPL test now waits for an observable 3270 ready screen
 and guest disabled-wait completion before saving the core. Its time limits
 are failure watchdogs, not the criterion for completion.
 
+The shared C89 loader routine can materialize a validated CMS24 fixed image
+into caller-supplied storage and materialize CMS31 at a checked 31-bit base,
+applying each validated relocation word. Host tests exercised the pinned
+RXVM, RXAS and RXC MODULE bytes. The routine has not yet been connected to
+U page allocation or executable module entry in the successor guest.
+
 ## Primary architecture and compatibility references
 
 - IBM, *z/Architecture Principles of Operation*, SA22-7832-14:

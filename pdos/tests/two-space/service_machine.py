@@ -271,16 +271,18 @@ def run(args):
         "DIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\n")
     out.joinpath("run.rc").write_text(
         f"sysclear\narchlvl esame\nloadcore \"{out / 'image.core'}\"\n"
-        f"runtest 0.5\nstopall\npsw\ngpr\ncr\n"
+        f"runtest 60\nstopall\npsw\ngpr\ncr\n"
         f"savecore \"{out / 'result.core'}\" 0 13fff\nquit\n")
     cmd = [str(Path(args.hercules).resolve()), "-t", "-f", str(out / "machine.cnf"),
-           "-r", str(out / "run.rc")]
+           "-o", str(out / "console.log"), "-r", str(out / "run.rc")]
     try:
-        proc = subprocess.run(cmd, cwd=out, capture_output=True, text=True, timeout=15)
+        proc = subprocess.run(cmd, cwd=out, capture_output=True, text=True, timeout=75)
         log = proc.stdout + proc.stderr
     except subprocess.TimeoutExpired as exc:
         log = (exc.stdout or b"").decode(errors="replace") + (exc.stderr or b"").decode(errors="replace")
         proc = None
+    if (out / "console.log").exists():
+        log = (out / "console.log").read_text(errors="replace")
     out.joinpath("hercules.log").write_text(log)
     manifest["hercules_argv"] = cmd
     manifest["host_exit_code"] = proc.returncode if proc else None
@@ -290,6 +292,9 @@ def run(args):
     else:
         result = {"pass": False, "checks": {"result_core_present": False}}
     result["pass"] &= proc is not None and proc.returncode == 0
+    result["checks"]["guest_completion_event"] = (
+        "HHC00809I Processor CP00: disabled wait state" in log)
+    result["pass"] &= result["checks"]["guest_completion_event"]
     # A separate synthetic machine-check entry exercises the bounded
     # fail-stop route; it is deliberately not reported as a hardware MCHK.
     negative = bytearray(out.joinpath("image.core").read_bytes())
@@ -298,20 +303,22 @@ def run(args):
     alternate.write_bytes(negative)
     out.joinpath("machine-check.rc").write_text(
         f"sysclear\narchlvl esame\nloadcore \"{alternate}\"\n"
-        f"runtest 0.5\nstopall\npsw\n"
+        f"runtest 60\nstopall\npsw\n"
         f"savecore \"{out / 'machine-check-result.core'}\" 0 13fff\nquit\n")
     negative_cmd = [str(Path(args.hercules).resolve()), "-t", "-f",
-                    str(out / "machine.cnf"), "-r",
+                    str(out / "machine.cnf"), "-o", str(out / "machine-check-console.log"), "-r",
                     str(out / "machine-check.rc")]
     try:
         negative_proc = subprocess.run(negative_cmd, cwd=out,
                                        capture_output=True, text=True,
-                                       timeout=15)
+                                       timeout=75)
         negative_log = negative_proc.stdout + negative_proc.stderr
     except subprocess.TimeoutExpired as exc:
         negative_proc = None
         negative_log = (exc.stdout or b"").decode(errors="replace") + \
                        (exc.stderr or b"").decode(errors="replace")
+    if (out / "machine-check-console.log").exists():
+        negative_log = (out / "machine-check-console.log").read_text(errors="replace")
     out.joinpath("machine-check.log").write_text(negative_log)
     negative_path = out / "machine-check-result.core"
     negative_raw = negative_path.read_bytes() if negative_path.exists() else b""
@@ -320,6 +327,7 @@ def run(args):
                    qword(negative_raw, 0x2188) == 5 and
                    qword(negative_raw, 0x2010) == 1 and
                    qword(negative_raw, 0x2008) == 10 and
+                   "HHC00809I Processor CP00: disabled wait state" in negative_log and
                    "HHC00803I" not in negative_log and
                    not re.search(r"HHC\d{5}E\b", negative_log))
     result["checks"]["synthetic_machine_check_failstop"] = negative_ok
@@ -336,19 +344,21 @@ def run(args):
     fault_core.write_bytes(fault_image)
     out.joinpath("unexpected-fault.rc").write_text(
         f"sysclear\narchlvl esame\nloadcore \"{fault_core}\"\n"
-        f"runtest 0.5\nstopall\npsw\n"
+        f"runtest 60\nstopall\npsw\n"
         f"savecore \"{out / 'unexpected-fault-result.core'}\" 0 13fff\nquit\n")
     fault_cmd = [str(Path(args.hercules).resolve()), "-t", "-f",
-                 str(out / "machine.cnf"), "-r",
+                 str(out / "machine.cnf"), "-o", str(out / "unexpected-fault-console.log"), "-r",
                  str(out / "unexpected-fault.rc")]
     try:
         fault_proc = subprocess.run(fault_cmd, cwd=out, capture_output=True,
-                                    text=True, timeout=15)
+                                    text=True, timeout=75)
         fault_log = fault_proc.stdout + fault_proc.stderr
     except subprocess.TimeoutExpired as exc:
         fault_proc = None
         fault_log = (exc.stdout or b"").decode(errors="replace") + \
                     (exc.stderr or b"").decode(errors="replace")
+    if (out / "unexpected-fault-console.log").exists():
+        fault_log = (out / "unexpected-fault-console.log").read_text(errors="replace")
     out.joinpath("unexpected-fault.log").write_text(fault_log)
     fault_path = out / "unexpected-fault-result.core"
     fault_raw = fault_path.read_bytes() if fault_path.exists() else b""
@@ -358,6 +368,7 @@ def run(args):
                 qword(fault_raw, 0x2010) == 0 and
                 qword(fault_raw, 0x2188) == 0xffffffffffffffff and
                 fault_raw[0x8e:0x90] == b"\0\x11" and
+                "HHC00809I Processor CP00: disabled wait state" in fault_log and
                 "HHC00803I" not in fault_log and
                 not re.search(r"HHC\d{5}E\b", fault_log))
     result["checks"]["unexpected_u_fault_failstop"] = fault_ok
