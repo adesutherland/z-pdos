@@ -183,6 +183,10 @@ releases against its K handle. FINIS-closed output is held for the diagnostic
 audit. The unchanged guest workloads pass fresh IPL, but native nested-file
 and heap guest controls, personality lowcore switching, terminal leases,
 pending I/O cancellation and fault unwind remain open.
+The [clear helper](../qualification/TWO-SPACE-CHANNEL-CLEAR-2026-10-06.md)
+has a guest-verified CSCH completion on an idle 3270 and a failing absent
+subchannel. Terminal-read cancellation during an active channel program and
+ownership transfer on nested invocation still need guest proof.
 
 ## Step 1: address and transition contract
 

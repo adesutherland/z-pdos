@@ -194,6 +194,10 @@ The [CMS output ownership check](qualification/TWO-SPACE-INVOCATION-OUTPUT-2026-
 keys transient output buffers by invocation, reaps unfinished buffers, and
 keeps FINIS-closed data in a K diagnostic store. Durable output and nested
 same-name guest controls remain open.
+The [subchannel clear check](qualification/TWO-SPACE-CHANNEL-CLEAR-2026-10-06.md)
+adds event-verified CSCH/TSCH completion and an absent-device failure path.
+An in-flight terminal cancellation and late-completion retry are still P1
+gates.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and

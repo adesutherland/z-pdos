@@ -9,6 +9,7 @@
          ENTRY TSCENABL
          ENTRY TSCSTART
          ENTRY TSCPOLL
+         ENTRY TSCCLEAR
 TSCIO    DS    0H
          STM   2,8,28(13)
          L     2,0(,1)
@@ -109,5 +110,41 @@ TSPNONE  DS    0H
          BRCL  15,TSPRET
 TSPYES   SR    15,15
 TSPRET   LM    2,3,28(13)
+         BR    14
+* CSCH is asynchronous. Do not recycle this real workspace until TSCH
+* reports the clear-function completion bit in the returned SCSW.
+TSCCLEAR DS    0H
+         STM   2,8,28(13)
+         L     2,0(,1)
+         L     3,4(,1)
+         LR    1,2
+         DC    X'B2300000'       CSCH (no storage operand)
+         BRCL  8,TCLINIT
+         SR    15,15
+         BCTR  15,0
+         BRCL  15,TCLRET
+TCLINIT  LA    5,128(3)
+         STCK  0(5)
+         BRCL  7,TCLFAIL
+         L     6,0(5)
+TCLWAIT  TSCH  0(3)
+         BRCL  8,TCLSTAT
+         BRCL  4,TCLNOST
+         BRCL  15,TCLFAIL
+TCLSTAT  TM    2(3),X'10'
+         BRCL  7,TCLDONE
+TCLNOST  STCK  8(5)
+         BRCL  7,TCLFAIL
+         L     7,8(5)
+         SR    7,6
+         LA    8,64
+         CR    7,8
+         BRCL  4,TCLWAIT
+TCLFAIL  SR    15,15
+         BCTR  15,0
+         BCTR  15,0
+         BRCL  15,TCLRET
+TCLDONE  SR    15,15
+TCLRET   LM    2,8,28(13)
          BR    14
          END   TSCIO

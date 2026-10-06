@@ -525,6 +525,13 @@ terminal_read_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 108(%r2)
+    lghi %r0, 0             /* idle clear needs its own TSCH completion */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 239
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3f0(%r2)
     lghi %r0, 0             /* absent subchannel fails without a timer */
     lghi %r1, 0
     lghi %r2, 0
@@ -1401,6 +1408,8 @@ trace_not_cms_fst:
     chi %r2, 236
     je storage_no_record
     chi %r2, 237
+    je storage_no_record
+    chi %r2, 239
     je storage_no_record
     chi %r2, 93
     je storage_no_record

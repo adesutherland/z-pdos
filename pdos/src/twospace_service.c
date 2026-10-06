@@ -111,6 +111,7 @@ int TSCENABL(unsigned int subchannel, unsigned char *schib);
 int TSCSTART(unsigned int subchannel, unsigned char *orb,
              unsigned char *irb);
 int TSCPOLL(unsigned int subchannel, unsigned char *irb);
+int TSCCLEAR(unsigned int subchannel, unsigned char *irb);
 
 static int channel_record(void *context, unsigned int cylinder,
                           unsigned int head, unsigned int record,
@@ -835,7 +836,19 @@ static unsigned int absent_channel_probe(const TSGREQUEST *request)
         return 24U;
     if (TSCIO(0x0001ffffU,TSCORB(&channel),TSCIRB(&channel)) != -2)
         return 16U;
+    if (TSCCLEAR(0x0001ffffU,TSCIRB(&channel)) != -1)
+        return 28U;
     return 0U;
+}
+
+/* Private channel-cancellation gate. An idle clear still has an asynchronous
+ * completion; success requires TSCH to report the clear-function event. */
+static unsigned int terminal_clear_probe(const TSGREQUEST *request)
+{
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction || !console_ssid || console_read_phase)
+        return 8U;
+    return TSCCLEAR(console_ssid,TSCIRB(&console_channel))==0 ? 0U : 12U;
 }
 
 /* Diagnostic native-entry gate. The real launcher will call this from K
@@ -2180,6 +2193,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 235U) return native_begin(request);
     if (request->svc == 236U) return native_end(request);
     if (request->svc == 237U) return native_reap_probe(request);
+    if (request->svc == 239U) return terminal_clear_probe(request);
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 223U) return high_storage_service(request);
     if (request->svc == 233U) return iarv64_service(request);
