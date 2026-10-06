@@ -91,6 +91,23 @@ int TSVOWN(TSVSTACK *stack, unsigned int token, unsigned int kind,
     return TSV_OK;
 }
 
+int TSVHAS(const TSVSTACK *stack, unsigned int token, unsigned int kind,
+           unsigned int handle)
+{
+    const TSVFRAME *frame;
+    unsigned int i;
+    if (!stack || !token || !handle || kind<TSV_IMAGE || kind>TSV_IO)
+        return TSV_BAD;
+    if (!stack->depth) return TSV_STALE;
+    frame=&stack->frame[stack->depth-1U];
+    if (frame->token!=token) return TSV_BUSY;
+    if (frame->state!=TSV_ACTIVE) return TSV_BUSY;
+    for (i=0U; i<frame->resources; ++i)
+        if (frame->resource[i].kind==kind &&
+            frame->resource[i].handle==handle) return TSV_OK;
+    return TSV_STALE;
+}
+
 int TSVFORGET(TSVSTACK *stack, unsigned int token, unsigned int kind,
               unsigned int handle)
 {

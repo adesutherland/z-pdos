@@ -35,9 +35,13 @@ static unsigned int tso24_loaded;
 static unsigned int cms31_lowcore_real;
 #define CMS31_LINES_REAL 0x20000U
 #define CMS24_EXTRA_LINES_REAL 0x26000U
-static unsigned int cms31_heap_live;
-static unsigned int cms31_heap_bytes;
-static TSPADDR cms31_heap_address;
+typedef struct {
+    TSPADDR address;
+    unsigned int bytes;
+    unsigned int handle;
+} CMSHEAP;
+/* Heap requests belong to the active CMS invocation, including nested calls. */
+static CMSHEAP cms_heaps[TSV_MAX_DEPTH];
 #define CMS_FILE_OWNER 0x434d5346U
 #define TSO_STAGE_OWNER 0x54534f31U
 #define TSO_IMAGE_OWNER 0x54534f32U
@@ -940,6 +944,10 @@ static unsigned int native_begin(TSGREQUEST *request)
                 image_owner,runtime_owner,
                 &caller,&token);
     if (rc!=TSV_OK) return rc==TSV_FULL ? 4U : 8U;
+    cms_heaps[native_invocations.depth-1U].address.hi=0U;
+    cms_heaps[native_invocations.depth-1U].address.lo=0U;
+    cms_heaps[native_invocations.depth-1U].bytes=0U;
+    cms_heaps[native_invocations.depth-1U].handle=0U;
     request->address.hi=0U;
     request->address.lo=token;
     return 0U;
@@ -975,6 +983,12 @@ static unsigned int native_end(const TSGREQUEST *request)
     if (!frame || frame->token!=request->address.lo) return 12U;
     rc=TSVEND(&native_invocations,request->address.lo,native_clean,
               (void *)frame);
+    if (rc==TSV_OK) {
+        cms_heaps[native_invocations.depth].address.hi=0U;
+        cms_heaps[native_invocations.depth].address.lo=0U;
+        cms_heaps[native_invocations.depth].bytes=0U;
+        cms_heaps[native_invocations.depth].handle=0U;
+    }
     return rc==TSV_OK ? 0U : 12U;
 }
 
@@ -1072,7 +1086,9 @@ static unsigned int storage_service(TSGREQUEST *request)
         return 0U;
     }
     handle=frame ? allocation_handle(task,request->address) : 0U;
-    if (frame && !handle) return 8U;
+    if (frame && (!handle ||
+        TSVHAS(&native_invocations,frame->token,TSV_ALLOCATION,handle)
+            !=TSV_OK)) return 8U;
     result=TSMFREE(&storage,task,request->address);
     if (result != TSM_OK) return 8U;
     if (frame && TSVFORGET(&native_invocations,frame->token,
@@ -1172,6 +1188,8 @@ static unsigned int iarv64_service(const TSGREQUEST *request)
         base.lo=cms_word(plist+60U);
         handle=allocation_handle(17U,base);
         if (base.hi!=1U || base.lo<0x20000000U || !handle ||
+            TSVHAS(&native_invocations,frame->token,
+                   TSV_ALLOCATION,handle)!=TSV_OK ||
             TSMFREE(&storage,17U,base)!=TSM_OK) return 8U;
         if (TSVFORGET(&native_invocations,frame->token,
                       TSV_ALLOCATION,handle)!=TSV_OK) return 12U;
@@ -1733,7 +1751,9 @@ static unsigned int cms_native_service(TSGREQUEST *request,
     TSPADDR minimum, maximum, address;
     unsigned char plist[44], message[256], fst[40];
     unsigned int i, n, length, result, flags, cursor, size, real;
-    unsigned int records;
+    unsigned int records, handle;
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
+    CMSHEAP *heap=frame ? &cms_heaps[native_invocations.depth-1U] : 0;
     CMSOUTPUT *file;
     TSIINPUT *input=0;
     volatile unsigned char *out;
@@ -1760,18 +1780,26 @@ static unsigned int cms_native_service(TSGREQUEST *request,
     for (i=0U; i<8U && plist[i]==obtain[i]; ++i) {}
     if (i==8U && profile==31U) {
         length=cms_word(plist+16U);
-        if (flags!=0x00e00000U || !length || (length&7U) ||
+        if (!frame || !heap || flags!=0x00e00000U || !length ||
+            (length&7U) ||
             length!=request->length || plist[28U]!=0x82U ||
-            plist[30U]!=3U || cms31_heap_live) return 12U;
+            plist[30U]!=3U || heap->handle) return 12U;
         minimum.hi=maximum.hi=0U;
         minimum.lo=0x08000000U; maximum.lo=0x7fffffffU;
-        result=TSMALLOC(&storage,4U,31U,minimum,maximum,
+        result=TSMALLOC(&storage,frame->runtime_owner,31U,minimum,maximum,
                         length,0,&address);
         if (result!=TSM_OK) return result==TSM_NOMEM ? 4U : 12U;
-        cms31_heap_address=address;
-        cms31_heap_bytes=length;
+        handle=allocation_handle(frame->runtime_owner,address);
+        if (!handle || TSVOWN(&native_invocations,frame->token,
+                              TSV_ALLOCATION,handle)!=TSV_OK) {
+            if (TSMFREE(&storage,frame->runtime_owner,address)!=TSM_OK)
+                return 12U;
+            return 4U;
+        }
+        heap->address=address;
+        heap->bytes=length;
+        heap->handle=handle;
         *(volatile unsigned int *)0x4514U=length;
-        cms31_heap_live=1U;
         request->address=address;
         *(volatile unsigned int *)0x4510U=1U;
         *(volatile unsigned int *)0x4098U=u_tables.used;
@@ -1781,14 +1809,20 @@ static unsigned int cms_native_service(TSGREQUEST *request,
     if (i==8U && profile==31U) {
         address.hi=0U;
         address.lo=*(volatile const unsigned int *)0x3044U & 0x7fffffffU;
-        if (flags!=0x00e00000U || !cms31_heap_live ||
-            address.lo!=cms31_heap_address.lo ||
-            cms_word(plist+16U)!=cms31_heap_bytes ||
+        if (!frame || !heap || flags!=0x00e00000U || !heap->handle ||
+            address.lo!=heap->address.lo ||
+            cms_word(plist+16U)!=heap->bytes ||
             cms_word(plist+24U)!=8U ||
             plist[28U]!=8U || plist[29U]!=2U ||
-            TSMFREE(&storage,4U,address)!=TSM_OK) return 12U;
-        cms31_heap_live=0U;
-        cms31_heap_bytes=0U;
+            TSVHAS(&native_invocations,frame->token,TSV_ALLOCATION,
+                   heap->handle)!=TSV_OK ||
+            TSMFREE(&storage,frame->runtime_owner,address)!=TSM_OK ||
+            TSVFORGET(&native_invocations,frame->token,TSV_ALLOCATION,
+                      heap->handle)!=TSV_OK) return 12U;
+        heap->address.hi=0U;
+        heap->address.lo=0U;
+        heap->bytes=0U;
+        heap->handle=0U;
         *(volatile unsigned int *)0x4510U=0U;
         *(volatile unsigned int *)0x4098U=u_tables.used;
         return 0U;

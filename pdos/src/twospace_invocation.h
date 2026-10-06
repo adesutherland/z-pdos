@@ -78,6 +78,11 @@ int TSVBEGIN(TSVSTACK *stack, unsigned int personality, unsigned int amode,
 const TSVFRAME *TSVTOP(const TSVSTACK *stack);
 int TSVOWN(TSVSTACK *stack, unsigned int token, unsigned int kind,
            unsigned int handle);
+/* Require that the active top frame owns this exact K handle before any
+ * external resource is freed. A suspended parent's handle is not usable by
+ * its child even if their lower-level allocator task ID is the same. */
+int TSVHAS(const TSVSTACK *stack, unsigned int token, unsigned int kind,
+           unsigned int handle);
 int TSVFORGET(TSVSTACK *stack, unsigned int token, unsigned int kind,
               unsigned int handle);
 int TSVCOMPLETE(TSVSTACK *stack, unsigned int token, unsigned int handle);

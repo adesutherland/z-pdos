@@ -56,6 +56,8 @@ int main(void)
     assert(top && top->token==parent && !top->parent &&
            top->caller.gpr[15].lo==0x100fU && top->caller.key==8U);
     assert(TSVOWN(&stack,parent,TSV_FILE,100U)==TSV_OK);
+    assert(TSVHAS(&stack,parent,TSV_FILE,100U)==TSV_OK);
+    assert(TSVHAS(&stack,parent,TSV_FILE,200U)==TSV_STALE);
     assert(TSVOWN(&stack,parent,TSV_IO,101U)==TSV_OK);
     assert(TSVOWN(&stack,parent,TSV_IO,101U)==TSV_BUSY);
     assert(TSVFORGET(&stack,parent,TSV_IO,101U)==TSV_BUSY);
@@ -67,10 +69,13 @@ int main(void)
     assert(top && top->token==child && top->parent==parent &&
            top->caller.gpr[15].lo==0x200fU);
     assert(stack.frame[0].state==TSV_SUSPENDED);
+    assert(TSVHAS(&stack,child,TSV_FILE,100U)==TSV_STALE);
+    assert(TSVHAS(&stack,parent,TSV_FILE,100U)==TSV_BUSY);
     assert(TSVOWN(&stack,parent,TSV_FILE,102U)==TSV_BUSY);
     assert(TSVCOMPLETE(&stack,parent,101U)==TSV_OK);
     assert(TSVCOMPLETE(&stack,parent,101U)==TSV_STALE);
     assert(TSVOWN(&stack,child,TSV_ALLOCATION,200U)==TSV_OK);
+    assert(TSVHAS(&stack,child,TSV_ALLOCATION,200U)==TSV_OK);
     assert(TSVOWN(&stack,child,TSV_IO,201U)==TSV_OK);
     assert(TSVEND(&stack,child,clean_owned,&trace)==TSV_BUSY);
     assert(TSVTOP(&stack)==0 && stack.frame[0].state==TSV_SUSPENDED);

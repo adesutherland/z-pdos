@@ -182,6 +182,10 @@ derives personality, AMODE and owners from a checked loaded-image record and
 rejects invalid or caller-placed entries. Fault-triggered unwind, pending
 I/O, a normal K-controlled launch and other resource lifetimes remain open;
 these checkpoints do not close P1 or qualify P2–P6.
+The [CMS heap ownership check](qualification/TWO-SPACE-INVOCATION-HEAP-2026-10-06.md)
+adds per-invocation CMS31 heap state and a pre-free K handle check for CMS,
+SVC 120 and IARV64. The unchanged guest paths passed fresh IPL, but a nested
+CMS heap and child-fault guest control remain open.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and
