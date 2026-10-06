@@ -177,6 +177,11 @@ The [CMS31 U mapping checkpoint](qualification/TWO-SPACE-CMS31-U-MAP-2026-10-06.
 connects the pinned RXVM stage to live U page allocation and relocation in
 a fresh diagnostic IPL. It does not enter RXVM, supply CMS services or
 qualify unchanged applications; those slice 6 and 7 gates remain open.
+The [same-origin guest backing checkpoint](qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
+then swaps a child test payload over the mapped RXVM interval, observes it
+from U, restores the parent pages and propagates the child's return value.
+It proves the memory transition needed for a colliding nested call but has
+not executed a child application or REXX `ADDRESS` command.
 
 ## PD-004: Batch-file delivery
 

@@ -18,6 +18,7 @@ static unsigned int storage_ready;
 static unsigned int console_ssid;
 static unsigned int console_read_phase;
 static unsigned int console_read_count;
+static unsigned int cms31_loaded;
 void TSFPURGE(void *unused);
 void TSKEYSET(unsigned int real_page, unsigned int key);
 
@@ -273,10 +274,41 @@ static unsigned int cms31_map_service(const TSGREQUEST *request)
     *(volatile unsigned int *)0x40e8U=info.image_bytes;
     *(volatile unsigned int *)0x40ecU=blocks;
     *(volatile unsigned int *)0x4098U=u_tables.used;
+    cms31_loaded=1U;
 release:
     if (TSRRELEASE(&storage.real,CMS_STAGE_OWNER,CMS_STAGE_REAL) != TSR_OK)
         return 12U;
     return result;
+}
+
+static unsigned int cms31_overlay_push(const TSGREQUEST *request)
+{
+    static const unsigned char child[] =
+        {0x4fU,0x56U,0x4cU,0x59U,0x43U,0x48U,0x49U,0x4cU};
+    TSPADDR base;
+    int result;
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    if (!cms31_loaded) return 4U;
+    base.hi=0U; base.lo=0x03000000U;
+    result=TSMOVERLAYPUSH(&storage,4U,base,child,sizeof child);
+    if (result != TSM_OK) return result == TSM_NOMEM ? 4U : 12U;
+    *(volatile unsigned int *)0x4098U=u_tables.used;
+    return 0U;
+}
+
+static unsigned int cms31_overlay_pop(const TSGREQUEST *request)
+{
+    TSPADDR base;
+    unsigned int returned;
+    if (request->address.hi || request->address.lo || request->direction)
+        return 8U;
+    if (!cms31_loaded) return 4U;
+    base.hi=0U; base.lo=0x03000000U;
+    if (TSMOVERLAYPOP(&storage,4U,base,request->length,&returned)
+        != TSM_OK) return 12U;
+    *(volatile unsigned int *)0x4098U=u_tables.used;
+    return returned;
 }
 
 static unsigned int terminal_service(const TSGREQUEST *request)
@@ -450,6 +482,8 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 212U) return cms24_header_service(request);
     if (request->svc == 213U) return cms24_full_service(request);
     if (request->svc == 214U) return cms31_map_service(request);
+    if (request->svc == 215U) return cms31_overlay_push(request);
+    if (request->svc == 216U) return cms31_overlay_pop(request);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
         return 0xfffffffbU;
