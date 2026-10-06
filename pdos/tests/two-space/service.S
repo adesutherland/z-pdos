@@ -229,11 +229,30 @@ app_b_cms31_call:
     l %r3, 0(%r3)
     sam31
     basr %r14, %r3         /* execute relocated child in U AMODE31 */
+    chi %r15, 0x3456
+    jne cms31_skip_fst_probe
+    lghi %r0, 0
+    larl %r1, cms31_child_va32
+    l %r1, 0(%r1)          /* mapped U31 parameter pointer */
+    lghi %r3, 0x200
+    basr %r14, %r3         /* CMS31 SYSREF veneer, SVC 205 */
+    lgr %r10, %r15
+    lghi %r15, 0x3456
+cms31_skip_fst_probe:
     sam64
+    chi %r15, 0x3456
+    jne cms31_skip_fst_record
+    larl %r2, cms31_probe_high_data
+    lg %r2, 0(%r2)
+    st %r10, 0x264(%r2)
+    st %r0, 0x268(%r2)
+    st %r1, 0x26c(%r2)
+cms31_skip_fst_record:
     lgr %r14, %r12
     br %r14
 .balign 4
 cms31_child_va32: .long 0x03000000
+cms31_probe_high_data: .quad 0x110001000
 
 .section .apphigh,"ax"
 app_high:
@@ -747,6 +766,13 @@ trace_not_cms24:
     chi %r4, 3              /* live CMS31 image at 0x03000000 */
     je storage_no_record
 trace_not_cms31:
+    chi %r2, 205
+    jne trace_not_cms_fst
+    lghi %r3, 0x3000
+    l %r4, 0x8c(%r3)
+    chi %r4, 0x202
+    je storage_no_record
+trace_not_cms_fst:
     chi %r2, 207
     je storage_no_record
     chi %r2, 208
@@ -851,6 +877,8 @@ no_cms24_inline:
     je copy_storage_address
     chi %r2, 204
     je copy_storage_address
+    chi %r2, 205
+    je copy_storage_address
     chi %r2, 223
     jne no_storage_address
 copy_storage_address:
@@ -861,6 +889,13 @@ copy_storage_address:
     lghi %r3, 0x3000
     stg %r2, 8(%r3)         /* complete U address back to caller R1 */
 no_storage_address:
+    l %r2, 16(%r6)
+    chi %r2, 205
+    jne no_fst_cursor
+    l %r2, 8(%r6)
+    lghi %r3, 0x3000
+    st %r2, 4(%r3)          /* CMS FSTLKP cursor back to caller R0 */
+no_fst_cursor:
     larl %r1, c_result_va
     lg %r1, 0(%r1)
     llgf %r2, 0(%r1)

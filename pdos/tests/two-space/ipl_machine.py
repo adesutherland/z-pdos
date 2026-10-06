@@ -304,6 +304,19 @@ def run(args):
                     struct.unpack_from(">3I",raw,0x12258) ==
                         (0x100,0x200,0x0a) and
                     raw[0x200:0x204] != b"\x0a\xcd\x07\xfe")
+                fst_rc, fst_cursor, fst_address = struct.unpack_from(
+                    ">3I",raw,0x12264)
+                if args.cmsfile:
+                    fst = raw[lowcore_real+0x300:lowcore_real+0x328]
+                    checks["cms31_fst_catalogue_result"] = (
+                        (fst_rc,fst_cursor,fst_address) == (0,1,0x300) and
+                        fst[:16] == "IOQUAL  RXBIN   ".encode("cp037") and
+                        fst[24:26] == b"\xc1\xf1" and
+                        fst[32:36] == b"\x00\x00\x01\x00")
+                else:
+                    checks["cms31_fst_veneer_absent_result"] = (
+                        (fst_rc,fst_cursor,fst_address) ==
+                        (1,0,0x03000000))
                 if args.cms24:
                     checks["cms_images_independent_real_backing"] = (
                         real24 + pages24*4096 <= real or
@@ -377,6 +390,7 @@ def main():
         p.add_argument(name)
     p.add_argument("cms24", nargs="?", choices=("cms24",))
     p.add_argument("cms31", nargs="?", choices=("cms31",))
+    p.add_argument("cmsfile", nargs="?", choices=("cmsfile",))
     try:
         return run(p.parse_args())
     except (OSError, ValueError) as exc:

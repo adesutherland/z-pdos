@@ -256,6 +256,11 @@ maps one U-owned, key-8 compatibility page at virtual zero with the SDK's
 separate from K's real prefix. It costs no page in the 13,914,112-byte
 post-image low placement gap. Actual SVC 205 lookup and cross-personality
 lowcore behavior remain open.
+The [CMS31 FST checkpoint](qualification/TWO-SPACE-CMS-FST-2026-10-06.md)
+adds a bounded VTOC lookup through that veneer. Separate fresh IPLs check
+the absent result and the pinned IOQUAL RXBIN FST with exact R0/R1/R15
+handoff. RXVM file-open/read, record data, writes and command dispatch
+remain open.
 
 ## PD-004: Batch-file delivery
 

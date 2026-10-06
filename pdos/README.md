@@ -31,6 +31,8 @@ The [live-screen result](doc/qualification/TWO-SPACE-CMS-LIVE-SCREEN-2026-10-06.
 puts the selected CMS version line on a connected 3270.
 The [CMS31 lowcore check](doc/qualification/TWO-SPACE-CMS31-LOWCORE-2026-10-06.md)
 adds a separately backed U compatibility page for the SDK SYSREF pointer.
+The [FST lookup check](doc/qualification/TWO-SPACE-CMS-FST-2026-10-06.md)
+exercises that veneer against an actual staged CMS31 dataset.
 
 The recorded source-built milestone runs unchanged cREXX TSO31, TSO64 ANY and
 TSO64 HIGH packages, including compiler, assembler, terminal and file workloads.

@@ -48,6 +48,10 @@ installs that U-owned page with independent real backing and key 8. It
 contains the CMS31 SYSREF pointer and SVC 205 veneer; the guest reads them
 through U DAT. The veneer and any CMS/TSO lowcore switching still need
 service and cross-personality qualification.
+The later [CMS31 FST result](../qualification/TWO-SPACE-CMS-FST-2026-10-06.md)
+calls the veneer in U, scans a bounded K VTOC catalogue and returns an
+FST through U lowcore storage. Absent and present cases pass fresh IPL;
+file record operations and personality switching remain separate work.
 The checked CMS24 RXVM is fixed at `0x20000`–`0x1ba6c0` (1,681,088 image
 bytes, 1,683,456 page-rounded bytes). It must not collide with a kernel
 virtual mapping or a second fixed module. Its usable heap must be measured

@@ -21,6 +21,7 @@ static unsigned int console_read_phase;
 static unsigned int console_read_count;
 static unsigned int cms31_loaded;
 static unsigned int cms24_loaded;
+static unsigned int cms31_lowcore_real;
 static unsigned int cms31_heap_live;
 static unsigned int cms31_heap_bytes;
 static TSPADDR cms31_heap_address;
@@ -437,6 +438,7 @@ static unsigned int cms31_map_service(const TSGREQUEST *request)
         result=12U; goto discard_lowcore;
     }
     *(volatile unsigned int *)0x40f8U=lowcore_real;
+    cms31_lowcore_real=lowcore_real;
     *(volatile unsigned int *)0x40e0U=real;
     *(volatile unsigned int *)0x40e4U=entry;
     *(volatile unsigned int *)0x40e8U=info.image_bytes;
@@ -748,6 +750,86 @@ static unsigned int cms_word(const unsigned char *p)
            ((unsigned int)p[2]<<8) | (unsigned int)p[3];
 }
 
+static unsigned int cms31_fst_lookup(TSGREQUEST *request)
+{
+    static const unsigned char prefix[6] =
+        {0xc3U,0xd4U,0xe2U,0xf3U,0xf1U,0x4bU};
+    const unsigned char *record;
+    unsigned char id[18];
+    unsigned char *fst;
+    unsigned int cylinder, head, number, visits=0U, seen=0U;
+    unsigned int i, j, name_len, type_len, at;
+    int count;
+    if (!cms31_lowcore_real || request->address.hi ||
+        request->address.lo<0x1000000U ||
+        request->address.lo>=0x80000000U || request->length>1024U)
+        return 12U;
+    count=channel_record(&channel,0U,0U,3U,80U,&record);
+    if (count<24 || record[4]!=0xe5U || record[5]!=0xd6U ||
+        record[6]!=0xd3U || record[7]!=0xf1U) return 12U;
+    cylinder=((unsigned int)record[15U]<<8)|record[16U];
+    head=((unsigned int)record[17U]<<8)|record[18U];
+    number=record[19U];
+    if (cylinder!=1U || head>=15U || !number) return 12U;
+    while (cylinder<=2U && visits<1500U) {
+        ++visits;
+        count=channel_record(&channel,cylinder,head,number,140U,&record);
+        if (count<0) {
+            number=1U; ++head;
+            if (head==15U) { head=0U; ++cylinder; }
+            continue;
+        }
+        if (count<115 || !record) return 12U;
+        if (record[0]==0U) return 1U;
+        if (record[44U]==0xf1U) {
+            for (i=0U; i<6U && record[i]==prefix[i]; ++i) {}
+            if (i==6U) {
+                at=6U;
+                for (name_len=0U; name_len<8U &&
+                     at<44U && record[at]!=0x4bU &&
+                     record[at]!=0x40U; ++name_len,++at) {}
+                if (name_len && at<44U && record[at++]==0x4bU) {
+                    j=at;
+                    for (type_len=0U; type_len<8U &&
+                         at<44U && record[at]!=0x40U;
+                         ++type_len,++at) {}
+                    if (type_len && (at==44U || record[at]==0x40U)) {
+                        for (i=at; i<44U && record[i]==0x40U; ++i) {}
+                        if (i==44U) {
+                            if (seen++==request->length) {
+                                for (i=0U; i<18U; ++i) id[i]=0x40U;
+                                for (i=0U; i<name_len; ++i)
+                                    id[i]=record[6U+i];
+                                for (i=0U; i<type_len; ++i)
+                                    id[8U+i]=record[j+i];
+                                id[16U]=0xc1U; id[17U]=0xf1U;
+                                fst=(unsigned char *)TSF_KAPERTURE_VA+
+                                    cms31_lowcore_real+0x300U;
+                                for (i=0U; i<40U; ++i) fst[i]=0U;
+                                for (i=0U; i<16U; ++i) fst[i]=id[i];
+                                fst[16U]=0x10U; fst[17U]=0x04U;
+                                fst[24U]=id[16U]; fst[25U]=id[17U];
+                                fst[27U]=1U; fst[30U]=0xe5U;
+                                fst[34U]=1U; /* 256-byte record cap */
+                                fst[38U]=0xf2U; fst[39U]=0xf6U;
+                                request->length=seen;
+                                request->address.hi=0U;
+                                request->address.lo=0x300U;
+                                return 0U;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (number==255U) {
+            number=1U; ++head;
+            if (head==15U) { head=0U; ++cylinder; }
+        } else ++number;
+    }
+    return 12U;
+}
+
 static unsigned int cms_line_screen(const unsigned char *message,
                                     unsigned int length)
 {
@@ -928,6 +1010,9 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
         *(volatile const unsigned int *)0x308cU <
             0x03000000U+*(volatile const unsigned int *)0x40e8U)
         return cms31_native_service(request);
+    if (request->svc == 205U && cms31_loaded &&
+        *(volatile const unsigned int *)0x308cU==0x202U)
+        return cms31_fst_lookup(request);
     if (request->svc == 206U) return volume_service(request);
     if (request->svc == 207U) return dataset_service(request);
     if (request->svc == 208U) return terminal_service(request);
