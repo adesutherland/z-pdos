@@ -30,6 +30,7 @@ main: procedure = .int
   memasm = out || "/TSM.asm"; memobj = out || "/TSM.obj"
   realasm = out || "/TSR.asm"; realobj = out || "/TSR.obj"
   placeasm = out || "/TSP.asm"; placeobj = out || "/TSP.obj"
+  invasm = out || "/TSV.asm"; invobj = out || "/TSV.obj"
   tlbobj = out || "/TSTLB.obj"
   entryobj = out || "/TSMENTRY.obj"
   keyobj = out || "/TSMKEY.obj"
@@ -53,6 +54,8 @@ main: procedure = .int
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_real.c -o :realasm"
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_placement.c -o :placeasm"
+  if rc <> 0 then return rc
+  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_invocation.c -o :invasm"
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_channel.c -o :chanasm"
   if rc <> 0 then return rc
@@ -79,6 +82,8 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :placeasm :placeobj"
   if rc <> 0 then return rc
+  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :invasm :invobj"
+  if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :chanasm :chanobj"
   if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :dsasm :dsobj"
@@ -99,10 +104,11 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_key.asm :keyobj"
   if rc <> 0 then return rc
-  address crexx "run :classicld --oformat binary --image-base 33554432 -e TSMENTRY -Map :map -o :binary :entryobj :object :gateobj :datobj :memobj :realobj :placeobj :chanobj :dsobj :cmsobj :cmsfileobj :cmscursorobj :tsoobj :chansupport :tlbobj :keyobj"
+  address crexx "run :classicld --oformat binary --image-base 33554432 -e TSMENTRY -Map :map -o :binary :entryobj :object :gateobj :datobj :memobj :realobj :placeobj :invobj :chanobj :dsobj :cmsobj :cmsfileobj :cmscursorobj :tsoobj :chansupport :tlbobj :keyobj"
   if rc <> 0 then return rc
   placemap = out || "/TSP.map"; placebin = out || "/TSP.bin"
   dattest = out || "/dat-test"; placetest = out || "/placement-test"
+  invtest = out || "/invocation-test"
   gatetest = out || "/gate-test"; memtest = out || "/memory-test"
   chantest = out || "/channel-test"
   dstest = out || "/dataset-test"
@@ -125,6 +131,10 @@ main: procedure = .int
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_placement.c pdos/tests/two-space/placement.c -o :placetest"
   if rc <> 0 then return rc
   address crexx "run :placetest"
+  if rc <> 0 then return rc
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_invocation.c pdos/tests/two-space/invocation.c -o :invtest"
+  if rc <> 0 then return rc
+  address crexx "run :invtest"
   if rc <> 0 then return rc
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_dat.c pdos/src/twospace_fixture.c pdos/src/twospace_gate.c pdos/tests/two-space/gate.c -o :gatetest"
   if rc <> 0 then return rc

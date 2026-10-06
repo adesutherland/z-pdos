@@ -164,6 +164,14 @@ used by P4. P5 is an opt-in integration route; P6 changes the default only
 after its normal image qualifies. A separate CMS or TSO U ASCE is not part of
 this plan unless the recorded shared-U review trigger is met.
 
+The [P0 ABI inventory](architecture/TWO-SPACE-ABI.md) now pins the selected
+unchanged inputs and names the untraced forms. The first [P1 invocation
+component check](qualification/TWO-SPACE-INVOCATION-2026-10-06.md) proves
+token and cleanup ordering on the host and a linked, uncalled Classic C31
+module in the diskless fixture. P0 remains incomplete and the actual K
+dispatch still uses saved-PC personality inference; neither checkpoint
+closes P1 or qualifies P2–P6.
+
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and
 real-frame ledger run in the guest. The map/unmap API and `PTLB` callback are

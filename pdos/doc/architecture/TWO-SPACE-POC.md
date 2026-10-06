@@ -79,8 +79,7 @@ configured Hercules 3215 line device reached by a Telnet client. A 3215-C
 instead writes to the integrated Hercules console and mixes host/operator
 messages with guest output, so it is not the first clean transcript target.
 The line view is a monitor, not another application address space or a second
-command processor. A
-line-only primary console is a further configuration of the same service
+command processor. A line-only primary console is a further configuration of the same service
 boundary. The first P4 qualification must prove the actual secondary device
 attachment and capture path; the current successor has not done so.
 
@@ -165,6 +164,8 @@ explicit states; elapsed time may detect a stall but must not decide whether
 an I/O completed. The exact parameter layouts and terminal request structures
 remain implementation gates in [PD-003](../BACKLOG.md#pd-003-two-space-supervisor-and-shared-application-memory)
 and [PD-021](../BACKLOG.md#pd-021-reusable-3270-application-presentation).
+The first [K invocation-ledger component result](../qualification/TWO-SPACE-INVOCATION-2026-10-06.md)
+proves token and cleanup behavior but is not yet called by this dispatcher.
 
 ## Step 1: address and transition contract
 
