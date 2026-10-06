@@ -174,6 +174,7 @@ static unsigned int cms24_header_service(const TSGREQUEST *request)
  * ends; no fixed high-real hole is consumed between service calls. */
 #define CMS_STAGE_CAPACITY 0x900000U
 #define CMS_STAGE_OWNER 0x434d5332U
+#define CMS31_LOWCORE_OWNER 0x434d534eU
 
 static unsigned int cms_stage_read(const unsigned char *name,
                                    unsigned int name_bytes,
@@ -383,9 +384,11 @@ static unsigned int cms31_map_service(const TSGREQUEST *request)
         0xe5U,0xd4U
     };
     unsigned char *stage;
-    TSPADDR base, placed;
+    TSPADDR base, placed, lowcore_address;
     TSHINFO info;
     unsigned int blocks, result, i, real=0U, entry, stage_real;
+    unsigned int lowcore_real=0U;
+    unsigned char *lowcore;
     int allocation;
     if (request->length || request->address.hi || request->address.lo ||
         request->direction) return 8U;
@@ -414,12 +417,38 @@ static unsigned int cms31_map_service(const TSGREQUEST *request)
         result=TSMFREE(&storage,4U,placed) == TSM_OK ? 12U : 0xfffffff0U;
         goto release;
     }
+    if (TSRALLOC(&storage.real,CMS31_LOWCORE_OWNER,4096U,
+                 TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,
+                 &lowcore_real)!=TSR_OK) {
+        result=4U; goto discard_image;
+    }
+    lowcore=(unsigned char *)TSF_KAPERTURE_VA+lowcore_real;
+    for (i=0U; i<4096U; ++i) lowcore[i]=0U;
+    lowcore[0x16U]=1U;       /* U 0x14 -> U SYSREF 0x100 */
+    lowcore[0x10eU]=2U;      /* SYSREF+12 -> U veneer 0x200 */
+    lowcore[0x200U]=0x0aU;  /* SVC 205, then BR R14 */
+    lowcore[0x201U]=0xcdU;
+    lowcore[0x202U]=0x07U;
+    lowcore[0x203U]=0xfeU;
+    TSKEYSET(lowcore_real,0x80U);
+    base.hi=0U; base.lo=0U;
+    lowcore_address.hi=0U; lowcore_address.lo=lowcore_real;
+    if (TSDMAP(&u_tables,base,lowcore_address)!=TSD_OK) {
+        result=12U; goto discard_lowcore;
+    }
+    *(volatile unsigned int *)0x40f8U=lowcore_real;
     *(volatile unsigned int *)0x40e0U=real;
     *(volatile unsigned int *)0x40e4U=entry;
     *(volatile unsigned int *)0x40e8U=info.image_bytes;
     *(volatile unsigned int *)0x40ecU=blocks;
     *(volatile unsigned int *)0x4098U=u_tables.used;
     cms31_loaded=1U;
+    goto release;
+discard_lowcore:
+    if (TSRRELEASE(&storage.real,CMS31_LOWCORE_OWNER,lowcore_real)!=TSR_OK)
+        result=0xfffffff0U;
+discard_image:
+    if (TSMFREE(&storage,4U,placed)!=TSM_OK) result=0xfffffff0U;
 release:
     if (TSRRELEASE(&storage.real,CMS_STAGE_OWNER,stage_real) != TSR_OK)
         return 12U;

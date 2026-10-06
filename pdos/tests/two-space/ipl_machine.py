@@ -291,6 +291,19 @@ def run(args):
                     raw[real:real+16] == staged[148:164] and
                     all(page_real(raw,0x28000f,0x03000000+i*4096) ==
                         real+i*4096 for i in range(pages)))
+                lowcore_real = struct.unpack_from(">I",raw,0x40f8)[0]
+                checks["cms31_u_lowcore_is_separate_from_k_prefix"] = (
+                    0x400000 <= lowcore_real < 0x10000000 and
+                    page_real(raw,0x28000f,0) == lowcore_real and
+                    raw[lowcore_real+0x14:lowcore_real+0x18] ==
+                        b"\x00\x00\x01\x00" and
+                    raw[lowcore_real+0x10c:lowcore_real+0x110] ==
+                        b"\x00\x00\x02\x00" and
+                    raw[lowcore_real+0x200:lowcore_real+0x204] ==
+                        b"\x0a\xcd\x07\xfe" and
+                    struct.unpack_from(">3I",raw,0x12258) ==
+                        (0x100,0x200,0x0a) and
+                    raw[0x200:0x204] != b"\x0a\xcd\x07\xfe")
                 if args.cms24:
                     checks["cms_images_independent_real_backing"] = (
                         real24 + pages24*4096 <= real or

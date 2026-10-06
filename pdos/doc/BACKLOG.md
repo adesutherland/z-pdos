@@ -250,6 +250,12 @@ routes the selected CMS24 and CMS31 application line writes through K's
 checked 3270 channel workspace. The final version line was observed on an
 independently connected terminal after guest completion. General multi-line
 console, input and file services remain open.
+The [CMS31 lowcore checkpoint](qualification/TWO-SPACE-CMS31-LOWCORE-2026-10-06.md)
+maps one U-owned, key-8 compatibility page at virtual zero with the SDK's
+`0x14` SYSREF pointer and SVC 205 veneer. Guest U reads prove that this is
+separate from K's real prefix. It costs no page in the 13,914,112-byte
+post-image low placement gap. Actual SVC 205 lookup and cross-personality
+lowcore behavior remain open.
 
 ## PD-004: Batch-file delivery
 

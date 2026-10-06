@@ -571,6 +571,13 @@ cms24_native_done:
     st %r15, 120(%r2)
     chi %r15, 0
     jne cms31_overlay_done
+    lghi %r1, 0
+    l %r4, 20(%r1)           /* U lowcore, never K's real prefix page */
+    st %r4, 0x258(%r2)
+    l %r5, 12(%r4)
+    st %r5, 0x25c(%r2)
+    llgc %r6, 0(%r5)
+    st %r6, 0x260(%r2)
     larl %r3, cms31_image_va
     lg %r3, 0(%r3)
     l %r4, 0(%r3)

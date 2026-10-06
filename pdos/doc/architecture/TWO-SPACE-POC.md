@@ -43,6 +43,11 @@ compatibility page at virtual zero. With only that page committed, the design
 starts from 16,773,120 low virtual bytes available for application placement
 before any program, stack, heap or guard allocations. We must inventory every
 CMS/TSO lowcore and parameter convention before deciding the final minimum.
+The later [guest lowcore result](../qualification/TWO-SPACE-CMS31-LOWCORE-2026-10-06.md)
+installs that U-owned page with independent real backing and key 8. It
+contains the CMS31 SYSREF pointer and SVC 205 veneer; the guest reads them
+through U DAT. The veneer and any CMS/TSO lowcore switching still need
+service and cross-personality qualification.
 The checked CMS24 RXVM is fixed at `0x20000`–`0x1ba6c0` (1,681,088 image
 bytes, 1,683,456 page-rounded bytes). It must not collide with a kernel
 virtual mapping or a second fixed module. Its usable heap must be measured
