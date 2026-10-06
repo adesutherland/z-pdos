@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * Compare selected low-resident AMODE31/64 materializers with pinned native
+ * Compare selected low-resident AMODE24/31/64 materializers with pinned native
  * load-module outputs at two placements, then mutate format boundaries.
  */
 #include "twospace_tso.h"
@@ -43,7 +43,7 @@ static void compare_released_loader(const unsigned char *raw,
                                     const unsigned char *image,
                                     unsigned int image_bytes,
                                     unsigned int base,
-                                    int mode)
+                                    int mode, int rmode_any)
 {
     char *legacy=(char *)calloc(TST_MAX_IMAGE,1U);
     int length=(int)raw_bytes, entry, amode, rmode;
@@ -51,7 +51,7 @@ static void compare_released_loader(const unsigned char *raw,
     memcpy(legacy,raw,raw_bytes);
     CHECK(fixPEMode(legacy,&length,&entry,(int)base,TST_MAX_IMAGE,
                     &amode,&rmode)==0);
-    CHECK(amode==mode && rmode==1 && length==(int)image_bytes);
+    CHECK(amode==mode && rmode==rmode_any && length==(int)image_bytes);
     CHECK(memcmp(image,legacy,image_bytes)==0);
     free(legacy);
 }
@@ -61,7 +61,7 @@ int main(int argc, char **argv)
     unsigned char *raw, *image, *mutated;
     unsigned int bytes, bytes64, stage_bytes;
     TSTINFO info;
-    if (argc!=5) return 2;
+    if (argc!=5 && argc!=6) return 2;
     raw=(unsigned char *)malloc(TST_MAX_RAW+1U);
     mutated=(unsigned char *)malloc(TST_MAX_RAW+1U);
     image=(unsigned char *)malloc(TST_MAX_IMAGE);
@@ -75,11 +75,11 @@ int main(int argc, char **argv)
     CHECK(TSTIMAGE31(raw,bytes,0x05000000U,image,TST_MAX_IMAGE,&info)==TST_OK);
     CHECK(info.image_bytes==1094960U &&
           hash_image(image,info.image_bytes)==0xf4b21310U);
-    compare_released_loader(raw,bytes,image,info.image_bytes,0x05000000U,2);
+    compare_released_loader(raw,bytes,image,info.image_bytes,0x05000000U,2,1);
     CHECK(TSTIMAGE31(raw,bytes,0x07000000U,image,TST_MAX_IMAGE,&info)==TST_OK);
     CHECK(info.image_bytes==1094960U &&
           hash_image(image,info.image_bytes)==0x3ce51566U);
-    compare_released_loader(raw,bytes,image,info.image_bytes,0x07000000U,2);
+    compare_released_loader(raw,bytes,image,info.image_bytes,0x07000000U,2,1);
     CHECK(TSTIMAGE31(raw,bytes,0x20000U,image,TST_MAX_IMAGE,&info)==TST_BAD);
     CHECK(TSTIMAGE64ANY(raw,bytes,0x09000000U,image,
                         TST_MAX_IMAGE,&info)==TST_BAD);
@@ -124,13 +124,13 @@ int main(int argc, char **argv)
     CHECK(info.image_bytes==767728U &&
           hash_image(image,info.image_bytes)==0x94d5943aU);
     compare_released_loader(raw,bytes64,image,info.image_bytes,
-                            0x09000000U,1);
+                            0x09000000U,1,1);
     CHECK(TSTIMAGE64ANY(raw,bytes64,0x0b000000U,image,
                         TST_MAX_IMAGE,&info)==TST_OK);
     CHECK(info.image_bytes==767728U &&
           hash_image(image,info.image_bytes)==0x1c28a98aU);
     compare_released_loader(raw,bytes64,image,info.image_bytes,
-                            0x0b000000U,1);
+                            0x0b000000U,1,1);
     CHECK(TSTIMAGE64ANY(raw,bytes64,0x20000U,image,
                         TST_MAX_IMAGE,&info)==TST_BAD);
     CHECK(TSTIMAGE64ANY(raw,bytes64,0x09000000U,image,
@@ -166,6 +166,39 @@ int main(int argc, char **argv)
     memcpy(mutated,raw,stage_bytes);
     mutated[15U]=75U;
     CHECK(TSTSTAGEVALIDATE(mutated,stage_bytes,31U,&info)==TST_BAD);
+    if (argc==6) {
+        unsigned int bytes24=read_file(argv[5],raw);
+        CHECK(bytes24==1379654U);
+        CHECK(TSTHEADER(raw,bytes24,24U,&info)==TST_OK &&
+              info.records==1415U && info.flags==0U &&
+              info.rmode_any==0U && info.entry_offset==0U &&
+              info.input_fnv==0xadd8ef0dU);
+        CHECK(TSTIMAGE24(raw,bytes24,0x00020000U,image,
+                         TST_MAX_IMAGE,&info)==TST_OK &&
+              info.image_bytes==1082128U &&
+              hash_image(image,info.image_bytes)==0x2b82c5a4U);
+        compare_released_loader(raw,bytes24,image,info.image_bytes,
+                                0x00020000U,0,0);
+        CHECK(TSTIMAGE24(raw,bytes24,0x00400000U,image,
+                         TST_MAX_IMAGE,&info)==TST_OK &&
+              info.image_bytes==1082128U &&
+              hash_image(image,info.image_bytes)==0xe3810260U);
+        compare_released_loader(raw,bytes24,image,info.image_bytes,
+                                0x00400000U,0,0);
+        CHECK(TSTIMAGE24(raw,bytes24,0x00f00000U,image,
+                         TST_MAX_IMAGE,&info)==TST_BAD);
+        CHECK(TSTIMAGE24(raw,bytes24,0x01000000U,image,
+                         TST_MAX_IMAGE,&info)==TST_BAD);
+        CHECK(TSTIMAGE24(raw,bytes24,0x00400001U,image,
+                         TST_MAX_IMAGE,&info)==TST_BAD);
+        CHECK(TSTIMAGE31(raw,bytes24,0x05000000U,image,
+                         TST_MAX_IMAGE,&info)==TST_BAD);
+        memcpy(mutated,raw,bytes24);
+        mutated[336U+57U]=0x12U;
+        CHECK(TSTIMAGE24(mutated,bytes24,0x00400000U,image,
+                         TST_MAX_IMAGE,&info)==TST_BAD);
+        puts("TSO24 native image: two low placements match released loader; bounds and mode controls pass");
+    }
     puts("TSO31 and TSO64 ANY native images: two placements each match released loader; malformed controls pass");
     free(raw); free(mutated); free(image);
     return 0;

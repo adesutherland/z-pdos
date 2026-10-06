@@ -169,8 +169,8 @@ static int image_low(const unsigned char *raw, unsigned int bytes,
     unsigned int nexttext=0U, lastend=0U, imageend=0U;
     int last_type=-1, type, done=0;
     if (!image || !info || !capacity || capacity>TST_MAX_IMAGE ||
-        (mode!=31U && mode!=64U) ||
-        (base&4095U) || base<0x1000000U ||
+        (mode!=24U && mode!=31U && mode!=64U) ||
+        (base&4095U) || base<(mode==24U ? 0x10000U : 0x1000000U) ||
         TSTHEADER(raw,bytes,mode,&parsed)!=TST_OK) return TST_BAD;
     for (i=0U; i<capacity; ++i) image[i]=0U;
     while (at<bytes && !done) {
@@ -251,7 +251,8 @@ static int image_low(const unsigned char *raw, unsigned int bytes,
     }
     if (!done || at!=bytes-16U || !imageend || imageend>capacity ||
         parsed.entry_offset>=imageend ||
-        base>0x7fffffffU-imageend) return TST_BAD;
+        base>(mode==24U ? 0x1000000U-imageend :
+                             0x7fffffffU-imageend)) return TST_BAD;
     parsed.image_bytes=imageend;
     *info=parsed;
     return TST_OK;
@@ -262,6 +263,15 @@ int TSTIMAGE31(const unsigned char *raw, unsigned int bytes,
                unsigned int capacity, TSTINFO *info)
 {
     return image_low(raw,bytes,base,image,capacity,31U,info);
+}
+
+int TSTIMAGE24(const unsigned char *raw, unsigned int bytes,
+               unsigned int base, unsigned char *image,
+               unsigned int capacity, TSTINFO *info)
+{
+    /* The selected AMODE24/RMODE24 member has low-only AL3/AL4 records.
+     * Its whole image, including save areas, must end below 16 MiB. */
+    return image_low(raw,bytes,base,image,capacity,24U,info);
 }
 
 int TSTIMAGE64ANY(const unsigned char *raw, unsigned int bytes,

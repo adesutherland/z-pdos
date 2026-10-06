@@ -71,7 +71,16 @@ addresses to Classic C. High U pointers require a 64-bit entry contract;
 silently truncating them to a C32 pointer is forbidden. This contract does
 not assert that every IBM service is already implemented.
 
-All app images occupy one U map. The loader needs a live interval inventory
+Applications share one U map while active, but the design does not require
+every application to remain resident simultaneously. The ordinary loader
+keeps existing applications mapped when a valid interval is available. If
+there is no suitable virtual interval or real backing for the module's
+AMODE/RMODE and requested storage, it returns a placement/storage error;
+it never silently places a 24-bit module or its required storage above
+16 MiB. Completed applications release their intervals. An explicitly
+nested call may use a reversible suspend/restore policy for a conflicting
+fixed origin, with the caller's state and return code checked on restoration.
+The loader needs a live interval inventory
 for code, data, stacks and heaps, keyed by module and lifetime, with checked
 AMODE/RMODE placement and relocation. It must refuse overlap before writing
 any page. A relocatable CMS MODULE can carry relocation records from
@@ -529,6 +538,14 @@ service validates and copies the 88-byte U parameter list and owns the
 wide-heap workload; the checked U 24-bit gap is unchanged. This is a
 selected TSO64 service and version-call result, not general IARV64 or TSO
 compatibility. The K C31 service is 64,774 bytes in the 128 KiB slot.
+
+The [TSO24 low-resident loader checkpoint](../qualification/TWO-SPACE-TSO24-LOADER-2026-10-06.md)
+materializes the separate source-built AMODE24/RMODE24 RXVM at U `0x20000`
+or `0x400000`, byte-for-byte against the existing loader. Its 1,085,440
+page-rounded image, 1 MiB stack and 4 MiB heap are 24-bit demands. Host
+placement controls reject a full low interval despite free 31-bit space,
+and permit reuse after release. This does not yet map or run TSO24 in the
+guest; its actual storage budget remains to be measured there.
 
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its

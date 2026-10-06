@@ -6,12 +6,13 @@ options levelb
 import rxfnsb
 main: procedure = .int
   arg args = .string[]
-  if args.0 <> 6 then do
-    say "usage: crexx -nokeep pdos/scripts/two-space-tso.crexx --args FRESH-build/pdos/work PINNED_RXV31_RDW PINNED_RXV64_RDW CLASSIC_CC CLASSIC_AS CLASSIC_LD"
+  if args.0 <> 6 & args.0 <> 7 then do
+    say "usage: crexx -nokeep pdos/scripts/two-space-tso.crexx --args FRESH-build/pdos/work PINNED_RXV31_RDW PINNED_RXV64_RDW CLASSIC_CC CLASSIC_AS CLASSIC_LD [PINNED_RXV24_RDW]"
     return 2
   end
   work = args.1; tso31 = args.2; tso64 = args.3
   classiccc = args.4; classicas = args.5; classicld = args.6
+  if args.0 = 7 then tso24 = args.7
   if left(work,11) <> "build/pdos/" | length(work) <= 11 | pos("..",work) > 0 then do
     say "fresh build/pdos/ output path required"
     return 2
@@ -19,6 +20,23 @@ main: procedure = .int
   if left(tso31,1) <> "/" | left(tso64,1) <> "/" then do
     say "absolute input paths required"
     return 2
+  end
+  if args.0 = 7 then do
+    if left(tso24,1) <> "/" then do
+      say "absolute TSO24 input path required"
+      return 2
+    end
+    address crexx "run test -f :tso24"
+    if rc <> 0 then do
+      say "TSO24 input missing"
+      return 2
+    end
+    hashes24 = .string[]
+    address crexx "run shasum -a 256 :tso24" output hashes24
+    if rc <> 0 | word(hashes24.1,1) <> "5d0159c02484f8dfd28ede0f25a3f262006b89fbee52a9ae8c9a152d6f13f356" then do
+      say "TSO24 input hash mismatch"
+      return 2
+    end
   end
   address crexx "run test ! -e :work"
   if rc <> 0 then do
@@ -72,7 +90,10 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_tso.c pdos/tests/two-space/tso.c :legacy -o :host"
   if rc <> 0 then return rc
-  address crexx "run :host :tso31 :tso64 :stage :stage64"
+  if args.0 = 7 then
+    address crexx "run :host :tso31 :tso64 :stage :stage64 :tso24"
+  else
+    address crexx "run :host :tso31 :tso64 :stage :stage64"
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src pdos/src/twospace_tso.c -o :asm"
   if rc <> 0 then return rc
@@ -82,5 +103,8 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run test -s :binary"
   if rc <> 0 then return rc
-  say "Pinned TSO31 and TSO64 ANY native materialization passed; Classic C31 object linked."
+  if args.0 = 7 then
+    say "Pinned TSO24/31/64 ANY native materialization passed; Classic C31 object linked."
+  else
+    say "Pinned TSO31 and TSO64 ANY native materialization passed; Classic C31 object linked."
   return 0

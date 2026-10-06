@@ -35,6 +35,16 @@ int main(void)
     CHECK(TSPFIND(&map, 64, addr(0xffffffffU,0xfffff000U),
                   addr(0xffffffffU,0xffffffffU), 8192, &found) == TSP_FULL);
     TSPINIT(&map);
+    CHECK(TSPRESV(&map,1,24,addr(0,0),0x20000) == TSP_OK);
+    CHECK(TSPRESV(&map,2,24,addr(0,0x20000),0xfe0000) == TSP_OK);
+    CHECK(TSPFIND(&map,24,addr(0,0x20000),addr(0,0xffffff),
+                  0x109000,&found) == TSP_FULL);
+    CHECK(TSPFIND(&map,31,addr(0,0x1000000),addr(0,0x7fffffff),
+                  0x109000,&found) == TSP_OK && found.lo==0x1000000);
+    CHECK(TSPRELS(&map,2) == TSP_OK);
+    CHECK(TSPFIND(&map,24,addr(0,0x20000),addr(0,0xffffff),
+                  0x109000,&found) == TSP_OK && found.lo==0x20000);
+    TSPINIT(&map);
     for (i = 0; i < TSP_SLOTS; ++i)
         CHECK(TSPRESV(&map, i+1, 64, addr(0,i*4096), 4096) == TSP_OK);
     CHECK(TSPRESV(&map, 99, 64, addr(1,0), 4096) == TSP_FULL);

@@ -84,8 +84,8 @@ remain separate work.
 - Status: Open
 - Target: pdos-zarch C32 kernel and native application contexts
 - Observation: TSO24 is rejected before dispatch; z/PDOS 0.1 qualifies the wider application routes.
-- Evidence: doc/qualification/QUALIFICATION.md and qualification-0.1.json.
-- Acceptance: Place code/save areas/parameters below 16 MiB, dispatch in the declared mode and qualify unchanged TSO24 RXVM I/O with its separate storage budget.
+- Evidence: doc/qualification/QUALIFICATION.md and qualification-0.1.json. The [successor TSO24 host loader check](qualification/TWO-SPACE-TSO24-LOADER-2026-10-06.md) is a separate partial result.
+- Acceptance: Place code/save areas/parameters below 16 MiB, dispatch in the declared mode and qualify unchanged TSO24 RXVM I/O with its separate storage budget. Preserve resident applications when suitable storage exists; return a clear failure when the required low virtual interval or real backing does not exist. Never silently promote a 24-bit request above the line or evict an unrelated application.
 
 ## PD-002: Conditional storage-service errors
 
@@ -119,16 +119,16 @@ qualification. This sequence does not add a second roadmap.
 | 3. K64 interruption path | Cover SVC, program, external, I/O and machine-check entries, nesting, full GPR/PSW/key preservation, and recoverable application faults. A malformed caller must not strand the machine in an interruption loop. |
 | 4. K/U service gate | Validate full-width U ranges, page translations, length, access direction and failures; copy through bounded K buffers. Never pass a raw U virtual pointer to Classic C31. Keep CMS and TSO personalities distinct. |
 | 5. Services in K | Move the selected storage, channel/dataset, terminal and command services into K. Audit 24-bit real channel buffers and every below-line GETMAIN fallback. Keep K code, DAT and heaps out of U's low virtual area; measure actual CMS24/TSO24 image, stack and heap headroom. |
-| 6. Shared-U loader and calls | Load fixed and relocatable CMS/TSO modules with a live interval inventory and checked AMODE/RMODE. Run nested application calls, including REXX `ADDRESS`; for a fixed-origin collision, use a defined reversible suspend/restore policy and verify caller state and return code. |
+| 6. Shared-U loader and calls | Load fixed and relocatable CMS/TSO modules with a live interval inventory and checked AMODE/RMODE. Keep other applications resident when suitable space exists; fail a normal load explicitly if no appropriate virtual interval or real backing exists, especially below 16 MiB. Never silently promote AMODE24/RMODE24 storage. Reuse storage after application completion. Run nested application calls, including REXX `ADDRESS`; an explicitly selected fixed-origin suspend/restore path must verify caller state and return code. |
 | 7. Replacement selection | Build a normal 3390 image selecting the successor explicitly. Qualify fresh IPL, unchanged CMS24/CMS31 and TSO31/TSO64 binaries, native TSO24 separately, low-memory exhaustion, bad service pointers, collisions, nested calls, faults and shutdown on named profiles before changing the default route. |
 
 After slice 7, review whether CMS and TSO workloads should continue sharing
 one U ASCE or have separate U spaces. Compare actual fixed-origin collisions,
 relocation and overlay costs, interapplication `ADDRESS`/LINK behavior,
 service-personality isolation, low 24-bit headroom and failure containment
-on qualified workloads. The present dual RXVM map and tiny nested children
-are insufficient to choose; retain this as a decision question, not an
-assumption that coexistence is straightforward or that separation is simpler.
+on qualified workloads. Simultaneous residency of every application is not
+a requirement. The present dual RXVM map and tiny nested children are
+insufficient to choose; retain this as a decision question.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and
@@ -177,6 +177,10 @@ TPUT paths. K validates the U parameter list, owns its 128 MiB high-U heap,
 and observes its DETACH before a separate wide-heap workload. This closes
 the narrow version-call gate, not the broader TSO command/file service,
 RMODE HIGH, abnormal-exit cleanup or native TSO24 gates.
+The [TSO24 host materializer checkpoint](qualification/TWO-SPACE-TSO24-LOADER-2026-10-06.md)
+matches the existing native loader at two below-line bases and proves
+that full low U placement fails without falling into 31-bit space. It does
+not yet run TSO24 after IPL or measure actual application headroom.
 
 The [6 October K channel checkpoint](qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
 adds a reserved 64 KiB low-real K workspace and a bounded post-handover
