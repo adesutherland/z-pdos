@@ -217,15 +217,15 @@ def run(args):
             judged["checks"]["k_terminal_screen_observed"] = (
                 "K SERVICE READY" in (out / "terminal.screen").read_text())
             judged["checks"]["terminal_input_sent"] = input_sent
-            if args.cms24file:
+            if args.cms24file and not args.tso31:
                 judged["checks"]["cms24_io24_summary_on_3270"] = (
                     "C24 SUMMARY: PASS=6 FAIL=0 SKIP=1" in
                     application_screen)
-            elif args.cmslibrary:
+            elif args.cmslibrary and not args.tso31:
                 judged["checks"]["cms_ioqual_summary_on_3270"] = (
                     "SUMMARY: PASS=8 FAIL=0 SKIP=3" in
                     application_screen)
-            elif args.cms24 or args.cms31:
+            elif (args.cms24 or args.cms31) and not args.tso31:
                 judged["checks"]["cms_version_on_3270"] = (
                     "crexx-1.0.0-beta.3 (Bytecode Mode)" in
                     application_screen)
@@ -428,16 +428,33 @@ def run(args):
                 tso_pages = (tso_bytes+4095)//4096
                 tso_hash = 0x811c9dc5
                 if tso_real and tso_real+tso_bytes <= len(raw):
-                    for value in raw[tso_real:tso_real+tso_bytes]:
+                    for value in raw[tso_real:tso_real+0x390]:
                         tso_hash = ((tso_hash ^ value)*0x01000193) & 0xffffffff
                 checks["tso31_checked_image_in_shared_u"] = (
                     struct.unpack_from(">I",raw,0x122dc)[0] == 0 and
                     tso_real >= 0x400000 and tso_bytes == 1094960 and
                     tso_entry == 0x07000000 and tso_blocks == 76 and
                     tso_input_fnv == 0x5db419ae and
-                    tso_hash == 0x3ce51566 and
+                    tso_hash == 0x5c5cc22d and
                     all(page_real(raw,0x28000f,0x07000000+i*4096) ==
                         tso_real+i*4096 for i in range(tso_pages)))
+                tso_arg, tso_alloc, tso_rc, tso_free = struct.unpack_from(
+                    ">Q3I",raw,0x122e0)
+                tso_lines, tso_length, tso_unknown, _ = struct.unpack_from(
+                    ">4I",raw,0x4700)
+                tso_attempts, tso_requested = struct.unpack_from(
+                    ">2I",raw,0x47a0)
+                checks["tso31_native_rxvm_version"] = (
+                    0x01000000 <= tso_arg < 0x80000000 and
+                    tso_alloc == tso_rc == tso_free == 0 and
+                    page_unmapped(raw,0x28000f,tso_arg) and
+                    tso_attempts >= 1 and tso_requested <= 132 and
+                    tso_lines >= 1 and tso_unknown == 0 and
+                    0 < tso_length <= 132 and
+                    "crexx-1.0.0-beta.3 (Bytecode Mode)" in
+                    raw[0x4710:0x4710+tso_length].decode("cp037") and
+                    "crexx-1.0.0-beta.3 (Bytecode Mode)" in
+                    application_screen)
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
                 real_bytes == 0x10000000 and stage >= 0x400000 and
                 stage + 0x400000 <= launch and launch + 4096 <= real_bytes and

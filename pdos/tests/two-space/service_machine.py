@@ -263,7 +263,9 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
          (((4238296 + 4095) // 4096) +
           2 * ((struct.unpack_from(">I",raw,0x4514)[0] + 4095) // 4096)
           if cmslibrary else 0) +
-         ((1094960 + 4095) // 4096 if tso31 else 0)) and
+         (((1094960 + 4095) // 4096) +
+          2 * ((0x04000000 // 4096) + (0x00100000 // 4096) + 2)
+          if tso31 else 0)) and
         0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x160000)
     errors = [x for x in log.splitlines() if re.search(r"HHC\d{5}E\b", x)]
     checks["no_hercules_error"] = not errors

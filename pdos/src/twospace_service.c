@@ -815,12 +815,16 @@ static unsigned int absent_channel_probe(const TSGREQUEST *request)
  */
 static unsigned int storage_service(TSGREQUEST *request)
 {
-    unsigned int mask_hi, mask_lo, flags, mode, storage_mode, result;
+    unsigned int mask_hi, mask_lo, flags, mode, storage_mode, result, task, pc;
     TSPADDR minimum, maximum, base;
     mask_hi=*(volatile const unsigned int *)0x3080U;
     mask_lo=*(volatile const unsigned int *)0x3084U;
     flags=*(volatile const unsigned int *)0x307cU;
     mode=(mask_hi & 1U) ? 64U : (mask_lo & 0x80000000U) ? 31U : 24U;
+    pc=*(volatile const unsigned int *)0x308cU;
+    task=tso31_loaded && pc>=0x07000000U &&
+         pc-0x07000000U<*(volatile const unsigned int *)0x4604U ?
+         16U : 1U;
     if (request->address.hi == 0U && request->address.lo == 0U) {
         if ((flags & 0x30U) == 0x30U) {
             if (mode == 24U) return 4U;
@@ -832,14 +836,14 @@ static unsigned int storage_service(TSGREQUEST *request)
             minimum.hi=maximum.hi=0U;
             minimum.lo=0x20000U; maximum.lo=0x00ffffffU;
         } else return 8U;
-        result=TSMALLOC(&storage,1U,storage_mode,minimum,maximum,
+        result=TSMALLOC(&storage,task,storage_mode,minimum,maximum,
                         request->length,0,&base);
         if (result != TSM_OK) return result == TSM_NOMEM ? 4U : 8U;
         request->address=base;
         *(volatile unsigned int *)0x4098U=u_tables.used;
         return 0U;
     }
-    result=TSMFREE(&storage,1U,request->address);
+    result=TSMFREE(&storage,task,request->address);
     if (result != TSM_OK) return 8U;
     *(volatile unsigned int *)0x4098U=u_tables.used;
     return 0U;
@@ -1261,6 +1265,44 @@ static unsigned int cms_line_screen(const unsigned char *message,
     return 0U;
 }
 
+/* Selected native TSO31 TPUT. R1's high bit denotes TGET in this ABI;
+ * input is a separate service, so never interpret that flag as a U address. */
+static unsigned int tso31_terminal_service(TSGREQUEST *request)
+{
+    TSGCONTEXT gate;
+    TSGREQUEST copy;
+    unsigned char message[132];
+    unsigned int i, status, mask_hi, mask_lo;
+    volatile unsigned char *receipt=(volatile unsigned char *)0x4710U;
+    mask_hi=*(volatile const unsigned int *)0x3080U;
+    mask_lo=*(volatile const unsigned int *)0x3084U;
+    *(volatile unsigned int *)0x47a0U+=1U;
+    *(volatile unsigned int *)0x47a4U=request->length;
+    *(volatile unsigned int *)0x47a8U=request->address.hi;
+    *(volatile unsigned int *)0x47acU=request->address.lo;
+    *(volatile unsigned int *)0x47b0U=request->direction;
+    /* TPUT defines R0/R1; upper GPR halves and R2 are not arguments.
+     * The saved PSW must say AMODE31 before reducing R1 to its 31 bits. */
+    if ((mask_hi&1U) || !(mask_lo&0x80000000U) ||
+        !request->address.lo || (request->address.lo&0x80000000U) ||
+        request->length>132U) return 8U;
+    gate.u_tables=&u_tables;
+    gate.real_aperture=(unsigned char *)TSF_KAPERTURE_VA;
+    gate.real_bytes=TSF_REAL_BYTES;
+    gate.rights=user_rights;
+    gate.rights_context=0;
+    copy=*request;
+    copy.address.hi=0U;
+    copy.direction=TSG_READ;
+    if (TSGCOPY(&gate,&copy,message,sizeof message)!=TSG_OK) return 8U;
+    status=cms_line_screen(message,request->length);
+    if (status) return status;
+    *(volatile unsigned int *)0x4700U+=1U;
+    *(volatile unsigned int *)0x4704U=request->length;
+    for (i=0U; i<request->length; ++i) receipt[i]=message[i];
+    return 0U;
+}
+
 /* The fixed-origin CMS24 entry has its own SVC and flagged 24-bit
  * line-buffer convention. Keep it distinct from the CMS31 CMSCALL path. */
 static unsigned int cms24_native_service(TSGREQUEST *request)
@@ -1643,9 +1685,16 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     int result;
     if (!request) return 0xffffffffU;
     if (attach()) return 0xfffffffaU;
-    /* The descriptor stores a 32-bit length for its bounded transfer and
-       GETMAIN subset. Refuse any nonzero caller high half before dispatch. */
-    if (*(volatile const unsigned int *)0x3000U != 0U)
+    /* The descriptor stores a 32-bit length. Refuse a nonzero caller high
+       half except for selected AMODE31 TPUT, whose R0 high half is not an
+       argument; its low half is independently bounded below. */
+    if (*(volatile const unsigned int *)0x3000U != 0U &&
+        !(request->svc==93U && tso31_loaded &&
+          !(*(volatile const unsigned int *)0x3080U&1U) &&
+          (*(volatile const unsigned int *)0x3084U&0x80000000U) &&
+          *(volatile const unsigned int *)0x308cU>=0x07000000U &&
+          *(volatile const unsigned int *)0x308cU-0x07000000U<
+              *(volatile const unsigned int *)0x4604U))
         return request->svc == 120U || request->svc == 223U ?
                8U : 0xfffffffdU;
     if (request->svc == 120U) return storage_service(request);
@@ -1691,9 +1740,25 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 229U) return cms_file_audit(request,24U);
     if (request->svc == 230U) return cms_cursor_guest_probe(request);
     if (request->svc == 231U) return tso31_map_service(request);
+    if (request->svc == 93U && tso31_loaded &&
+        *(volatile const unsigned int *)0x308cU>=0x07000000U &&
+        *(volatile const unsigned int *)0x308cU-0x07000000U<
+            *(volatile const unsigned int *)0x4604U)
+        return tso31_terminal_service(request);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
+    {
+        if (tso31_loaded &&
+            *(volatile const unsigned int *)0x308cU>=0x07000000U &&
+            *(volatile const unsigned int *)0x308cU-0x07000000U<
+                *(volatile const unsigned int *)0x4604U &&
+            *(volatile unsigned int *)0x4708U==0U) {
+            *(volatile unsigned int *)0x4708U=request->svc;
+            *(volatile unsigned int *)0x470cU=
+                *(volatile const unsigned int *)0x308cU;
+        }
         return 0xfffffffbU;
+    }
     gate.u_tables = &u_tables;
     gate.real_aperture = (unsigned char *)TSF_KAPERTURE_VA;
     gate.real_bytes = TSF_REAL_BYTES;

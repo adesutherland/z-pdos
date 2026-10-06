@@ -154,6 +154,16 @@ relocation and REXX `ADDRESS` calls. Slice 7 still needs an explicitly selected
 normal replacement image and unchanged CMS/TSO guest qualification. The
 release route remains the one-ASCE kernel.
 
+The [native TSO31 checkpoint](qualification/TWO-SPACE-TSO31-NATIVE-2026-10-06.md)
+now runs unchanged RXVM `-v` in the diagnostic shared U ASCE beside the
+qualified CMS24/CMS31 calls. Its selected SVC 120/93 storage and output
+surface uses K-owned real backing and bounded U copies, with no lasting
+24-bit U gap consumption. Slice 5 still needs general command, TSO file and
+terminal input services plus native TSO24 budgeting. Slice 6 still needs
+real `ADDRESS`/LINK application calls and conflicting-module qualification.
+Slice 7 still needs TSO64/native TSO24 and the explicitly selected normal
+successor image with full regression and failure controls.
+
 The [6 October K channel checkpoint](qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
 adds a reserved 64 KiB low-real K workspace and a bounded post-handover
 `VOL1` read through real-addressed CCWs. This removes the virtual-equals-real

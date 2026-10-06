@@ -484,6 +484,15 @@ service compatibility remain untested. The current C31 service nearly fills
 its 64 KiB fixture slot, so new services require an explicit K layout and
 DAT capacity decision.
 
+The [native TSO31 entry result](../qualification/TWO-SPACE-TSO31-NATIVE-2026-10-06.md)
+adds one unchanged RXVM `-v` invocation in AMODE31. K keeps the TSO
+allocations under a distinct owner and accepts the native SVC 93 TPUT
+register contract through its checked U copy gate. The exact version line
+appears on a connected 3270 and RXVM returns RC 0, while the unchanged
+CMS31 IOQUAL and CMS24 IO24 calls also pass in the same U ASCE. This is a
+narrow execution coexistence result. It does not establish a general TSO
+file/input surface, CMS-to-TSO `ADDRESS`, TSO64 or native TSO24 support.
+
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
 SVC through K, returns `0x3456` to a U64 caller, restores the parent PTEs,

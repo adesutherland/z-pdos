@@ -265,6 +265,19 @@ app_b_cms31_second_call:
     br %r14
 cms31_second_va32: .long 0x05000000
 
+.balign 8
+app_b_tso31_call:
+    lgr %r12, %r14
+    larl %r3, tso31_entry_va32
+    l %r3, 0(%r3)
+    lgr %r15, %r3
+    sam31
+    basr %r14, %r3
+    sam64
+    lgr %r14, %r12
+    br %r14
+tso31_entry_va32: .long 0x07000000
+
 .section .apphigh,"ax"
 app_high:
     larl %r1, high_data_va
@@ -820,6 +833,42 @@ cms24_io_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x2dc(%r2)
+    chi %r15, 0
+    jne tso31_call_done
+    lghi %r0, 4096
+    lghi %r1, 0
+    lghi %r15, 0x30
+    svc 120                 /* one temporary U31 ABI parameter page */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    stg %r1, 0x2e0(%r2)
+    st %r15, 0x2e8(%r2)
+    chi %r15, 0
+    jne tso31_call_done
+    lgr %r10, %r1
+    la %r4, 64(%r10)
+    st %r4, 0(%r10)         /* parameter pointer array */
+    mvi 64(%r10), 0
+    mvi 65(%r10), 2
+    mvi 66(%r10), 0x60      /* EBCDIC -v, native TSO command tail */
+    mvi 67(%r10), 0xa5
+    xc 256(72,%r10),256(%r10)
+    la %r13, 256(%r10)
+    lgr %r1, %r10
+    larl %r4, tso31_trampoline_va
+    lg %r4, 0(%r4)
+    basr %r14, %r4
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x2ec(%r2)
+    lghi %r0, 4096
+    lgr %r1, %r10
+    lghi %r15, 0x30
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x2f0(%r2)
+tso31_call_done:
     brasl %r14, wide_heap_workload
     larl %r3, high_data_va
     lg %r3, 0(%r3)
@@ -861,6 +910,7 @@ cms31_image_va: .quad 0x03000000
 cms24_image_va: .quad 0x20000
 cms31_trampoline_va: .quad app_b_cms31_call
 cms31_second_trampoline_va: .quad app_b_cms31_second_call
+tso31_trampoline_va: .quad app_b_tso31_call
 forged_va: .quad 0x100021000
 cross_va: .quad 0x110001ffe
 write_va: .quad 0x110001024
@@ -995,6 +1045,8 @@ trace_not_cms_fst:
     chi %r2, 230
     je storage_no_record
     chi %r2, 231
+    je storage_no_record
+    chi %r2, 93
     je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore
