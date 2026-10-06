@@ -36,7 +36,10 @@ CMS24/CMS31 RXVM MODULEs. None of this places K storage in U's 24-bit
 virtual range. Both unchanged RXVM `-v` programs run in this diagnostic
 IPL. A [selected CMS31 file result](../qualification/TWO-SPACE-CMS31-IOQUAL-2026-10-06.md)
 also runs IOQUAL with LIBRARY through checked K file records and transient
-output. The successor still lacks persistent output, general CMS/TSO file
+output. A [selected CMS24 IO24 result](../qualification/TWO-SPACE-CMS24-IO24-2026-10-06.md)
+uses a fresh fixed-origin overlay and profile-specific K file state, with its
+13,914,112-byte low U placement gap restored after the call. The successor
+still lacks persistent output, general CMS/TSO file
 and command adapters, REXX `ADDRESS` calls and the explicitly selected
 replacement image. A post-qualification review will decide whether CMS
 and TSO continue to share one U ASCE.

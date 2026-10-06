@@ -273,6 +273,13 @@ The [CMS transfer preflight checkpoint](qualification/TWO-SPACE-CMS-TRANSFER-202
 preflights both U destinations of `RDBUF` before either copy, keeps its cursor
 unchanged on failure and repeats the full positive guest IPL. A guest-level
 malformed CMS record request remains an acceptance gap.
+The [CMS24 IO24 checkpoint](qualification/TWO-SPACE-CMS24-IO24-2026-10-06.md)
+runs a pristine fixed-origin RXVM overlay on unchanged IO24 RXBIN in the
+same U ASCE as both CMS31 images. Its 6/0/1 guest result, two exact transient
+output hashes, restored parent, and 13,914,112-byte post-run 24-bit gap pass
+122 fresh-IPL checks. A DAT software-walker correction makes absent segment
+entries return `TSD_MISSING`. Persistent output, TSO applications and
+cross-personality calls remain open.
 
 ## PD-004: Batch-file delivery
 

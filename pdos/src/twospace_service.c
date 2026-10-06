@@ -26,21 +26,23 @@ static unsigned int cms31_secondary_bytes;
 static unsigned int cms24_loaded;
 static unsigned int cms31_lowcore_real;
 #define CMS31_LINES_REAL 0x20000U
+#define CMS24_EXTRA_LINES_REAL 0x26000U
 static unsigned int cms31_heap_live;
 static unsigned int cms31_heap_bytes;
 static TSPADDR cms31_heap_address;
 #define CMS_FILE_OWNER 0x434d5346U
-static unsigned int cms_file_real;
-static unsigned int cms_file_length;
-static unsigned int cms_file_records;
-static unsigned int cms_file_cursor;
-static unsigned char cms_file_id[18];
+typedef struct {
+    unsigned char id[18];
+    unsigned int real, length, records, cursor;
+} CMSINPUT;
+/* CMS24 and CMS31 must not replace each other's active record cursor. */
+static CMSINPUT cms_inputs[2];
 #define CMS_OUTPUT_SLOTS 4U
 #define CMS_OUTPUT_BYTES 0x200000U
 typedef struct {
     unsigned char id[18];
     unsigned int real, length, cursor, records, source_bytes;
-    unsigned int closed;
+    unsigned int closed, profile;
 } CMSOUTPUT;
 static CMSOUTPUT cms_outputs[CMS_OUTPUT_SLOTS];
 void TSFPURGE(void *unused);
@@ -608,6 +610,57 @@ static unsigned int cms24_overlay_pop(const TSGREQUEST *request)
     return returned;
 }
 
+/* A second invocation needs pristine fixed-origin RXVM bytes. Keep the
+ * exited first image as suspended parent backing and copy the checked
+ * MODULE into a temporary K-owned real interval before the overlay push. */
+static unsigned int cms24_fresh_push(const TSGREQUEST *request)
+{
+    static const unsigned char name[] = {
+        0xc3U,0xd4U,0xe2U,0xf2U,0xf4U,0x4bU,0xd9U,0xe7U,
+        0xe5U,0xd4U
+    };
+    unsigned char *stage, *image;
+    TSHINFO info;
+    TSPADDR base;
+    unsigned int blocks, stage_real, image_real=0U, span, entry, result;
+    unsigned int pushed=0U, returned;
+    int status;
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    if (!cms24_loaded || storage.depth) return 4U;
+    result=cms_stage_read(name,sizeof name,24U,&stage,&stage_real,
+                          &info,&blocks);
+    if (result) return result;
+    span=(info.image_bytes+4095U)&~4095U;
+    if (TSRALLOC(&storage.real,CMS_FILE_OWNER+6U,span,
+                 TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,&image_real)
+            !=TSR_OK) { result=4U; goto release_stage; }
+    image=(unsigned char *)TSF_KAPERTURE_VA+image_real;
+    base.hi=0U; base.lo=0x20000U;
+    if (TSHIMAGE(stage,blocks*18452U,24U,base.lo,image,
+                 info.image_bytes,&entry)!=TSH_OK || entry!=base.lo) {
+        result=12U; goto release_image;
+    }
+    status=TSMOVERLAYPUSH(&storage,5U,base,image,info.image_bytes);
+    result=status==TSM_OK ? 0U : status==TSM_NOMEM ? 4U : 12U;
+    if (!result) {
+        pushed=1U;
+        *(volatile unsigned int *)0x4098U=u_tables.used;
+    }
+release_image:
+    if (TSRRELEASE(&storage.real,CMS_FILE_OWNER+6U,image_real)!=TSR_OK)
+        result=0xfffffff0U;
+release_stage:
+    if (TSRRELEASE(&storage.real,CMS_STAGE_OWNER,stage_real)!=TSR_OK)
+        result=0xfffffff0U;
+    if (result && pushed) {
+        if (TSMOVERLAYPOP(&storage,5U,base,0U,&returned)!=TSM_OK)
+            result=0xfffffff0U;
+        *(volatile unsigned int *)0x4098U=u_tables.used;
+    }
+    return result;
+}
+
 static unsigned int cms24_child_probe(void)
 {
     unsigned int mask_hi=*(volatile const unsigned int *)0x3080U;
@@ -829,32 +882,50 @@ static void cms_put_word(unsigned char *p, unsigned int value)
     p[2]=(unsigned char)(value>>8); p[3]=(unsigned char)value;
 }
 
-static unsigned int cms_file_close(void)
+static CMSINPUT *cms_input(unsigned int profile)
 {
-    if (cms_file_real &&
-        TSRRELEASE(&storage.real,CMS_FILE_OWNER,cms_file_real)!=TSR_OK)
+    if (profile==24U) return &cms_inputs[0];
+    if (profile==31U) return &cms_inputs[1];
+    return 0;
+}
+
+static unsigned int cms_input_owner(unsigned int profile)
+{
+    return CMS_FILE_OWNER+(profile==24U ? 5U : 0U);
+}
+
+static unsigned int cms_file_close(unsigned int profile)
+{
+    CMSINPUT *input=cms_input(profile);
+    if (!input) return 12U;
+    if (input->real &&
+        TSRRELEASE(&storage.real,cms_input_owner(profile),input->real)
+            !=TSR_OK)
         return 12U;
-    cms_file_real=0U;
-    cms_file_length=cms_file_records=cms_file_cursor=0U;
+    input->real=input->length=input->records=input->cursor=0U;
     return 0U;
 }
 
-static CMSOUTPUT *cms_output_find(const unsigned char id[18])
+static CMSOUTPUT *cms_output_find(const unsigned char id[18],
+                                  unsigned int profile)
 {
     unsigned int slot, i;
     for (slot=0U; slot<CMS_OUTPUT_SLOTS; ++slot) {
-        if (!cms_outputs[slot].real) continue;
+        if (!cms_outputs[slot].real ||
+            cms_outputs[slot].profile!=profile) continue;
         for (i=0U; i<18U && cms_outputs[slot].id[i]==id[i]; ++i) {}
         if (i==18U) return &cms_outputs[slot];
     }
     return 0;
 }
 
-static CMSOUTPUT *cms_output_create(const unsigned char id[18])
+static CMSOUTPUT *cms_output_create(const unsigned char id[18],
+                                    unsigned int profile)
 {
     unsigned int slot, real, i;
     CMSOUTPUT *out;
-    if (id[16U]!=0xc1U || id[17U]!=0xf1U) return 0;
+    if ((profile!=24U && profile!=31U) ||
+        id[16U]!=0xc1U || id[17U]!=0xf1U) return 0;
     for (slot=0U; slot<CMS_OUTPUT_SLOTS; ++slot)
         if (!cms_outputs[slot].real) break;
     if (slot==CMS_OUTPUT_SLOTS ||
@@ -865,6 +936,7 @@ static CMSOUTPUT *cms_output_create(const unsigned char id[18])
     for (i=0U; i<18U; ++i) out->id[i]=id[i];
     out->real=real; out->length=out->cursor=64U;
     out->records=out->source_bytes=out->closed=0U;
+    out->profile=profile;
     return out;
 }
 
@@ -877,13 +949,14 @@ static unsigned int cms_output_erase(CMSOUTPUT *out)
         TSRRELEASE(&storage.real,CMS_FILE_OWNER+slot+1U,
                    out->real)!=TSR_OK) return 12U;
     out->real=out->length=out->cursor=0U;
-    out->records=out->source_bytes=out->closed=0U;
+    out->records=out->source_bytes=out->closed=out->profile=0U;
     return 0U;
 }
 
 /* The CMS file envelope is a checked sequence of variable records in a
  * fixed-block dataset. Keep its backing in K real storage, never U low VA. */
-static unsigned int cms_file_open(const unsigned char id[18])
+static unsigned int cms_file_open(const unsigned char id[18],
+                                  unsigned int profile)
 {
     static const unsigned char prefix[6] =
         {0xc3U,0xd4U,0xe2U,0xf3U,0xf1U,0x4bU};
@@ -891,16 +964,18 @@ static unsigned int cms_file_open(const unsigned char id[18])
     const unsigned char *record;
     TSKEXTENT extent;
     TSIFINFO info;
+    CMSINPUT *input=cms_input(profile);
     unsigned int i, j, n=0U, blocks, span, real;
     unsigned int cylinder, head, number;
     int found, count;
-    if (id[16]!=0xc1U || id[17]!=0xf1U) return 28U;
-    if (cms_file_real) {
-        for (i=0U; i<18U && cms_file_id[i]==id[i]; ++i) {}
+    if (!input || id[16]!=0xc1U || id[17]!=0xf1U) return 28U;
+    if (input->real) {
+        for (i=0U; i<18U && input->id[i]==id[i]; ++i) {}
         if (i==18U) return 0U;
-        if (cms_file_close()!=0U) return 12U;
+        if (cms_file_close(profile)!=0U) return 12U;
     }
     for (i=0U; i<6U; ++i) name[n++]=prefix[i];
+    if (profile==24U) { name[3U]=0xf2U; name[4U]=0xf4U; }
     for (i=0U; i<8U && id[i]!=0x40U; ++i) {
         if (id[i]==0x4bU || (i==0U && id[i]==0x5cU)) return 28U;
         name[n++]=id[i];
@@ -922,11 +997,11 @@ static unsigned int cms_file_open(const unsigned char id[18])
     cylinder=extent.start_cylinder; head=extent.start_head; number=1U;
     count=channel_record(&channel,cylinder,head,number,18452U,&record);
     if (count!=18452) return 12U;
-    if (TSIFHEADER(record,(unsigned int)count,31U,&info)!=TSIF_OK)
+    if (TSIFHEADER(record,(unsigned int)count,profile,&info)!=TSIF_OK)
         return 12U;
     blocks=info.blocks;
     span=(blocks*18452U+4095U)&~4095U;
-    if (TSRALLOC(&storage.real,CMS_FILE_OWNER,span,
+    if (TSRALLOC(&storage.real,cms_input_owner(profile),span,
                  TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,&real)!=TSR_OK)
         return 4U;
     stage=(unsigned char *)TSF_KAPERTURE_VA+real;
@@ -941,15 +1016,15 @@ static unsigned int cms_file_open(const unsigned char id[18])
             number=1U; if (++head==15U) { head=0U; ++cylinder; }
         }
     }
-    if (TSIFVALIDATE(stage,blocks*18452U,31U,&info)!=TSIF_OK)
+    if (TSIFVALIDATE(stage,blocks*18452U,profile,&info)!=TSIF_OK)
         goto corrupt;
-    for (i=0U; i<18U; ++i) cms_file_id[i]=id[i];
-    cms_file_real=real;
-    cms_file_length=64U+info.payload_bytes;
-    cms_file_records=info.records; cms_file_cursor=64U;
+    for (i=0U; i<18U; ++i) input->id[i]=id[i];
+    input->real=real;
+    input->length=64U+info.payload_bytes;
+    input->records=info.records; input->cursor=64U;
     return 0U;
 corrupt:
-    return TSRRELEASE(&storage.real,CMS_FILE_OWNER,real)==TSR_OK ?
+    return TSRRELEASE(&storage.real,cms_input_owner(profile),real)==TSR_OK ?
            12U : 0xfffffff0U;
 }
 
@@ -1095,17 +1170,22 @@ static unsigned int cms24_native_service(TSGREQUEST *request)
             return 12U;
     }
     n=*(volatile unsigned int *)0x4300U;
-    if (n>=8U) return 12U;
-    out=(volatile unsigned char *)(0x4304U+n*136U);
+    if (n>=128U) return 12U;
+    out=n==0U ? (volatile unsigned char *)0x4304U :
+        (volatile unsigned char *)(TSF_KAPERTURE_VA+
+          CMS24_EXTRA_LINES_REAL+4U+(n-1U)*136U);
     *(volatile unsigned int *)out=length;
     for (i=0U; i<length; ++i) out[4U+i]=message[i];
     *(volatile unsigned int *)0x4300U=n+1U;
+    if (n) *(volatile unsigned int *)(TSF_KAPERTURE_VA+
+             CMS24_EXTRA_LINES_REAL)=n;
     return cms_line_screen(message,length);
 }
 
 /* First live CMS31 CMSCALL subset. The saved old PSW selects the mapped
  * module, and every U parameter is copied through the checked K gate. */
-static unsigned int cms31_native_service(TSGREQUEST *request)
+static unsigned int cms_native_service(TSGREQUEST *request,
+                                       unsigned int profile)
 {
     static const unsigned char obtain[8] =
         {0xc4U,0xd4U,0xe2U,0xc6U,0xd9U,0xd6U,0xe2U,0xe5U};
@@ -1130,9 +1210,12 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
     unsigned int i, n, length, result, flags, cursor, size, real;
     unsigned int records;
     CMSOUTPUT *file;
+    CMSINPUT *input=cms_input(profile);
     volatile unsigned char *out;
-    if (request->address.hi || request->address.lo < 0x1000000U ||
-        request->address.lo >= 0x80000000U) return 12U;
+    if (!input || request->address.hi ||
+        request->address.lo < (profile==24U ? 0x20000U : 0x1000000U) ||
+        request->address.lo >= (profile==24U ? 0x1000000U : 0x80000000U))
+        return 12U;
     gate.u_tables=&u_tables;
     gate.real_aperture=(unsigned char *)TSF_KAPERTURE_VA;
     gate.real_bytes=TSF_REAL_BYTES;
@@ -1142,9 +1225,15 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
     copy.length=32U;
     copy.direction=TSG_READ;
     if (TSGCOPY(&gate,&copy,plist,sizeof plist) != TSG_OK) return 12U;
+    if (profile==24U) {
+        static const unsigned char typlin[8] =
+            {0xe3U,0xe8U,0xd7U,0xd3U,0xc9U,0xd5U,0x40U,0x40U};
+        for (i=0U; i<8U && plist[i]==typlin[i]; ++i) {}
+        if (i==8U) return cms24_native_service(request);
+    }
     flags=*(volatile const unsigned int *)0x307cU;
     for (i=0U; i<8U && plist[i]==obtain[i]; ++i) {}
-    if (i==8U) {
+    if (i==8U && profile==31U) {
         length=cms_word(plist+16U);
         if (flags!=0x00e00000U || !length || (length&7U) ||
             length!=request->length || plist[28U]!=0x82U ||
@@ -1164,7 +1253,7 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
         return 0U;
     }
     for (i=0U; i<8U && plist[i]==release[i]; ++i) {}
-    if (i==8U) {
+    if (i==8U && profile==31U) {
         address.hi=0U;
         address.lo=*(volatile const unsigned int *)0x3044U & 0x7fffffffU;
         if (flags!=0x00e00000U || !cms31_heap_live ||
@@ -1180,7 +1269,7 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
         return 0U;
     }
     for (i=0U; i<8U && plist[i]==line[i]; ++i) {}
-    if (i==8U) {
+    if (i==8U && profile==31U) {
         length=cms_word(plist+12U);
         if (flags || length>130U || cms_word(plist+8U)<0x1000000U ||
             cms_word(plist+8U)>=0x80000000U) return 12U;
@@ -1206,12 +1295,12 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
         copy.address.lo=request->address.lo+28U;
         copy.length=4U; copy.direction=TSG_WRITE;
         if (TSGPROBE(&gate,&copy)!=TSG_OK) return 12U;
-        file=cms_output_find(plist+8U);
+        file=cms_output_find(plist+8U,profile);
         if (file) records=file->records;
         else {
-            result=cms_file_open(plist+8U);
+            result=cms_file_open(plist+8U,profile);
             if (result) return result;
-            records=cms_file_records;
+            records=input->records;
         }
         for (i=0U; i<40U; ++i) fst[i]=0U;
         for (i=0U; i<16U; ++i) fst[i]=plist[8U+i];
@@ -1236,19 +1325,19 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
         copy.address.lo=request->address.lo+40U;
         copy.length=4U; copy.direction=TSG_WRITE;
         if (TSGPROBE(&gate,&copy)!=TSG_OK) return 12U;
-        file=cms_output_find(plist+8U);
+        file=cms_output_find(plist+8U,profile);
         if (file) {
             real=file->real;
             cursor=(plist[26U]==0U && plist[27U]==1U) ?
                    64U : file->cursor;
             length=file->length;
         } else {
-            result=cms_file_open(plist+8U);
+            result=cms_file_open(plist+8U,profile);
             if (result) return result;
-            real=cms_file_real;
+            real=input->real;
             cursor=(plist[26U]==0U && plist[27U]==1U) ?
-                   64U : cms_file_cursor;
-            length=cms_file_length;
+                   64U : input->cursor;
+            length=input->length;
         }
         if (cursor>=length || cursor>length-2U) return 12U;
         size=((unsigned int)((unsigned char *)TSF_KAPERTURE_VA+
@@ -1256,8 +1345,10 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
              ((unsigned char *)TSF_KAPERTURE_VA+
               real)[cursor+1U];
         if (!size || size>256U || size>length-cursor-2U ||
-            cms_word(plist+28U)<0x1000000U ||
-            cms_word(plist+28U)>=0x80000000U ||
+            cms_word(plist+28U)<
+                (profile==24U ? 0x20000U : 0x1000000U) ||
+            cms_word(plist+28U)>=
+                (profile==24U ? 0x1000000U : 0x80000000U) ||
             cms_word(plist+32U)<size) return 12U;
         for (i=0U; i<size; ++i)
             message[i]=((unsigned char *)TSF_KAPERTURE_VA+
@@ -1273,7 +1364,7 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
         if (TSGCOPY(&gate,&copy,plist+40U,4U)!=TSG_OK)
             return 12U;
         if (file) file->cursor=cursor+2U+size;
-        else cms_file_cursor=cursor+2U+size;
+        else input->cursor=cursor+2U+size;
         return 0U;
     }
     for (i=0U; i<8U && plist[i]==wrbuf[i]; ++i) {}
@@ -1282,17 +1373,19 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
         if (TSGCOPY(&gate,&copy,plist,sizeof plist)!=TSG_OK) return 12U;
         length=cms_word(plist+32U);
         if (!length || length>256U ||
-            cms_word(plist+28U)<0x1000000U ||
-            cms_word(plist+28U)>=0x80000000U) return 12U;
+            cms_word(plist+28U)<
+                (profile==24U ? 0x20000U : 0x1000000U) ||
+            cms_word(plist+28U)>=
+                (profile==24U ? 0x1000000U : 0x80000000U)) return 12U;
         copy.address.lo=cms_word(plist+28U);
         copy.length=length;
         if (TSGCOPY(&gate,&copy,message,sizeof message)!=TSG_OK)
             return 12U;
-        file=cms_output_find(plist+8U);
+        file=cms_output_find(plist+8U,profile);
         if (!file) {
-            result=cms_file_open(plist+8U);
+            result=cms_file_open(plist+8U,profile);
             if (result!=28U) return 12U;
-            file=cms_output_create(plist+8U);
+            file=cms_output_create(plist+8U,profile);
             if (!file) return 4U;
         }
         if (file->closed || file->records>=65535U ||
@@ -1310,7 +1403,7 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
     }
     for (i=0U; i<8U && plist[i]==finis[i]; ++i) {}
     if (i==8U) {
-        file=cms_output_find(plist+8U);
+        file=cms_output_find(plist+8U,profile);
         if (file) {
             if (!file->records) {
                 ((unsigned char *)TSF_KAPERTURE_VA+file->real)[64U]=0U;
@@ -1321,12 +1414,12 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
             file->closed=1U;
             return 0U;
         }
-        for (i=0U; i<18U && cms_file_id[i]==plist[8U+i]; ++i) {}
-        return i==18U && cms_file_real ? cms_file_close() : 28U;
+        for (i=0U; i<18U && input->id[i]==plist[8U+i]; ++i) {}
+        return i==18U && input->real ? cms_file_close(profile) : 28U;
     }
     for (i=0U; i<8U && plist[i]==erase[i]; ++i) {}
     if (i==8U) {
-        file=cms_output_find(plist+8U);
+        file=cms_output_find(plist+8U,profile);
         return file ? cms_output_erase(file) : 28U;
     }
     {
@@ -1357,19 +1450,38 @@ static unsigned int cms31_library_probe(const TSGREQUEST *request)
            extent.logical_length==18452U ? 0U : 12U;
 }
 
+static unsigned int cms24_io24_probe(const TSGREQUEST *request)
+{
+    static const unsigned char name[] = {
+        0xc3U,0xd4U,0xe2U,0xf2U,0xf4U,0x4bU,
+        0xc9U,0xd6U,0xf2U,0xf4U,0x4bU,
+        0xd9U,0xe7U,0xc2U,0xc9U,0xd5U
+    };
+    TSKEXTENT extent;
+    int result;
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    result=TSKFIND(channel_record,&channel,name,sizeof name,&extent);
+    if (result==TSK_ABSENT) return 4U;
+    return result==TSK_OK && extent.record_format==0x80U &&
+           extent.block_length==18452U &&
+           extent.logical_length==18452U ? 0U : 12U;
+}
+
 /* Fixture completion receipt. Keep hashes in K-only low real diagnostics,
  * then release each transient file buffer before the next workload. */
-static unsigned int cms31_file_audit(const TSGREQUEST *request)
+static unsigned int cms_file_audit(const TSGREQUEST *request,
+                                   unsigned int profile)
 {
     volatile unsigned char *receipt=(volatile unsigned char *)(
-        TSF_KAPERTURE_VA+0x25500U);
+        TSF_KAPERTURE_VA+(profile==24U ? 0x25580U : 0x25500U));
     unsigned int slot, i, count=0U, hash, result=0U;
     CMSOUTPUT *out;
     if (request->length || request->address.hi || request->address.lo ||
         request->direction) return 8U;
     for (slot=0U; slot<CMS_OUTPUT_SLOTS; ++slot) {
         out=&cms_outputs[slot];
-        if (!out->real) continue;
+        if (!out->real || out->profile!=profile) continue;
         if (!out->closed) result=12U;
         hash=0x811c9dc5U;
         for (i=64U; i<out->length; ++i)
@@ -1383,8 +1495,9 @@ static unsigned int cms31_file_audit(const TSGREQUEST *request)
         ++count;
         if (cms_output_erase(out)!=0U) result=12U;
     }
-    *(volatile unsigned int *)(TSF_KAPERTURE_VA+0x254f0U)=count;
-    if (cms_file_close()!=0U) result=12U;
+    *(volatile unsigned int *)(TSF_KAPERTURE_VA+
+        (profile==24U ? 0x254f4U : 0x254f0U))=count;
+    if (cms_file_close(profile)!=0U) result=12U;
     return result;
 }
 
@@ -1406,7 +1519,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 202U && cms24_loaded &&
         *(volatile const unsigned int *)0x308cU >= 0x20000U &&
         *(volatile const unsigned int *)0x308cU < 0x1ba6c0U)
-        return cms24_native_service(request);
+        return cms_native_service(request,24U);
     if (request->svc == 204U &&
         ((cms31_loaded &&
           *(volatile const unsigned int *)0x308cU >= 0x03000000U &&
@@ -1416,7 +1529,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
           *(volatile const unsigned int *)0x308cU >= 0x05000000U &&
           *(volatile const unsigned int *)0x308cU <
               0x05000000U+cms31_secondary_bytes)))
-        return cms31_native_service(request);
+        return cms_native_service(request,31U);
     if (request->svc == 205U && cms31_loaded &&
         *(volatile const unsigned int *)0x308cU==0x202U)
         return cms31_fst_lookup(request);
@@ -1435,10 +1548,13 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 219U) return cms24_child_probe();
     if (request->svc == 220U) return cms24_overlay_push(request);
     if (request->svc == 221U) return cms24_overlay_pop(request);
+    if (request->svc == 227U) return cms24_fresh_push(request);
+    if (request->svc == 228U) return cms24_io24_probe(request);
     if (request->svc == 222U) return absent_channel_probe(request);
     if (request->svc == 224U) return cms31_secondary_map_service(request);
     if (request->svc == 225U) return cms31_library_probe(request);
-    if (request->svc == 226U) return cms31_file_audit(request);
+    if (request->svc == 226U) return cms_file_audit(request,31U);
+    if (request->svc == 229U) return cms_file_audit(request,24U);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
         return 0xfffffffbU;

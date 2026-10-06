@@ -34,6 +34,10 @@ int main(void)
     CHECK(TSDMAP(&u, address(0,0x02000000U), address(0,0xd000)) == TSD_OK);
     CHECK(TSDMAP(&u, address(0x00000001U,0x10000000U),
                  address(0,0x6000)) == TSD_OK);
+    CHECK(TSDLOOKUP(&u,address(0,0x00200000U),&previous) == TSD_MISSING);
+    CHECK(TSDUNMAP(&u,address(0,0x00200000U),&previous) == TSD_MISSING);
+    CHECK(TSDLOOKUP(&u,address(0,0x02000000U),&previous) == TSD_OK);
+    CHECK(previous.hi == 0U && previous.lo == 0xd000U);
     CHECK(word(up + 8U * 8U + 4U) == 0x20U); /* K high R1 absent in U */
     CHECK(TSDINIT(&small, tiny, 0x180000U, 16384U) == TSD_OK);
     CHECK(TSDMAP(&small, address(0,0), address(0,0)) == TSD_FULL);

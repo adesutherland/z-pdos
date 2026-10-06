@@ -99,7 +99,7 @@ static int map_page(TSDSTATE *s, TSPADDR va, TSPADDR pa,
     for (i = 0; i < 4U; ++i) {
         if (need) { absent[i] = 1U; need += i == 3U ? 4096U : 16384U; continue; }
         p = entry(s, origins[i], indexes[i]);
-        next = child(p, i == 3U ? 0x400U : 0x20U);
+        next = child(p, 0x20U);
         if (!next) {
             absent[i] = 1U;
             need += i == 3U ? 4096U : 16384U;
@@ -164,7 +164,7 @@ int TSDUNMAP(TSDSTATE *s, TSPADDR va, TSPADDR *old_pa)
     origin = s->asce_lo & ~4095U;
     for (i = 0U; i < 4U; ++i) {
         p = entry(s,origin,indexes[i]);
-        next = child(p,i == 3U ? 0x400U : 0x20U);
+        next = child(p,0x20U);
         if (!next) return TSD_MISSING;
         if (next < s->pool_real || (next & 4095U) ||
             s->used < (i == 3U ? 4096U : 16384U) ||
@@ -210,7 +210,7 @@ int TSDLOOKUP(const TSDSTATE *s, TSPADDR va, TSPADDR *real)
             real->lo = low + (va.lo & 4095U);
             return real->lo < low ? TSD_BAD : TSD_OK;
         }
-        if (low == (i == 3U ? 0x400U : 0x20U)) return TSD_MISSING;
+        if (low == 0x20U) return TSD_MISSING;
         if ((low & 4095U) != (i == 0U ? 0x0fU :
                                i == 1U ? 0x0bU : i == 2U ? 0x07U : 0U))
             return TSD_BAD;

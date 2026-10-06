@@ -76,7 +76,7 @@ def page_unmapped(raw, root, virtual):
         entry = struct.unpack_from(">Q", raw, origin + index * 8)[0]
         if level == 4:
             return entry == 0x400
-        if entry == (0x400 if level == 3 else 0x20):
+        if entry == 0x20:
             return True
         origin = entry & ~4095
         if origin < 0x280000 or origin >= 0x3e0000:
@@ -94,7 +94,7 @@ def page_real(raw, root, virtual):
         if origin < 0x280000 or origin >= 0x3e0000:
             return None
         entry = struct.unpack_from(">Q", raw, origin + index * 8)[0]
-        if entry == (0x400 if level >= 3 else 0x20):
+        if entry == (0x400 if level == 4 else 0x20):
             return None
         origin = entry & ~4095
         if level == 4:
@@ -205,7 +205,8 @@ def run(args):
             judged = judge(raw[:0x14000], log, ipl=True,
                            cms24=bool(args.cms24), cms31=bool(args.cms31),
                            cmsfile=bool(args.cmsfile),
-                           cmslibrary=bool(args.cmslibrary))
+                           cmslibrary=bool(args.cmslibrary),
+                           cms24file=bool(args.cms24file))
             judged["checks"]["ipl_subchannel_handover"] = (
                 0x10000 <= struct.unpack_from(">I",raw,0x40bc)[0] < 0x10100)
             judged["checks"]["independent_disk_console_channel_workspaces"] = (
@@ -215,7 +216,11 @@ def run(args):
             judged["checks"]["k_terminal_screen_observed"] = (
                 "K SERVICE READY" in (out / "terminal.screen").read_text())
             judged["checks"]["terminal_input_sent"] = input_sent
-            if args.cmslibrary:
+            if args.cms24file:
+                judged["checks"]["cms24_io24_summary_on_3270"] = (
+                    "C24 SUMMARY: PASS=6 FAIL=0 SKIP=1" in
+                    application_screen)
+            elif args.cmslibrary:
                 judged["checks"]["cms_ioqual_summary_on_3270"] = (
                     "SUMMARY: PASS=8 FAIL=0 SKIP=3" in
                     application_screen)
@@ -283,9 +288,40 @@ def run(args):
                     0x20000 <= plist24 < 0x00f00000 and
                     allocated24 == rxvm24_rc == released24 == 0 and
                     page_unmapped(raw,0x28000f,plist24) and
-                    struct.unpack_from(">I",raw,0x4300)[0] == 1 and
+                    struct.unpack_from(">I",raw,0x4300)[0] ==
+                    (14 if args.cms24file else 1) and
                     struct.unpack_from(">I",raw,0x4304)[0] == len(version) and
                     raw[0x4308:0x4308+len(version)] == version)
+                if args.cms24file:
+                    io_probe, push = struct.unpack_from(">2I",raw,0x122b0)
+                    io_plist = struct.unpack_from(">Q",raw,0x122b8)[0]
+                    allocated, io_rc, audit, released, returned, restored = \
+                        struct.unpack_from(">6I",raw,0x122c0)
+                    extra = struct.unpack_from(">I",raw,0x26000)[0]
+                    summary = "C24 SUMMARY: PASS=6 FAIL=0 SKIP=1".encode("cp037")
+                    last = 0x26004+(extra-1)*136
+                    checks["cms24_io24_native_result"] = (
+                        io_probe == push == allocated == io_rc ==
+                        audit == released == returned == 0 and
+                        0x1bb000 <= io_plist < 0xf00000 and
+                        page_unmapped(raw,0x28000f,io_plist) and
+                        restored == int.from_bytes(staged24[148:152],"big") and
+                        extra == 13 and
+                        struct.unpack_from(">I",raw,last)[0] == len(summary) and
+                        raw[last+4:last+4+len(summary)] == summary)
+                    expected24 = (("QTEXT   D       A1",3,21,0x98faeef8),
+                                  ("QBIN    D       A1",1,256,0xb5884564))
+                    checks["cms24_io24_records_verified_and_released"] = (
+                        struct.unpack_from(">I",raw,0x254f4)[0] == 2 and
+                        all(raw[0x25580+i*32:0x25580+i*32+18] ==
+                            name.encode("cp037") and
+                            struct.unpack_from(">3I",raw,0x25580+i*32+20) ==
+                            (records,source_bytes,checksum)
+                            for i,(name,records,source_bytes,checksum)
+                            in enumerate(expected24)))
+                    checks["cms24_gap_restored_after_second_run"] = all(
+                        page_unmapped(raw,0x28000f,at)
+                        for at in range(0x1bb000,0xf00000,4096))
             if args.cms31:
                 real, entry, image_bytes, blocks = struct.unpack_from(">4I",raw,0x40e0)
                 staged = (disk.parent / "cms31-rxvm.bin").read_bytes()
@@ -414,7 +450,7 @@ def run(args):
     checks["source_core_marker"] = core.read_bytes()[0x2000:0x2008] == b"PD2NEXT1"
     checks["disk_unchanged"] = disk_before == digest(disk)
     judged["pass"] = all(checks.values())
-    receipt = {"profile": "ESAME, model 2064, 64 MiB, one CPU, 3390 01B9, 3270 0009",
+    receipt = {"profile": "ESAME, model 2064, 256 MiB, one CPU, 3390 01B9, 3270 0009",
                "disk_sha256_before_ipl": disk_before,
                "disk_sha256_after_ipl": digest(disk),
                "source_core_sha256": digest(core),
@@ -437,6 +473,7 @@ def main():
     p.add_argument("cms31", nargs="?", choices=("cms31",))
     p.add_argument("cmsfile", nargs="?", choices=("cmsfile",))
     p.add_argument("cmslibrary", nargs="?", choices=("cmslibrary",))
+    p.add_argument("cms24file", nargs="?", choices=("cms24file",))
     try:
         return run(p.parse_args())
     except (OSError, ValueError) as exc:

@@ -447,6 +447,14 @@ The [record-transfer checkpoint](../qualification/TWO-SPACE-CMS-TRANSFER-2026-10
 adds a non-mutating U range probe. The selected CMS31 `STATE` and `RDBUF`
 calls preflight their return words and record destinations before side
 effects, so a bad second pointer cannot leave a partial record copy.
+The [CMS24 IO24 checkpoint](../qualification/TWO-SPACE-CMS24-IO24-2026-10-06.md)
+adds profile-specific K file state and runs a fresh fixed-origin RXVM overlay
+on unchanged IO24 bytecode. The 24-bit U placement gap remains 13,914,112
+bytes after the overlay and temporary call page are released. The whole-gap
+check also exposed and corrected K's absent-segment software walk: segment
+entries use `0x20`, whereas page-table entries use `0x400`. This is a
+selected CMS24/CMS31 coexistence case; it does not establish TSO service
+compatibility or real cross-personality application calls.
 
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its

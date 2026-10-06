@@ -724,6 +724,80 @@ cms31_native_release:
     lg %r2, 0(%r2)
     st %r15, 0x230(%r2)
 cms31_native_done:
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 228                 /* optional pinned CMS24 IO24 bytecode */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x2b0(%r2)
+    chi %r15, 0
+    jne cms24_io_done
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 227                 /* pristine fixed-origin RXVM child backing */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x2b4(%r2)
+    chi %r15, 0
+    jne cms24_io_done
+    lghi %r0, 4096
+    lghi %r1, 0
+    lghi %r15, 0x10
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    stg %r1, 0x2b8(%r2)
+    st %r15, 0x2c0(%r2)
+    chi %r15, 0
+    jne cms24_io_pop
+    lgr %r10, %r1
+    larl %r4, cms24_io24_plist_bytes
+    mvc 0(64,%r10),0(%r4)
+    mvi 64(%r10), 0xff
+    mvc 65(63,%r10),64(%r10)
+    xc 256(72,%r10),256(%r10)
+    larl %r4, cms24_bridge
+    mvc 512(16,%r10),0(%r4)
+    la %r13, 256(%r10)
+    lgr %r1, %r10
+    larl %r3, cms24_image_va
+    lg %r3, 0(%r3)
+    la %r4, 512(%r10)
+    basr %r14, %r4
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x2c4(%r2)
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 229                 /* snapshot/release profile-24 K files */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x2c8(%r2)
+    lghi %r0, 4096
+    lgr %r1, %r10
+    lghi %r15, 0x10
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x2cc(%r2)
+cms24_io_pop:
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    l %r0, 0x2c4(%r2)
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 221
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x2d0(%r2)
+    larl %r3, cms24_image_va
+    lg %r3, 0(%r3)
+    l %r4, 0(%r3)
+    st %r4, 0x2d4(%r2)
+cms24_io_done:
     brasl %r14, wide_heap_workload
     larl %r3, high_data_va
     lg %r3, 0(%r3)
@@ -772,6 +846,15 @@ denied_va: .quad 0x20000
 cms31_plist_bytes:
 .byte 0xd9,0xe7,0xe5,0xd4,0x40,0x40,0x40,0x40
 .byte 0x60,0xa5,0x40,0x40,0x40,0x40,0x40,0x40
+cms24_io24_plist_bytes:
+.byte 0xd9,0xe7,0xe5,0xd4,0x40,0x40,0x40,0x40
+.byte 0xc9,0xd6,0xf2,0xf4,0x40,0x40,0x40,0x40
+.byte 0x60,0xc1,0x40,0x40,0x40,0x40,0x40,0x40
+.byte 0xc1,0xe4,0xe3,0xd6,0x40,0x40,0x40,0x40
+.byte 0xd8,0xe3,0xc5,0xe7,0xe3,0x4b,0xc4,0x40
+.byte 0xd8,0xc2,0xc9,0xd5,0x4b,0xc4,0x40,0x40
+.byte 0xd8,0xd4,0xc9,0xe2,0xe2,0x4b,0xc4,0x40
+.byte 0xc3,0xd4,0xe2,0xd9,0xc5,0xc3,0x40,0x40
 cms31_ioqual_plist_bytes:
 .byte 0xd9,0xe7,0xe5,0xd4,0x40,0x40,0x40,0x40
 .byte 0xc9,0xd6,0xd8,0xe4,0xc1,0xd3,0x40,0x40
@@ -880,6 +963,12 @@ trace_not_cms_fst:
     chi %r2, 225
     je storage_no_record
     chi %r2, 226
+    je storage_no_record
+    chi %r2, 227
+    je storage_no_record
+    chi %r2, 228
+    je storage_no_record
+    chi %r2, 229
     je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore

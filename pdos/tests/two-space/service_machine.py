@@ -126,7 +126,7 @@ def make_core(elf, classic, dat_emit, out):
 
 
 def judge(raw, log, ipl=False, cms24=False, cms31=False,
-          cmsfile=False, cmslibrary=False):
+          cmsfile=False, cmslibrary=False, cms24file=False):
     if len(raw) != 0x14000 or raw[0x2000:0x2008] != b"PD2NEXT1":
         raise ValueError("missing/malformed result core")
     expected_masks = (0x0481000000000000, 0x0481000080000000) + \
@@ -258,6 +258,7 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
          (5 * ((4238296 + 4095) // 4096) + 3 +
           2 * (0x04000000 // 4096) if cms31 and ipl else
           5 * ((4238296 + 4095) // 4096) if cms31 else 0) +
+         (4 * ((1681088 + 4095) // 4096) + 2 if cms24file else 0) +
          (((4238296 + 4095) // 4096) +
           2 * ((struct.unpack_from(">I",raw,0x4514)[0] + 4095) // 4096)
           if cmslibrary else 0)) and
