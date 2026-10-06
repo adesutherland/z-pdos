@@ -269,6 +269,10 @@ CMS24 file services, full TSO binaries in the successor, interapplication
 The [CMS file validation checkpoint](qualification/TWO-SPACE-CMS-FILE-VALIDATION-2026-10-06.md)
 extracts the staged envelope checks into host-tested C89 source and reruns
 the full CMS31 IOQUAL fresh IPL with the same 119 guest checks.
+The [CMS transfer preflight checkpoint](qualification/TWO-SPACE-CMS-TRANSFER-2026-10-06.md)
+preflights both U destinations of `RDBUF` before either copy, keeps its cursor
+unchanged on failure and repeats the full positive guest IPL. A guest-level
+malformed CMS record request remains an acceptance gap.
 
 ## PD-004: Batch-file delivery
 

@@ -49,6 +49,9 @@ static int test(unsigned char *real)
     request.address.lo=0x10001024U; request.direction=TSG_WRITE;
     request.length=4U;
     buffer[0]=0x55U; buffer[1]=0x66U; buffer[2]=0x77U; buffer[3]=0x88U;
+    real[0x12024U]=0xa5U;
+    if (TSGPROBE(&gate,&request) != TSG_OK ||
+        real[0x12024U] != 0xa5U) return 17;
     if (TSGCOPY(&gate,&request,buffer,sizeof buffer) != TSG_OK ||
         memcmp(real+0x12024U,buffer,4U)) return 3;
     request.address.hi=0x10U; request.address.lo=0x21000U;
@@ -60,11 +63,14 @@ static int test(unsigned char *real)
     if (TSGCOPY(&gate,&request,buffer,sizeof buffer) != TSG_BAD) return 5;
     request.address.hi=0U; request.address.lo=0x20000U;
     request.direction=TSG_WRITE;
+    if (TSGPROBE(&gate,&request) != TSG_DENIED) return 18;
     if (TSGCOPY(&gate,&request,buffer,sizeof buffer) != TSG_DENIED)
         return 6;
     request.address.hi=1U; request.address.lo=0x10002ffeU;
     memset(buffer,0x5aU,sizeof buffer);
     memcpy(unchanged,buffer,sizeof buffer);
+    if (TSGPROBE(&gate,&request) != TSG_UNMAPPED ||
+        real[0x13ffeU] != 0U || real[0x13fffU] != 0U) return 19;
     if (TSGCOPY(&gate,&request,buffer,sizeof buffer) != TSG_UNMAPPED ||
         memcmp(buffer,unchanged,sizeof buffer) ||
         real[0x13ffeU] != 0U || real[0x13fffU] != 0U) return 7;
@@ -97,6 +103,6 @@ int main(void)
     result=test(real);
     free(real);
     if (result) { fprintf(stderr,"K/U gate control %d failed\n",result); return 1; }
-    puts("K/U gate: full-width, page crossing, writes, permissions and atomic failures pass");
+    puts("K/U gate: full-width, page crossing, non-mutating probes, permissions and atomic failures pass");
     return 0;
 }

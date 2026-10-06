@@ -443,6 +443,10 @@ fixed-origin coexistence remain to be qualified.
 The [file-validator checkpoint](../qualification/TWO-SPACE-CMS-FILE-VALIDATION-2026-10-06.md)
 separates the C89 envelope and record checks from the K endpoint, exercises
 corruption cases on the host and repeats the unchanged IOQUAL guest run.
+The [record-transfer checkpoint](../qualification/TWO-SPACE-CMS-TRANSFER-2026-10-06.md)
+adds a non-mutating U range probe. The selected CMS31 `STATE` and `RDBUF`
+calls preflight their return words and record destinations before side
+effects, so a bad second pointer cannot leave a partial record copy.
 
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its

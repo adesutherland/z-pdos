@@ -35,5 +35,8 @@ typedef struct {
 
 int TSGCOPY(const TSGCONTEXT *gate, const TSGREQUEST *request,
             unsigned char *kernel_buffer, unsigned int capacity);
+/* Check an entire U transfer without touching its destination or a K buffer.
+ * The single CPU keeps the U map stable until the subsequent copy. */
+int TSGPROBE(const TSGCONTEXT *gate, const TSGREQUEST *request);
 
 #endif

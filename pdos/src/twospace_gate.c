@@ -17,23 +17,20 @@ static int resolve(const TSGCONTEXT *gate, TSPADDR address,
     return TSG_OK;
 }
 
-int TSGCOPY(const TSGCONTEXT *gate, const TSGREQUEST *request,
-            unsigned char *buffer, unsigned int capacity)
+int TSGPROBE(const TSGCONTEXT *gate, const TSGREQUEST *request)
 {
     TSPADDR at, last;
-    unsigned int remaining, chunk, offset, real, i;
+    unsigned int remaining, chunk, offset, real;
     int status;
-    if (!gate || !request || !buffer || !gate->u_tables ||
+    if (!gate || !request || !gate->u_tables ||
         !gate->real_aperture || !gate->rights ||
         !request->length || request->length > TSG_MAX_COPY ||
-        request->length > capacity ||
         (request->direction != TSG_READ &&
          request->direction != TSG_WRITE)) return TSG_BAD;
     last.lo = request->address.lo + request->length - 1U;
     last.hi = request->address.hi +
               (last.lo < request->address.lo ? 1U : 0U);
     if (last.hi < request->address.hi) return TSG_BAD;
-    /* Preflight every page before changing U or the caller's K buffer. */
     at = request->address;
     remaining = request->length;
     while (remaining) {
@@ -48,6 +45,18 @@ int TSGCOPY(const TSGCONTEXT *gate, const TSGREQUEST *request,
             if (at.lo == 0U) ++at.hi;
         }
     }
+    return TSG_OK;
+}
+
+int TSGCOPY(const TSGCONTEXT *gate, const TSGREQUEST *request,
+            unsigned char *buffer, unsigned int capacity)
+{
+    TSPADDR at;
+    unsigned int remaining, chunk, offset, real, i;
+    int status;
+    if (!buffer || !request || request->length > capacity) return TSG_BAD;
+    status=TSGPROBE(gate,request);
+    if (status != TSG_OK) return status;
     at = request->address;
     remaining = request->length;
     offset = 0U;

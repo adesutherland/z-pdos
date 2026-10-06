@@ -1203,6 +1203,9 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
     for (i=0U; i<8U && plist[i]==state[i]; ++i) {}
     if (i==8U) {
         if (!cms31_lowcore_real) return 12U;
+        copy.address.lo=request->address.lo+28U;
+        copy.length=4U; copy.direction=TSG_WRITE;
+        if (TSGPROBE(&gate,&copy)!=TSG_OK) return 12U;
         file=cms_output_find(plist+8U);
         if (file) records=file->records;
         else {
@@ -1230,16 +1233,21 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
     if (i==8U) {
         copy=*request; copy.length=44U; copy.direction=TSG_READ;
         if (TSGCOPY(&gate,&copy,plist,sizeof plist)!=TSG_OK) return 12U;
+        copy.address.lo=request->address.lo+40U;
+        copy.length=4U; copy.direction=TSG_WRITE;
+        if (TSGPROBE(&gate,&copy)!=TSG_OK) return 12U;
         file=cms_output_find(plist+8U);
         if (file) {
-            if (plist[26U]==0U && plist[27U]==1U) file->cursor=64U;
-            real=file->real; cursor=file->cursor; length=file->length;
+            real=file->real;
+            cursor=(plist[26U]==0U && plist[27U]==1U) ?
+                   64U : file->cursor;
+            length=file->length;
         } else {
             result=cms_file_open(plist+8U);
             if (result) return result;
-            if (plist[26U]==0U && plist[27U]==1U)
-                cms_file_cursor=64U;
-            real=cms_file_real; cursor=cms_file_cursor;
+            real=cms_file_real;
+            cursor=(plist[26U]==0U && plist[27U]==1U) ?
+                   64U : cms_file_cursor;
             length=cms_file_length;
         }
         if (cursor>=length || cursor>length-2U) return 12U;
@@ -1256,6 +1264,7 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
                         real)[cursor+2U+i];
         copy.address.lo=cms_word(plist+28U);
         copy.length=size; copy.direction=TSG_WRITE;
+        if (TSGPROBE(&gate,&copy)!=TSG_OK) return 12U;
         if (TSGCOPY(&gate,&copy,message,sizeof message)!=TSG_OK)
             return 12U;
         cms_put_word(plist+40U,size);
