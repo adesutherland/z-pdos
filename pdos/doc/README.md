@@ -7,8 +7,9 @@ and an application's service call.
 - [Architecture](architecture/README.md): boot, C32/64-bit boundaries, storage,
   program loading, datasets and terminal services.
 - [Two-space successor](architecture/TWO-SPACE-POC.md): K64/C31/shared-U
-  contract and bounded implementation; the [storage and overlay result](qualification/TWO-SPACE-STORAGE-OVERLAY-2026-10-05.md)
-  names the latest guest proof and remaining compatibility gates.
+  contract and bounded implementation; the [wide-heap result](qualification/TWO-SPACE-WIDE-HEAPS-2026-10-06.md)
+  records the latest combined CMS-image and memory proof, with the remaining
+  compatibility gates in the [backlog](BACKLOG.md).
 - [Source-to-image dependencies](architecture/DEPENDENCIES.md): selected inputs,
   the three linked programs and disk construction.
 - [Development guide](development/README.md): source map and change contracts.

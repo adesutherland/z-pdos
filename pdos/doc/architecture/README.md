@@ -12,8 +12,8 @@ boundaries and the [exact guest record](../qualification/QUALIFICATION.md)
 for what has run.
 
 The two-address-space successor, its K64/C31/shared-U proofs, checked guest-DAT
-IPL, bounded interruption/service gate, live storage and dual CMS image
-mapping checkpoints are in
+IPL, bounded interruption/service gate, live storage, K-owned channel and
+terminal operations, dual CMS image maps and wide heaps are in
 [the two-space PoC contract](TWO-SPACE-POC.md).
 The current released disk-boot kernel described below has not yet adopted
 that layout.
@@ -23,19 +23,20 @@ switch and saves full-width context; a K-only C31 endpoint walks U's tables
 through a K alias. U allocation chooses an interval in one shared 64-bit map,
 backs it with real frames outside the core, zeroes them and changes the live
 U DAT with a single-CPU purge. It can return a low U address backed by high
-real storage. The first actual service subset is conditional SVC 120
-GETMAIN/FREEMAIN. A host-checked overlay primitive can preserve a suspended
-fixed-origin caller while child frames occupy the same U address. See the
-[exact checkpoint](../qualification/TWO-SPACE-STORAGE-OVERLAY-2026-10-05.md).
-The next [K channel checkpoint](../qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
-reads one 3390 record after the K handover using a K-owned low-real channel
-workspace and explicit real CCW addresses. It leaves U's low virtual range
-free for applications. The [dataset checkpoint](../qualification/TWO-SPACE-DATASET-2026-10-06.md)
-then resolves a format-1 first extent and reads the checked `KCORE.BIN`
-header through that path.
-The successor still lacks the format loaders, CMS/TSO service adapters,
-general dataset and terminal I/O and command dispatch needed to become the
-selected OS.
+real storage. The selected conditional SVC 120 GETMAIN/FREEMAIN subset and
+an internal high-U diagnostic entry allocate, touch and release simultaneous
+16 MiB U31 and 32 MiB U64 heaps while CMS24/CMS31 RXVM images are mapped.
+The [wide-heap result](../qualification/TWO-SPACE-WIDE-HEAPS-2026-10-06.md)
+measures 319,488 U table bytes in the 64 MiB real profile. Reversible
+fixed-origin child backing is also exercised in the guest.
+
+K reads checked CKD records through separate low-real disk and console
+workspaces, writes and reads the 3270, and validates and maps the pinned
+CMS24/CMS31 RXVM MODULEs. None of this places K storage in U's 24-bit
+virtual range. The successor still lacks general CMS/TSO file and command
+adapters, execution of the unchanged RXVM programs, REXX `ADDRESS` calls
+and the explicitly selected replacement image. A post-qualification review
+will decide whether CMS and TSO continue to share one U ASCE.
 
 ## The system at a glance
 
