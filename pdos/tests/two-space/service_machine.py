@@ -287,6 +287,9 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
          lease_finish == 0 and child_cancel == 8 and
          lease_parent != 0 and lease_child > lease_parent)
         if ipl else lease_begin == 8)
+    image_leases=struct.unpack_from(">4I",raw,0x1244c)
+    checks["shared_image_cache_leases_follow_nested_frames"] = (
+        image_leases==(1,2,1,0) if ipl else image_leases==(0,0,0,0))
     checks["absent_subchannel_fails_without_wait"] = (
         struct.unpack_from(">I",raw,0x121c4)[0] == 0)
     checks["k_cms24_module_header"] = (

@@ -175,6 +175,11 @@ delivery remain to be implemented.
 The [image-selection gate](../qualification/TWO-SPACE-IMAGE-SELECTION-2026-10-06.md)
 then replaced caller-declared personality and placement with a checked K
 record; normal command launch and dynamic image handles remain open.
+The [image-lease gate](../qualification/TWO-SPACE-IMAGE-LEASE-2026-10-06.md)
+counts each invocation's reference to a K-cached mapped image. Returning a
+child releases its lease while the parent's image stays mapped. Cache
+replacement, eviction and native application re-entry still need policy and
+guest proof.
 The subsequent [heap](../qualification/TWO-SPACE-INVOCATION-HEAP-2026-10-06.md),
 [input cursor](../qualification/TWO-SPACE-INVOCATION-FILES-2026-10-06.md) and
 [output staging](../qualification/TWO-SPACE-INVOCATION-OUTPUT-2026-10-06.md)

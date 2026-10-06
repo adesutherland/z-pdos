@@ -31,6 +31,7 @@ static unsigned int console_read_count;
 static unsigned int console_read_owner;
 static unsigned int console_read_io_handle;
 static unsigned int console_next_io_handle;
+static unsigned int native_image_active[32];
 static unsigned int cms31_loaded;
 static unsigned int cms31_secondary_loaded;
 static unsigned int cms24_loaded;
@@ -1053,6 +1054,15 @@ static unsigned int native_begin(TSGREQUEST *request)
                 image_owner,runtime_owner,
                 &caller,&token);
     if (rc!=TSV_OK) return rc==TSV_FULL ? 4U : 8U;
+    /* The checked image map is a K cache. Each invocation holds a lease;
+     * returning the last lease does not evict a still useful mapped module. */
+    if (image_owner>=32U || native_image_active[image_owner]==0xffffffffU ||
+        TSVOWN(&native_invocations,token,TSV_IMAGE,token)!=TSV_OK) {
+        rc=TSVEND(&native_invocations,token,native_clean,
+                  &native_invocations.frame[native_invocations.depth-1U]);
+        return rc==TSV_OK ? 4U : 12U;
+    }
+    ++native_image_active[image_owner];
     if (cms_lowcore_template_ready && native_invocations.depth>1U) {
         if (TSRALLOC(&storage.real,CMS_LOWCORE_SAVE_OWNER,4096U,
                      TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,
@@ -1091,6 +1101,12 @@ static int native_clean(unsigned int token, const TSVRESOURCE *resource,
     unsigned int i;
     (void)token;
     if (!frame || !resource) return 1;
+    if (resource->kind==TSV_IMAGE) {
+        if (resource->handle!=frame->token || frame->image_owner>=32U ||
+            !native_image_active[frame->image_owner]) return 1;
+        --native_image_active[frame->image_owner];
+        return 0;
+    }
     if (resource->kind==TSV_LOWCORE) {
         unsigned char *saved=(unsigned char *)TSF_KAPERTURE_VA+
                              resource->handle;
@@ -1161,6 +1177,14 @@ static unsigned int native_end(const TSGREQUEST *request)
         cms_heaps[native_invocations.depth].handle=0U;
     }
     return rc==TSV_OK ? 0U : 12U;
+}
+
+/* Private diagnostic selector: inspect one checked image's active leases. */
+static unsigned int native_image_lease_probe(const TSGREQUEST *request)
+{
+    if (request->direction || request->address.hi || request->address.lo ||
+        !request->length || request->length>=32U) return 8U;
+    return native_image_active[request->length];
 }
 
 static unsigned int allocation_handle(unsigned int task, TSPADDR address)
@@ -2327,6 +2351,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 239U) return terminal_clear_probe(request);
     if (request->svc == 240U) return terminal_cancel_probe(request);
     if (request->svc == 241U) return terminal_phase_probe(request);
+    if (request->svc == 242U) return native_image_lease_probe(request);
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 223U) return high_storage_service(request);
     if (request->svc == 233U) return iarv64_service(request);

@@ -532,6 +532,13 @@ terminal_owner_probe:
     st %r1, 0x418(%r2)
     chi %r15, 0
     jne terminal_owner_done
+    lghi %r0, 15            /* K image cache has one parent lease */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 242
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x44c(%r2)
     lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0
@@ -551,6 +558,13 @@ terminal_owner_probe:
     st %r1, 0x424(%r2)
     chi %r15, 0
     jne terminal_owner_parent_end
+    lghi %r0, 15            /* diagnostic nested lease is counted */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 242
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x450(%r2)
     lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0
@@ -565,6 +579,13 @@ terminal_owner_probe:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x42c(%r2)
+    lghi %r0, 15
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 242
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x454(%r2)
 terminal_owner_parent_end:
     lghi %r0, 0
     llgf %r1, 0x418(%r2)
@@ -573,6 +594,13 @@ terminal_owner_parent_end:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x430(%r2)
+    lghi %r0, 15
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 242
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x458(%r2)
     lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0
@@ -1580,6 +1608,8 @@ trace_not_cms_fst:
     chi %r2, 240
     je storage_no_record
     chi %r2, 241
+    je storage_no_record
+    chi %r2, 242
     je storage_no_record
     chi %r2, 93
     je storage_no_record

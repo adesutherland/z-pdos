@@ -191,6 +191,11 @@ now compares all three unchanged high bodies with the released loader at two
 full-width U bases, and Classic C31 compilation passes. Staging and entering
 HIGH in the guest, native LOAD/DELETE and normal-image qualification remain
 open.
+The [K image-lease gate](qualification/TWO-SPACE-IMAGE-LEASE-2026-10-06.md)
+counts nested invocation references to a checked mapped image and releases
+them as frames unwind, while leaving a reusable cache mapping in place.
+Checked replacement of a leased image, eviction and native same-image calls
+remain open.
 The [CMS heap ownership check](qualification/TWO-SPACE-INVOCATION-HEAP-2026-10-06.md)
 adds per-invocation CMS31 heap state and a pre-free K handle check for CMS,
 SVC 120 and IARV64. The unchanged guest paths passed fresh IPL, but a nested
