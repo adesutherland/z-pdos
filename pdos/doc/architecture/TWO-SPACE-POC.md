@@ -493,6 +493,12 @@ CMS31 IOQUAL and CMS24 IO24 calls also pass in the same U ASCE. This is a
 narrow execution coexistence result. It does not establish a general TSO
 file/input surface, CMS-to-TSO `ADDRESS`, TSO64 or native TSO24 support.
 
+The [TSO64 ANY host materializer](../qualification/TWO-SPACE-TSO64-ANY-LOADER-2026-10-06.md)
+now checks and relocates the selected low-resident AMODE64 member at two U
+bases, byte-for-byte against the released loader. It has not entered the
+guest or exercised a 64-bit native service. RMODE HIGH's 64-bit relocation
+format remains distinct.
+
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
 SVC through K, returns `0x3456` to a U64 caller, restores the parent PTEs,

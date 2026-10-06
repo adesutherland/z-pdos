@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * Compare the selected successor AMODE31 materializer with pinned native
+ * Compare selected low-resident AMODE31/64 materializers with pinned native
  * load-module outputs at two placements, then mutate format boundaries.
  */
 #include "twospace_tso.h"
@@ -42,7 +42,8 @@ static void compare_released_loader(const unsigned char *raw,
                                     unsigned int raw_bytes,
                                     const unsigned char *image,
                                     unsigned int image_bytes,
-                                    unsigned int base)
+                                    unsigned int base,
+                                    int mode)
 {
     char *legacy=(char *)calloc(TST_MAX_IMAGE,1U);
     int length=(int)raw_bytes, entry, amode, rmode;
@@ -50,7 +51,7 @@ static void compare_released_loader(const unsigned char *raw,
     memcpy(legacy,raw,raw_bytes);
     CHECK(fixPEMode(legacy,&length,&entry,(int)base,TST_MAX_IMAGE,
                     &amode,&rmode)==0);
-    CHECK(amode==2 && rmode==1 && length==(int)image_bytes);
+    CHECK(amode==mode && rmode==1 && length==(int)image_bytes);
     CHECK(memcmp(image,legacy,image_bytes)==0);
     free(legacy);
 }
@@ -74,12 +75,14 @@ int main(int argc, char **argv)
     CHECK(TSTIMAGE31(raw,bytes,0x05000000U,image,TST_MAX_IMAGE,&info)==TST_OK);
     CHECK(info.image_bytes==1094960U &&
           hash_image(image,info.image_bytes)==0xf4b21310U);
-    compare_released_loader(raw,bytes,image,info.image_bytes,0x05000000U);
+    compare_released_loader(raw,bytes,image,info.image_bytes,0x05000000U,2);
     CHECK(TSTIMAGE31(raw,bytes,0x07000000U,image,TST_MAX_IMAGE,&info)==TST_OK);
     CHECK(info.image_bytes==1094960U &&
           hash_image(image,info.image_bytes)==0x3ce51566U);
-    compare_released_loader(raw,bytes,image,info.image_bytes,0x07000000U);
+    compare_released_loader(raw,bytes,image,info.image_bytes,0x07000000U,2);
     CHECK(TSTIMAGE31(raw,bytes,0x20000U,image,TST_MAX_IMAGE,&info)==TST_BAD);
+    CHECK(TSTIMAGE64ANY(raw,bytes,0x09000000U,image,
+                        TST_MAX_IMAGE,&info)==TST_BAD);
     CHECK(TSTIMAGE31(raw,bytes,0x07000000U,image,1000000U,&info)==TST_BAD);
     CHECK(TSTHEADER(raw,bytes,64U,&info)==TST_BAD);
     CHECK(TSTHEADER(raw,bytes-1U,31U,&info)==TST_BAD);
@@ -116,6 +119,24 @@ int main(int argc, char **argv)
           info.entry_offset==0U && info.input_fnv==0x007eda54U);
     CHECK(TSTIMAGE31(raw,bytes64,0x05000000U,image,
                      TST_MAX_IMAGE,&info)==TST_BAD);
+    CHECK(TSTIMAGE64ANY(raw,bytes64,0x09000000U,image,
+                        TST_MAX_IMAGE,&info)==TST_OK);
+    CHECK(info.image_bytes==767728U &&
+          hash_image(image,info.image_bytes)==0x94d5943aU);
+    compare_released_loader(raw,bytes64,image,info.image_bytes,
+                            0x09000000U,1);
+    CHECK(TSTIMAGE64ANY(raw,bytes64,0x0b000000U,image,
+                        TST_MAX_IMAGE,&info)==TST_OK);
+    CHECK(info.image_bytes==767728U &&
+          hash_image(image,info.image_bytes)==0x1c28a98aU);
+    compare_released_loader(raw,bytes64,image,info.image_bytes,
+                            0x0b000000U,1);
+    CHECK(TSTIMAGE64ANY(raw,bytes64,0x20000U,image,
+                        TST_MAX_IMAGE,&info)==TST_BAD);
+    CHECK(TSTIMAGE64ANY(raw,bytes64,0x09000000U,image,
+                        767727U,&info)==TST_BAD);
+    CHECK(TSTIMAGE64ANY(raw,bytes64-1U,0x09000000U,image,
+                        TST_MAX_IMAGE,&info)==TST_BAD);
     stage_bytes=read_file(argv[3],raw);
     CHECK(stage_bytes==76U*TST_BLOCK);
     CHECK(TSTSTAGEVALIDATE(raw,stage_bytes,31U,&info)==TST_OK &&
@@ -129,7 +150,7 @@ int main(int argc, char **argv)
     memcpy(mutated,raw,stage_bytes);
     mutated[15U]=75U;
     CHECK(TSTSTAGEVALIDATE(mutated,stage_bytes,31U,&info)==TST_BAD);
-    puts("TSO31 native image: two relocations match released loader; TSO64 header and malformed controls pass");
+    puts("TSO31 and TSO64 ANY native images: two placements each match released loader; malformed controls pass");
     free(raw); free(mutated); free(image);
     return 0;
 }

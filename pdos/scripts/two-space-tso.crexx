@@ -79,5 +79,5 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run test -s :binary"
   if rc <> 0 then return rc
-  say "Pinned TSO31 native materialization and TSO64 header passed; Classic C31 object linked."
+  say "Pinned TSO31 and TSO64 ANY native materialization passed; Classic C31 object linked."
   return 0

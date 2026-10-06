@@ -140,9 +140,9 @@ static int rld31(unsigned char *image, unsigned int text_bytes,
     return at==length ? TST_OK : TST_BAD;
 }
 
-int TSTIMAGE31(const unsigned char *raw, unsigned int bytes,
-               unsigned int base, unsigned char *image,
-               unsigned int capacity, TSTINFO *info)
+static int image_low(const unsigned char *raw, unsigned int bytes,
+                     unsigned int base, unsigned char *image,
+                     unsigned int capacity, unsigned int mode, TSTINFO *info)
 {
     TSTSECTION sections[TST_SECTIONS];
     TSTINFO parsed;
@@ -151,8 +151,9 @@ int TSTIMAGE31(const unsigned char *raw, unsigned int bytes,
     unsigned int nexttext=0U, lastend=0U, imageend=0U;
     int last_type=-1, type, done=0;
     if (!image || !info || !capacity || capacity>TST_MAX_IMAGE ||
+        (mode!=31U && mode!=64U) ||
         (base&4095U) || base<0x1000000U ||
-        TSTHEADER(raw,bytes,31U,&parsed)!=TST_OK) return TST_BAD;
+        TSTHEADER(raw,bytes,mode,&parsed)!=TST_OK) return TST_BAD;
     for (i=0U; i<capacity; ++i) image[i]=0U;
     while (at<bytes && !done) {
         size=half(raw+at);
@@ -236,4 +237,20 @@ int TSTIMAGE31(const unsigned char *raw, unsigned int bytes,
     parsed.image_bytes=imageend;
     *info=parsed;
     return TST_OK;
+}
+
+int TSTIMAGE31(const unsigned char *raw, unsigned int bytes,
+               unsigned int base, unsigned char *image,
+               unsigned int capacity, TSTINFO *info)
+{
+    return image_low(raw,bytes,base,image,capacity,31U,info);
+}
+
+int TSTIMAGE64ANY(const unsigned char *raw, unsigned int bytes,
+                  unsigned int base, unsigned char *image,
+                  unsigned int capacity, TSTINFO *info)
+{
+    /* AMODE64/RMODE ANY still carries AL4 relocations in a low-resident
+     * classic member. The high-resident module has a distinct AL8 format. */
+    return image_low(raw,bytes,base,image,capacity,64U,info);
 }
