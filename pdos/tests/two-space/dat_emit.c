@@ -27,7 +27,7 @@ int main(int argc, char **argv)
         TSPRESV(&placements,3U,64U,address(1U,0x10000000U),8192U) != TSP_OK ||
         TSPRESV(&placements,4U,24U,address(0U,0x20000U),4096U) != TSP_COLLISION)
         return 2;
-    if (TSFBUILD(core,0x100000U,0x140000U,&dat,0,0)) return 2;
+    if (TSFBUILD(core,0x100000U,0x180000U,&dat,0,0)) return 2;
     f = fopen(argv[1], "wb");
     if (!f || fwrite(core,1,CORE_SIZE,f) != CORE_SIZE || fclose(f) != 0)
         return 2;

@@ -43,32 +43,32 @@ int TSFBUILD(unsigned char *core, unsigned int kpool, unsigned int upool,
     TSPADDR va, pa, old;
     if (!core || !result || (kpool & 4095U) || (upool & 4095U) ||
         kpool < 0x14000U || upool < 0x14000U ||
-        kpool > TSF_CORE_BYTES - TSF_POOL_BYTES ||
-        upool > TSF_CORE_BYTES - TSF_POOL_BYTES ||
-        (kpool < upool + TSF_POOL_BYTES &&
-         upool < kpool + TSF_POOL_BYTES) ||
+        kpool > TSF_CORE_BYTES - TSF_KPOOL_BYTES ||
+        upool > TSF_CORE_BYTES - TSF_UPOOL_BYTES ||
+        (kpool < upool + TSF_UPOOL_BYTES &&
+         upool < kpool + TSF_KPOOL_BYTES) ||
         (kpool < TSF_SERVICE_EXT_REAL+TSF_SERVICE_EXT_BYTES &&
-         TSF_SERVICE_EXT_REAL < kpool+TSF_POOL_BYTES) ||
+         TSF_SERVICE_EXT_REAL < kpool+TSF_KPOOL_BYTES) ||
         (upool < TSF_SERVICE_EXT_REAL+TSF_SERVICE_EXT_BYTES &&
-         TSF_SERVICE_EXT_REAL < upool+TSF_POOL_BYTES) ||
+         TSF_SERVICE_EXT_REAL < upool+TSF_UPOOL_BYTES) ||
         (kpool < TSF_CHANNEL_REAL+TSF_CHANNEL_BYTES &&
-         TSF_CHANNEL_REAL < kpool+TSF_POOL_BYTES) ||
+         TSF_CHANNEL_REAL < kpool+TSF_KPOOL_BYTES) ||
         (upool < TSF_CHANNEL_REAL+TSF_CHANNEL_BYTES &&
-         TSF_CHANNEL_REAL < upool+TSF_POOL_BYTES) ||
+         TSF_CHANNEL_REAL < upool+TSF_UPOOL_BYTES) ||
         (kpool < TSF_CONSOLE_REAL+TSF_CHANNEL_BYTES &&
-         TSF_CONSOLE_REAL < kpool+TSF_POOL_BYTES) ||
+         TSF_CONSOLE_REAL < kpool+TSF_KPOOL_BYTES) ||
         (upool < TSF_CONSOLE_REAL+TSF_CHANNEL_BYTES &&
-         TSF_CONSOLE_REAL < upool+TSF_POOL_BYTES)) return -1;
+         TSF_CONSOLE_REAL < upool+TSF_UPOOL_BYTES)) return -1;
     for (i = 0U; i < sizeof kmaps / sizeof kmaps[0]; ++i)
-        if ((kmaps[i].real >= kpool && kmaps[i].real < kpool + TSF_POOL_BYTES) ||
-            (kmaps[i].real >= upool && kmaps[i].real < upool + TSF_POOL_BYTES))
+        if ((kmaps[i].real >= kpool && kmaps[i].real < kpool + TSF_KPOOL_BYTES) ||
+            (kmaps[i].real >= upool && kmaps[i].real < upool + TSF_UPOOL_BYTES))
             return -1;
     for (i = 0U; i < sizeof umaps / sizeof umaps[0]; ++i)
-        if ((umaps[i].real >= kpool && umaps[i].real < kpool + TSF_POOL_BYTES) ||
-            (umaps[i].real >= upool && umaps[i].real < upool + TSF_POOL_BYTES))
+        if ((umaps[i].real >= kpool && umaps[i].real < kpool + TSF_KPOOL_BYTES) ||
+            (umaps[i].real >= upool && umaps[i].real < upool + TSF_UPOOL_BYTES))
             return -1;
-    if (TSDINIT(&k,core+kpool,kpool,TSF_POOL_BYTES) != TSD_OK ||
-        TSDINIT(&u,core+upool,upool,TSF_POOL_BYTES) != TSD_OK ||
+    if (TSDINIT(&k,core+kpool,kpool,TSF_KPOOL_BYTES) != TSD_OK ||
+        TSDINIT(&u,core+upool,upool,TSF_UPOOL_BYTES) != TSD_OK ||
         map_all(&k,kmaps,sizeof kmaps / sizeof kmaps[0]) ||
         map_all(&u,umaps,sizeof umaps / sizeof umaps[0])) return -1;
     /* All final real frames have one supervisor-only C31 aperture. U never
@@ -76,8 +76,8 @@ int TSFBUILD(unsigned char *core, unsigned int kpool, unsigned int upool,
     for (i = 0U; i < TSF_REAL_BYTES / 4096U; ++i) {
         va.hi=0U; va.lo=TSF_KAPERTURE_VA+i*4096U;
         pa.hi=0U; pa.lo=i*4096U;
-        if ((pa.lo >= kpool && pa.lo < kpool+TSF_POOL_BYTES) ||
-            (pa.lo >= upool && pa.lo < upool+TSF_POOL_BYTES)) {
+        if ((pa.lo >= kpool && pa.lo < kpool+TSF_KPOOL_BYTES) ||
+            (pa.lo >= upool && pa.lo < upool+TSF_UPOOL_BYTES)) {
             if (TSDMAPTABLE(&k,va,pa) != TSD_OK) return -1;
         } else if (TSDMAP(&k,va,pa) != TSD_OK) return -1;
     }
@@ -89,10 +89,13 @@ int TSFBUILD(unsigned char *core, unsigned int kpool, unsigned int upool,
     }
     /* K31 can revisit both table pools after the real bootstrap is gone.
        U has no such alias. The ledger has already reserved these frames. */
-    for (i = 0U; i < TSF_POOL_BYTES / 4096U; ++i) {
+    for (i = 0U; i < TSF_KPOOL_BYTES / 4096U; ++i) {
         va.hi=0U; pa.hi=0U;
         va.lo=TSF_KPOOL_VA+i*4096U; pa.lo=kpool+i*4096U;
         if (TSDMAPTABLE(&k,va,pa) != TSD_OK) return -1;
+    }
+    for (i = 0U; i < TSF_UPOOL_BYTES / 4096U; ++i) {
+        va.hi=0U; pa.hi=0U;
         va.lo=TSF_UPOOL_VA+i*4096U; pa.lo=upool+i*4096U;
         if (TSDMAPTABLE(&k,va,pa) != TSD_OK) return -1;
     }

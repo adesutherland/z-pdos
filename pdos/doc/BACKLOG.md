@@ -195,6 +195,10 @@ return value to a U64 caller. It proves the mixed-mode memory and executable
 transition needed for a colliding nested call. Neither RXVM executes yet;
 full CMS linkage, general file/command services, REXX `ADDRESS`, TSO programs,
 wide heap budgets and normal successor selection remain unqualified.
+The [64 MiB real-memory checkpoint](qualification/TWO-SPACE-64M-2026-10-06.md)
+widens the single-CPU diagnostic K aperture while keeping both channel
+buffers low-real and all K tables out of U. Its fresh IPL passed, but
+large 31/64-bit allocations and application heap needs remain to be measured.
 The [CMS24 child checkpoint](qualification/TWO-SPACE-CMS24-CHILD-2026-10-06.md)
 proves the same reversible collision at the fixed 24-bit RXVM origin,
 including a real AMODE24 SVC and return to a U64 caller. It remains a

@@ -310,8 +310,8 @@ app_high:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 60(%r2)
-    lghi %r0, 4096          /* 16 MiB exceeds the 14 MiB free real pool */
-    sllg %r0, %r0, 12
+    lghi %r0, 4096          /* 64 MiB exceeds the whole named real profile */
+    sllg %r0, %r0, 14
     lghi %r1, 0
     lghi %r15, 0x30
     svc 120
@@ -741,7 +741,7 @@ fault_pc: .quad isolation_fault
 recovery_pc: .quad app_fault_resume
 synthetic_machine_va: .quad synthetic_machine_dispatch
 k_table_alias_va: .quad 0x05000000
-u_table_alias_va: .quad 0x05040000
+u_table_alias_va: .quad 0x05080000
 bounce_va: .quad 0x03000080
 c_result_va: .quad 0x030000a0
 c_trampoline_va: .quad 0x02010000

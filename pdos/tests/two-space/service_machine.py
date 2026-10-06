@@ -14,7 +14,7 @@ import struct
 import subprocess
 import sys
 
-from machine import REAL, digest, qword
+from machine import digest, qword
 
 KCORE = 0x0100000000000000
 LOW_REQUEST = 0x21000
@@ -79,7 +79,7 @@ def make_core(elf, classic, dat_emit, out):
     application = {0x20000: 0x5000, 0x21000: 0x7000,
                    0x02000000: 0x11000, 0x110000000: 0x6000,
                    HIGH_REQUEST: 0x12000, 0x110002000: 0x13000}
-    pools = ((0x100000, 0x140000), (0x140000, 0x180000))
+    pools = ((0x100000, 0x180000), (0x180000, 0x1c0000))
     if any(lo <= pa < hi for pa in (*kernel.values(), *application.values())
            for lo, hi in pools):
         raise ValueError("DAT real pool overlaps image backing")
@@ -89,7 +89,7 @@ def make_core(elf, classic, dat_emit, out):
                              *(0x14000 + i * 4096 for i in range(11))}
     if private_kernel_frames.intersection(application.values()):
         raise ValueError("U maps private K real frame")
-    if any(0x180000 <= pa < 0x1a0000 for pa in application.values()):
+    if any(0x1c0000 <= pa < 0x1e0000 for pa in application.values()):
         raise ValueError("U maps low-real K channel buffer")
     image = out / "image.core"
     image.write_bytes(core)
@@ -101,28 +101,28 @@ def make_core(elf, classic, dat_emit, out):
         kasce, kbytes, uasce, ubytes = map(int, built.stdout.split())
     except ValueError as exc:
         raise ValueError("malformed DAT builder result") from exc
-    if (kasce, uasce) != (0x10000f, 0x14000f) or \
-            kbytes > 0x40000 or ubytes > 0x40000:
+    if (kasce, uasce) != (0x10000f, 0x18000f) or \
+            kbytes > 0x80000 or ubytes > 0x40000:
         raise ValueError("DAT builder returned unexpected ASCE or size")
     built_core = image.read_bytes()
     if qword(built_core, 0x100000 + 8 * 8) == 0x20 or \
-            qword(built_core, 0x140000 + 8 * 8) != 0x20:
+            qword(built_core, 0x180000 + 8 * 8) != 0x20:
         raise ValueError("high K R1 entry or U isolation absent")
     kstats = {"table_bytes": kbytes, "table_4k_frames": kbytes // 4096,
-              "mapped_pages": len(kernel) + 4096 + 2 * 0x40000 // 4096}
+              "mapped_pages": len(kernel) + 16384 + 0xc0000 // 4096}
     ustats = {"table_bytes": ubytes, "table_4k_frames": ubytes // 4096,
               "mapped_pages": len(application)}
     return {"kernel_asce": hex(kasce), "application_asce": hex(uasce),
             "kernel_dat": kstats, "application_dat": ustats,
             "kernel_mappings": {hex(k): hex(v) for k, v in kernel.items()},
             "application_mappings": {hex(k): hex(v) for k, v in application.items()},
-            "kernel_table_aliases": {"kernel": ["0x5000000", "0x503ffff"],
-                                     "application_tables": ["0x5040000", "0x507ffff"]},
-            "kernel_real_aperture": ["0x8000000", "0x8ffffff"],
+            "kernel_table_aliases": {"kernel": ["0x5000000", "0x507ffff"],
+                                     "application_tables": ["0x5080000", "0x50bffff"]},
+            "kernel_real_aperture": ["0x8000000", "0xbffffff"],
             "kernel_pages_in_application_low_virtual": 0,
             "application_low_virtual_bytes": sum(4096 for va in application if va < 0x1000000),
             "application_low_unmapped_bytes": 0x1000000 - sum(4096 for va in application if va < 0x1000000),
-            "classic_service_size": len(service), "real_memory_bytes": REAL}
+            "classic_service_size": len(service), "real_memory_bytes": 0x4000000}
 
 
 def judge(raw, log, ipl=False, cms24=False, cms31=False):
@@ -147,7 +147,7 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False):
               "io_entry_returned": qword(raw, 0x2198) == 1,
               "kcore_above_region_third_range": qword(raw, 0x2020) == KCORE,
               "k_can_read_own_dat_pool": qword(raw, 0x2028) == 0x10400f,
-              "k_can_read_u_dat_pool": qword(raw, 0x2030) == 0x14400f,
+              "k_can_read_u_dat_pool": qword(raw, 0x2030) == 0x18400f,
               "expected_isolation_fault": raw[0x8e:0x90] == b"\0\x11",
               "fault_in_problem_amode64": qword(raw, 0x150) & MODE_MASK ==
                     0x0481000180000000,
@@ -280,7 +280,7 @@ def run(args):
     manifest["tools_sha256"] = {name: digest(getattr(args, name)) for name in
                                 ("assembler", "linker", "classic_cc", "classic_as", "classic_ld", "hercules", "dat_emit")}
     out.joinpath("machine.cnf").write_text(
-        "ARCHLVL ESAME\nMAINSIZE 16\nNUMCPU 1\nCPUMODEL 2064\n"
+        "ARCHLVL ESAME\nMAINSIZE 64\nNUMCPU 1\nCPUMODEL 2064\n"
         "DIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\n")
     out.joinpath("run.rc").write_text(
         f"sysclear\narchlvl esame\nloadcore \"{out / 'image.core'}\"\n"

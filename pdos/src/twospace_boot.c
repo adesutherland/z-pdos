@@ -173,7 +173,7 @@ int main(int argc, char **argv)
         crc32_bytes(stub,launch_len) != launch_crc) FAIL(28);
     if (be32(core+0x2000U) != 0x5044324eU ||
         !zeroes(core+0x4000U,16U) ||
-        !zeroes(core+0x100000U,0x80000U)) FAIL(29);
+        !zeroes(core+0x100000U,0xc0000U)) FAIL(29);
     /* The real interruption/context island and all mapped service slots are
        owned even when their initial bytes are zero and omitted from disk. */
     if (TSRINIT(&final_core,CORE_SIZE) != TSR_OK) FAIL(30);
@@ -197,9 +197,9 @@ int main(int argc, char **argv)
                    TSF_CHANNEL_BYTES,TSR_RUN) != TSR_OK) FAIL(31);
     if (TSRRESERVE(&final_core,701U,TSF_CONSOLE_REAL,
                    TSF_CHANNEL_BYTES,TSR_RUN) != TSR_OK) FAIL(31);
-    if (TSRALLOC(&final_core,3U,TSF_POOL_BYTES,0x100000U,
+    if (TSRALLOC(&final_core,3U,TSF_KPOOL_BYTES,0x100000U,
                  CORE_SIZE,TSR_RUN,&kpool) != TSR_OK) FAIL(32);
-    if (TSRALLOC(&final_core,4U,TSF_POOL_BYTES,0x100000U,
+    if (TSRALLOC(&final_core,4U,TSF_UPOOL_BYTES,0x100000U,
                  CORE_SIZE,TSR_RUN,&upool) != TSR_OK) FAIL(34);
     if (TSFBUILD(core,kpool,upool,&dat,purge_callback,0)) FAIL(35);
     if (purges != 2U) FAIL(36);
@@ -214,8 +214,8 @@ int main(int argc, char **argv)
     put32(core+0x40bcU,(unsigned int)device);
     /* Preserve the guest-built boot snapshot before K performs live U map
        changes. The runtime updates 0x4098 with its current U table use. */
-    put32(core+0x40b0U,crc32_bytes(core+kpool,TSF_POOL_BYTES));
-    put32(core+0x40b4U,crc32_bytes(core+upool,TSF_POOL_BYTES));
+    put32(core+0x40b0U,crc32_bytes(core+kpool,TSF_KPOOL_BYTES));
+    put32(core+0x40b4U,crc32_bytes(core+upool,TSF_UPOOL_BYTES));
     put32(core+0x40b8U,dat.ubytes);
     DETAIL[1]=stage; DETAIL[2]=launch;
     DIAG = 0x5453ffffU;

@@ -37,8 +37,8 @@ static int attach(void)
 {
     TSPADDR at;
     if (storage_ready) return 0;
-    if (TSDATTACH(&u_tables,(unsigned char *)TSF_UPOOL_VA,0x140000U,
-                  TSF_POOL_BYTES,
+    if (TSDATTACH(&u_tables,(unsigned char *)TSF_UPOOL_VA,0x180000U,
+                  TSF_UPOOL_BYTES,
                   *(volatile const unsigned int *)0x4098U,
                   *(volatile const unsigned int *)0x400cU) != TSD_OK ||
         TSDLIVE(&u_tables,purge,0) != TSD_OK ||

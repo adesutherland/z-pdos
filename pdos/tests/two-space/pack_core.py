@@ -14,7 +14,7 @@ import zlib
 BLOCK = 18452
 PAGE = 4096
 CORE = 0x200000
-REAL = 0x1000000
+REAL = 0x4000000
 ENTRY = 0x1000
 LAUNCH_ITEM = CORE
 MAX_DATA_RECORDS = 40
@@ -32,11 +32,11 @@ def bare_core(source):
     if len(source) != CORE or source[0x2000:0x2008] != b"PD2NEXT1":
         raise ValueError("expected exact successor core")
     if (struct.unpack_from(">I", source, 0x4004)[0] != 0x10000f or
-            struct.unpack_from(">I", source, 0x400c)[0] != 0x14000f):
+            struct.unpack_from(">I", source, 0x400c)[0] != 0x18000f):
         raise ValueError("expected checked host DAT reference")
     core = bytearray(source)
     core[0x4000:0x4010] = bytes(16)
-    core[0x100000:0x180000] = bytes(0x80000)
+    core[0x100000:0x1c0000] = bytes(0xc0000)
     return bytes(core)
 
 

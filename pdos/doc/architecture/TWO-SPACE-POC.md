@@ -367,8 +367,17 @@ cover unchanged CMS24 RXVM and CMS31 RXVM, RXAS and RXC stages; the
 loads pinned RXVM from both profiles in one fresh IPL. CMS24 stays fixed at
 `0x20000`; CMS31 is relocated to `0x03000000`. K writes image bytes through
 its real aperture, and the host gate checks their U page translations and
-distinct real backing. The 16 MiB fixture is a diagnostic real-memory
-profile, not a production 31/64-bit heap policy.
+distinct real backing. The original 16 MiB fixture was a diagnostic
+real-memory profile; it did not establish a production 31/64-bit heap policy.
+
+The [64 MiB real-memory result](../qualification/TWO-SPACE-64M-2026-10-06.md)
+widens this same single-CPU successor. The K-only real aperture covers
+64 MiB through sparse 4 KiB translations. Separate K/U table pools use
+512/256 KiB within the 2 MiB final core, and disk/console buffers stay
+below the 24-bit real limit. U virtual placements and the 24-bit free
+interval do not move. This proves the wider physical map and fresh IPL;
+generous 31/64-bit application heaps still need allocation and guest
+workload measurements.
 
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
