@@ -125,7 +125,7 @@ def make_core(elf, classic, dat_emit, out):
             "classic_service_size": len(service), "real_memory_bytes": REAL}
 
 
-def judge(raw, log, ipl=False):
+def judge(raw, log, ipl=False, cms24=False):
     if len(raw) != 0x14000 or raw[0x2000:0x2008] != b"PD2NEXT1":
         raise ValueError("missing/malformed result core")
     expected_masks = (0x0481000000000000, 0x0481000080000000) + \
@@ -209,6 +209,13 @@ def judge(raw, log, ipl=False):
     checks["k_terminal_read_finish"] = (
         struct.unpack_from(">I",raw,0x1206c)[0] ==
         (0 if ipl else 0xfffffffb))
+    checks["k_cms24_module_header"] = (
+        struct.unpack_from(">I",raw,0x12070)[0] ==
+        (0 if cms24 else 4 if ipl else 0xfffffffb))
+    if cms24:
+        checks["cms24_fixed_origin_contract"] = (
+            struct.unpack_from(">4I",raw,0x40c8) ==
+            (0x20000,0x1ba6c0,0x20000,1681222))
     if ipl:
         count = struct.unpack_from(">I",raw,0x12080)[0]
         checks["k_terminal_input_copied_to_u"] = (
@@ -244,10 +251,10 @@ def run(args):
                  "twospace_real.c", "twospace_real.h",
                  "twospace_channel.c", "twospace_channel.h",
                  "twospace_channel.asm", "twospace_dataset.c",
-                 "twospace_dataset.h"):
+                 "twospace_dataset.h", "twospace_cms.c", "twospace_cms.h"):
         manifest["source_sha256"]["pdos/src/" + name] = digest(src.parent.parent / "src" / name)
     for name in ("dat.c", "dat_emit.c", "placement.c", "gate.c", "memory.c",
-                 "channel.c", "dataset.c"):
+                 "channel.c", "dataset.c", "cms.c"):
         manifest["source_sha256"]["pdos/tests/two-space/" + name] = digest(src / name)
     manifest["source_sha256"]["pdos/scripts/two-space-next.crexx"] = digest(src.parent.parent / "scripts/two-space-next.crexx")
     manifest["elf_sha256"] = digest(args.elf)

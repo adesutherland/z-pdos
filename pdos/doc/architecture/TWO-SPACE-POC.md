@@ -338,6 +338,16 @@ caller can retry with a valid U pointer. This is an input transfer proof,
 not a command interpreter. Command dispatch, general CMS/TSO file APIs and
 unchanged application loads remain open.
 
+The [CMS24 header checkpoint](../qualification/TWO-SPACE-CMS-HEADER-2026-10-06.md)
+adds the pinned, unchanged staged RXVM MODULE as an optional dataset on the
+disposable successor disk. K finds its checked first extent and validates the
+first block's stage envelope and MODULE header through Classic C31. The
+reported fixed origin `0x20000`, end `0x1ba6c0` and entry `0x20000` agree
+with the inspected release input. This is a format and placement prerequisite:
+K has not read all MODULE records, validated the full payload, mapped the
+image into U or run RXVM. CMS31 header parsing passes a host check on its
+actual staged RXVM input; guest qualification of it is later work.
+
 ## Primary architecture and compatibility references
 
 - IBM, *z/Architecture Principles of Operation*, SA22-7832-14:

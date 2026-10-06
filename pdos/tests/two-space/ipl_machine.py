@@ -127,7 +127,8 @@ def run(args):
         raw = result_path.read_bytes()
         reference = core.read_bytes()
         try:
-            judged = judge(raw[:0x14000], log, ipl=True)
+            judged = judge(raw[:0x14000], log, ipl=True,
+                           cms24=bool(args.cms24))
             judged["checks"]["ipl_subchannel_handover"] = (
                 0x10000 <= struct.unpack_from(">I",raw,0x40bc)[0] < 0x10100)
             judged["checks"]["k_terminal_screen_observed"] = (
@@ -193,6 +194,7 @@ def main():
     p = argparse.ArgumentParser()
     for name in ("disk", "core", "hercules", "output"):
         p.add_argument(name)
+    p.add_argument("cms24", nargs="?", choices=("cms24",))
     try:
         return run(p.parse_args())
     except (OSError, ValueError) as exc:

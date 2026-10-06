@@ -347,7 +347,8 @@ app_high:
     st %r15, 104(%r2)
     chi %r15, 0
     jne terminal_read_done
-    lghi %r5, 30000
+    larl %r5, terminal_poll_budget
+    lg %r5, 0(%r5)
 terminal_read_poll:
     lghi %r0, 256
     larl %r1, input_data_va
@@ -363,6 +364,13 @@ terminal_read_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 108(%r2)
+    lghi %r0, 0             /* K inspects checked CMS24 MODULE first block */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 212
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 112(%r2)
     larl %r3, high_data_va
     lg %r3, 0(%r3)
     l %r3, 44(%r3)
@@ -382,6 +390,7 @@ app_fault_resume:
 .balign 8
 high_data_va: .quad 0x110001000
 input_data_va: .quad 0x110001080
+terminal_poll_budget: .quad 1000000
 forged_va: .quad 0x100021000
 cross_va: .quad 0x110001ffe
 write_va: .quad 0x110001024
@@ -429,6 +438,8 @@ initial_nested_done:
     chi %r2, 209
     je storage_no_record
     chi %r2, 210
+    je storage_no_record
+    chi %r2, 212
     je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore

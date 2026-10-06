@@ -8,6 +8,7 @@
 #include "twospace_memory.h"
 #include "twospace_channel.h"
 #include "twospace_dataset.h"
+#include "twospace_cms.h"
 
 static unsigned int user_rights(unsigned int frame, void *unused);
 static TSDSTATE u_tables;
@@ -121,6 +122,36 @@ static unsigned int dataset_service(const TSGREQUEST *request)
                          extent.start_head,1U,18452U,&first);
     if (count != 18452 || first[0] != 0x54U || first[1] != 0x53U ||
         first[2] != 0x50U || first[3] != 0x32U) return 12U;
+    return 0U;
+}
+
+static unsigned int cms24_header_service(const TSGREQUEST *request)
+{
+    static const unsigned char name[] = {
+        0xc3U,0xd4U,0xe2U,0xf2U,0xf4U,0x4bU,0xd9U,0xe7U,
+        0xe5U,0xd4U
+    };
+    const unsigned char *first;
+    TSKEXTENT extent;
+    TSHINFO info;
+    int result, count;
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    if (*(volatile const unsigned int *)0x40bcU == 0U) return 0xfffffffbU;
+    result=TSKFIND(channel_record,&channel,name,sizeof name,&extent);
+    if (result == TSK_ABSENT) return 4U;
+    if (result != TSK_OK || extent.record_format != 0x80U ||
+        extent.block_length != 18452U || extent.logical_length != 18452U)
+        return 12U;
+    count=channel_record(&channel,extent.start_cylinder,
+                         extent.start_head,1U,18452U,&first);
+    if (count != 18452 ||
+        TSHHEADER(first,(unsigned int)count,24U,&info) != TSH_OK)
+        return 12U;
+    *(volatile unsigned int *)0x40c8U=info.origin;
+    *(volatile unsigned int *)0x40ccU=info.end;
+    *(volatile unsigned int *)0x40d0U=info.entry;
+    *(volatile unsigned int *)0x40d4U=info.module_bytes;
     return 0U;
 }
 
@@ -292,6 +323,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 208U) return terminal_service(request);
     if (request->svc == 209U) return terminal_read_start(request);
     if (request->svc == 210U) return terminal_read_poll(request);
+    if (request->svc == 212U) return cms24_header_service(request);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
         return 0xfffffffbU;

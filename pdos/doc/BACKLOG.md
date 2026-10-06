@@ -162,6 +162,12 @@ General CMS/TSO file I/O and command services remain open. The diagnostic C31 se
 K-only pages and no additional low U virtual page. This does not complete
 slice 5 or select the replacement image.
 
+The [CMS24 header checkpoint](qualification/TWO-SPACE-CMS-HEADER-2026-10-06.md)
+adds a pinned unchanged RXVM stage to a disposable image and validates its
+first block through K C31 after IPL. Full record/hash validation, U mapping,
+relocation, command dispatch and actual CMS/TSO execution remain slice 6/7
+work. The first-block proof cannot stand in for application compatibility.
+
 ## PD-004: Batch-file delivery
 
 - Type: improvement
