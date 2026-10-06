@@ -567,6 +567,42 @@ cms24_overlay_done:
     l %r4, 0(%r3)
     st %r4, 400(%r2)
 cms31_overlay_done:
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    l %r3, 120(%r2)
+    chi %r3, 0
+    jne cms31_native_done
+    lghi %r0, 4096          /* U31 PLIST and caller save area */
+    lghi %r1, 0
+    lghi %r15, 0x30
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    stg %r1, 0x220(%r2)
+    st %r15, 0x228(%r2)
+    chi %r15, 0
+    jne cms31_native_done
+    lgr %r10, %r1
+    larl %r4, cms31_plist_bytes
+    mvc 0(16,%r10),0(%r4)
+    mvi 16(%r10), 0xff
+    mvc 17(111,%r10),16(%r10)
+    la %r13, 256(%r10)
+    lgr %r1, %r10
+    larl %r3, cms31_trampoline_va
+    lg %r3, 0(%r3)
+    basr %r14, %r3          /* enter unchanged RXVM -v in AMODE31 */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x22c(%r2)
+    lghi %r0, 4096
+    lgr %r1, %r10
+    lghi %r15, 0x30
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x230(%r2)
+cms31_native_done:
     brasl %r14, wide_heap_workload
     larl %r3, high_data_va
     lg %r3, 0(%r3)
@@ -584,11 +620,13 @@ app_fault_resume:
     lg %r2, 0(%r2)
     st %r15, 20(%r2)         /* recoverable application fault code */
     larl %r4, wide_heap_restore_gprs
-    lmg %r8, %r9, 0(%r4)
+    lmg %r8, %r13, 0(%r4)
     svc 0                    /* bounded fixture exit into K */
 .balign 8
 wide_heap_restore_gprs:
 .quad 0x3333333300000008, 0x4444444400000009
+.quad 0x555555550000000a, 0x666666660000000b
+.quad 0x777777770000000c, 0x888888880000000d
 high_data_va: .quad 0x110001000
 input_data_va: .quad 0x110001080
 cms31_image_va: .quad 0x03000000
@@ -598,6 +636,9 @@ forged_va: .quad 0x100021000
 cross_va: .quad 0x110001ffe
 write_va: .quad 0x110001024
 denied_va: .quad 0x20000
+cms31_plist_bytes:
+.byte 0xd9,0xe7,0xe5,0xd4,0x40,0x40,0x40,0x40
+.byte 0x60,0xa5,0x40,0x40,0x40,0x40,0x40,0x40
 
 .section .appdata,"aw"
 .long 0xa1b2c3d4, 0
@@ -634,6 +675,14 @@ initial_nested_done:
     l %r2, 0xa0(%r3)
     chi %r2, 120
     je storage_no_record
+    chi %r2, 204
+    jne trace_not_cms31
+    lghi %r3, 0x3000
+    llgf %r4, 0x8c(%r3)
+    srlg %r4, %r4, 24
+    chi %r4, 3              /* live CMS31 image at 0x03000000 */
+    je storage_no_record
+trace_not_cms31:
     chi %r2, 207
     je storage_no_record
     chi %r2, 208
@@ -717,6 +766,8 @@ kcore_after_c:
     lg %r6, 0(%r6)
     l %r2, 16(%r6)
     chi %r2, 120
+    je copy_storage_address
+    chi %r2, 204
     je copy_storage_address
     chi %r2, 223
     jne no_storage_address

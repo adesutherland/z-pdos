@@ -230,6 +230,13 @@ now supplies enough K/U DAT capacity and real-frame headroom for simultaneous
 The SDK defaults are recorded by the owning Mainframe ELF SDK in
 `docs/compiler/SDK.md`. The CMS31 C stack, unchanged application runs and
 their service ABIs still need qualification.
+The [first native CMS31 checkpoint](qualification/TWO-SPACE-CMS31-NATIVE-2026-10-06.md)
+enters unchanged RXVM `-v` from U64, exercises its 3 MiB image-resident C
+stack and 64 MiB U31 heap, and returns RC 0 through K's checked CMSCALL
+subset. Its one output line is captured in K diagnostic storage. This
+establishes one actual CMS31 execution path, while CMS file/input/command
+services, live 3270 application output, CMS24 execution, TSO application
+execution and REXX `ADDRESS` remain open.
 
 ## PD-004: Batch-file delivery
 

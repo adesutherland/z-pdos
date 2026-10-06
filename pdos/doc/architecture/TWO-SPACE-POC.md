@@ -403,12 +403,20 @@ DAT bytes and U reaches 909,312. The low U24 placement gap stays
 real-frame and DAT headroom on that profile; it does not run the unchanged
 SDK programs, exercise the CMS31 C stack, or establish the service ABI.
 
+The [unchanged CMS31 entry result](../qualification/TWO-SPACE-CMS31-NATIVE-2026-10-06.md)
+runs RXVM `-v` with its image-resident 3 MiB C stack and 64 MiB U31
+heap. K's Classic C31 endpoint recognizes the selected CMSCALL storage and
+line-write requests by the caller's saved PC within the checked CMS31 image.
+It copies U parameters through the K gate and records one exact version
+line. General CMS file, input and command APIs remain open.
+
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
 SVC through K, returns `0x3456` to a U64 caller, restores the parent PTEs,
 and verifies its bytes again. Each live page-table replacement is purged on
-the one CPU. This proves a mixed-mode memory and gate transition. Neither
-RXVM runs yet: CMS lowcore, file and command services and actual REXX
+the one CPU. This proves a mixed-mode memory and gate transition. The later
+CMS31 `-v` check runs after the parent image is restored; CMS lowcore,
+file and command services and actual REXX
 `ADDRESS` behavior remain to be implemented. The IPL harness waits for the
 3270 ready screen and guest disabled-wait event; time limits only detect
 stalls.

@@ -283,6 +283,17 @@ def run(args):
                     and child == 0x0ad9a7f9 and executed == 0x3456
                     and struct.unpack_from(">I",raw,0x40f4)[0] == 31
                     and returned == executed and restored == parent)
+                plist, allocated, rxvm_rc, released = struct.unpack_from(
+                    ">Q3I", raw, 0x12220)
+                version = "crexx-1.0.0-beta.3 (Bytecode Mode)".encode("cp037")
+                checks["cms31_native_rxvm_version"] = (
+                    0x01000000 <= plist < 0x80000000 and
+                    allocated == rxvm_rc == released == 0 and
+                    page_unmapped(raw,0x28000f,plist) and
+                    struct.unpack_from(">I",raw,0x4200)[0] == 1 and
+                    struct.unpack_from(">I",raw,0x4204)[0] == len(version) and
+                    raw[0x4208:0x4208+len(version)] == version and
+                    struct.unpack_from(">I",raw,0x4510)[0] == 0)
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
                 real_bytes == 0x10000000 and stage >= 0x400000 and
                 stage + 0x400000 <= launch and launch + 4096 <= real_bytes and

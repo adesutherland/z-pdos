@@ -21,6 +21,9 @@ static unsigned int console_read_phase;
 static unsigned int console_read_count;
 static unsigned int cms31_loaded;
 static unsigned int cms24_loaded;
+static unsigned int cms31_heap_live;
+static unsigned int cms31_heap_bytes;
+static TSPADDR cms31_heap_address;
 void TSFPURGE(void *unused);
 void TSKEYSET(unsigned int real_page, unsigned int key);
 
@@ -710,6 +713,98 @@ static unsigned int high_storage_service(TSGREQUEST *request)
     return 0U;
 }
 
+static unsigned int cms_word(const unsigned char *p)
+{
+    return ((unsigned int)p[0]<<24) | ((unsigned int)p[1]<<16) |
+           ((unsigned int)p[2]<<8) | (unsigned int)p[3];
+}
+
+/* First live CMS31 CMSCALL subset. The saved old PSW selects the mapped
+ * module, and every U parameter is copied through the checked K gate. */
+static unsigned int cms31_native_service(TSGREQUEST *request)
+{
+    static const unsigned char obtain[8] =
+        {0xc4U,0xd4U,0xe2U,0xc6U,0xd9U,0xd6U,0xe2U,0xe5U};
+    static const unsigned char release[8] =
+        {0xc4U,0xd4U,0xe2U,0xc6U,0xd9U,0xd9U,0xe2U,0xe5U};
+    static const unsigned char line[8] =
+        {0xd3U,0xc9U,0xd5U,0xc5U,0xe6U,0xd9U,0xe3U,0x40U};
+    TSGCONTEXT gate;
+    TSGREQUEST copy;
+    TSPADDR minimum, maximum, address;
+    unsigned char plist[32], message[130];
+    unsigned int i, n, length, result, flags;
+    volatile unsigned char *out;
+    if (request->address.hi || request->address.lo < 0x1000000U ||
+        request->address.lo >= 0x80000000U) return 12U;
+    gate.u_tables=&u_tables;
+    gate.real_aperture=(unsigned char *)TSF_KAPERTURE_VA;
+    gate.real_bytes=TSF_REAL_BYTES;
+    gate.rights=user_rights;
+    gate.rights_context=0;
+    copy=*request;
+    copy.length=32U;
+    copy.direction=TSG_READ;
+    if (TSGCOPY(&gate,&copy,plist,sizeof plist) != TSG_OK) return 12U;
+    flags=*(volatile const unsigned int *)0x307cU;
+    for (i=0U; i<8U && plist[i]==obtain[i]; ++i) {}
+    if (i==8U) {
+        length=cms_word(plist+16U);
+        if (flags!=0x00e00000U || !length || (length&7U) ||
+            length!=request->length || plist[28U]!=0x82U ||
+            plist[30U]!=3U || cms31_heap_live) return 12U;
+        minimum.hi=maximum.hi=0U;
+        minimum.lo=0x08000000U; maximum.lo=0x7fffffffU;
+        result=TSMALLOC(&storage,4U,31U,minimum,maximum,
+                        length,0,&address);
+        if (result!=TSM_OK) return result==TSM_NOMEM ? 4U : 12U;
+        cms31_heap_address=address;
+        cms31_heap_bytes=length;
+        cms31_heap_live=1U;
+        request->address=address;
+        *(volatile unsigned int *)0x4510U=1U;
+        *(volatile unsigned int *)0x4098U=u_tables.used;
+        return 0U;
+    }
+    for (i=0U; i<8U && plist[i]==release[i]; ++i) {}
+    if (i==8U) {
+        address.hi=0U;
+        address.lo=*(volatile const unsigned int *)0x3044U & 0x7fffffffU;
+        if (flags!=0x00e00000U || !cms31_heap_live ||
+            address.lo!=cms31_heap_address.lo ||
+            cms_word(plist+16U)!=cms31_heap_bytes ||
+            cms_word(plist+24U)!=8U ||
+            plist[28U]!=8U || plist[29U]!=2U ||
+            TSMFREE(&storage,4U,address)!=TSM_OK) return 12U;
+        cms31_heap_live=0U;
+        cms31_heap_bytes=0U;
+        *(volatile unsigned int *)0x4510U=0U;
+        *(volatile unsigned int *)0x4098U=u_tables.used;
+        return 0U;
+    }
+    for (i=0U; i<8U && plist[i]==line[i]; ++i) {}
+    if (i==8U) {
+        length=cms_word(plist+12U);
+        if (flags || length>130U || cms_word(plist+8U)<0x1000000U ||
+            cms_word(plist+8U)>=0x80000000U) return 12U;
+        if (length) {
+            copy.address.hi=0U;
+            copy.address.lo=cms_word(plist+8U);
+            copy.length=length;
+            if (TSGCOPY(&gate,&copy,message,sizeof message)!=TSG_OK)
+                return 12U;
+        }
+        n=*(volatile unsigned int *)0x4200U;
+        if (n>=8U) return 12U;
+        out=(volatile unsigned char *)(0x4204U+n*136U);
+        *(volatile unsigned int *)out=length;
+        for (i=0U; i<length; ++i) out[4U+i]=message[i];
+        *(volatile unsigned int *)0x4200U=n+1U;
+        return 0U;
+    }
+    return 12U;
+}
+
 unsigned int pdosTwoSpaceService(TSGREQUEST *request)
 {
     TSGCONTEXT gate;
@@ -725,6 +820,11 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
                8U : 0xfffffffdU;
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 223U) return high_storage_service(request);
+    if (request->svc == 204U && cms31_loaded &&
+        *(volatile const unsigned int *)0x308cU >= 0x03000000U &&
+        *(volatile const unsigned int *)0x308cU <
+            0x03000000U+*(volatile const unsigned int *)0x40e8U)
+        return cms31_native_service(request);
     if (request->svc == 206U) return volume_service(request);
     if (request->svc == 207U) return dataset_service(request);
     if (request->svc == 208U) return terminal_service(request);
