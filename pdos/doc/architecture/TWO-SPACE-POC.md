@@ -281,10 +281,12 @@ live interval inventory. With a registered CMS24 RXVM image ending at
 `0x1bb000`, the first subsequent page can start there. This retains the
 `0x1bb000`–`0x200000` gap that an artificial 2 MiB U floor would lose. The
 current guest maps CMS24 RXVM at that fixed origin. The ledger reserves
-`0x0`–`0x1ffff` for interfaces and `0xf00000`–`0xffffff` for a future
-24-bit stack, leaving the contiguous `0x1bb000`–`0xefffff` gap of
-13,914,112 low U virtual bytes. This is a placement budget; the stack is
-not yet backed and unchanged CMS24/TSO24 heap demand is unmeasured.
+`0x0`–`0x1ffff` for interfaces and `0xf00000`–`0xffffff` for the
+24-bit stack and guard, leaving the contiguous `0x1bb000`–`0xefffff` gap of
+13,914,112 low U virtual bytes. The [guarded stack result](../qualification/TWO-SPACE-CMS24-STACK-2026-10-06.md)
+now backs `0xf01000`–`0xffffff` with separate real frames and leaves the
+first page unmapped. A tiny AMODE24 child writes the last stack page. The
+gap is a placement budget; unchanged CMS24/TSO24 heap demand is unmeasured.
 
 Fixed-origin collision handling now has a K-owned page-backing primitive.
 It keeps a suspended caller's real frames intact, maps distinct child frames

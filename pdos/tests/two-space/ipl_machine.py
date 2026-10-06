@@ -236,6 +236,15 @@ def run(args):
                     raw[real24:real24+16] == staged24[148:164] and
                     all(page_real(raw,0x14000f,0x20000+i*4096) ==
                         real24+i*4096 for i in range(pages24)))
+                stack_real, stack_bytes = struct.unpack_from(">2I",raw,0x4114)
+                checks["cms24_guarded_backed_stack"] = (
+                    stack_bytes == 0xff000 and
+                    0x200000 <= stack_real < 0x1000000 and
+                    stack_real + stack_bytes <= 0x1000000 and
+                    page_unmapped(raw,0x14000f,0xf00000) and
+                    all(page_real(raw,0x14000f,0xf01000+i*4096) ==
+                        stack_real+i*4096 for i in range(stack_bytes//4096)) and
+                    raw[stack_real+stack_bytes-4096] == 0x5a)
                 parent24, push24, executed24, returned24, restored24, child24 = \
                     struct.unpack_from(">6I", raw, 0x121a0)
                 checks["cms24_nested_backing_restored"] = (

@@ -184,6 +184,10 @@ MODULE bytes. The [dual CMS mapping checkpoint](qualification/TWO-SPACE-DUAL-CMS
 now connects both pinned RXVM images to live U allocations in one fresh IPL,
 with dynamic K stage reservations and a measured 13,914,112-byte contiguous
 24-bit placement gap between the CMS24 image and reserved stack range.
+The [guarded CMS24 stack checkpoint](qualification/TWO-SPACE-CMS24-STACK-2026-10-06.md)
+backs that stack range with 255 U pages while preserving the same gap; a
+tiny AMODE24 child writes its last page. Actual unchanged CMS24/TSO24
+heap and stack demand remains to be measured.
 The [same-origin guest backing checkpoint](qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 then swaps an eight-byte AMODE31 child over the mapped RXVM interval,
 executes its nested SVC from U, restores the parent pages and propagates its

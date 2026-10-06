@@ -264,8 +264,9 @@ static unsigned int cms24_map_service(const TSGREQUEST *request)
     };
     unsigned char *stage;
     TSPADDR first, second, expected_first, expected_second, old, placed;
+    TSPADDR guard, stack, placed_stack;
     TSHINFO info;
-    unsigned int blocks, stage_real, result, i, real=0U, entry;
+    unsigned int blocks, stage_real, result, i, real=0U, stack_real=0U, entry;
     int allocation;
     if (request->length || request->address.hi || request->address.lo ||
         request->direction) return 8U;
@@ -312,17 +313,53 @@ static unsigned int cms24_map_service(const TSGREQUEST *request)
     if (!real || TSHIMAGE(stage,blocks*18452U,24U,placed.lo,
                           (unsigned char *)TSF_KAPERTURE_VA+real,
                           info.image_bytes,&entry) != TSH_OK) {
-        if (TSMFREE(&storage,5U,placed) != TSM_OK)
-            { result=0xfffffff0U; goto release; }
-        result=12U; goto restore_reservation;
+        result=12U; goto free_image;
     }
+    guard.hi=stack.hi=0U;
+    guard.lo=0x00f00000U; stack.lo=0x00f01000U;
+    if (TSPRELS(&storage.virtuals,0x80000007U) != TSP_OK) {
+        result=0xfffffff0U; goto free_image;
+    }
+    if (TSMRESERVE(&storage,7U,24U,guard,4096U) != TSP_OK) {
+        result=0xfffffff0U; goto restore_stack_reservation;
+    }
+    allocation=TSMALLOC(&storage,5U,24U,stack,stack,0x000ff000U,
+                         1,&placed_stack);
+    if (allocation != TSM_OK) {
+        result=allocation == TSM_NOMEM ? 4U : 12U;
+        goto restore_guard;
+    }
+    for (i=0U; i<TSM_ALLOCS; ++i)
+        if (storage.allocations[i].handle &&
+            storage.allocations[i].task == 5U &&
+            storage.allocations[i].address.hi == placed_stack.hi &&
+            storage.allocations[i].address.lo == placed_stack.lo &&
+            storage.allocations[i].bytes == 0x000ff000U) {
+            stack_real=storage.allocations[i].real;
+            break;
+        }
+    if (!stack_real) { result=0xfffffff0U; goto free_stack; }
     *(volatile unsigned int *)0x4100U=real;
     *(volatile unsigned int *)0x4104U=entry;
     *(volatile unsigned int *)0x4108U=info.image_bytes;
     *(volatile unsigned int *)0x410cU=TSMLOWFREE(&storage);
+    *(volatile unsigned int *)0x4114U=stack_real;
+    *(volatile unsigned int *)0x4118U=0x000ff000U;
     *(volatile unsigned int *)0x4098U=u_tables.used;
     cms24_loaded=1U;
     result=0U; goto release;
+free_stack:
+    if (TSMFREE(&storage,5U,placed_stack) != TSM_OK)
+        { result=0xfffffff0U; goto release; }
+restore_guard:
+    if (TSPRELS(&storage.virtuals,0x80000007U) != TSP_OK)
+        { result=0xfffffff0U; goto release; }
+restore_stack_reservation:
+    if (TSMRESERVE(&storage,7U,24U,guard,0x100000U) != TSP_OK)
+        { result=0xfffffff0U; goto release; }
+free_image:
+    if (TSMFREE(&storage,5U,placed) != TSM_OK)
+        { result=0xfffffff0U; goto release; }
 restore_reservation:
     if (TSMRESERVE(&storage,1U,24U,first,0x2000U) != TSP_OK)
         { result=0xfffffff0U; goto release; }
@@ -430,10 +467,13 @@ static unsigned int cms31_child_probe(void)
 
 static unsigned int cms24_overlay_push(const TSGREQUEST *request)
 {
-    /* GNU s390 z900: SAM24; SVC 219; LGHI R15,0x2468; SAM64; BR R14. */
+    /* GNU s390 z900: SAM24; SVC 219; LHI R3,-4096; MVI 0(R3),0x5a;
+       LGHI R15,0x2468; SAM64; BR R14. The 24-bit address is 0xfff000,
+       inside the backed stack's final page. */
     static const unsigned char child[] = {
-        0x01U,0x0cU,0x0aU,0xdbU,0xa7U,0xf9U,
-        0x24U,0x68U,0x01U,0x0eU,0x07U,0xfeU
+        0x01U,0x0cU,0x0aU,0xdbU,0xa7U,0x38U,0xf0U,0x00U,
+        0x92U,0x5aU,0x30U,0x00U,0xa7U,0xf9U,0x24U,0x68U,
+        0x01U,0x0eU,0x07U,0xfeU
     };
     TSPADDR base;
     int result;
