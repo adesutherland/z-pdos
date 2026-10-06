@@ -182,6 +182,10 @@ derives personality, AMODE and owners from a checked loaded-image record and
 rejects invalid or caller-placed entries. Fault-triggered unwind, pending
 I/O, a normal K-controlled launch and other resource lifetimes remain open;
 these checkpoints do not close P1 or qualify P2–P6.
+The [TSO64 HIGH boundary inventory](qualification/TWO-SPACE-TSO64-HIGH-BOUNDARY-2026-10-06.md)
+pins all three unchanged launcher/body pairs and prevents the ANY loader from
+accepting an RMODE64 directory. HIGH AL8 materialization, native LOAD/DELETE
+linkage and successor guest execution remain open.
 The [CMS heap ownership check](qualification/TWO-SPACE-INVOCATION-HEAP-2026-10-06.md)
 adds per-invocation CMS31 heap state and a pre-free K handle check for CMS,
 SVC 120 and IARV64. The unchanged guest paths passed fresh IPL, but a nested

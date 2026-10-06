@@ -38,8 +38,8 @@ int TSTIMAGE24(const unsigned char *raw, unsigned int bytes,
 int TSTIMAGE31(const unsigned char *raw, unsigned int bytes,
                unsigned int base, unsigned char *image,
                unsigned int capacity, TSTINFO *info);
-/* AMODE64/RMODE ANY classic low-resident member. This does not accept the
- * separate RMODE HIGH AL8 relocation format. */
+/* AMODE64/RMODE ANY classic low-resident member. Both TSTHEADER and this
+ * materializer reject the separate RMODE64 AL8 relocation format. */
 int TSTIMAGE64ANY(const unsigned char *raw, unsigned int bytes,
                   unsigned int base, unsigned char *image,
                   unsigned int capacity, TSTINFO *info);

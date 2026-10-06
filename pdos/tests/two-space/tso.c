@@ -137,6 +137,11 @@ int main(int argc, char **argv)
                         767727U,&info)==TST_BAD);
     CHECK(TSTIMAGE64ANY(raw,bytes64-1U,0x09000000U,image,
                         TST_MAX_IMAGE,&info)==TST_BAD);
+    memcpy(mutated,raw,bytes64);
+    mutated[336U+57U]=0x31U; /* AMODE64/RMODE64 is a separate load form */
+    CHECK(TSTHEADER(mutated,bytes64,64U,&info)==TST_BAD);
+    CHECK(TSTIMAGE64ANY(mutated,bytes64,0x09000000U,image,
+                        TST_MAX_IMAGE,&info)==TST_BAD);
     stage_bytes=read_file(argv[4],raw);
     CHECK(stage_bytes==45U*TST_BLOCK);
     CHECK(TSTSTAGEHEADER64(raw,stage_bytes,&bytes,&bytes64)==TST_OK &&

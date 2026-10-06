@@ -108,7 +108,8 @@ int TSTHEADER(const unsigned char *raw, unsigned int bytes,
             if ((expected_mode==24U && (flags&3U)!=0U) ||
                 (expected_mode==31U && (flags&3U)!=2U) ||
                 (expected_mode==64U && (flags&3U)!=1U) ||
-                (expected_mode!=24U && !(flags&0x10U)))
+                (expected_mode!=24U && !(flags&0x10U)) ||
+                (flags&0x20U))
                 return TST_BAD;
         }
         at+=size;
