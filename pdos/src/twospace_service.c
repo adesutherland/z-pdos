@@ -719,6 +719,28 @@ static unsigned int cms_word(const unsigned char *p)
            ((unsigned int)p[2]<<8) | (unsigned int)p[3];
 }
 
+static unsigned int cms_line_screen(const unsigned char *message,
+                                    unsigned int length)
+{
+    unsigned char *screen;
+    unsigned int i;
+    if (!console_ssid || console_read_phase || !message || length>130U)
+        return 12U;
+    screen=TSCDATA(&console_channel);
+    for (i=0U; i<1773U; ++i) screen[i]=0x40U;
+    screen[0]=0xc3U; screen[1]=0x11U; screen[2]=0x5dU;
+    screen[3]=0x7fU; screen[4]=0x1dU; screen[5]=0xf0U;
+    for (i=0U; i<length; ++i) screen[6U+i]=message[i];
+    screen[1766]=0x1dU; screen[1767]=0U; screen[1768]=0x13U;
+    screen[1769]=0x3cU; screen[1770]=0x5dU; screen[1771]=0x7fU;
+    screen[1772]=0U;
+    if (TSCBUILDCONSWRITE(&console_channel,1773U)!=TSC_OK ||
+        TSCIO(console_ssid,TSCORB(&console_channel),
+              TSCIRB(&console_channel))!=0 ||
+        TSCCHECKWRITE(&console_channel)!=TSC_OK) return 12U;
+    return 0U;
+}
+
 /* The fixed-origin CMS24 entry has its own SVC and flagged 24-bit
  * line-buffer convention. Keep it distinct from the CMS31 CMSCALL path. */
 static unsigned int cms24_native_service(TSGREQUEST *request)
@@ -764,7 +786,7 @@ static unsigned int cms24_native_service(TSGREQUEST *request)
     *(volatile unsigned int *)out=length;
     for (i=0U; i<length; ++i) out[4U+i]=message[i];
     *(volatile unsigned int *)0x4300U=n+1U;
-    return 0U;
+    return cms_line_screen(message,length);
 }
 
 /* First live CMS31 CMSCALL subset. The saved old PSW selects the mapped
@@ -848,7 +870,7 @@ static unsigned int cms31_native_service(TSGREQUEST *request)
         *(volatile unsigned int *)out=length;
         for (i=0U; i<length; ++i) out[4U+i]=message[i];
         *(volatile unsigned int *)0x4200U=n+1U;
-        return 0U;
+        return cms_line_screen(message,length);
     }
     return 12U;
 }

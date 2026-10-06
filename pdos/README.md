@@ -27,6 +27,8 @@ command APIs. The [narrow CMS31 result](doc/qualification/TWO-SPACE-CMS31-NATIVE
 does run unchanged RXVM `-v` through K's checked storage and line subset.
 The [CMS24 result](doc/qualification/TWO-SPACE-CMS24-NATIVE-2026-10-06.md)
 adds the unchanged fixed-origin RXVM `-v` path in the same U space.
+The [live-screen result](doc/qualification/TWO-SPACE-CMS-LIVE-SCREEN-2026-10-06.md)
+puts the selected CMS version line on a connected 3270.
 
 The recorded source-built milestone runs unchanged cREXX TSO31, TSO64 ANY and
 TSO64 HIGH packages, including compiler, assembler, terminal and file workloads.

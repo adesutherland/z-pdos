@@ -417,6 +417,10 @@ address and skips its inline four-byte continuation on return. Both
 unchanged RXVM images execute in the same U ASCE in that diagnostic IPL.
 This is evidence of a narrow coexistence case; file/input services,
 application commands and TSO binaries have not yet been exercised together.
+The [live-screen checkpoint](../qualification/TWO-SPACE-CMS-LIVE-SCREEN-2026-10-06.md)
+connects those selected CMS line-write requests to K's real-addressed
+3270 workspace. The final version line is observed after guest completion;
+the general CMS terminal and file APIs remain open.
 
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its

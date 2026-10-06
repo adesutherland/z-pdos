@@ -245,6 +245,11 @@ continuation. CMS24 and CMS31 each execute and return RC 0 in one fresh IPL.
 The bridge's one allocated 24-bit U page is released, so the permanent
 13,914,112-byte low placement gap does not shrink. General CMS file/input
 services and actual REXX `ADDRESS` remain open.
+The [live CMS screen checkpoint](qualification/TWO-SPACE-CMS-LIVE-SCREEN-2026-10-06.md)
+routes the selected CMS24 and CMS31 application line writes through K's
+checked 3270 channel workspace. The final version line was observed on an
+independently connected terminal after guest completion. General multi-line
+console, input and file services remain open.
 
 ## PD-004: Batch-file delivery
 

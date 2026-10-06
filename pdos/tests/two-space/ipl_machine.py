@@ -130,6 +130,7 @@ def run(args):
          "-scriptport", str(script_port)],
         stdout=terminal_log, stderr=subprocess.STDOUT)
     input_sent = False
+    application_screen = ""
     proc = None
     lines = []
     events = queue.Queue()
@@ -170,6 +171,10 @@ def run(args):
         if not input_sent:
             raise RuntimeError("3270 PING entry failed")
         await_wait_state(events, proc, out / "console.log")
+        shown = terminal_action(script_port, "Ascii()")
+        if shown.returncode == 0:
+            application_screen = shown.stdout
+        out.joinpath("terminal.application-screen").write_text(application_screen)
         proc.stdin.write("stopall\npsw\ngpr\ncr\n"
         f"savecore \"{out / 'result.core'}\" 0 fffffff\nquit\n")
         proc.stdin.flush()
@@ -208,6 +213,10 @@ def run(args):
             judged["checks"]["k_terminal_screen_observed"] = (
                 "K SERVICE READY" in (out / "terminal.screen").read_text())
             judged["checks"]["terminal_input_sent"] = input_sent
+            if args.cms24 or args.cms31:
+                judged["checks"]["cms_version_on_3270"] = (
+                    "crexx-1.0.0-beta.3 (Bytecode Mode)" in
+                    application_screen)
             checks = judged["checks"]
             report = struct.unpack_from(">8I", raw, 0x4080)
             _, stage, launch, kpool, upool, kbytes, ubytes, real_bytes = report
