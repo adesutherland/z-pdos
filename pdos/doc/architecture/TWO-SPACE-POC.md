@@ -354,6 +354,15 @@ relocations. It passes the unchanged CMS24 RXVM and CMS31 RXVM, RXAS and RXC
 stage files from the pinned release contract. This is parser evidence only;
 K's guest dataset path still reaches only the first block at this point.
 
+The next guest checkpoint reads all 92 F/18452 blocks of the pinned v2
+CMS24 RXVM dataset into a K-only real-memory aperture, reserved in the real
+frame ledger for the duration of the read. K validates the complete staged
+MODULE before releasing that reservation. The selected CMS24 application
+virtual origin remains `0x20000`; this checkpoint does not map or execute
+the image in U. The IPL test now waits for an observable 3270 ready screen
+and guest disabled-wait completion before saving the core. Its time limits
+are failure watchdogs, not the criterion for completion.
+
 ## Primary architecture and compatibility references
 
 - IBM, *z/Architecture Principles of Operation*, SA22-7832-14:

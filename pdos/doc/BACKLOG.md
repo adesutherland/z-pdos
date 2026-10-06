@@ -164,9 +164,11 @@ slice 5 or select the replacement image.
 
 The [CMS24 header checkpoint](qualification/TWO-SPACE-CMS-HEADER-2026-10-06.md)
 adds a pinned unchanged RXVM stage to a disposable image and validates its
-first block through K C31 after IPL. Full record/hash validation, U mapping,
+first block through K C31 after IPL. The later [full-stage guest checkpoint](qualification/TWO-SPACE-CMS-FULL-GUEST-2026-10-06.md)
+reads and validates all 92 records of the v2 CMS24 stage under K and uses
+observable guest completion rather than a fixed IPL pause. U mapping,
 relocation, command dispatch and actual CMS/TSO execution remain slice 6/7
-work. The first-block proof cannot stand in for application compatibility.
+work. Full-stage validation cannot stand in for application compatibility.
 
 ## PD-004: Batch-file delivery
 

@@ -212,10 +212,15 @@ def judge(raw, log, ipl=False, cms24=False):
     checks["k_cms24_module_header"] = (
         struct.unpack_from(">I",raw,0x12070)[0] ==
         (0 if cms24 else 4 if ipl else 0xfffffffb))
+    checks["k_cms24_full_stage"] = (
+        struct.unpack_from(">I",raw,0x12074)[0] ==
+        (0 if cms24 else 4 if ipl else 0xfffffffb))
     if cms24:
         checks["cms24_fixed_origin_contract"] = (
             struct.unpack_from(">4I",raw,0x40c8) ==
             (0x20000,0x1ba6c0,0x20000,1681222))
+        checks["cms24_k_complete_read"] = (
+            struct.unpack_from(">2I",raw,0x40d8) == (0x434d5332,92))
     if ipl:
         count = struct.unpack_from(">I",raw,0x12080)[0]
         checks["k_terminal_input_copied_to_u"] = (

@@ -155,6 +155,68 @@ static unsigned int cms24_header_service(const TSGREQUEST *request)
     return 0U;
 }
 
+/* Temporary K-only proof buffer: page aligned, never mapped in U, and
+ * reserved against GETMAIN for the entire CKD read and validation. */
+#define CMS_STAGE_REAL 0x600000U
+#define CMS_STAGE_CAPACITY 0x900000U
+#define CMS_STAGE_OWNER 0x434d5332U
+
+static unsigned int cms24_full_service(const TSGREQUEST *request)
+{
+    static const unsigned char name[] = {
+        0xc3U,0xd4U,0xe2U,0xf2U,0xf4U,0x4bU,0xd9U,0xe7U,
+        0xe5U,0xd4U
+    };
+    const unsigned char *record;
+    unsigned char *stage=(unsigned char *)TSF_KAPERTURE_VA+CMS_STAGE_REAL;
+    TSKEXTENT extent;
+    TSHINFO info;
+    unsigned int cylinder, head, number, blocks, index, offset, total;
+    unsigned int result=12U;
+    int found, count;
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    if (*(volatile const unsigned int *)0x40bcU == 0U) return 0xfffffffbU;
+    found=TSKFIND(channel_record,&channel,name,sizeof name,&extent);
+    if (found == TSK_ABSENT) return 4U;
+    if (found != TSK_OK || extent.record_format != 0x80U ||
+        extent.block_length != 18452U || extent.logical_length != 18452U)
+        return 12U;
+    if (TSRRESERVE(&storage.real,CMS_STAGE_OWNER,CMS_STAGE_REAL,
+                   CMS_STAGE_CAPACITY,TSR_RUN) != TSR_OK) return 4U;
+    cylinder=extent.start_cylinder; head=extent.start_head; number=1U;
+    count=channel_record(&channel,cylinder,head,number,18452U,&record);
+    if (count != 18452 || TSHHEADER(record,18452U,24U,&info) != TSH_OK)
+        goto release;
+    total=64U+info.module_bytes;
+    blocks=(total+18451U)/18452U;
+    if (!blocks || blocks > CMS_STAGE_CAPACITY/18452U) goto release;
+    for (index=0U; index<blocks; ++index) {
+        if (!TSKWITHIN(&extent,cylinder,head)) goto release;
+        if (index) {
+            count=channel_record(&channel,cylinder,head,number,18452U,&record);
+            if (count != 18452) goto release;
+        }
+        offset=index*18452U;
+        { unsigned int i;
+          for (i=0U; i<18452U; ++i) stage[offset+i]=record[i]; }
+        ++number;
+        if (number == 4U) {
+            number=1U; ++head;
+            if (head == 15U) { head=0U; ++cylinder; }
+        }
+    }
+    if (TSHVALIDATE(stage,blocks*18452U,24U,&info) != TSH_OK)
+        goto release;
+    *(volatile unsigned int *)0x40d8U=CMS_STAGE_OWNER;
+    *(volatile unsigned int *)0x40dcU=blocks;
+    result=0U;
+release:
+    if (TSRRELEASE(&storage.real,CMS_STAGE_OWNER,CMS_STAGE_REAL) != TSR_OK)
+        return 12U;
+    return result;
+}
+
 static unsigned int terminal_service(const TSGREQUEST *request)
 {
     static const unsigned char message[] = {
@@ -324,6 +386,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 209U) return terminal_read_start(request);
     if (request->svc == 210U) return terminal_read_poll(request);
     if (request->svc == 212U) return cms24_header_service(request);
+    if (request->svc == 213U) return cms24_full_service(request);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
         return 0xfffffffbU;

@@ -3,10 +3,12 @@
 import argparse
 import json
 from pathlib import Path
+import queue
 import socket
 import struct
 import subprocess
 import sys
+import threading
 import time
 import zlib
 
@@ -23,6 +25,39 @@ def unused_loopback_port():
 def terminal_action(port, action):
     return subprocess.run(["x3270if", "-t", str(port), action],
                           capture_output=True, text=True, timeout=2)
+
+
+def await_condition(check, limit, description):
+    """Poll observable state; elapsed time is only a failure watchdog."""
+    end = time.monotonic() + limit
+    while time.monotonic() < end:
+        result = check()
+        if result:
+            return result
+        time.sleep(0.05)
+    raise TimeoutError(description)
+
+
+def drain_output(stream, lines, events):
+    for line in stream:
+        lines.append(line)
+        events.put(line)
+
+
+def await_wait_state(events, proc):
+    end = time.monotonic() + 60
+    while time.monotonic() < end:
+        if proc.poll() is not None:
+            raise RuntimeError("Hercules exited before guest completion")
+        try:
+            line = events.get(timeout=0.1)
+        except queue.Empty:
+            continue
+        if "HHC00809I Processor CP00: disabled wait state" in line:
+            return
+        if "HHC00803I" in line:
+            raise RuntimeError("guest program interrupt loop")
+    raise TimeoutError("guest completion wait state")
 
 
 def page_unmapped(raw, root, virtual):
@@ -61,9 +96,7 @@ def run(args):
         "DIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\n"
         f"CNSLPORT 127.0.0.1:{console_port}\n"
         f"01B9 3390 {disk}\n0009 3270\n")
-    out.joinpath("run.rc").write_text(
-        f"sysclear\nipl 01B9\npause 8\nstopall\npsw\ngpr\ncr\n"
-        f"savecore \"{out / 'result.core'}\" 0 1fffff\nquit\n")
+    out.joinpath("run.rc").write_text("sysclear\nipl 01B9\n")
     cmd = [str(hercules), "-t", "-f", str(out / "machine.cnf"),
            "-r", str(out / "run.rc")]
     terminal_log = (out / "s3270.log").open("w")
@@ -72,47 +105,57 @@ def run(args):
          "-scriptport", str(script_port)],
         stdout=terminal_log, stderr=subprocess.STDOUT)
     input_sent = False
+    proc = None
+    lines = []
+    events = queue.Queue()
     try:
-        deadline = time.monotonic() + 4
-        while time.monotonic() < deadline:
+        def script_ready():
             try:
-                if terminal_action(script_port, "Query(ConnectionState)").returncode == 0:
-                    break
+                return terminal_action(script_port, "Query(ConnectionState)").returncode == 0
             except subprocess.TimeoutExpired:
-                pass
-            time.sleep(0.1)
+                return False
+        await_condition(script_ready, 10, "s3270 script port")
         proc = subprocess.Popen(cmd, cwd=out, stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, text=True)
-        for _ in range(40):
-            connected = terminal_action(
-                script_port, f"Connect(0009@127.0.0.1:{console_port})")
-            if connected.returncode == 0:
-                break
-            time.sleep(0.1)
-        screen = ""
-        for _ in range(80):
-            observed = terminal_action(script_port, "Ascii()")
-            if observed.returncode == 0:
-                screen = observed.stdout
-                if "K SERVICE READY" in screen:
-                    break
-            time.sleep(0.1)
+                                stderr=subprocess.STDOUT, stdin=subprocess.PIPE,
+                                text=True, bufsize=1)
+        reader = threading.Thread(target=drain_output,
+                                  args=(proc.stdout, lines, events), daemon=True)
+        reader.start()
+        def connect():
+            try:
+                connected = terminal_action(
+                    script_port, f"Connect(0009@127.0.0.1:{console_port})")
+                return connected.returncode == 0
+            except subprocess.TimeoutExpired:
+                return False
+        await_condition(connect, 20, "3270 console connection")
+        def ready_screen():
+            try:
+                observed = terminal_action(script_port, "Ascii()")
+                return observed.stdout if observed.returncode == 0 and \
+                    "K SERVICE READY" in observed.stdout else None
+            except subprocess.TimeoutExpired:
+                return None
+        screen = await_condition(ready_screen, 30, "K service screen")
         out.joinpath("terminal.screen").write_text(screen)
-        if "K SERVICE READY" in screen:
-            terminal_action(script_port, "Set(aidWait,false)")
-            typed = terminal_action(script_port, 'String("PING")')
-            entered = terminal_action(script_port, "Enter()")
-            input_sent = typed.returncode == 0 and entered.returncode == 0
-        stdout, _ = proc.communicate(timeout=45)
-        log = stdout
-    except subprocess.TimeoutExpired as exc:
-        log = exc.stdout or ""
-        if isinstance(log, bytes):
-            log = log.decode(errors="replace")
-        if 'proc' in locals():
+        terminal_action(script_port, "Set(aidWait,false)")
+        typed = terminal_action(script_port, 'String("PING")')
+        entered = terminal_action(script_port, "Enter()")
+        input_sent = typed.returncode == 0 and entered.returncode == 0
+        if not input_sent:
+            raise RuntimeError("3270 PING entry failed")
+        await_wait_state(events, proc)
+        proc.stdin.write("stopall\npsw\ngpr\ncr\n"
+                         f"savecore \"{out / 'result.core'}\" 0 1fffff\nquit\n")
+        proc.stdin.flush()
+        proc.stdin.close()
+        proc.wait(timeout=20)
+        reader.join(timeout=2)
+    except (TimeoutError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        if proc is not None and proc.poll() is None:
             proc.kill()
-            proc.communicate()
-        proc = None
+            proc.wait()
+        failure = str(exc)
     finally:
         terminal.terminate()
         try:
@@ -121,6 +164,7 @@ def run(args):
             terminal.kill()
             terminal.wait()
         terminal_log.close()
+    log = "".join(lines)
     out.joinpath("hercules.log").write_text(log)
     result_path = out / "result.core"
     if result_path.exists() and result_path.stat().st_size == 0x200000:
@@ -172,6 +216,9 @@ def run(args):
     checks["fresh_ipl_command"] = "HHC01603I ipl 01B9" in log
     checks["no_program_interrupt_loop"] = "HHC00803I" not in log
     checks["hercules_exit_zero"] = proc is not None and proc.returncode == 0
+    checks["event_driven_ipl"] = "HHC00809I Processor CP00: disabled wait state" in log
+    if 'failure' in locals():
+        judged["failure"] = failure
     checks["source_core_marker"] = core.read_bytes()[0x2000:0x2008] == b"PD2NEXT1"
     checks["disk_unchanged"] = disk_before == digest(disk)
     judged["pass"] = all(checks.values())

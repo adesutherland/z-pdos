@@ -18,7 +18,7 @@ main: procedure = .int
     call require rc = 0, "CMS24 stage exists"
     hashes = .string[]
     address crexx "run shasum -a 256 :cms24" output hashes
-    call require rc = 0 & word(hashes.1,1) = "313367ea0b4d90aec256720dcbca253116229e717534e0bd194ae23ce927fa88", "pinned unchanged CMS24 stage"
+    call require rc = 0 & word(hashes.1,1) = "04550b86d7bdfa3c9060d9fa154875adf3ccb677d95ba13290836ddc02a8da9e", "pinned unchanged CMS24 v2 stage"
   end
   call require left(work,11) = "build/pdos/" & length(work) > 11 & pos("..",work) = 0, "fresh owned build path"
   call require left(hercdir,1) = "/", "absolute Hercules tools path"
