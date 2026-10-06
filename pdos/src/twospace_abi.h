@@ -1,0 +1,134 @@
+/* SPDX-License-Identifier: MIT
+ * PD-003 P0: frozen byte contracts for the first K/shared-U replacement.
+ * These definitions select interfaces; they do not implement a service.
+ * All stored words are big-endian octets, independent of host C layout.
+ */
+#ifndef PDOS_TWO_SPACE_ABI_H
+#define PDOS_TWO_SPACE_ABI_H
+
+#define TSA_VERSION 1U
+#define TSA_COMMAND_BYTES 198U
+#define TSA_CMS_TOKENS 68U
+#define TSA_NATIVE_PARAMETERS 16U
+
+/* IBM SVC6 control list: EPLOC, flag/DCB word, optional ERRET. */
+#define TSA_LINK_BYTES 12U
+#define TSA_LINK_NAME 0U
+#define TSA_LINK_FLAGS 4U
+#define TSA_LINK_DCB 5U
+#define TSA_LINK_ERRET 8U
+#define TSA_LINK_EXTENDED 0x80U
+#define TSA_CMS_PROGRAM 0U
+#define TSA_CMS_COPY_FENCE 0x0000a000U
+#define TSA_CMS_STORAGE_FLAGS 0x00e00000U
+#define TSA_CMS_FSCB_BYTES 44U
+#define TSA_CMS_FST_BYTES 40U
+#define TSA_DCB_BYTES 88U
+#define TSA_DECB_BYTES 20U
+
+/* Neutral PDOS I/O request: R0 byte count, full R1 U address, R2 operation.
+ * K derives ownership from its active invocation, never from a U token.
+ * Native CMS/TSO terminal calls remain distinct adapters to the same driver.
+ */
+#define TSA_IO_SVC 200U
+#define TSA_IO_CAPABILITIES 0U
+#define TSA_IO_LINE_WRITE 1U
+#define TSA_IO_LINE_READ 2U
+#define TSA_IO_SCREEN_ACQUIRE 16U
+#define TSA_IO_SCREEN_WRITE 17U
+#define TSA_IO_SCREEN_RELEASE 18U
+#define TSA_IO_MONITOR_STATUS 32U
+#define TSA_IO_INPUT_HANDOFF 33U
+#define TSA_IO_TRANSCRIPT 34U
+#define TSA_CAP_BYTES 64U
+#define TSA_CAP_VERSION 0U
+#define TSA_CAP_LENGTH 4U
+#define TSA_CAP_DEVICE_CLASS 8U
+#define TSA_CAP_DEVICE_ADDRESS 12U
+#define TSA_CAP_ROWS 16U
+#define TSA_CAP_COLUMNS 20U
+#define TSA_CAP_DEFAULT_ROWS 24U
+#define TSA_CAP_DEFAULT_COLUMNS 28U
+#define TSA_CAP_ALTERNATE_ROWS 32U
+#define TSA_CAP_ALTERNATE_COLUMNS 36U
+#define TSA_CAP_ADDRESS_FORMAT 40U
+#define TSA_CAP_ATTRIBUTES 44U
+#define TSA_CAP_FEATURES 48U
+#define TSA_CAP_LINE_LIMIT 52U
+#define TSA_CAP_SCREEN_LIMIT 56U
+#define TSA_CAP_GENERATION 60U
+#define TSA_DEVICE_3270 1U
+#define TSA_DEVICE_LINE 2U
+#define TSA_ADDRESS_CODED12 1U
+#define TSA_ADDRESS_BINARY14 2U
+#define TSA_FEATURE_LINE_INPUT 1U
+#define TSA_FEATURE_LINE_OUTPUT 2U
+#define TSA_FEATURE_SCREEN 4U
+#define TSA_FEATURE_MONITOR 8U
+#define TSA_FEATURE_TRANSCRIPT 16U
+#define TSA_FEATURE_INPUT_HANDOFF 32U
+#define TSA_LINE_BYTES 32U
+#define TSA_LINE_VERSION 0U
+#define TSA_LINE_LENGTH 4U
+#define TSA_LINE_FLAGS 8U
+#define TSA_LINE_CAPACITY 12U
+#define TSA_LINE_ADDRESS_HI 16U
+#define TSA_LINE_ADDRESS_LO 20U
+#define TSA_LINE_COUNT 24U
+#define TSA_LINE_AID 28U
+
+/* K invocation result; native R15 is an adapter-specific projection. */
+#define TSA_RESULT_BYTES 32U
+#define TSA_RESULT_VERSION 0U
+#define TSA_RESULT_OS_STATUS 4U
+#define TSA_RESULT_REASON 8U
+#define TSA_RESULT_ABEND 12U
+#define TSA_RESULT_RC_VALID 16U
+#define TSA_RESULT_APP_RC 20U
+#define TSA_RESULT_TOKEN 24U
+#define TSA_RESULT_FLAGS 28U
+#define TSA_OS_OK 0U
+#define TSA_OS_STORAGE 4U
+#define TSA_OS_PARAMETER 8U
+#define TSA_OS_EXECUTION 12U
+#define TSA_OS_BUSY 16U
+#define TSA_OS_UNSUPPORTED 20U
+#define TSA_OS_TRANSCRIPT_GAP 24U
+
+/* Shared screen/line request header and field vector. Text is native
+ * EBCDIC; U presentation owns Unicode conversion and layout decisions.
+ */
+#define TSA_SCREEN_HEADER 32U
+#define TSA_SCREEN_VERSION 0U
+#define TSA_SCREEN_LENGTH 4U
+#define TSA_SCREEN_FLAGS 8U
+#define TSA_SCREEN_COUNT 12U
+#define TSA_SCREEN_CURSOR_ROW 16U
+#define TSA_SCREEN_CURSOR_COLUMN 20U
+#define TSA_SCREEN_GENERATION 24U
+#define TSA_SCREEN_RESERVED 28U
+#define TSA_SCREEN_FIELD_BYTES 24U
+#define TSA_FIELD_ROW 0U
+#define TSA_FIELD_COLUMN 4U
+#define TSA_FIELD_ATTRIBUTES 8U
+#define TSA_FIELD_LENGTH 12U
+#define TSA_FIELD_ADDRESS_HI 16U
+#define TSA_FIELD_ADDRESS_LO 20U
+#define TSA_SCREEN_FIELDS 64U
+#define TSA_SCREEN_BYTES 16384U
+#define TSA_TRANSCRIPT_VERSION 1U
+#define TSA_TRANSCRIPT_HEADER 32U
+#define TSA_TRANSCRIPT_TYPE 4U
+#define TSA_TRANSCRIPT_SEQUENCE_HI 8U
+#define TSA_TRANSCRIPT_SEQUENCE_LO 12U
+#define TSA_TRANSCRIPT_PAYLOAD 16U
+#define TSA_TRANSCRIPT_TOKEN 20U
+#define TSA_TRANSCRIPT_ENCODING 24U
+#define TSA_TRANSCRIPT_FLAGS 28U
+#define TSA_TRANSCRIPT_COMMAND_BEGIN 1U
+#define TSA_TRANSCRIPT_TEXT 2U
+#define TSA_TRANSCRIPT_COMMAND_END 3U
+#define TSA_TRANSCRIPT_SCREEN_CHANGE 4U
+#define TSA_TRANSCRIPT_GAP 5U
+
+#endif

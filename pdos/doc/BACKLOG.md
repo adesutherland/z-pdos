@@ -169,13 +169,27 @@ ASCE is not part of this plan unless the recorded shared-U review trigger is
 met.
 
 The [P0 ABI inventory](architecture/TWO-SPACE-ABI.md) now pins the selected
-unchanged inputs and names the untraced forms.
+unchanged inputs and now freezes the selected native forms.
+I now authorise completing P0 through P6 in that order, with a local commit
+at each completed checkpoint. The earlier bounded PCOMM diagnostic work is
+supporting implementation evidence; it does not replace this sequence. Each
+step is closed only against its own acceptance. Publication remains a separate
+decision. Required failure controls stay bounded to the named plan cases.
+
+| Current checkpoint | Status | Accepted result / next gate |
+| --- | --- | --- |
+| P0 | Done | [Frozen native contract and inventory](architecture/TWO-SPACE-ABI.md), [P0 source/object qualification](qualification/TWO-SPACE-P0-2026-10-06.md), native call fixtures and versioned PDOS I/O/result byte layouts. |
+| P1 | In progress | Existing descriptor, DAT, channel and PCOMM proofs are inputs. Close complete ownership, interruption/completion and real return/fault cleanup before expanding the service surface. |
+| P2 | Open | Complete all frozen CMS/TSO storage, file, input and command forms with durable output/readback. |
+| P3 | Open | General native loading and unchanged same-personality parent/child calls, including selected modes and caller restoration. |
+| P4 | Open | Four 3270 models, C presentation, monitor/line primary and transcript/input-handoff gates. |
+| P5 | Open | Explicit normal successor image with independent K emergency output and shutdown. |
+| P6 | Open | Full unchanged workload and failure matrix; qualify before selecting the default. |
+
 The later [HIGH launcher linkage check](qualification/TWO-SPACE-TSO64-HIGH-LOADER-2026-10-06.md)
 ties all three frozen low launchers to their corresponding high bodies and
-records their source-level parameter and return path. P0 still needs the
-normal application-call fixture and the remaining selected terminal/file
-forms. Its completion does not require a successor guest pass, which belongs
-to P2/P3.
+records their source-level parameter and return path. The P0 audit now
+freezes the native application-call fixtures and selected terminal/file forms. Their successor guest passes belong to P2/P3.
 
 The first [P1 invocation
 component check](qualification/TWO-SPACE-INVOCATION-2026-10-06.md) proves
@@ -183,8 +197,8 @@ token and cleanup ordering on the host and a linked, uncalled Classic C31
 module in the diskless fixture. The subsequent [fresh-IPL invocation
 gate](qualification/TWO-SPACE-INVOCATION-GATE-2026-10-06.md) executes the
 descriptor around unchanged TSO24/31/64 ANY RXVM calls and assigns SVC 120,
-IARV64 and TPUT to that active owner. P0 remains incomplete. The private U
-fixture still requests entry. A further [fresh-IPL allocation unwind
+IARV64 and TPUT to that active owner. P0 was incomplete at that checkpoint;
+the private U fixture still requested entry. A further [fresh-IPL allocation unwind
 check](qualification/TWO-SPACE-INVOCATION-REAP-2026-10-06.md) proves that K
 releases a live TSO31 page on end. The [CMS invocation
 gate](qualification/TWO-SPACE-CMS-INVOCATION-2026-10-06.md) wraps five CMS24

@@ -1,0 +1,79 @@
+/* SPDX-License-Identifier: MIT
+ * P0 source/object/native-format fixture freeze; no successor guest claim.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i = .int; variant = .int
+  name = .string; source = .string; object = .string
+  mode = .string; origin = .string; module = .string; residence = .string
+  if args.0 <> 1 & args.0 <> 3 then do
+    say "usage: crexx -nokeep pdos/scripts/two-space-p0.crexx --args NEW-build/pdos/output [PINNED_RELEASE_ZIP XMIT_EXTRACTOR]"
+    return 2
+  end
+  work = args.1
+  if left(work,11) <> "build/pdos/" | length(work) <= 11 | pos("..",work) > 0 then return 2
+  address crexx "run test ! -e :work"
+  if rc <> 0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc <> 0 then return rc
+  classicas = "build/tools/assembler/mf-classic-as"
+  classicld = "build/tools/linker/mf-classic-ld"
+  source_names = "cms-parent cms-parent24 cms-child tso-parent tso-parent64 tso-child"
+  do i = 1 to words(source_names)
+    name = word(source_names,i)
+    source = "pdos/tests/two-space/p0/" || name || ".asm"
+    object = work || "/" || name || ".obj"
+    address crexx "run :classicas --profile z900 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :source :object"
+    if rc <> 0 then return rc
+  end
+  do variant = 1 to 4
+    mode = word("24 31 24 31",variant)
+    name = word("cms-parent24 cms-parent cms-child cms-child",variant)
+    object = work || "/" || name || ".obj"
+    origin = "131072"
+    if mode = "31" then origin = "35651584"
+    module = work || "/" || name || "-" || mode || ".module"
+    address crexx "run :classicld --oformat cms --image-base :origin --amode :mode --rmode ANY -e @@MAIN -o :module :object"
+    if rc <> 0 then return rc
+  end
+  do variant = 1 to 6
+    mode = word("24 31 64 24 31 64",variant)
+    name = "tso-parent"
+    if variant > 3 then name = "tso-child"
+    if variant = 3 then name = "tso-parent64"
+    object = work || "/" || name || ".obj"
+    residence = "ANY"
+    if mode = "24" then residence = "24"
+    module = work || "/" || name || "-" || mode || ".rdw"
+    address crexx "run :classicld --oformat mvs --image-base 0 --amode :mode --rmode :residence -e @@MAIN -o :module :object"
+    if rc <> 0 then return rc
+  end
+  source_files = .string[]; hashes = .string[]
+  address crexx "run rg --files pdos/tests/two-space/p0" output source_files
+  if rc <> 0 then return rc
+  source_files[source_files.0+1] = "pdos/src/twospace_abi.h"
+  source_files[source_files.0+1] = "pdos/scripts/two-space-p0.crexx"
+  address crexx "run shasum -a 256 :source_files[]" output hashes
+  if rc <> 0 then return rc
+  do i = 1 to hashes.0
+    call lineout work || "/source.sha256",hashes[i]
+  end
+  call lineout work || "/source.sha256"
+  files = .string[]; hashes = .string[]
+  address crexx "run find :work -type f" output files
+  if rc <> 0 then return rc
+  address crexx "run shasum -a 256 :files[]" output hashes
+  if rc <> 0 then return rc
+  do i = 1 to hashes.0
+    call lineout work || "/artifacts.sha256",hashes[i]
+  end
+  call lineout work || "/artifacts.sha256"
+  if args.0 = 3 then do
+    archive = args.2; extractor = args.3; inventory = work || "/inventory"
+    address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/p0/inventory.py :archive :extractor :inventory"
+    if rc <> 0 then return rc
+  end
+  say "P0 native call fixtures frozen; K/U application-call execution remains P3 acceptance."
+  return 0
