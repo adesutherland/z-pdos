@@ -373,6 +373,13 @@ terminal_read_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 116(%r2)
+    lghi %r0, 0             /* K maps checked CMS31 image in shared U */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 214
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 120(%r2)
     larl %r3, high_data_va
     lg %r3, 0(%r3)
     l %r3, 44(%r3)
@@ -443,6 +450,8 @@ initial_nested_done:
     chi %r2, 212
     je storage_no_record
     chi %r2, 213
+    je storage_no_record
+    chi %r2, 214
     je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore

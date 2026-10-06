@@ -366,8 +366,14 @@ are failure watchdogs, not the criterion for completion.
 The shared C89 loader routine can materialize a validated CMS24 fixed image
 into caller-supplied storage and materialize CMS31 at a checked 31-bit base,
 applying each validated relocation word. Host tests exercised the pinned
-RXVM, RXAS and RXC MODULE bytes. The routine has not yet been connected to
-U page allocation or executable module entry in the successor guest.
+RXVM, RXAS and RXC MODULE bytes. The successor now uses this routine for
+the pinned CMS31 RXVM: after a complete CKD read into a reserved K buffer,
+K allocates 31-bit U pages at `0x03000000`, writes the relocated image through
+its own real aperture, and retains those U mappings. A fresh IPL checked
+all image page translations and the first bytes in real storage. This is a
+mapped-image proof; it does not enter RXVM or provide its CMS API surface.
+The 16 MiB fixture could accommodate this RXVM image and stage together, but
+is not a production heap budget for CMS31, TSO31 or 64-bit applications.
 
 ## Primary architecture and compatibility references
 

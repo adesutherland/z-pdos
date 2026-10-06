@@ -171,8 +171,12 @@ relocation, command dispatch and actual CMS/TSO execution remain slice 6/7
 work. Full-stage validation cannot stand in for application compatibility.
 The [image materialization checkpoint](qualification/TWO-SPACE-CMS-IMAGE-2026-10-06.md)
 adds a C89 fixed CMS24 copy and CMS31 relocation pass over validated staged
-MODULE bytes. U page allocation, executable entry and application-call
+MODULE bytes. Fixed CMS24 U placement, executable entry and application-call
 integration are still required for slice 6.
+The [CMS31 U mapping checkpoint](qualification/TWO-SPACE-CMS31-U-MAP-2026-10-06.md)
+connects the pinned RXVM stage to live U page allocation and relocation in
+a fresh diagnostic IPL. It does not enter RXVM, supply CMS services or
+qualify unchanged applications; those slice 6 and 7 gates remain open.
 
 ## PD-004: Batch-file delivery
 

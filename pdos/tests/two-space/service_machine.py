@@ -125,7 +125,7 @@ def make_core(elf, classic, dat_emit, out):
             "classic_service_size": len(service), "real_memory_bytes": REAL}
 
 
-def judge(raw, log, ipl=False, cms24=False):
+def judge(raw, log, ipl=False, cms24=False, cms31=False):
     if len(raw) != 0x14000 or raw[0x2000:0x2008] != b"PD2NEXT1":
         raise ValueError("missing/malformed result core")
     expected_masks = (0x0481000000000000, 0x0481000080000000) + \
@@ -215,6 +215,9 @@ def judge(raw, log, ipl=False, cms24=False):
     checks["k_cms24_full_stage"] = (
         struct.unpack_from(">I",raw,0x12074)[0] ==
         (0 if cms24 else 4 if ipl else 0xfffffffb))
+    checks["k_cms31_image_map"] = (
+        struct.unpack_from(">I",raw,0x12078)[0] ==
+        (0 if cms31 else 4 if ipl else 0xfffffffb))
     if cms24:
         checks["cms24_fixed_origin_contract"] = (
             struct.unpack_from(">4I",raw,0x40c8) ==
@@ -227,7 +230,8 @@ def judge(raw, log, ipl=False, cms24=False):
             7 <= count <= 252 and raw[0x12084] == 0x7d and
             b"\xd7\xc9\xd5\xc7" in raw[0x12084:0x12084+count])
     checks["live_dat_mutations_purged"] = (
-        struct.unpack_from(">I",raw,0x40ac)[0] == 4 and
+        struct.unpack_from(">I",raw,0x40ac)[0] ==
+        (4 + (4238296 + 4095) // 4096 if cms31 else 4) and
         0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x40000)
     errors = [x for x in log.splitlines() if re.search(r"HHC\d{5}E\b", x)]
     checks["no_hercules_error"] = not errors

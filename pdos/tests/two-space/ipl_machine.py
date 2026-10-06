@@ -44,7 +44,7 @@ def drain_output(stream, lines, events):
         events.put(line)
 
 
-def await_wait_state(events, proc):
+def await_wait_state(events, proc, console_log):
     end = time.monotonic() + 60
     while time.monotonic() < end:
         if proc.poll() is not None:
@@ -52,11 +52,17 @@ def await_wait_state(events, proc):
         try:
             line = events.get(timeout=0.1)
         except queue.Empty:
-            continue
+            line = ""
         if "HHC00809I Processor CP00: disabled wait state" in line:
             return
         if "HHC00803I" in line:
             raise RuntimeError("guest program interrupt loop")
+        if console_log.exists():
+            written = console_log.read_text(errors="replace")
+            if "HHC00803I" in written:
+                raise RuntimeError("guest program interrupt loop")
+            if "HHC00809I Processor CP00: disabled wait state" in written:
+                return
     raise TimeoutError("guest completion wait state")
 
 
@@ -76,6 +82,24 @@ def page_unmapped(raw, root, virtual):
         if origin < 0x140000 or origin >= 0x180000:
             return False
     return False
+
+
+def page_real(raw, root, virtual):
+    hi, lo = virtual >> 32, virtual & 0xffffffff
+    indexes = (hi >> 21, (hi >> 10) & 2047,
+               ((hi & 1023) << 1) | (lo >> 31),
+               (lo >> 20) & 2047, (lo >> 12) & 255)
+    origin = root & ~4095
+    for level, index in enumerate(indexes):
+        if origin < 0x140000 or origin >= 0x180000:
+            return None
+        entry = struct.unpack_from(">Q", raw, origin + index * 8)[0]
+        if entry == (0x400 if level >= 3 else 0x20):
+            return None
+        origin = entry & ~4095
+        if level == 4:
+            return origin
+    return None
 
 
 def run(args):
@@ -98,6 +122,7 @@ def run(args):
         f"01B9 3390 {disk}\n0009 3270\n")
     out.joinpath("run.rc").write_text("sysclear\nipl 01B9\n")
     cmd = [str(hercules), "-t", "-f", str(out / "machine.cnf"),
+           "-o", str(out / "console.log"),
            "-r", str(out / "run.rc")]
     terminal_log = (out / "s3270.log").open("w")
     terminal = subprocess.Popen(
@@ -144,9 +169,9 @@ def run(args):
         input_sent = typed.returncode == 0 and entered.returncode == 0
         if not input_sent:
             raise RuntimeError("3270 PING entry failed")
-        await_wait_state(events, proc)
+        await_wait_state(events, proc, out / "console.log")
         proc.stdin.write("stopall\npsw\ngpr\ncr\n"
-                         f"savecore \"{out / 'result.core'}\" 0 1fffff\nquit\n")
+        f"savecore \"{out / 'result.core'}\" 0 ffffff\nquit\n")
         proc.stdin.flush()
         proc.stdin.close()
         proc.wait(timeout=20)
@@ -164,15 +189,16 @@ def run(args):
             terminal.kill()
             terminal.wait()
         terminal_log.close()
-    log = "".join(lines)
+    log = (out / "console.log").read_text(errors="replace") if \
+        (out / "console.log").exists() else "".join(lines)
     out.joinpath("hercules.log").write_text(log)
     result_path = out / "result.core"
-    if result_path.exists() and result_path.stat().st_size == 0x200000:
+    if result_path.exists() and result_path.stat().st_size == 0x1000000:
         raw = result_path.read_bytes()
         reference = core.read_bytes()
         try:
             judged = judge(raw[:0x14000], log, ipl=True,
-                           cms24=bool(args.cms24))
+                           cms24=bool(args.cms24), cms31=bool(args.cms31))
             judged["checks"]["ipl_subchannel_handover"] = (
                 0x10000 <= struct.unpack_from(">I",raw,0x40bc)[0] < 0x10100)
             judged["checks"]["k_terminal_screen_observed"] = (
@@ -191,14 +217,26 @@ def run(args):
             checks["runtime_u_pages_released"] = (
                 page_unmapped(raw, 0x14000f, 0x22000) and
                 page_unmapped(raw, 0x14000f, 0x02010000) and
-                raw[0x140000:0x180000] == reference[0x140000:0x180000])
+                (bool(args.cms31) or
+                 raw[0x140000:0x180000] == reference[0x140000:0x180000]))
+            if args.cms31:
+                real, entry, image_bytes, blocks = struct.unpack_from(">4I",raw,0x40e0)
+                staged = (disk.parent / "cms31-rxvm.bin").read_bytes()
+                pages = (image_bytes + 4095) // 4096
+                checks["cms31_u_image_contract"] = (
+                    0x200000 <= real < 0x700000 and
+                    entry == 0x03000000 and image_bytes == 4238296 and
+                    blocks == 239 and real + pages * 4096 <= 0x700000 and
+                    raw[real:real+16] == staged[148:164] and
+                    all(page_real(raw,0x14000f,0x03000000+i*4096) ==
+                        real+i*4096 for i in range(pages)))
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
                 real_bytes == 0x1000000 and stage >= 0x400000 and
                 stage + 0x200000 <= launch and launch + 4096 <= real_bytes and
                 (kpool, upool, kbytes) ==
                 (0x100000, 0x140000, 200704) and
                 struct.unpack_from(">I",raw,0x40b8)[0] == 94208 and
-                ubytes == 94208)
+                (94208 < ubytes <= 0x40000 if args.cms31 else ubytes == 94208))
             checks["guest_dat_unmap_remap_ptlb"] = struct.unpack_from(">I",raw,0x40a0)[0] == 2
             judged["handover"] = {"stage_real": hex(stage),
                                   "launcher_real": hex(launch),
@@ -242,6 +280,7 @@ def main():
     for name in ("disk", "core", "hercules", "output"):
         p.add_argument(name)
     p.add_argument("cms24", nargs="?", choices=("cms24",))
+    p.add_argument("cms31", nargs="?", choices=("cms31",))
     try:
         return run(p.parse_args())
     except (OSError, ValueError) as exc:
