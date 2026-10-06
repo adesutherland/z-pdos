@@ -321,6 +321,14 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
         (pending_phase == 2 and marker == 0 and
          retry_poll == retry_phase == 1) if ipl else
         pending_phase == marker == retry_poll == retry_phase == 0)
+    no_owner, retry_begin, retry_token, stale_completion, retry_end = \
+        struct.unpack_from(">5I",raw,0x124c8)
+    checks["late_completion_rejected_for_new_terminal_owner"] = (
+        (no_owner == 8 and retry_begin == stale_completion ==
+         retry_end == 0 and retry_token > lease_parent)
+        if ipl else
+        (no_owner == retry_begin == retry_token == stale_completion ==
+         retry_end == 0))
     image_leases=struct.unpack_from(">4I",raw,0x1244c)
     checks["shared_image_cache_leases_follow_nested_frames"] = (
         image_leases==(1,2,1,0) if ipl else image_leases==(0,0,0,0))

@@ -31,6 +31,8 @@ static unsigned int console_read_count;
 static unsigned int console_read_owner;
 static unsigned int console_read_io_handle;
 static unsigned int console_next_io_handle;
+static unsigned int retired_terminal_io_token;
+static unsigned int retired_terminal_io_handle;
 static unsigned int terminal_start_fail_once;
 static unsigned int native_image_active[32];
 static unsigned int controlled_launches;
@@ -111,6 +113,7 @@ static int attach(void)
     if (TSMRESERVE(&storage,7U,24U,at,0x100000U) != TSP_OK)
         return -1;
     TSVINIT(&native_invocations);
+    retired_terminal_io_token=retired_terminal_io_handle=0U;
     controlled_launches=0U;
     *(volatile unsigned int *)0x4f00U=0U;
     storage_ready=1U;
@@ -812,6 +815,7 @@ static unsigned int terminal_io_complete(unsigned int token)
 static unsigned int terminal_read_cancel(unsigned int token)
 {
     const TSVFRAME *frame=TSVTOP(&native_invocations);
+    unsigned int retired_handle=console_read_io_handle;
     if (!console_read_phase) return 0U;
     if (token!=console_read_owner ||
         (token && (!frame || frame->token!=token))) return 8U;
@@ -827,6 +831,10 @@ static unsigned int terminal_read_cancel(unsigned int token)
     }
     if (token && TSVFORGET(&native_invocations,token,TSV_TERMINAL,
                            console_ssid)!=TSV_OK) return 12U;
+    if (token && retired_handle) {
+        retired_terminal_io_token=token;
+        retired_terminal_io_handle=retired_handle;
+    }
     console_read_phase=console_read_count=console_read_owner=0U;
     console_read_io_handle=0U;
     return 0U;
@@ -931,6 +939,35 @@ static unsigned int terminal_phase_probe(const TSGREQUEST *request)
     if (request->length || request->address.hi || request->address.lo ||
         request->direction) return 8U;
     return console_read_phase;
+}
+
+/* Inject the recorded, already retired completion after a different owner
+ * has acquired the terminal. This tests the ownership ledger without a
+ * scheduler delay or a second physical channel completion. */
+static unsigned int terminal_late_completion_probe(const TSGREQUEST *request)
+{
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
+    unsigned int token, phase;
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    if (!frame || !retired_terminal_io_token ||
+        !retired_terminal_io_handle ||
+        frame->token==retired_terminal_io_token ||
+        console_read_owner!=frame->token || console_read_phase!=1U ||
+        console_read_io_handle ||
+        TSVHAS(&native_invocations,frame->token,TSV_TERMINAL,
+               console_ssid)!=TSV_OK) return 8U;
+    token=frame->token;
+    phase=console_read_phase;
+    if (TSVCOMPLETE(&native_invocations,retired_terminal_io_token,
+                    retired_terminal_io_handle)!=TSV_STALE ||
+        !TSVTOP(&native_invocations) ||
+        TSVTOP(&native_invocations)->token!=token ||
+        console_read_owner!=token || console_read_phase!=phase ||
+        console_read_io_handle ||
+        TSVHAS(&native_invocations,token,TSV_TERMINAL,
+               console_ssid)!=TSV_OK) return 12U;
+    return 0U;
 }
 
 /* Private failure injection: select an absent subchannel for the next SSCH.
@@ -2502,6 +2539,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 243U) return terminal_start_failure_probe(request);
     if (request->svc == 244U) return native_caller_psw_probe(request);
     if (request->svc == 245U) return native_controlled_launch(request);
+    if (request->svc == 248U) return terminal_late_completion_probe(request);
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 223U) return high_storage_service(request);
     if (request->svc == 233U) return iarv64_service(request);

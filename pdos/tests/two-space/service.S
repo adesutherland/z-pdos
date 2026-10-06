@@ -710,6 +710,23 @@ terminal_owner_parent_end:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x458(%r2)
+    lghi %r0, 0             /* no new owner: injection must be unavailable */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 248
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x4c8(%r2)
+    lghi %r0, 5             /* a distinct invocation owns the retry */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 235
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x4cc(%r2)
+    st %r1, 0x4d0(%r2)
+    chi %r15, 0
+    jne terminal_owner_done
     lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0
@@ -718,7 +735,14 @@ terminal_owner_parent_end:
     lg %r2, 0(%r2)
     st %r15, 0x434(%r2)
     chi %r15, 0
-    jne terminal_owner_done
+    jne terminal_owner_retry_end
+    lghi %r0, 0             /* late parent completion cannot touch retry */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 248
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x4d4(%r2)
     lghi %r0, 256           /* no stale AID after the parent's clear */
     larl %r1, input_data_va
     lg %r1, 0(%r1)
@@ -741,6 +765,14 @@ terminal_owner_parent_end:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x438(%r2)
+terminal_owner_retry_end:
+    lghi %r0, 0
+    llgf %r1, 0x4d0(%r2)
+    lghi %r2, 0
+    svc 236
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x4d8(%r2)
 terminal_owner_done:
     br %r14
 terminal_owner_poll_error:
@@ -1808,6 +1840,8 @@ trace_not_cms_fst:
     chi %r2, 245
     je storage_no_record
     chi %r2, 246
+    je storage_no_record
+    chi %r2, 248
     je storage_no_record
     chi %r2, 93
     je storage_no_record
