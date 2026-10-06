@@ -33,6 +33,7 @@ static unsigned int console_read_io_handle;
 static unsigned int console_next_io_handle;
 static unsigned int terminal_start_fail_once;
 static unsigned int native_image_active[32];
+static unsigned int controlled_launches;
 static unsigned int cms31_loaded;
 static unsigned int cms31_secondary_loaded;
 static unsigned int cms24_loaded;
@@ -110,6 +111,8 @@ static int attach(void)
     if (TSMRESERVE(&storage,7U,24U,at,0x100000U) != TSP_OK)
         return -1;
     TSVINIT(&native_invocations);
+    controlled_launches=0U;
+    *(volatile unsigned int *)0x4f00U=0U;
     storage_ready=1U;
     return 0;
 }
@@ -1195,6 +1198,7 @@ static unsigned int native_end(const TSGREQUEST *request)
     frame=native_invocations.depth ?
         &native_invocations.frame[native_invocations.depth-1U] : 0;
     if (!frame || frame->token!=request->address.lo) return 12U;
+    if (frame->controlled) return 8U;
     if (console_read_phase && console_read_owner==frame->token &&
         terminal_read_cancel(frame->token)!=0U) return 12U;
     rc=TSVEND(&native_invocations,request->address.lo,native_clean,
@@ -1225,6 +1229,107 @@ static unsigned int native_caller_psw_probe(TSGREQUEST *request)
         request->address.lo || !frame) return 8U;
     request->address.hi=frame->caller.psw_address.hi;
     request->address.lo=frame->caller.psw_address.lo;
+    return 0U;
+}
+
+/* A diagnostic K-controlled U call. The selector chooses one of two linked
+ * fixture entries; neither an entry PC nor a return PC comes from U data.
+ * The native image lease gives the call the same cleanup path as a real app. */
+#define CONTROL_NORMAL_PC 0x02000e00U
+#define CONTROL_FAULT_PC 0x02000e20U
+#define CONTROL_RETURN_PC 0x02000e80U
+static int controlled_u64_context(volatile const unsigned int *saved)
+{
+    /* DAT on, key 8, problem state, AMODE64, and the registered U ASCE. */
+    return (saved[0x80U/4U]&0x04f10001U)==0x04810001U &&
+           saved[0x90U/4U]==*(volatile const unsigned int *)0x4008U &&
+           saved[0x94U/4U]==*(volatile const unsigned int *)0x400cU;
+}
+static unsigned int native_controlled_launch(const TSGREQUEST *request)
+{
+    TSGREQUEST begin;
+    TSVFRAME *frame;
+    volatile unsigned int *saved=(volatile unsigned int *)0x3000U;
+    unsigned int rc;
+    if ((request->length!=1U && request->length!=2U) ||
+        request->direction || request->address.hi || request->address.lo ||
+        !controlled_u64_context(saved))
+        return 8U;
+    begin.address.hi=begin.address.lo=0U;
+    begin.length=5U;
+    begin.direction=0U;
+    begin.svc=235U;
+    rc=native_begin(&begin);
+    if (rc) return rc;
+    frame=&native_invocations.frame[native_invocations.depth-1U];
+    frame->controlled=1U;
+    ++controlled_launches;
+    *(volatile unsigned int *)0x4f00U=controlled_launches;
+    saved[0x88U/4U]=0U;
+    saved[0x8cU/4U]=request->length==1U ?
+                     CONTROL_NORMAL_PC : CONTROL_FAULT_PC;
+    saved[28U]=0U;
+    saved[29U]=CONTROL_RETURN_PC;
+    saved[30U]=0U;
+    saved[31U]=0U;
+    return 0U;
+}
+
+/* Return exactly once to the caller saved before K changed the old PSW.
+ * The application RC and OS status occupy separate registers. A fault has
+ * no application RC. Do not publish caller state until owned cleanup passes. */
+static unsigned int native_controlled_finish(void)
+{
+    TSVFRAME *frame;
+    TSVCONTEXT caller;
+    TSGREQUEST end;
+    volatile unsigned int *saved=(volatile unsigned int *)0x3000U;
+    unsigned int i, app_rc, os_status, kind, token, rc;
+    frame=native_invocations.depth ?
+        &native_invocations.frame[native_invocations.depth-1U] : 0;
+    if (!frame || !frame->controlled || !controlled_launches ||
+        !controlled_u64_context(saved)) return 12U;
+    kind=saved[0x98U/4U+1U];
+    if (kind==1U) {
+        if (saved[0x88U/4U] ||
+            saved[0x8cU/4U]!=CONTROL_RETURN_PC+2U) return 12U;
+        app_rc=saved[31U];
+        os_status=0U;
+    } else if (kind==2U) {
+        if (!(saved[0x80U/4U]&0x00010000U) ||
+            *(volatile const unsigned short *)0x8eU==0U)
+            return 12U;
+        app_rc=0xffffffffU;
+        os_status=12U;
+    } else return 12U;
+    for (i=0U; i<16U; ++i) caller.gpr[i]=frame->caller.gpr[i];
+    caller.psw=frame->caller.psw;
+    caller.psw_address=frame->caller.psw_address;
+    caller.asce=frame->caller.asce;
+    caller.key=frame->caller.key;
+    token=frame->token;
+    end.address.hi=0U; end.address.lo=token;
+    end.length=0U; end.direction=0U; end.svc=236U;
+    frame->controlled=0U;
+    rc=native_end(&end);
+    if (rc) {
+        frame->controlled=1U;
+        return rc;
+    }
+    --controlled_launches;
+    *(volatile unsigned int *)0x4f00U=controlled_launches;
+    for (i=0U; i<16U; ++i) {
+        saved[2U*i]=caller.gpr[i].hi;
+        saved[2U*i+1U]=caller.gpr[i].lo;
+    }
+    saved[0U]=0U; saved[1U]=os_status;
+    saved[30U]=0U; saved[31U]=app_rc;
+    saved[0x80U/4U]=caller.psw.hi;
+    saved[0x84U/4U]=caller.psw.lo;
+    saved[0x88U/4U]=caller.psw_address.hi;
+    saved[0x8cU/4U]=caller.psw_address.lo;
+    saved[0x90U/4U]=caller.asce.hi;
+    saved[0x94U/4U]=caller.asce.lo;
     return 0U;
 }
 
@@ -2369,6 +2474,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     int result;
     if (!request) return 0xffffffffU;
     if (attach()) return 0xfffffffaU;
+    if (request->svc == 246U) return native_controlled_finish();
     caller_pc=*(volatile const unsigned int *)0x308cU;
     native_frame=native_caller(caller_pc);
     native_tso=native_frame && native_frame->personality==TSV_TSO;
@@ -2395,6 +2501,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 242U) return native_image_lease_probe(request);
     if (request->svc == 243U) return terminal_start_failure_probe(request);
     if (request->svc == 244U) return native_caller_psw_probe(request);
+    if (request->svc == 245U) return native_controlled_launch(request);
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 223U) return high_storage_service(request);
     if (request->svc == 233U) return iarv64_service(request);

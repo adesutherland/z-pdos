@@ -486,6 +486,10 @@ def run(args):
                     raw[0x20008:0x20008+len(version)] == version and
                     struct.unpack_from(">I",raw,0x4510)[0] == 0)
             if args.tso31:
+                controlled_fault_page = struct.unpack_from(">Q",raw,0x124b0)[0]
+                checks["controlled_child_fault_page_unmapped"] = (
+                    0x02010000 <= controlled_fault_page < 0x80000000 and
+                    page_unmapped(raw,0x28000f,controlled_fault_page))
                 reap_address = struct.unpack_from(">Q",raw,0x12390)[0]
                 checks["native_reap_page_unmapped_after_return"] = (
                     0x02010000 <= reap_address < 0x80000000 and

@@ -45,8 +45,15 @@ cursor.
 The [native TSO loader-core check](doc/qualification/TWO-SPACE-TSO-LOADER-2026-10-06.md)
 reproduces the selected TSO31 load image at two bases in K-private host
 staging. The [fresh IPL map](doc/qualification/TWO-SPACE-TSO31-MAP-2026-10-06.md)
-places the checked image beside CMS24/CMS31 in shared U; TSO execution is
-still unqualified.
+places the checked image beside CMS24/CMS31 in shared U. Later fresh-IPL
+checks run unchanged [TSO31](doc/qualification/TWO-SPACE-TSO31-NATIVE-2026-10-06.md),
+[TSO64 ANY](doc/qualification/TWO-SPACE-TSO64-NATIVE-2026-10-06.md) and
+[TSO24](doc/qualification/TWO-SPACE-TSO24-BETA3-NATIVE-2026-10-06.md)
+RXVM version calls. The
+[K-controlled call proof](doc/qualification/TWO-SPACE-CONTROLLED-CALL-2026-10-06.md)
+returns from a registered synthetic U child and recovers its caller after a
+child fault, reaping that child's mapped page. Native application-to-
+application calls and the normal successor image remain open.
 
 The recorded source-built milestone runs unchanged cREXX TSO31, TSO64 ANY and
 TSO64 HIGH packages, including compiler, assembler, terminal and file workloads.

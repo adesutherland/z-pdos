@@ -777,6 +777,12 @@ version call and low runtime storage still pass. The ordinary loader may
 keep programs resident when suitable space exists; it has no obligation to
 keep all applications loaded at once.
 
+The [K-controlled call proof](../qualification/TWO-SPACE-CONTROLLED-CALL-2026-10-06.md)
+adds a private diagnostic transition from K into a registered U child. It
+restores the interrupted caller after normal return and one recoverable
+child fault, with separate OS status and application RC. Its fixed fixture
+entries do not establish native CMS or TSO application-call linkage.
+
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
 SVC through K, returns `0x3456` to a U64 caller, restores the parent PTEs,

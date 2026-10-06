@@ -292,6 +292,20 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
         (psw_rc==0 and psw_actual==psw_expected and
          psw_actual>=0x02000000 and psw_after_end==8) if ipl else
         (psw_rc==psw_actual==psw_expected==psw_after_end==0))
+    call_os,call_rc,fault_os,fault_rc,lease_after=struct.unpack_from(
+        ">5I",raw,0x1249c)
+    fault_page=struct.unpack_from(">Q",raw,0x124b0)[0]
+    restored=struct.unpack_from(">4I",raw,0x124b8)
+    checks["k_controlled_return_and_child_fault_unwind"] = (
+        (call_os==0 and call_rc==0x2468 and fault_os==12 and
+         fault_rc==0xffffffff and lease_after==0 and
+         0x1000000<=fault_page<0x80000000 and
+         restored==(0x1357,0x2468,0x3579,0x468a) and
+         struct.unpack_from(">I",raw,0x4f00)[0]==0) if tso31 else
+        (call_os==1 and call_rc==8 and fault_os==2 and
+         fault_rc==8 and lease_after==fault_page==0 and
+         restored==(0x1357,0x2468,0x3579,0x468a) and
+         struct.unpack_from(">I",raw,0x4f00)[0]==0))
     lease_begin, lease_parent, lease_start, lease_child_begin, lease_child, \
         child_cancel, lease_child_end, lease_parent_end, lease_retry, \
         lease_finish = struct.unpack_from(">10I",raw,0x12414)
@@ -347,10 +361,11 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
          (((4238296 + 4095) // 4096) +
           2 * ((struct.unpack_from(">I",raw,0x4514)[0] + 4095) // 4096)
           if cmslibrary else 0) +
-         # The guest invocation probe maps and reaps one extra page.
+         # The invocation and controlled child-fault probes each map and
+         # reap one extra page through the checked K allocator.
          (((1094960 + 4095) // 4096) +
           2 * ((0x04000000 // 4096) + (0x00100000 // 4096) + 2)
-          + 2
+          + (4 if ipl else 2)
           if tso31 else 0) +
          (((767728 + 4095) // 4096) +
           (2 * ((0x08000000 // 4096) + (0x00100000 // 4096) +

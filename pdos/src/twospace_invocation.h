@@ -59,6 +59,7 @@ typedef struct {
     unsigned int state;
     unsigned int image_owner;
     unsigned int runtime_owner;
+    unsigned int controlled;
     TSVCONTEXT caller;
     TSVRESOURCE resource[TSV_MAX_RESOURCES];
     unsigned int resources;

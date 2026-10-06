@@ -298,6 +298,33 @@ app_b_tso64_call:
     br %r14
 tso64_entry_va32: .long 0x09000000
 
+/* Private K-controlled entries linked into the checked U code page. */
+.org 0xe00
+controlled_child_normal:
+    lghi %r3, 0
+    lghi %r4, 0
+    lghi %r15, 0x2468
+    br %r14
+.org 0xe20
+controlled_child_fault:
+    lghi %r3, 0
+    lghi %r4, 0
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 237                 /* K must reap this live page after the fault */
+    larl %r2, controlled_data_va
+    lg %r2, 0(%r2)
+    stg %r1, 0x4b0(%r2)
+    lghi %r1, 0x1000
+    lg %r2, 0(%r1)           /* K-only page absent from U */
+.org 0xe80
+controlled_child_return:
+    svc 246                 /* K restores the saved caller continuation */
+    lghi %r1, 0x1000
+    lg %r2, 0(%r1)           /* returning here is a broken gate */
+controlled_data_va: .quad 0x110001000
+
 .section .apphigh,"ax"
 app_high:
     larl %r1, high_data_va
@@ -539,6 +566,42 @@ nested_lowcore_parent_end:
     st %r15, 0x498(%r2)
 nested_lowcore_done:
     br %r14
+controlled_call_probe:
+    lgr %r12, %r14
+    lghi %r3, 0x1357
+    lghi %r4, 0x2468
+    lghi %r0, 1            /* K-registered normal child entry */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 245
+controlled_normal_continuation:
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r0, 0x49c(%r2)     /* OS status separate from child RC */
+    st %r15, 0x4a0(%r2)
+    st %r3, 0x4b8(%r2)
+    st %r4, 0x4bc(%r2)
+    lghi %r3, 0x3579
+    lghi %r4, 0x468a
+    lghi %r0, 2            /* K-registered faulting child entry */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 245
+controlled_fault_continuation:
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r0, 0x4a4(%r2)
+    st %r15, 0x4a8(%r2)
+    st %r3, 0x4c0(%r2)
+    st %r4, 0x4c4(%r2)
+    lghi %r0, 15
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 242                 /* both K image leases must be gone */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x4ac(%r2)
+    br %r12
 terminal_owner_probe:
     lghi %r0, 5            /* parent owns the pending terminal lease */
     lghi %r1, 0
@@ -1494,6 +1557,7 @@ tso24_release_page:
     st %r15, 0x330(%r2)
 tso24_call_done:
     brasl %r14, nested_lowcore_probe
+    brasl %r14, controlled_call_probe
     lghi %r0, 7            /* no K image record: deterministic failure */
     lghi %r1, 0
     lghi %r2, 0
@@ -1741,6 +1805,10 @@ trace_not_cms_fst:
     je storage_no_record
     chi %r2, 244
     je storage_no_record
+    chi %r2, 245
+    je storage_no_record
+    chi %r2, 246
+    je storage_no_record
     chi %r2, 93
     je storage_no_record
     lghi %r1, 0x2000
@@ -1793,6 +1861,10 @@ kcore_after_c:
     larl %r6, bounce_va
     lg %r6, 0(%r6)
     l %r2, 16(%r6)
+    chi %r2, 245
+    je controlled_launch_result
+    chi %r2, 246
+    je controlled_finish_result
     chi %r2, 202
     jne no_cms24_inline
     lghi %r3, 0x4100
@@ -1853,6 +1925,22 @@ return_app:
     larl %r1, resume_va
     lg %r1, 0(%r1)
     br %r1
+controlled_launch_result:
+    larl %r1, c_result_va
+    lg %r1, 0(%r1)
+    llgf %r2, 0(%r1)
+    chi %r2, 0
+    je return_app
+    lghi %r3, 0x3000
+    stg %r2, 120(%r3)
+    j return_app
+controlled_finish_result:
+    larl %r1, c_result_va
+    lg %r1, 0(%r1)
+    llgf %r2, 0(%r1)
+    chi %r2, 0
+    jne unhandled_interrupt
+    j return_app
 nested_svc:
     lghi %r1, 0x3100
     lg %r2, 0x80(%r1)
@@ -1916,12 +2004,12 @@ application_program_fault:
     jz unhandled_interrupt
     lh %r2, 0x8e
     chi %r2, 0x11
-    jne unhandled_interrupt
+    jne controlled_program_fault
     lg %r2, 0x88(%r1)
     larl %r3, fault_pc
     lg %r3, 0(%r3)
     cgr %r2, %r3
-    jne unhandled_interrupt
+    jne controlled_program_fault
     lghi %r2, -4
     stg %r2, 120(%r1)
     larl %r2, recovery_pc
@@ -1931,6 +2019,15 @@ application_program_fault:
     lghi %r2, 1
     stg %r2, 0(%r1)
     j return_app
+controlled_program_fault:
+    lghi %r3, 0x4f00
+    l %r3, 0(%r3)
+    chi %r3, 0
+    je unhandled_interrupt
+    lghi %r3, 0x3000
+    lghi %r4, 246
+    st %r4, 0xa0(%r3)
+    j kcore
 unhandled_interrupt:
     lghi %r1, 0x2188
     lghi %r2, -1

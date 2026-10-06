@@ -241,6 +241,12 @@ now retains both old-PSW halves in the invocation frame and checks the saved
 instruction address against the actual SVC continuation in a fresh IPL. This
 is required state for K-controlled launch and fault unwind; neither is yet
 implemented by the diagnostic SVC 235/236 path.
+The [K-controlled call gate](qualification/TWO-SPACE-CONTROLLED-CALL-2026-10-06.md)
+now enters registered synthetic U children from a saved K frame, restores
+the caller on normal return and a protected-page child fault, separates OS
+status from application RC, and reaps a child-owned U page. Native same-
+personality calls, nested controlled children and fault cleanup with pending
+I/O remain open; this does not close P1 or P3.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and
