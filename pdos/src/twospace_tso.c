@@ -31,11 +31,11 @@ static int stage_header(const unsigned char *block, unsigned int length,
     unsigned int i, bytes, count;
     if (!block || !raw_bytes || !blocks || length<TST_BLOCK)
         return TST_BAD;
-    if (mode!=31U && mode!=64U) return TST_BAD;
+    if (mode!=24U && mode!=31U && mode!=64U) return TST_BAD;
     for (i=0U; i<5U; ++i)
         if (block[i]!=prefix[i]) return TST_BAD;
-    if (block[5U]!=(mode==31U ? 0x33U : 0x36U) ||
-        block[6U]!=(mode==31U ? 0x31U : 0x34U) ||
+    if (block[5U]!=(mode==24U ? 0x32U : mode==31U ? 0x33U : 0x36U) ||
+        block[6U]!=(mode==24U ? 0x34U : mode==31U ? 0x31U : 0x34U) ||
         block[7U]!=0x01U) return TST_BAD;
     bytes=word(block+8U); count=word(block+12U);
     if (bytes<56U+280U+292U+16U || bytes>TST_MAX_RAW ||
@@ -49,6 +49,10 @@ static int stage_header(const unsigned char *block, unsigned int length,
 int TSTSTAGEHEADER(const unsigned char *block, unsigned int length,
                    unsigned int *raw_bytes, unsigned int *blocks)
 { return stage_header(block,length,31U,raw_bytes,blocks); }
+
+int TSTSTAGEHEADER24(const unsigned char *block, unsigned int length,
+                     unsigned int *raw_bytes, unsigned int *blocks)
+{ return stage_header(block,length,24U,raw_bytes,blocks); }
 
 int TSTSTAGEHEADER64(const unsigned char *block, unsigned int length,
                      unsigned int *raw_bytes, unsigned int *blocks)

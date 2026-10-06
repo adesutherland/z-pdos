@@ -546,6 +546,13 @@ page-rounded image, 1 MiB stack and 4 MiB heap are 24-bit demands. Host
 placement controls reject a full low interval despite free 31-bit space,
 and permit reuse after release. This does not yet map or run TSO24 in the
 guest; its actual storage budget remains to be measured there.
+The [fresh-IPL TSO24 map](../qualification/TWO-SPACE-TSO24-MAP-2026-10-06.md)
+subsequently installs that member at `0x400000` beside the retained CMS24
+image. Its 265 U pages have independent high-real backing, and the checked
+low placement gap retains 12,828,672 bytes before TSO24 runtime storage.
+A full 16 MiB low-only request returns RC 4 with no address while high-U
+work continues. The native TSO24 entry and its stack/heap budget are still
+unqualified.
 
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its

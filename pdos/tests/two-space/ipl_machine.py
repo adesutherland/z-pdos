@@ -219,7 +219,8 @@ def run(args):
                            cmsfile=bool(args.cmsfile),
                            cmslibrary=bool(args.cmslibrary),
                            cms24file=bool(args.cms24file),
-                           tso31=bool(args.tso31), tso64=bool(args.tso64))
+                           tso31=bool(args.tso31), tso64=bool(args.tso64),
+                           tso24=bool(args.tso24))
             judged["checks"]["ipl_subchannel_handover"] = (
                 0x10000 <= struct.unpack_from(">I",raw,0x40bc)[0] < 0x10100)
             judged["checks"]["independent_disk_console_channel_workspaces"] = (
@@ -333,6 +334,7 @@ def run(args):
                             for i,(name,records,source_bytes,checksum)
                             in enumerate(expected24)))
                     checks["cms24_gap_restored_after_second_run"] = all(
+                        (args.tso24 and 0x400000 <= at < 0x509000) or
                         page_unmapped(raw,0x28000f,at)
                         for at in range(0x1bb000,0xf00000,4096))
             if args.cms31:
@@ -503,6 +505,21 @@ def run(args):
                     0 < tso_length <= 132 and
                     "crexx-1.0.0-beta.3 (Bytecode Mode)" in
                     raw[0x4d10:0x4d10+tso_length].decode("cp037"))
+            if args.tso24:
+                t24_real, t24_bytes, t24_entry, t24_blocks, t24_input, \
+                    t24_image = struct.unpack_from(">6I",raw,0x4680)
+                t24_pages = (t24_bytes+4095)//4096
+                checks["tso24_checked_low_image_in_shared_u"] = (
+                    struct.unpack_from(">I",raw,0x1230c)[0] == 0 and
+                    t24_real >= 0x400000 and t24_bytes == 1082128 and
+                    t24_entry == 0x00400000 and t24_blocks == 75 and
+                    t24_input == 0xadd8ef0d and
+                    t24_image == 0xe3810260 and
+                    all(page_real(raw,0x28000f,0x400000+i*4096) ==
+                        t24_real+i*4096 for i in range(t24_pages)))
+                checks["tso24_oversized_low_request_fails_without_fallback"] = (
+                    struct.unpack_from(">I",raw,0x12310)[0] == 4 and
+                    struct.unpack_from(">Q",raw,0x12318)[0] == 0)
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
                 real_bytes == 0x10000000 and stage >= 0x400000 and
                 stage + 0x400000 <= launch and launch + 4096 <= real_bytes and
@@ -560,6 +577,7 @@ def main():
     p.add_argument("cms24file", nargs="?", choices=("cms24file",))
     p.add_argument("tso31", nargs="?", choices=("tso31",))
     p.add_argument("tso64", nargs="?", choices=("tso64",))
+    p.add_argument("tso24", nargs="?", choices=("tso24",))
     try:
         return run(p.parse_args())
     except (OSError, ValueError) as exc:

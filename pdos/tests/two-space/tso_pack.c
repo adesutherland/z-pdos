@@ -23,8 +23,9 @@ int main(int argc, char **argv)
     unsigned int i, blocks, length, mode, fnv=0x811c9dc5U;
     TSTINFO info;
     if (argc!=3 && argc!=4) return 2;
-    mode=argc==4 && strcmp(argv[3],"64")==0 ? 64U : 31U;
-    if (argc==4 && mode!=64U) return 2;
+    mode=argc==4 && strcmp(argv[3],"64")==0 ? 64U :
+         argc==4 && strcmp(argv[3],"24")==0 ? 24U : 31U;
+    if (argc==4 && mode==31U) return 2;
     raw=(unsigned char *)malloc(TST_MAX_RAW+1U);
     if (!raw) return 3;
     input=fopen(argv[1],"rb");
@@ -41,6 +42,7 @@ int main(int argc, char **argv)
     if (!stage) { free(raw); return 6; }
     for (i=0U; i<8U; ++i) stage[i]=magic[i];
     if (mode==64U) { stage[5U]=0x36U; stage[6U]=0x34U; }
+    if (mode==24U) { stage[5U]=0x32U; stage[6U]=0x34U; }
     put_word(stage+8U,(unsigned int)read_bytes);
     put_word(stage+12U,blocks);
     for (i=0U; i<(unsigned int)read_bytes; ++i)

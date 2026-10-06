@@ -22,6 +22,8 @@ int TSTHEADER(const unsigned char *raw, unsigned int bytes,
               unsigned int expected_mode, TSTINFO *info);
 int TSTSTAGEHEADER(const unsigned char *block, unsigned int length,
                    unsigned int *raw_bytes, unsigned int *blocks);
+int TSTSTAGEHEADER24(const unsigned char *block, unsigned int length,
+                     unsigned int *raw_bytes, unsigned int *blocks);
 int TSTSTAGEHEADER64(const unsigned char *block, unsigned int length,
                      unsigned int *raw_bytes, unsigned int *blocks);
 int TSTSTAGEVALIDATE(const unsigned char *stage, unsigned int length,

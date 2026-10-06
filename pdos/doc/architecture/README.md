@@ -57,7 +57,10 @@ version calls now run through selected MVS-style storage and terminal
 services. The separate
 [TSO24 host loader checkpoint](../qualification/TWO-SPACE-TSO24-LOADER-2026-10-06.md)
 matches native AMODE24/RMODE24 relocation at two low U bases, but has not
-run the member in the guest. A normal load must fail if its required low
+run the member in the guest. A
+[fresh-IPL map](../qualification/TWO-SPACE-TSO24-MAP-2026-10-06.md) now
+holds its image beside CMS24 and rejects an impossible low-only request
+with RC 4 while high-U work still succeeds. A normal load must fail if its required low
 virtual interval or real backing is unavailable. Broader TSO service
 compatibility remains open.
 

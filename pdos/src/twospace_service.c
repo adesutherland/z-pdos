@@ -30,6 +30,7 @@ static unsigned int cms31_secondary_bytes;
 static unsigned int cms24_loaded;
 static unsigned int tso31_loaded;
 static unsigned int tso64_loaded;
+static unsigned int tso24_loaded;
 static unsigned int cms31_lowcore_real;
 #define CMS31_LINES_REAL 0x20000U
 #define CMS24_EXTRA_LINES_REAL 0x26000U
@@ -1156,13 +1157,17 @@ done:
 static unsigned int tso_map_service(const TSGREQUEST *request,
                                     unsigned int mode)
 {
+    static const unsigned char name24[10]={
+        0xe3U,0xe2U,0xd6U,0xf2U,0xf4U,0x4bU,
+        0xd9U,0xe7U,0xe5U,0xd4U};
     static const unsigned char name31[10]={
         0xe3U,0xe2U,0xd6U,0xf3U,0xf1U,0x4bU,
         0xd9U,0xe7U,0xe5U,0xd4U};
     static const unsigned char name64[10]={
         0xe3U,0xe2U,0xd6U,0xf6U,0xf4U,0x4bU,
         0xd9U,0xe7U,0xe5U,0xd4U};
-    const unsigned char *name=mode==31U ? name31 : name64;
+    const unsigned char *name=mode==24U ? name24 :
+                              mode==31U ? name31 : name64;
     const unsigned char *record;
     TSKEXTENT extent;
     TSTINFO info;
@@ -1171,14 +1176,15 @@ static unsigned int tso_map_service(const TSGREQUEST *request,
     unsigned int bytes, blocks, stage_span, stage_real=0U, image_real=0U;
     unsigned int cylinder, head, number, i, j, slot, mapped_real=0U;
     unsigned int image_fnv=0x811c9dc5U;
-    unsigned int task=mode==31U ? 15U : 17U;
+    unsigned int task=mode==24U ? 18U : mode==31U ? 15U : 17U;
     volatile unsigned int *receipt=(volatile unsigned int *)(
-        mode==31U ? 0x4600U : 0x4640U);
-    int count, found, rc;
+        mode==24U ? 0x4680U : mode==31U ? 0x4600U : 0x4640U);
+    int count, found, rc, failure=12;
     if (request->length || request->address.hi || request->address.lo ||
         request->direction) return 8U;
-    if (mode!=31U && mode!=64U) return 8U;
-    if (mode==31U ? tso31_loaded : tso64_loaded) return 0U;
+    if (mode!=24U && mode!=31U && mode!=64U) return 8U;
+    if (mode==24U ? tso24_loaded :
+        mode==31U ? tso31_loaded : tso64_loaded) return 0U;
     found=TSKFIND(channel_record,&channel,name,10U,&extent);
     if (found==TSK_ABSENT) return 4U;
     if (found!=TSK_OK || extent.record_format!=0x80U ||
@@ -1188,7 +1194,9 @@ static unsigned int tso_map_service(const TSGREQUEST *request,
     if (!TSKWITHIN(&extent,cylinder,head)) return 12U;
     count=channel_record(&channel,cylinder,head,number,TST_BLOCK,&record);
     if (count!=(int)TST_BLOCK ||
-        (mode==31U ? TSTSTAGEHEADER(record,(unsigned int)count,
+        (mode==24U ? TSTSTAGEHEADER24(record,(unsigned int)count,
+                                     &bytes,&blocks) :
+         mode==31U ? TSTSTAGEHEADER(record,(unsigned int)count,
                                    &bytes,&blocks) :
          TSTSTAGEHEADER64(record,(unsigned int)count,
                           &bytes,&blocks))!=TST_OK)
@@ -1220,15 +1228,21 @@ static unsigned int tso_map_service(const TSGREQUEST *request,
     }
     image=(unsigned char *)TSF_KAPERTURE_VA+image_real;
     base.hi=maximum.hi=0U;
-    base.lo=mode==31U ? 0x07000000U : 0x09000000U;
-    if ((mode==31U ? TSTIMAGE31(stage+64U,bytes,base.lo,image,
+    base.lo=mode==24U ? 0x00400000U :
+            mode==31U ? 0x07000000U : 0x09000000U;
+    if ((mode==24U ? TSTIMAGE24(stage+64U,bytes,base.lo,image,
+                               TST_MAX_IMAGE,&info) :
+         mode==31U ? TSTIMAGE31(stage+64U,bytes,base.lo,image,
                                 TST_MAX_IMAGE,&info) :
          TSTIMAGE64ANY(stage+64U,bytes,base.lo,image,
                        TST_MAX_IMAGE,&info))!=TST_OK) goto bad_image;
-    maximum.lo=base.lo+0x00ffffffU;
+    maximum.lo=mode==24U ? 0x00ffffffU : base.lo+0x00ffffffU;
     rc=TSMALLOC(&storage,task,mode,base,maximum,
                 info.image_bytes,1,&mapped);
-    if (rc!=TSM_OK) goto bad_image;
+    if (rc!=TSM_OK) {
+        failure=(rc==TSM_NOMEM || rc==TSM_COLLISION) ? 4 : 12;
+        goto bad_image;
+    }
     for (slot=0U; slot<TSM_ALLOCS; ++slot)
         if (storage.allocations[slot].handle &&
             storage.allocations[slot].task==task &&
@@ -1255,7 +1269,8 @@ static unsigned int tso_map_service(const TSGREQUEST *request,
     receipt[3U]=blocks;
     receipt[4U]=info.input_fnv;
     receipt[5U]=image_fnv; /* Full mapped image, before its writable data runs. */
-    if (mode==31U) tso31_loaded=1U;
+    if (mode==24U) tso24_loaded=1U;
+    else if (mode==31U) tso31_loaded=1U;
     else tso64_loaded=1U;
     *(volatile unsigned int *)0x4098U=u_tables.used;
     return 0U;
@@ -1263,7 +1278,7 @@ bad_image:
     rc=TSRRELEASE(&storage.real,TSO_IMAGE_OWNER,image_real);
     found=TSRRELEASE(&storage.real,TSO_STAGE_OWNER,stage_real);
     if (rc!=TSR_OK || found!=TSR_OK) return 0xfffffff0U;
-    return 12U;
+    return (unsigned int)failure;
 bad_stage:
     return TSRRELEASE(&storage.real,TSO_STAGE_OWNER,stage_real)==TSR_OK ?
            12U : 0xfffffff0U;
@@ -1855,6 +1870,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 230U) return cms_cursor_guest_probe(request);
     if (request->svc == 231U) return tso_map_service(request,31U);
     if (request->svc == 232U) return tso_map_service(request,64U);
+    if (request->svc == 234U) return tso_map_service(request,24U);
     if (request->svc == 93U && native_tso)
         return tso_terminal_service(request);
     if (request->svc != 1U && request->svc != 202U &&

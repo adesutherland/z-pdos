@@ -61,7 +61,7 @@ int main(int argc, char **argv)
     unsigned char *raw, *image, *mutated;
     unsigned int bytes, bytes64, stage_bytes;
     TSTINFO info;
-    if (argc!=5 && argc!=6) return 2;
+    if (argc!=5 && argc!=7) return 2;
     raw=(unsigned char *)malloc(TST_MAX_RAW+1U);
     mutated=(unsigned char *)malloc(TST_MAX_RAW+1U);
     image=(unsigned char *)malloc(TST_MAX_IMAGE);
@@ -166,7 +166,7 @@ int main(int argc, char **argv)
     memcpy(mutated,raw,stage_bytes);
     mutated[15U]=75U;
     CHECK(TSTSTAGEVALIDATE(mutated,stage_bytes,31U,&info)==TST_BAD);
-    if (argc==6) {
+    if (argc==7) {
         unsigned int bytes24=read_file(argv[5],raw);
         CHECK(bytes24==1379654U);
         CHECK(TSTHEADER(raw,bytes24,24U,&info)==TST_OK &&
@@ -197,6 +197,15 @@ int main(int argc, char **argv)
         mutated[336U+57U]=0x12U;
         CHECK(TSTIMAGE24(mutated,bytes24,0x00400000U,image,
                          TST_MAX_IMAGE,&info)==TST_BAD);
+        stage_bytes=read_file(argv[6],raw);
+        CHECK(stage_bytes==75U*TST_BLOCK);
+        CHECK(TSTSTAGEHEADER24(raw,stage_bytes,&bytes,&bytes64)==TST_OK &&
+              bytes==1379654U && bytes64==75U);
+        CHECK(TSTSTAGEVALIDATE(raw,stage_bytes,24U,&info)==TST_OK);
+        CHECK(TSTSTAGEVALIDATE(raw,stage_bytes,31U,&info)==TST_BAD);
+        memcpy(mutated,raw,stage_bytes);
+        mutated[64U+100U]^=1U;
+        CHECK(TSTSTAGEVALIDATE(mutated,stage_bytes,24U,&info)==TST_BAD);
         puts("TSO24 native image: two low placements match released loader; bounds and mode controls pass");
     }
     puts("TSO31 and TSO64 ANY native images: two placements each match released loader; malformed controls pass");

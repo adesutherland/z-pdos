@@ -131,7 +131,7 @@ def make_core(elf, classic, dat_emit, out):
 
 def judge(raw, log, ipl=False, cms24=False, cms31=False,
           cmsfile=False, cmslibrary=False, cms24file=False,
-          tso31=False, tso64=False):
+          tso31=False, tso64=False, tso24=False):
     if len(raw) != 0x14000 or raw[0x2000:0x2008] != b"PD2NEXT1":
         raise ValueError("missing/malformed result core")
     expected_masks = (0x0481000000000000, 0x0481000080000000) + \
@@ -273,7 +273,8 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
          (((767728 + 4095) // 4096) +
           (2 * ((0x08000000 // 4096) + (0x00100000 // 4096) +
                 (0x00010000 // 4096) + 1 + 1) if ipl else 0)
-          if tso64 else 0)) and
+          if tso64 else 0) +
+         (((1082128 + 4095) // 4096) if tso24 else 0)) and
         0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x160000)
     errors = [x for x in log.splitlines() if re.search(r"HHC\d{5}E\b", x)]
     checks["no_hercules_error"] = not errors

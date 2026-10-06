@@ -932,6 +932,22 @@ tso31_call_done:
     lg %r2, 0(%r2)
     st %r15, 0x308(%r2)
 tso64_call_done:
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 234                 /* checked AMODE24/RMODE24 TSO image map */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x30c(%r2)
+    lghi %r0, 1
+    sllg %r0, %r0, 24
+    lghi %r1, 0
+    lghi %r15, 0x10
+    svc 120                 /* low-only demand: no 24-bit interval can fit */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x310(%r2)
+    stg %r1, 0x318(%r2)
     brasl %r14, wide_heap_workload
     larl %r3, high_data_va
     lg %r3, 0(%r3)
@@ -1113,6 +1129,8 @@ trace_not_cms_fst:
     chi %r2, 232
     je storage_no_record
     chi %r2, 233
+    je storage_no_record
+    chi %r2, 234
     je storage_no_record
     chi %r2, 93
     je storage_no_record

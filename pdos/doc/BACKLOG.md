@@ -181,6 +181,11 @@ The [TSO24 host materializer checkpoint](qualification/TWO-SPACE-TSO24-LOADER-20
 matches the existing native loader at two below-line bases and proves
 that full low U placement fails without falling into 31-bit space. It does
 not yet run TSO24 after IPL or measure actual application headroom.
+The [fresh-IPL TSO24 map](qualification/TWO-SPACE-TSO24-MAP-2026-10-06.md)
+now checks and installs the image beside CMS24 when room exists and returns
+RC 4 for an impossible 16 MiB low-only request while high-U work succeeds.
+Native entry, its actual 1 MiB stack/4 MiB heap and selected TSO services
+remain the next gate; static image coexistence alone does not qualify them.
 
 The [6 October K channel checkpoint](qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
 adds a reserved 64 KiB low-real K workspace and a bounded post-handover

@@ -75,6 +75,7 @@ main: procedure = .int
   packer = out || "/tso-pack"
   stage = out || "/tso31-rxvm.bin"
   stage64 = out || "/tso64-rxvm.bin"
+  stage24 = out || "/tso24-rxvm.bin"
   legacy = out || "/legacy-loader.o"
   asm = out || "/TST.asm"
   obj = out || "/TST.obj"
@@ -88,10 +89,14 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :packer :tso64 :stage64 64"
   if rc <> 0 then return rc
+  if args.0 = 7 then do
+    address crexx "run :packer :tso24 :stage24 24"
+    if rc <> 0 then return rc
+  end
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_tso.c pdos/tests/two-space/tso.c :legacy -o :host"
   if rc <> 0 then return rc
   if args.0 = 7 then
-    address crexx "run :host :tso31 :tso64 :stage :stage64 :tso24"
+    address crexx "run :host :tso31 :tso64 :stage :stage64 :tso24 :stage24"
   else
     address crexx "run :host :tso31 :tso64 :stage :stage64"
   if rc <> 0 then return rc
