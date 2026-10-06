@@ -266,6 +266,9 @@ Selected checked file reads and transient K-owned writes yield
 that absent LIBRARY prevents second-app dispatch. Persistent output,
 CMS24 file services, full TSO binaries in the successor, interapplication
 `ADDRESS` and the normal replacement image remain open.
+The [CMS file validation checkpoint](qualification/TWO-SPACE-CMS-FILE-VALIDATION-2026-10-06.md)
+extracts the staged envelope checks into host-tested C89 source and reruns
+the full CMS31 IOQUAL fresh IPL with the same 119 guest checks.
 
 ## PD-004: Batch-file delivery
 

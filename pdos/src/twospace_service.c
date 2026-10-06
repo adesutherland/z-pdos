@@ -9,6 +9,7 @@
 #include "twospace_channel.h"
 #include "twospace_dataset.h"
 #include "twospace_cms.h"
+#include "twospace_cmsfile.h"
 
 static unsigned int user_rights(unsigned int frame, void *unused);
 static TSDSTATE u_tables;
@@ -29,7 +30,6 @@ static unsigned int cms31_heap_live;
 static unsigned int cms31_heap_bytes;
 static TSPADDR cms31_heap_address;
 #define CMS_FILE_OWNER 0x434d5346U
-#define CMS_FILE_LIMIT (3U*1024U*1024U)
 static unsigned int cms_file_real;
 static unsigned int cms_file_length;
 static unsigned int cms_file_records;
@@ -887,13 +887,12 @@ static unsigned int cms_file_open(const unsigned char id[18])
 {
     static const unsigned char prefix[6] =
         {0xc3U,0xd4U,0xe2U,0xf3U,0xf1U,0x4bU};
-    static const unsigned char magic[8] =
-        {0x50U,0x44U,0x43U,0x4dU,0x53U,0x46U,0x30U,0x31U};
     unsigned char name[32], *stage;
     const unsigned char *record;
     TSKEXTENT extent;
-    unsigned int i, j, n=0U, payload, records, blocks, span, real;
-    unsigned int cylinder, head, number, used, hash, cursor, size, source_sum;
+    TSIFINFO info;
+    unsigned int i, j, n=0U, blocks, span, real;
+    unsigned int cylinder, head, number;
     int found, count;
     if (id[16]!=0xc1U || id[17]!=0xf1U) return 28U;
     if (cms_file_real) {
@@ -923,12 +922,9 @@ static unsigned int cms_file_open(const unsigned char id[18])
     cylinder=extent.start_cylinder; head=extent.start_head; number=1U;
     count=channel_record(&channel,cylinder,head,number,18452U,&record);
     if (count!=18452) return 12U;
-    for (i=0U; i<8U && record[i]==magic[i]; ++i) {}
-    if (i!=8U || cms_word(record+8U)!=31U) return 12U;
-    payload=cms_word(record+12U); records=cms_word(record+20U);
-    if (!payload || payload>CMS_FILE_LIMIT-64U ||
-        !records || records>65535U || !cms_word(record+16U)) return 12U;
-    used=64U+payload; blocks=(used+18451U)/18452U;
+    if (TSIFHEADER(record,(unsigned int)count,31U,&info)!=TSIF_OK)
+        return 12U;
+    blocks=info.blocks;
     span=(blocks*18452U+4095U)&~4095U;
     if (TSRALLOC(&storage.real,CMS_FILE_OWNER,span,
                  TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,&real)!=TSR_OK)
@@ -945,23 +941,12 @@ static unsigned int cms_file_open(const unsigned char id[18])
             number=1U; if (++head==15U) { head=0U; ++cylinder; }
         }
     }
-    for (i=used; i<blocks*18452U; ++i) if (stage[i]) goto corrupt;
-    hash=0x811c9dc5U;
-    for (i=64U; i<used; ++i)
-        hash=(hash^(unsigned int)stage[i])*0x01000193U;
-    if (hash!=cms_word(stage+56U)) goto corrupt;
-    cursor=64U; source_sum=0U;
-    for (j=0U; j<records; ++j) {
-        if (cursor>used-2U) goto corrupt;
-        size=((unsigned int)stage[cursor]<<8)|stage[cursor+1U];
-        if (!size || size>256U || size>used-cursor-2U) goto corrupt;
-        source_sum+=size;
-        cursor+=2U+size;
-    }
-    if (cursor!=used || source_sum!=cms_word(stage+16U)) goto corrupt;
+    if (TSIFVALIDATE(stage,blocks*18452U,31U,&info)!=TSIF_OK)
+        goto corrupt;
     for (i=0U; i<18U; ++i) cms_file_id[i]=id[i];
     cms_file_real=real;
-    cms_file_length=used; cms_file_records=records; cms_file_cursor=64U;
+    cms_file_length=64U+info.payload_bytes;
+    cms_file_records=info.records; cms_file_cursor=64U;
     return 0U;
 corrupt:
     return TSRRELEASE(&storage.real,CMS_FILE_OWNER,real)==TSR_OK ?

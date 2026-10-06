@@ -440,6 +440,9 @@ records use transient K real buffers and are checked and released at
 completion. The positive IPL proves this noncolliding second invocation;
 disk persistence, cross-personality `ADDRESS` calls and arbitrary
 fixed-origin coexistence remain to be qualified.
+The [file-validator checkpoint](../qualification/TWO-SPACE-CMS-FILE-VALIDATION-2026-10-06.md)
+separates the C89 envelope and record checks from the K endpoint, exercises
+corruption cases on the host and repeats the unchanged IOQUAL guest run.
 
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
