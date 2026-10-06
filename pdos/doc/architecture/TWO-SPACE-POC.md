@@ -9,6 +9,10 @@ AMODE31 and AMODE64 programs, use the same U translation. Application-to-
 application calls therefore retain ordinary in-space pointers when the target
 ABI permits them. This is a design contract and a bounded machine proof, not
 a replacement disk-boot OS or a general CMS/TSO compatibility claim.
+After slice 7 qualification, we will review whether CMS and TSO should
+instead have separate U ASCEs, using measured collisions, low-memory
+headroom and cross-personality call behavior. The shared-U proof does not
+settle that design choice.
 
 ## Step 1: address and transition contract
 
@@ -379,8 +383,14 @@ keeps the 512 KiB K table pool and widens the U pool to 384 KiB within the
 limit. U virtual placements and the 24-bit free interval do not move.
 The retained host check maps simultaneous 16 MiB U31 and 32 MiB U64
 regions in 290,816 U table bytes. This proves table capacity and a fresh
-IPL; actual 31/64-bit heap allocation and access still need a guest
-workload measurement.
+IPL. The later [wide-heap guest check](../qualification/TWO-SPACE-WIDE-HEAPS-2026-10-06.md)
+allocates, touches and releases a 16 MiB U31 heap and a 32 MiB U64 heap
+at once while the CMS24/CMS31 RXVM images are mapped. U DAT use reaches
+319,488 of 393,216 bytes. The high-U request uses an internal diagnostic
+SVC 223 with a full-width address; the selected conditional SVC 120 path
+retains its existing below/above-line register convention. The CMS images
+are not yet executed, and these sizes do not define a maximum application
+heap policy.
 
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its

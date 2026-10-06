@@ -194,6 +194,18 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False):
     checks["full_width_storage_length_rejected"] = (
         struct.unpack_from(">I",raw,0x1204c)[0] == 8 and
         qword(raw,0x12050) == 0)
+    wide31 = qword(raw,0x121d0)
+    wide64 = qword(raw,0x121e8)
+    checks["simultaneous_wide_heaps_touched_and_released"] = (
+        0x02010000 <= wide31 <= 0x7f000000 and
+        wide64 == 0x0000000120000000 and
+        struct.unpack_from(">3I",raw,0x121d8) == (0,0x31,0x32) and
+        struct.unpack_from(">4I",raw,0x121f0) == (0,0x61,0x62,0) and
+        struct.unpack_from(">I",raw,0x12200)[0] == 0)
+    checks["high_heap_rejects_stale_free_and_wide_length"] = (
+        struct.unpack_from(">I",raw,0x12210)[0] == 8 and
+        struct.unpack_from(">I",raw,0x12204)[0] == 8 and
+        qword(raw,0x12208) == 0)
     checks["k_channel_vol1_read"] = (
         struct.unpack_from(">I",raw,0x1205c)[0] ==
         (0 if ipl else 0xfffffffb))
@@ -239,7 +251,8 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False):
             b"\xd7\xc9\xd5\xc7" in raw[0x12084:0x12084+count])
     checks["live_dat_mutations_purged"] = (
         struct.unpack_from(">I",raw,0x40ac)[0] ==
-        (4 + (2 + 5 * ((1681088 + 4095) // 4096) + 255 if cms24 else 0) +
+        (4 + 24576 +
+         (2 + 5 * ((1681088 + 4095) // 4096) + 255 if cms24 else 0) +
          (5 * ((4238296 + 4095) // 4096) if cms31 else 0)) and
         0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x60000)
     errors = [x for x in log.splitlines() if re.search(r"HHC\d{5}E\b", x)]

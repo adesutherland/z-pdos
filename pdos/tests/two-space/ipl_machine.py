@@ -223,6 +223,14 @@ def run(args):
                 page_unmapped(raw, 0x18000f, 0x02010000) and
                 (bool(args.cms24) or bool(args.cms31) or
                  raw[0x180000:0x1e0000] == reference[0x180000:0x1e0000]))
+            wide31 = struct.unpack_from(">Q",raw,0x121d0)[0]
+            wide64 = struct.unpack_from(">Q",raw,0x121e8)[0]
+            checks["wide_heap_endpoints_unmapped_after_free"] = (
+                0x02010000 <= wide31 <= 0x7f000000 and
+                wide64 == 0x0000000120000000 and
+                all(page_unmapped(raw,0x18000f,at) for at in
+                    (wide31,wide31+0x00fff000,
+                     wide64,wide64+0x01fff000)))
             if args.cms24:
                 real24, entry24, image24, low_free = struct.unpack_from(
                     ">4I", raw, 0x4100)

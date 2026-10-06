@@ -684,6 +684,32 @@ static unsigned int storage_service(TSGREQUEST *request)
     return 0U;
 }
 
+/* Internal U64 proof selector. It does not change the existing SVC 120
+ * convention or claim an IBM high-storage ABI. */
+static unsigned int high_storage_service(TSGREQUEST *request)
+{
+    TSPADDR minimum, maximum, base;
+    unsigned int result;
+    if (!(*(volatile const unsigned int *)0x3080U & 1U)) return 8U;
+    if (request->address.hi == 0U && request->address.lo == 0U) {
+        minimum.hi=maximum.hi=1U;
+        minimum.lo=0x20000000U;
+        maximum.lo=0x7fffffffU;
+        result=TSMALLOC(&storage,1U,64U,minimum,maximum,
+                        request->length,0,&base);
+        if (result != TSM_OK) return result == TSM_NOMEM ? 4U : 8U;
+        request->address=base;
+    } else {
+        if (request->address.hi != 1U ||
+            request->address.lo < 0x20000000U ||
+            request->address.lo > 0x7fffffffU) return 8U;
+        result=TSMFREE(&storage,1U,request->address);
+        if (result != TSM_OK) return 8U;
+    }
+    *(volatile unsigned int *)0x4098U=u_tables.used;
+    return 0U;
+}
+
 unsigned int pdosTwoSpaceService(TSGREQUEST *request)
 {
     TSGCONTEXT gate;
@@ -695,8 +721,10 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     /* The descriptor stores a 32-bit length for its bounded transfer and
        GETMAIN subset. Refuse any nonzero caller high half before dispatch. */
     if (*(volatile const unsigned int *)0x3000U != 0U)
-        return request->svc == 120U ? 8U : 0xfffffffdU;
+        return request->svc == 120U || request->svc == 223U ?
+               8U : 0xfffffffdU;
     if (request->svc == 120U) return storage_service(request);
+    if (request->svc == 223U) return high_storage_service(request);
     if (request->svc == 206U) return volume_service(request);
     if (request->svc == 207U) return dataset_service(request);
     if (request->svc == 208U) return terminal_service(request);

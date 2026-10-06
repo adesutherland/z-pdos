@@ -138,8 +138,8 @@ K-only C31 virtual aliases exercised after DAT is enabled. Slices 3 and 4
 now pass a fresh IPL of that fixture, including nested SVC, U fault recovery,
 full-width U page walks, bounded transfers, CMS/TSO probe selectors and a
 synthetic machine-check fail-stop control. Real asynchronous external/I/O
-handling, machine-check hardware injection, general frame reclamation by the
-running K nucleus and wider memory profiles remain open.
+handling, machine-check hardware injection and general frame reclamation by
+the running K nucleus remain open. That checkpoint used 16 MiB real storage.
 The final-core placement is still the fixture's linked real-zero image;
 actual CMS/TSO application compatibility remains unqualified.
 
@@ -147,9 +147,9 @@ The [storage and overlay checkpoint](qualification/TWO-SPACE-STORAGE-OVERLAY-202
 adds a K C31 conditional SVC 120 subset, live DAT map/free with PTLB and no
 above-to-below fallback. The fresh diagnostic 3390 IPL passes its storage
 and restored-table checks. The host control exercises two nested fixed-origin
-backing swaps and caller restoration. Slice 5 still needs channel/dataset,
-terminal and command services plus the 24-bit channel-buffer and real CMS24/
-TSO24 budget audits. Slice 6 still needs actual CMS/TSO format loading,
+backing swaps and caller restoration. At that checkpoint, slice 5 still
+needed channel/dataset, terminal and command services plus the 24-bit
+channel-buffer and real CMS24/TSO24 budget audits. Slice 6 still needs actual CMS/TSO format loading,
 relocation and REXX `ADDRESS` calls. Slice 7 still needs an explicitly selected
 normal replacement image and unchanged CMS/TSO guest qualification. The
 release route remains the one-ASCE kernel.
@@ -202,15 +202,25 @@ executes its nested SVC from U, restores the parent pages and propagates its
 return value to a U64 caller. It proves the mixed-mode memory and executable
 transition needed for a colliding nested call. Neither RXVM executes yet;
 full CMS linkage, general file/command services, REXX `ADDRESS`, TSO programs,
-wide heap budgets and normal successor selection remain unqualified.
+unchanged application heap requirements and normal successor selection
+remain unqualified.
 The [64 MiB real-memory checkpoint](qualification/TWO-SPACE-64M-2026-10-06.md)
 widens the single-CPU diagnostic K aperture while keeping both channel
-buffers low-real and all K tables out of U. Its fresh IPL passed, but
-large 31/64-bit allocations and application heap needs remain to be measured.
+buffers low-real and all K tables out of U. Its fresh IPL passed; at that
+checkpoint large 31/64-bit allocations were still unmeasured.
 The [CMS24 child checkpoint](qualification/TWO-SPACE-CMS24-CHILD-2026-10-06.md)
 proves the same reversible collision at the fixed 24-bit RXVM origin,
 including a real AMODE24 SVC and return to a U64 caller. It remains a
 minimal instruction test, not an unchanged CMS24 application run.
+The [U DAT capacity checkpoint](qualification/TWO-SPACE-U-DAT-CAPACITY-2026-10-06.md)
+widens the U table pool to 384 KiB and retains a simultaneous 16 MiB U31
+plus 32 MiB U64 mapping control. The later
+[guest wide-heap checkpoint](qualification/TWO-SPACE-WIDE-HEAPS-2026-10-06.md)
+allocates, accesses and releases both heaps while the CMS24/CMS31 RXVM
+images are mapped. The guest uses 319,488 U DAT bytes and leaves both heap
+endpoint pages unmapped after free. Internal SVC 223 is only a provisional
+high-U fixture entry; actual application storage and CMS/TSO service ABI
+qualification remain open.
 
 ## PD-004: Batch-file delivery
 

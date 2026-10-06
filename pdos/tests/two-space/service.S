@@ -329,6 +329,88 @@ app_high:
     lg %r2, 0(%r2)
     st %r15, 76(%r2)
     stg %r1, 80(%r2)
+    j wide_heap_code_end
+wide_heap_workload:
+    lghi %r0, 4096          /* concurrent 16 MiB U31 heap */
+    sllg %r0, %r0, 12
+    lghi %r1, 0
+    lghi %r15, 0x30
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    stg %r1, 0x1d0(%r2)
+    st %r15, 0x1d8(%r2)
+    chi %r15, 0
+    jne wide_heap_done
+    lgr %r8, %r1
+    mvi 0(%r8), 0x31
+    llgc %r4, 0(%r8)
+    st %r4, 0x1dc(%r2)
+    lghi %r5, 4096
+    sllg %r5, %r5, 12
+    aghi %r5, -1
+    agr %r5, %r8
+    mvi 0(%r5), 0x32
+    llgc %r4, 0(%r5)
+    st %r4, 0x1e0(%r2)
+    lghi %r0, 4096          /* concurrent 32 MiB U64 heap */
+    sllg %r0, %r0, 13
+    lghi %r1, 0
+    svc 223                 /* provisional internal high-U selector */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    stg %r1, 0x1e8(%r2)
+    st %r15, 0x1f0(%r2)
+    chi %r15, 0
+    jne wide64_done
+    lgr %r9, %r1
+    mvi 0(%r9), 0x61
+    llgc %r4, 0(%r9)
+    st %r4, 0x1f4(%r2)
+    lghi %r5, 4096
+    sllg %r5, %r5, 13
+    aghi %r5, -1
+    agr %r5, %r9
+    mvi 0(%r5), 0x62
+    llgc %r4, 0(%r5)
+    st %r4, 0x1f8(%r2)
+    lghi %r0, 4096
+    sllg %r0, %r0, 13
+    lgr %r1, %r9
+    svc 223
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x1fc(%r2)
+    lghi %r0, 4096
+    sllg %r0, %r0, 13
+    lgr %r1, %r9
+    svc 223                 /* a second free cannot claim another allocation */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x210(%r2)
+wide64_done:
+    lghi %r0, 4096
+    sllg %r0, %r0, 12
+    lgr %r1, %r8
+    lghi %r15, 0x30
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x200(%r2)
+    lghi %r0, 1
+    sllg %r0, %r0, 32
+    aghi %r0, 4096
+    lghi %r1, 0
+    svc 223                 /* no high-half length truncation */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x204(%r2)
+    stg %r1, 0x208(%r2)
+wide_heap_done:
+    larl %r4, wide_heap_restore_gprs
+    lmg %r8, %r9, 0(%r4)
+    br %r14
+wide_heap_code_end:
     lghi %r0, 0             /* K reads VOL1 through its real channel buffer */
     lghi %r1, 0
     lghi %r2, 0
@@ -485,6 +567,7 @@ cms24_overlay_done:
     l %r4, 0(%r3)
     st %r4, 400(%r2)
 cms31_overlay_done:
+    brasl %r14, wide_heap_workload
     larl %r3, high_data_va
     lg %r3, 0(%r3)
     l %r3, 44(%r3)
@@ -500,8 +583,12 @@ app_fault_resume:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 20(%r2)         /* recoverable application fault code */
+    larl %r4, wide_heap_restore_gprs
+    lmg %r8, %r9, 0(%r4)
     svc 0                    /* bounded fixture exit into K */
 .balign 8
+wide_heap_restore_gprs:
+.quad 0x3333333300000008, 0x4444444400000009
 high_data_va: .quad 0x110001000
 input_data_va: .quad 0x110001080
 cms31_image_va: .quad 0x03000000
@@ -577,6 +664,8 @@ initial_nested_done:
     je storage_no_record
     chi %r2, 222
     je storage_no_record
+    chi %r2, 223
+    je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore
     stg %r8, 32(%r1)
@@ -628,7 +717,10 @@ kcore_after_c:
     lg %r6, 0(%r6)
     l %r2, 16(%r6)
     chi %r2, 120
+    je copy_storage_address
+    chi %r2, 223
     jne no_storage_address
+copy_storage_address:
     llgf %r2, 0(%r6)
     sllg %r2, %r2, 32
     llgf %r4, 4(%r6)
