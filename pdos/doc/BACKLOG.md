@@ -203,6 +203,11 @@ saves the parent's U compatibility page in K real storage and restores it on
 child return. Its fresh IPL also caught and corrected an overbroad top-level
 reset that erased a prepared CMS FST. Unchanged native parent/child calls,
 fault unwind and independent top-level personality transitions remain open.
+The [terminal ownership check](qualification/TWO-SPACE-TERMINAL-OWNER-2026-10-06.md)
+binds a pending read to its invocation, prevents a nested child from
+cancelling it, and clears the subchannel before giving it to another owner.
+The fresh IPL passes the waiting-for-attention case. In-flight cancellation,
+late completion and retry remain open.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and

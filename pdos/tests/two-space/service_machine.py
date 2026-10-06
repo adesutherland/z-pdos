@@ -273,6 +273,15 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
          child_end == parent_end == 0 and parent_restored == 0x5a and
          parent_token != 0 and child_token > parent_token)
         if ipl else parent_begin == 8)
+    lease_begin, lease_parent, lease_start, lease_child_begin, lease_child, \
+        child_cancel, lease_child_end, lease_parent_end, lease_retry, \
+        lease_finish = struct.unpack_from(">10I",raw,0x12414)
+    checks["nested_terminal_lease_isolated_and_released"] = (
+        (lease_begin == lease_start == lease_child_begin ==
+         lease_child_end == lease_parent_end == lease_retry ==
+         lease_finish == 0 and child_cancel == 8 and
+         lease_parent != 0 and lease_child > lease_parent)
+        if ipl else lease_begin == 8)
     checks["absent_subchannel_fails_without_wait"] = (
         struct.unpack_from(">I",raw,0x121c4)[0] == 0)
     checks["k_cms24_module_header"] = (

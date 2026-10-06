@@ -28,6 +28,9 @@ static unsigned int storage_ready;
 static unsigned int console_ssid;
 static unsigned int console_read_phase;
 static unsigned int console_read_count;
+static unsigned int console_read_owner;
+static unsigned int console_read_io_handle;
+static unsigned int console_next_io_handle;
 static unsigned int cms31_loaded;
 static unsigned int cms31_secondary_loaded;
 static unsigned int cms24_loaded;
@@ -751,18 +754,60 @@ static unsigned int terminal_service(const TSGREQUEST *request)
 
 static unsigned int terminal_read_start(const TSGREQUEST *request)
 {
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
     if (request->length || request->address.hi || request->address.lo ||
         request->direction) return 8U;
     if (!console_ssid) return 0xfffffffbU;
     if (console_read_phase) return 4U;
+    if (frame && TSVOWN(&native_invocations,frame->token,TSV_TERMINAL,
+                        console_ssid)!=TSV_OK) return 4U;
     /* A 3270 READ MODIFIED issued before an AID returns NoAID with no
        modified fields. Wait for attention, then submit the read CCW. */
+    console_read_owner=frame ? frame->token : 0U;
+    console_read_io_handle=0U;
     console_read_phase=1U;
+    return 0U;
+}
+
+static unsigned int terminal_io_complete(unsigned int token)
+{
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
+    if (!console_read_io_handle) return 0U;
+    if (!frame || frame->token!=token ||
+        TSVCOMPLETE(&native_invocations,token,console_read_io_handle)
+            !=TSV_OK ||
+        TSVFORGET(&native_invocations,token,TSV_IO,
+                  console_read_io_handle)!=TSV_OK) return 12U;
+    console_read_io_handle=0U;
+    return 0U;
+}
+
+static unsigned int terminal_read_cancel(unsigned int token)
+{
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
+    if (!console_read_phase) return 0U;
+    if (token!=console_read_owner ||
+        (token && (!frame || frame->token!=token))) return 8U;
+    /* A phase-one attention may already be pending when its owner exits.
+     * Quiesce that subchannel before another owner may submit a read. */
+    if (console_read_phase==1U || console_read_phase==2U ||
+        console_read_phase==4U) {
+        if (TSCCLEAR(console_ssid,TSCIRB(&console_channel))!=0 ||
+            terminal_io_complete(token)!=0U) {
+            console_read_phase=4U; /* quarantine real workspace */
+            return 12U;
+        }
+    }
+    if (token && TSVFORGET(&native_invocations,token,TSV_TERMINAL,
+                           console_ssid)!=TSV_OK) return 12U;
+    console_read_phase=console_read_count=console_read_owner=0U;
+    console_read_io_handle=0U;
     return 0U;
 }
 
 static unsigned int terminal_read_poll(const TSGREQUEST *request)
 {
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
     TSGCONTEXT gate;
     TSGREQUEST output;
     unsigned char bytes[TSG_MAX_COPY];
@@ -771,23 +816,36 @@ static unsigned int terminal_read_poll(const TSGREQUEST *request)
     if (request->length != TSG_MAX_COPY ||
         request->direction != TSG_WRITE) return 8U;
     if (!console_read_phase) return 0xfffffffbU;
+    if ((frame ? frame->token : 0U)!=console_read_owner) return 8U;
+    if (console_read_phase==4U) return 12U;
     if (console_read_phase != 3U) {
         status=TSCPOLL(console_ssid,TSCIRB(&console_channel));
         if (status < 0) {
-            console_read_phase=0U;
+            console_read_phase=4U;
+            terminal_read_cancel(console_read_owner);
             return 12U;
         }
         if (status != 0) return 1U;
     }
     if (console_read_phase == 1U) {
         if ((TSCIRB(&console_channel)[8U] & 0x80U) == 0U) return 1U;
-        if (TSCBUILDCONSREAD(&console_channel,252U) != TSC_OK ||
-            TSCSTART(console_ssid,TSCORB(&console_channel),
-                     TSCIRB(&console_channel)) != 0) {
-            console_read_phase=0U;
+        if (TSCBUILDCONSREAD(&console_channel,252U) != TSC_OK) {
+            terminal_read_cancel(console_read_owner);
             return 12U;
         }
+        if (frame) {
+            if (console_next_io_handle==0xffffffffU) return 4U;
+            ++console_next_io_handle;
+            if (TSVOWN(&native_invocations,frame->token,TSV_IO,
+                       console_next_io_handle)!=TSV_OK) return 4U;
+            console_read_io_handle=console_next_io_handle;
+        }
         console_read_phase=2U;
+        if (TSCSTART(console_ssid,TSCORB(&console_channel),
+                     TSCIRB(&console_channel)) != 0) {
+            terminal_read_cancel(console_read_owner);
+            return 12U;
+        }
         return 1U;
     }
     if (console_read_phase == 2U) {
@@ -795,15 +853,17 @@ static unsigned int terminal_read_poll(const TSGREQUEST *request)
             /* Initial status can precede the actual READ MODIFIED data. */
             if (TSCIRB(&console_channel)[8U] == 0U &&
                 TSCIRB(&console_channel)[9U] == 0U) return 1U;
-            console_read_phase=0U;
+            terminal_read_cancel(console_read_owner);
             return 12U;
         }
+        if (terminal_io_complete(console_read_owner)!=0U) return 12U;
         if (count == 3U && TSCDATA(&console_channel)[0] == 0x60U) {
             console_read_phase=1U;
             return 1U;
         }
         if (count < 3U || count > 252U) {
-            console_read_phase=0U;
+            console_read_phase=3U;
+            terminal_read_cancel(console_read_owner);
             return 12U;
         }
         console_read_count=count;
@@ -823,9 +883,18 @@ static unsigned int terminal_read_poll(const TSGREQUEST *request)
     gate.rights_context=0;
     output=*request;
     status=TSGCOPY(&gate,&output,bytes,sizeof bytes);
-    if (status == TSG_OK) console_read_phase=0U;
+    if (status == TSG_OK && terminal_read_cancel(console_read_owner)!=0U)
+        return 12U;
     return status == TSG_OK ? 0U :
            status == TSG_DENIED ? 0xfffffffcU : 0xfffffffdU;
+}
+
+static unsigned int terminal_cancel_probe(const TSGREQUEST *request)
+{
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    return terminal_read_cancel(frame ? frame->token : 0U);
 }
 
 /* Diagnostic selector only: an absent subchannel must fail immediately,
@@ -1064,6 +1133,8 @@ static unsigned int native_end(const TSGREQUEST *request)
     frame=native_invocations.depth ?
         &native_invocations.frame[native_invocations.depth-1U] : 0;
     if (!frame || frame->token!=request->address.lo) return 12U;
+    if (console_read_phase && console_read_owner==frame->token &&
+        terminal_read_cancel(frame->token)!=0U) return 12U;
     rc=TSVEND(&native_invocations,request->address.lo,native_clean,
               (void *)frame);
     if (rc==TSV_OK) {
@@ -2237,6 +2308,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 236U) return native_end(request);
     if (request->svc == 237U) return native_reap_probe(request);
     if (request->svc == 239U) return terminal_clear_probe(request);
+    if (request->svc == 240U) return terminal_cancel_probe(request);
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 223U) return high_storage_service(request);
     if (request->svc == 233U) return iarv64_service(request);

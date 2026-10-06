@@ -521,6 +521,74 @@ nested_lowcore_parent_end:
     st %r15, 0x410(%r2)
 nested_lowcore_done:
     br %r14
+terminal_owner_probe:
+    lghi %r0, 5            /* parent owns the pending terminal lease */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 235
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x414(%r2)
+    st %r1, 0x418(%r2)
+    chi %r15, 0
+    jne terminal_owner_done
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 209
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x41c(%r2)
+    chi %r15, 0
+    jne terminal_owner_parent_end
+    lghi %r0, 5
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 235                 /* child must not cancel parent's read */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x420(%r2)
+    st %r1, 0x424(%r2)
+    chi %r15, 0
+    jne terminal_owner_parent_end
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 240
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x428(%r2)
+    lghi %r0, 0
+    llgf %r1, 0x424(%r2)
+    lghi %r2, 0
+    svc 236
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x42c(%r2)
+terminal_owner_parent_end:
+    lghi %r0, 0
+    llgf %r1, 0x418(%r2)
+    lghi %r2, 0
+    svc 236                 /* K releases parent's pending lease */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x430(%r2)
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 209                 /* new diagnostic owner can start again */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x434(%r2)
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 240
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x438(%r2)
+terminal_owner_done:
+    br %r14
 .section .apphigh,"ax"
 wide_heap_code_end:
     lghi %r0, 0             /* K reads VOL1 through its real channel buffer */
@@ -1222,6 +1290,7 @@ tso24_release_page:
     st %r15, 0x330(%r2)
 tso24_call_done:
     brasl %r14, nested_lowcore_probe
+    brasl %r14, terminal_owner_probe
     lghi %r0, 7            /* no K image record: deterministic failure */
     lghi %r1, 0
     lghi %r2, 0
@@ -1458,6 +1527,8 @@ trace_not_cms_fst:
     chi %r2, 237
     je storage_no_record
     chi %r2, 239
+    je storage_no_record
+    chi %r2, 240
     je storage_no_record
     chi %r2, 93
     je storage_no_record

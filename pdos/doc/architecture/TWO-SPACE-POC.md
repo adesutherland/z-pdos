@@ -185,8 +185,10 @@ and heap guest controls, personality lowcore switching, terminal leases,
 pending I/O cancellation and fault unwind remain open.
 The [clear helper](../qualification/TWO-SPACE-CHANNEL-CLEAR-2026-10-06.md)
 has a guest-verified CSCH completion on an idle 3270 and a failing absent
-subchannel. Terminal-read cancellation during an active channel program and
-ownership transfer on nested invocation still need guest proof.
+subchannel. The [terminal owner gate](../qualification/TWO-SPACE-TERMINAL-OWNER-2026-10-06.md)
+then binds a waiting read to its invocation, rejects child cancellation and
+clears the subchannel before transferring its lease. In-flight READ MODIFIED
+cancellation and late status isolation still need guest proof.
 The [nested lowcore gate](../qualification/TWO-SPACE-INVOCATION-LOWCORE-2026-10-06.md)
 stores a suspended parent's U compatibility page in a K-owned real frame,
 installs the child template, then restores the parent page on child end. It
