@@ -58,9 +58,9 @@ static void compare_released_loader(const unsigned char *raw,
 int main(int argc, char **argv)
 {
     unsigned char *raw, *image, *mutated;
-    unsigned int bytes, bytes64;
+    unsigned int bytes, bytes64, stage_bytes;
     TSTINFO info;
-    if (argc!=3) return 2;
+    if (argc!=4) return 2;
     raw=(unsigned char *)malloc(TST_MAX_RAW+1U);
     mutated=(unsigned char *)malloc(TST_MAX_RAW+1U);
     image=(unsigned char *)malloc(TST_MAX_IMAGE);
@@ -116,6 +116,19 @@ int main(int argc, char **argv)
           info.entry_offset==0U && info.input_fnv==0x007eda54U);
     CHECK(TSTIMAGE31(raw,bytes64,0x05000000U,image,
                      TST_MAX_IMAGE,&info)==TST_BAD);
+    stage_bytes=read_file(argv[3],raw);
+    CHECK(stage_bytes==76U*TST_BLOCK);
+    CHECK(TSTSTAGEVALIDATE(raw,stage_bytes,31U,&info)==TST_OK &&
+          info.raw_bytes==1395270U && info.records==1429U);
+    memcpy(mutated,raw,stage_bytes);
+    mutated[64U+100U]^=1U;
+    CHECK(TSTSTAGEVALIDATE(mutated,stage_bytes,31U,&info)==TST_BAD);
+    memcpy(mutated,raw,stage_bytes);
+    mutated[stage_bytes-1U]=1U;
+    CHECK(TSTSTAGEVALIDATE(mutated,stage_bytes,31U,&info)==TST_BAD);
+    memcpy(mutated,raw,stage_bytes);
+    mutated[15U]=75U;
+    CHECK(TSTSTAGEVALIDATE(mutated,stage_bytes,31U,&info)==TST_BAD);
     puts("TSO31 native image: two relocations match released loader; TSO64 header and malformed controls pass");
     free(raw); free(mutated); free(image);
     return 0;

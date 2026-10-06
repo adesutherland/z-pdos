@@ -10,6 +10,7 @@
 #define TST_BAD -1
 #define TST_MAX_RAW (5U*1024U*1024U)
 #define TST_MAX_IMAGE (5U*1024U*1024U)
+#define TST_BLOCK 18452U
 typedef struct {
     unsigned int raw_bytes, records, max_record;
     unsigned int mode, rmode_any, flags;
@@ -19,6 +20,10 @@ typedef struct {
 
 int TSTHEADER(const unsigned char *raw, unsigned int bytes,
               unsigned int expected_mode, TSTINFO *info);
+int TSTSTAGEHEADER(const unsigned char *block, unsigned int length,
+                   unsigned int *raw_bytes, unsigned int *blocks);
+int TSTSTAGEVALIDATE(const unsigned char *stage, unsigned int length,
+                     unsigned int expected_mode, TSTINFO *info);
 /* AMODE31/RMODE ANY only. The caller owns a K-only destination with at least
  * capacity bytes; no partly built image is ever mapped into U on failure. */
 int TSTIMAGE31(const unsigned char *raw, unsigned int bytes,

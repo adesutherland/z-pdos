@@ -54,6 +54,8 @@ main: procedure = .int
   address crexx "run mkdir -p :out"
   if rc <> 0 then return rc
   host = out || "/tso-host-test"
+  packer = out || "/tso-pack"
+  stage = out || "/tso31-rxvm.bin"
   legacy = out || "/legacy-loader.o"
   asm = out || "/TST.asm"
   obj = out || "/TST.obj"
@@ -61,9 +63,13 @@ main: procedure = .int
   mapfile = out || "/TST.map"
   address crexx "run clang -std=c89 -O1 -g -Wno-format -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src -c pdos/src/pdosutil.c -o :legacy"
   if rc <> 0 then return rc
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_tso.c pdos/tests/two-space/tso_pack.c -o :packer"
+  if rc <> 0 then return rc
+  address crexx "run :packer :tso31 :stage"
+  if rc <> 0 then return rc
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_tso.c pdos/tests/two-space/tso.c :legacy -o :host"
   if rc <> 0 then return rc
-  address crexx "run :host :tso31 :tso64"
+  address crexx "run :host :tso31 :tso64 :stage"
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src pdos/src/twospace_tso.c -o :asm"
   if rc <> 0 then return rc

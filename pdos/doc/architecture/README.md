@@ -48,7 +48,11 @@ replacement image. A post-qualification review will decide whether CMS
 and TSO continue to share one U ASCE.
 The [native TSO loader-core check](../qualification/TWO-SPACE-TSO-LOADER-2026-10-06.md)
 matches the existing TSO31 materialized image at two bases; guest staging,
-mapping and TSO execution remain open.
+mapping and TSO execution were then separate gates. The
+[fresh-IPL TSO31 map](../qualification/TWO-SPACE-TSO31-MAP-2026-10-06.md)
+now places the unchanged native image at U `0x07000000` beside CMS24 and both
+CMS31 images without consuming the 24-bit U placement gap. TSO execution and
+MVS-style service compatibility remain open.
 
 ## The system at a glance
 

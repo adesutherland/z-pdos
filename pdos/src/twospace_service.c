@@ -11,6 +11,7 @@
 #include "twospace_cms.h"
 #include "twospace_cmsfile.h"
 #include "twospace_cmscursor.h"
+#include "twospace_tso.h"
 
 static unsigned int user_rights(unsigned int frame, void *unused);
 static TSDSTATE u_tables;
@@ -25,6 +26,7 @@ static unsigned int cms31_loaded;
 static unsigned int cms31_secondary_loaded;
 static unsigned int cms31_secondary_bytes;
 static unsigned int cms24_loaded;
+static unsigned int tso31_loaded;
 static unsigned int cms31_lowcore_real;
 #define CMS31_LINES_REAL 0x20000U
 #define CMS24_EXTRA_LINES_REAL 0x26000U
@@ -32,6 +34,8 @@ static unsigned int cms31_heap_live;
 static unsigned int cms31_heap_bytes;
 static TSPADDR cms31_heap_address;
 #define CMS_FILE_OWNER 0x434d5346U
+#define TSO_STAGE_OWNER 0x54534f31U
+#define TSO_IMAGE_OWNER 0x54534f32U
 /* Each open input, including one reopened by a nested app, owns its cursor. */
 static TSISTATE cms_inputs;
 #define CMS_OUTPUT_SLOTS 4U
@@ -1057,6 +1061,104 @@ done:
     return result;
 }
 
+/* Load the pinned native TSO31 record stream from a checked 3390 extent.
+ * Materialize privately, then publish one noncolliding U31 interval. */
+static unsigned int tso31_map_service(const TSGREQUEST *request)
+{
+    static const unsigned char name[10]={
+        0xe3U,0xe2U,0xd6U,0xf3U,0xf1U,0x4bU,
+        0xd9U,0xe7U,0xe5U,0xd4U};
+    const unsigned char *record;
+    TSKEXTENT extent;
+    TSTINFO info;
+    TSPADDR base, maximum, mapped;
+    unsigned char *stage, *image, *destination;
+    unsigned int bytes, blocks, stage_span, stage_real=0U, image_real=0U;
+    unsigned int cylinder, head, number, i, j, slot, mapped_real=0U;
+    int count, found, rc;
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    if (tso31_loaded) return 0U;
+    found=TSKFIND(channel_record,&channel,name,sizeof name,&extent);
+    if (found==TSK_ABSENT) return 4U;
+    if (found!=TSK_OK || extent.record_format!=0x80U ||
+        extent.block_length!=TST_BLOCK ||
+        extent.logical_length!=TST_BLOCK) return 12U;
+    cylinder=extent.start_cylinder; head=extent.start_head; number=1U;
+    if (!TSKWITHIN(&extent,cylinder,head)) return 12U;
+    count=channel_record(&channel,cylinder,head,number,TST_BLOCK,&record);
+    if (count!=(int)TST_BLOCK ||
+        TSTSTAGEHEADER(record,(unsigned int)count,&bytes,&blocks)!=TST_OK)
+        return 12U;
+    stage_span=(blocks*TST_BLOCK+4095U)&~4095U;
+    if (TSRALLOC(&storage.real,TSO_STAGE_OWNER,stage_span,
+                 TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,&stage_real)!=TSR_OK)
+        return 4U;
+    stage=(unsigned char *)TSF_KAPERTURE_VA+stage_real;
+    for (j=0U; j<blocks; ++j) {
+        if (!TSKWITHIN(&extent,cylinder,head)) goto bad_stage;
+        if (j) {
+            count=channel_record(&channel,cylinder,head,number,
+                                 TST_BLOCK,&record);
+            if (count!=(int)TST_BLOCK) goto bad_stage;
+        }
+        for (i=0U; i<TST_BLOCK; ++i)
+            stage[j*TST_BLOCK+i]=record[i];
+        if (++number==4U) {
+            number=1U; if (++head==15U) { head=0U; ++cylinder; }
+        }
+    }
+    if (TSTSTAGEVALIDATE(stage,blocks*TST_BLOCK,31U,&info)!=TST_OK ||
+        info.raw_bytes!=bytes) goto bad_stage;
+    if (TSRALLOC(&storage.real,TSO_IMAGE_OWNER,TST_MAX_IMAGE,
+                 TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,&image_real)!=TSR_OK) {
+        return TSRRELEASE(&storage.real,TSO_STAGE_OWNER,stage_real)
+               ==TSR_OK ? 4U : 0xfffffff0U;
+    }
+    image=(unsigned char *)TSF_KAPERTURE_VA+image_real;
+    if (TSTIMAGE31(stage+64U,bytes,0x07000000U,image,
+                   TST_MAX_IMAGE,&info)!=TST_OK) goto bad_image;
+    base.hi=maximum.hi=0U;
+    base.lo=0x07000000U;
+    maximum.lo=0x07ffffffU;
+    rc=TSMALLOC(&storage,15U,31U,base,maximum,
+                info.image_bytes,1,&mapped);
+    if (rc!=TSM_OK) goto bad_image;
+    for (slot=0U; slot<TSM_ALLOCS; ++slot)
+        if (storage.allocations[slot].handle &&
+            storage.allocations[slot].task==15U &&
+            storage.allocations[slot].address.hi==mapped.hi &&
+            storage.allocations[slot].address.lo==mapped.lo) {
+            mapped_real=storage.allocations[slot].real;
+            break;
+        }
+    if (!mapped_real) {
+        TSMFREE(&storage,15U,mapped);
+        goto bad_image;
+    }
+    destination=(unsigned char *)TSF_KAPERTURE_VA+mapped_real;
+    for (i=0U; i<info.image_bytes; ++i) destination[i]=image[i];
+    rc=TSRRELEASE(&storage.real,TSO_IMAGE_OWNER,image_real);
+    found=TSRRELEASE(&storage.real,TSO_STAGE_OWNER,stage_real);
+    if (rc!=TSR_OK || found!=TSR_OK) return 0xfffffff0U;
+    *(volatile unsigned int *)0x4600U=mapped_real;
+    *(volatile unsigned int *)0x4604U=info.image_bytes;
+    *(volatile unsigned int *)0x4608U=base.lo+info.entry_offset;
+    *(volatile unsigned int *)0x460cU=blocks;
+    *(volatile unsigned int *)0x4610U=info.input_fnv;
+    tso31_loaded=1U;
+    *(volatile unsigned int *)0x4098U=u_tables.used;
+    return 0U;
+bad_image:
+    rc=TSRRELEASE(&storage.real,TSO_IMAGE_OWNER,image_real);
+    found=TSRRELEASE(&storage.real,TSO_STAGE_OWNER,stage_real);
+    if (rc!=TSR_OK || found!=TSR_OK) return 0xfffffff0U;
+    return 12U;
+bad_stage:
+    return TSRRELEASE(&storage.real,TSO_STAGE_OWNER,stage_real)==TSR_OK ?
+           12U : 0xfffffff0U;
+}
+
 static unsigned int cms31_fst_lookup(TSGREQUEST *request)
 {
     static const unsigned char prefix[6] =
@@ -1588,6 +1690,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 226U) return cms_file_audit(request,31U);
     if (request->svc == 229U) return cms_file_audit(request,24U);
     if (request->svc == 230U) return cms_cursor_guest_probe(request);
+    if (request->svc == 231U) return tso31_map_service(request);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
         return 0xfffffffbU;

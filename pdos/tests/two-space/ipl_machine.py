@@ -206,7 +206,8 @@ def run(args):
                            cms24=bool(args.cms24), cms31=bool(args.cms31),
                            cmsfile=bool(args.cmsfile),
                            cmslibrary=bool(args.cmslibrary),
-                           cms24file=bool(args.cms24file))
+                           cms24file=bool(args.cms24file),
+                           tso31=bool(args.tso31))
             judged["checks"]["ipl_subchannel_handover"] = (
                 0x10000 <= struct.unpack_from(">I",raw,0x40bc)[0] < 0x10100)
             judged["checks"]["independent_disk_console_channel_workspaces"] = (
@@ -421,6 +422,22 @@ def run(args):
                     struct.unpack_from(">I",raw,0x20004)[0] == len(version) and
                     raw[0x20008:0x20008+len(version)] == version and
                     struct.unpack_from(">I",raw,0x4510)[0] == 0)
+            if args.tso31:
+                tso_real, tso_bytes, tso_entry, tso_blocks, tso_input_fnv = \
+                    struct.unpack_from(">5I",raw,0x4600)
+                tso_pages = (tso_bytes+4095)//4096
+                tso_hash = 0x811c9dc5
+                if tso_real and tso_real+tso_bytes <= len(raw):
+                    for value in raw[tso_real:tso_real+tso_bytes]:
+                        tso_hash = ((tso_hash ^ value)*0x01000193) & 0xffffffff
+                checks["tso31_checked_image_in_shared_u"] = (
+                    struct.unpack_from(">I",raw,0x122dc)[0] == 0 and
+                    tso_real >= 0x400000 and tso_bytes == 1094960 and
+                    tso_entry == 0x07000000 and tso_blocks == 76 and
+                    tso_input_fnv == 0x5db419ae and
+                    tso_hash == 0x3ce51566 and
+                    all(page_real(raw,0x28000f,0x07000000+i*4096) ==
+                        tso_real+i*4096 for i in range(tso_pages)))
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
                 real_bytes == 0x10000000 and stage >= 0x400000 and
                 stage + 0x400000 <= launch and launch + 4096 <= real_bytes and
@@ -476,6 +493,7 @@ def main():
     p.add_argument("cmsfile", nargs="?", choices=("cmsfile",))
     p.add_argument("cmslibrary", nargs="?", choices=("cmslibrary",))
     p.add_argument("cms24file", nargs="?", choices=("cms24file",))
+    p.add_argument("tso31", nargs="?", choices=("tso31",))
     try:
         return run(p.parse_args())
     except (OSError, ValueError) as exc:

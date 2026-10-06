@@ -22,6 +22,38 @@ static void put_word(unsigned char *p, unsigned int value)
     p[2]=(unsigned char)(value>>8); p[3]=(unsigned char)value;
 }
 
+int TSTSTAGEHEADER(const unsigned char *block, unsigned int length,
+                   unsigned int *raw_bytes, unsigned int *blocks)
+{
+    static const unsigned char magic[8]={
+        0x50U,0x44U,0x54U,0x53U,0x4fU,0x33U,0x31U,0x01U};
+    unsigned int i, bytes, count;
+    if (!block || !raw_bytes || !blocks || length<TST_BLOCK)
+        return TST_BAD;
+    for (i=0U; i<8U; ++i) if (block[i]!=magic[i]) return TST_BAD;
+    bytes=word(block+8U); count=word(block+12U);
+    if (bytes<56U+280U+292U+16U || bytes>TST_MAX_RAW ||
+        count!=(bytes+64U+TST_BLOCK-1U)/TST_BLOCK || !count ||
+        word(block+20U)!=0U) return TST_BAD;
+    for (i=24U; i<64U; ++i) if (block[i]) return TST_BAD;
+    *raw_bytes=bytes; *blocks=count;
+    return TST_OK;
+}
+
+int TSTSTAGEVALIDATE(const unsigned char *stage, unsigned int length,
+                     unsigned int expected_mode, TSTINFO *info)
+{
+    unsigned int bytes, blocks, i, fnv=0x811c9dc5U;
+    if (!stage || !info ||
+        TSTSTAGEHEADER(stage,length,&bytes,&blocks)!=TST_OK ||
+        length!=blocks*TST_BLOCK) return TST_BAD;
+    for (i=0U; i<bytes; ++i)
+        fnv=(fnv^stage[64U+i])*0x01000193U;
+    if (fnv!=word(stage+16U)) return TST_BAD;
+    for (i=64U+bytes; i<length; ++i) if (stage[i]) return TST_BAD;
+    return TSTHEADER(stage+64U,bytes,expected_mode,info);
+}
+
 int TSTHEADER(const unsigned char *raw, unsigned int bytes,
               unsigned int expected_mode, TSTINFO *info)
 {

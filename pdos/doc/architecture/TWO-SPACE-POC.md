@@ -473,6 +473,17 @@ ANY header, but high image relocation, K dataset staging, shared-U mapping,
 TSO SVC services and actual TSO execution remain integration work. This
 host/target-build result does not count as TSO coexistence in the guest.
 
+The [fresh-IPL TSO31 map](../qualification/TWO-SPACE-TSO31-MAP-2026-10-06.md)
+now carries that unchanged native record stream through K's bounded 3390
+reader and private materialization buffer, then installs 268 U pages at
+`0x07000000`. Both CMS31 images and CMS24 stay mapped. The complete guest
+image hash matches the host loader's image at that base; staged K buffers
+are released and no page of U's low 24-bit placement gap is taken. This
+is a genuine same-ASCE image coexistence result, while dispatch and MVS-style
+service compatibility remain untested. The current C31 service nearly fills
+its 64 KiB fixture slot, so new services require an explicit K layout and
+DAT capacity decision.
+
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
 SVC through K, returns `0x3456` to a U64 caller, restores the parent PTEs,

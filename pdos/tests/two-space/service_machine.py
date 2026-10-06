@@ -126,7 +126,8 @@ def make_core(elf, classic, dat_emit, out):
 
 
 def judge(raw, log, ipl=False, cms24=False, cms31=False,
-          cmsfile=False, cmslibrary=False, cms24file=False):
+          cmsfile=False, cmslibrary=False, cms24file=False,
+          tso31=False):
     if len(raw) != 0x14000 or raw[0x2000:0x2008] != b"PD2NEXT1":
         raise ValueError("missing/malformed result core")
     expected_masks = (0x0481000000000000, 0x0481000080000000) + \
@@ -261,7 +262,8 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
          (4 * ((1681088 + 4095) // 4096) + 2 if cms24file else 0) +
          (((4238296 + 4095) // 4096) +
           2 * ((struct.unpack_from(">I",raw,0x4514)[0] + 4095) // 4096)
-          if cmslibrary else 0)) and
+          if cmslibrary else 0) +
+         ((1094960 + 4095) // 4096 if tso31 else 0)) and
         0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x160000)
     errors = [x for x in log.splitlines() if re.search(r"HHC\d{5}E\b", x)]
     checks["no_hercules_error"] = not errors
@@ -292,7 +294,8 @@ def run(args):
                  "twospace_channel.asm", "twospace_dataset.c",
                  "twospace_dataset.h", "twospace_cms.c", "twospace_cms.h",
                  "twospace_cmsfile.c", "twospace_cmsfile.h",
-                 "twospace_cmscursor.c", "twospace_cmscursor.h"):
+                 "twospace_cmscursor.c", "twospace_cmscursor.h",
+                 "twospace_tso.c", "twospace_tso.h"):
         manifest["source_sha256"]["pdos/src/" + name] = digest(src.parent.parent / "src" / name)
     for name in ("dat.c", "dat_emit.c", "placement.c", "gate.c", "memory.c",
                  "channel.c", "dataset.c", "cms.c", "cmsfile.c",

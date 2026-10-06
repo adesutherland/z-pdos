@@ -294,6 +294,15 @@ builds the code with Classic C31. It validates the pinned TSO64 ANY directory
 but does not materialize or run that image. K staging, U mapping, TSO service
 dispatch and fresh guest execution remain open.
 
+The [TSO31 shared-U map checkpoint](qualification/TWO-SPACE-TSO31-MAP-2026-10-06.md)
+now reads the pinned native stream through K's checked CKD path, validates
+its staged records, materializes it privately and maps all 268 pages at
+U `0x07000000` beside both CMS31 images and CMS24. A fresh IPL passes 124
+checks. TSO31 execution and its MVS-style services remain open, as do TSO64
+materialization, native TSO24 and the normal replacement image. The C31
+fixture service uses 60,926 of its reserved 65,536 bytes; any expansion must
+be K-only and explicitly budgeted rather than consuming low U placement.
+
 ## PD-004: Batch-file delivery
 
 - Type: improvement

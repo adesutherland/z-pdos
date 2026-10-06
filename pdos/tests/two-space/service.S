@@ -809,6 +809,17 @@ cms24_io_pop:
     l %r4, 0(%r3)
     st %r4, 0x2d4(%r2)
 cms24_io_done:
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    lghi %r3, 0x231
+    st %r3, 0x2dc(%r2)
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 231                 /* checked native TSO31 image into shared U */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x2dc(%r2)
     brasl %r14, wide_heap_workload
     larl %r3, high_data_va
     lg %r3, 0(%r3)
@@ -982,6 +993,8 @@ trace_not_cms_fst:
     chi %r2, 229
     je storage_no_record
     chi %r2, 230
+    je storage_no_record
+    chi %r2, 231
     je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore
