@@ -12,7 +12,8 @@ static const TSFMAPPING kmaps[] = {
 static const TSFMAPPING umaps[] = {
     {0U,0x20000U,0x5000U}, {0U,0x21000U,0x7000U},
     {0U,0x02000000U,0x11000U}, {1U,0x10000000U,0x6000U},
-    {1U,0x10001000U,0x12000U}, {1U,0x10002000U,0x13000U}
+    {1U,0x10001000U,0x12000U}, {1U,0x10002000U,0x13000U},
+    {1U,0x10003000U,0x1f000U}
 };
 
 static int map_all(TSDSTATE *state, const TSFMAPPING *maps,

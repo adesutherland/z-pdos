@@ -31,7 +31,7 @@ def load_elf(path):
     hdr = struct.unpack_from(">HHIQQQIHHHHHH", raw, 16)
     typ, machine, version, entry, phoff, _, flags, ehsize, phsize, phnum = hdr[:10]
     if (typ, machine, version, entry, flags, ehsize, phsize, phnum) != (
-            2, 22, 1, 0x1000, 0, 64, 56, 13):
+            2, 22, 1, 0x1000, 0, 64, 56, 14):
         raise ValueError("unexpected ELF machine, entry or segment count")
     if phoff + phnum * phsize > len(raw):
         raise ValueError("truncated ELF program headers")
@@ -40,7 +40,7 @@ def load_elf(path):
                 (0x21000, 0x7000), (0x22000, 0x8000),
                 (KCORE, 0x9000), (0x02020000, 0xf000),
                 (0x02000000, 0x11000), (HIGH_REQUEST, 0x12000),
-                (0x110002000, 0x13000)}
+                (0x110002000, 0x13000), (0x110003000, 0x1f000)}
     core = bytearray(0x400000)
     actual = set()
     for i in range(phnum):
@@ -81,7 +81,8 @@ def make_core(elf, classic, dat_emit, out):
                    for i in range(32)})
     application = {0x20000: 0x5000, 0x21000: 0x7000,
                    0x02000000: 0x11000, 0x110000000: 0x6000,
-                   HIGH_REQUEST: 0x12000, 0x110002000: 0x13000}
+                   HIGH_REQUEST: 0x12000, 0x110002000: 0x13000,
+                   0x110003000: 0x1f000}
     pools = ((0x100000, 0x280000), (0x280000, 0x3e0000))
     if any(lo <= pa < hi for pa in (*kernel.values(), *application.values())
            for lo, hi in pools):
@@ -190,6 +191,15 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
     checks["cms24_live_getmain_freemain"] = (
         struct.unpack_from(">III",raw,0x7020) == (0x22000,0,0) and
         struct.unpack_from(">I",raw,0x702c)[0] == 0x5a)
+    for enabled, label, offset in (
+            (cms24, "cms24_k_invocation", 0x123a0),
+            (cms31, "cms31_k_invocation", 0x123ac),
+            (cms31, "cms31_overlay_k_invocation", 0x123d0),
+            (cmslibrary, "cms31_second_k_invocation", 0x123b8),
+            (cms24file, "cms24_io_k_invocation", 0x123c4)):
+        if enabled:
+            begin, token, end = struct.unpack_from(">III",raw,offset)
+            checks[label] = begin == end == 0 and token != 0
     checks["tso64_above_line_getmain_freemain"] = (
         qword(raw,0x12030) == 0x02010000 and
         struct.unpack_from(">II",raw,0x12038) == (0,0) and

@@ -10,7 +10,8 @@ static unsigned int rights(unsigned int frame, void *unused)
     (void)unused;
     if (frame == 0x7000U || frame == 0x12000U || frame == 0x13000U)
         return TSG_READ | TSG_WRITE;
-    if (frame == 0x5000U || frame == 0x6000U || frame == 0x11000U)
+    if (frame == 0x5000U || frame == 0x6000U || frame == 0x11000U ||
+        frame == 0x1f000U)
         return TSG_READ;
     return 0U;
 }
@@ -69,11 +70,16 @@ static int test(unsigned char *real)
     request.address.hi=1U; request.address.lo=0x10002ffeU;
     memset(buffer,0x5aU,sizeof buffer);
     memcpy(unchanged,buffer,sizeof buffer);
-    if (TSGPROBE(&gate,&request) != TSG_UNMAPPED ||
+    if (TSGPROBE(&gate,&request) != TSG_DENIED ||
         real[0x13ffeU] != 0U || real[0x13fffU] != 0U) return 19;
-    if (TSGCOPY(&gate,&request,buffer,sizeof buffer) != TSG_UNMAPPED ||
+    if (TSGCOPY(&gate,&request,buffer,sizeof buffer) != TSG_DENIED ||
         memcmp(buffer,unchanged,sizeof buffer) ||
         real[0x13ffeU] != 0U || real[0x13fffU] != 0U) return 7;
+    request.address.lo=0x10003ffeU;
+    request.direction=TSG_READ;
+    if (TSGPROBE(&gate,&request) != TSG_UNMAPPED ||
+        TSGCOPY(&gate,&request,buffer,sizeof buffer) != TSG_UNMAPPED)
+        return 20;
     request.length=0U;
     if (TSGCOPY(&gate,&request,buffer,sizeof buffer) != TSG_BAD) return 8;
     request.length=TSG_MAX_COPY+1U;

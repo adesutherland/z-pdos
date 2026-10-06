@@ -165,7 +165,13 @@ an I/O completed. The exact parameter layouts and terminal request structures
 remain implementation gates in [PD-003](../BACKLOG.md#pd-003-two-space-supervisor-and-shared-application-memory)
 and [PD-021](../BACKLOG.md#pd-021-reusable-3270-application-presentation).
 The first [K invocation-ledger component result](../qualification/TWO-SPACE-INVOCATION-2026-10-06.md)
-proves token and cleanup behavior but is not yet called by this dispatcher.
+proved token and cleanup ordering. The subsequent [TSO](../qualification/TWO-SPACE-INVOCATION-GATE-2026-10-06.md)
+and [CMS](../qualification/TWO-SPACE-CMS-INVOCATION-2026-10-06.md) guest
+gates connect the descriptor to selected native service calls, and the
+[allocation unwind](../qualification/TWO-SPACE-INVOCATION-REAP-2026-10-06.md)
+releases a live page on end. The diagnostic U fixture still requests entry;
+K-controlled launch, complete resource ownership, fault unwind and event
+delivery remain to be implemented.
 
 ## Step 1: address and transition contract
 
@@ -584,8 +590,10 @@ SDK programs, exercise the CMS31 C stack, or establish the service ABI.
 
 The [unchanged CMS31 entry result](../qualification/TWO-SPACE-CMS31-NATIVE-2026-10-06.md)
 runs RXVM `-v` with its image-resident 3 MiB C stack and 64 MiB U31
-heap. K's Classic C31 endpoint recognizes the selected CMSCALL storage and
-line-write requests by the caller's saved PC within the checked CMS31 image.
+heap. At that checkpoint K's Classic C31 endpoint recognized the selected
+CMSCALL storage and line-write requests by the caller's saved PC within the
+checked CMS31 image. The later invocation gate uses an explicit CMS owner
+and checks that PC against the selected image.
 It copies U parameters through the K gate and records one exact version
 line. General CMS file, input and command APIs remain open.
 The later [unchanged CMS24 entry result](../qualification/TWO-SPACE-CMS24-NATIVE-2026-10-06.md)

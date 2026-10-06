@@ -393,6 +393,7 @@ app_high:
     st %r15, 76(%r2)
     stg %r1, 80(%r2)
     j wide_heap_code_end
+.section .apphelper,"ax"
 wide_heap_workload:
     lghi %r0, 4096          /* concurrent 64 MiB U31 heap */
     sllg %r0, %r0, 14
@@ -473,6 +474,7 @@ wide_heap_done:
     larl %r4, wide_heap_restore_gprs
     lmg %r8, %r9, 0(%r4)
     br %r14
+.section .apphigh,"ax"
 wide_heap_code_end:
     lghi %r0, 0             /* K reads VOL1 through its real channel buffer */
     lghi %r1, 0
@@ -609,6 +611,17 @@ cms24_overlay_done:
     larl %r4, cms24_bridge
     mvc 512(16,%r10),0(%r4)
     la %r13, 256(%r10)
+    lghi %r0, 124
+    larl %r1, cms24_image_va
+    lg %r1, 0(%r1)
+    lghi %r2, 0
+    svc 235                 /* CMS24 RXVM invocation */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3a0(%r2)
+    st %r1, 0x3a4(%r2)
+    chi %r15, 0
+    jne cms24_native_release_page
     lgr %r1, %r10
     larl %r3, cms24_image_va
     lg %r3, 0(%r3)
@@ -617,6 +630,14 @@ cms24_overlay_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x24c(%r2)
+    lghi %r0, 0
+    llgf %r1, 0x3a4(%r2)
+    lghi %r2, 0
+    svc 236
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3a8(%r2)
+cms24_native_release_page:
     lghi %r0, 4096
     lgr %r1, %r10
     lghi %r15, 0x10
@@ -658,13 +679,32 @@ cms24_native_done:
     lg %r3, 0(%r3)
     l %r4, 0(%r3)
     st %r4, 392(%r2)
+    lghi %r0, 131
+    larl %r1, cms31_image_va
+    lg %r1, 0(%r1)
+    lghi %r2, 0
+    svc 235                 /* mapped CMS31 overlay child */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3d0(%r2)
+    st %r1, 0x3d4(%r2)
+    chi %r15, 0
+    jne cms31_overlay_pop
     larl %r3, cms31_trampoline_va
     lg %r3, 0(%r3)
     basr %r14, %r3         /* low U trampoline switches to AMODE31 */
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 404(%r2)
-    lgr %r0, %r15          /* child completion value */
+    lghi %r0, 0
+    llgf %r1, 0x3d4(%r2)
+    lghi %r2, 0
+    svc 236
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3d8(%r2)
+cms31_overlay_pop:
+    llgf %r0, 404(%r2)     /* child completion value */
     lghi %r1, 0
     lghi %r2, 0
     svc 216
@@ -697,6 +737,17 @@ cms31_overlay_done:
     mvi 16(%r10), 0xff
     mvc 17(111,%r10),16(%r10)
     la %r13, 256(%r10)
+    lghi %r0, 131
+    larl %r1, cms31_image_va
+    lg %r1, 0(%r1)
+    lghi %r2, 0
+    svc 235                 /* first CMS31 RXVM invocation */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3ac(%r2)
+    st %r1, 0x3b0(%r2)
+    chi %r15, 0
+    jne cms31_native_release
     lgr %r1, %r10
     larl %r3, cms31_trampoline_va
     lg %r3, 0(%r3)
@@ -704,6 +755,13 @@ cms31_overlay_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x22c(%r2)
+    lghi %r0, 0
+    llgf %r1, 0x3b0(%r2)
+    lghi %r2, 0
+    svc 236
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3b4(%r2)
     l %r3, 0x264(%r2)
     chi %r3, 0              /* IOQUAL staged only in positive FST IPL */
     jne cms31_native_release
@@ -745,6 +803,17 @@ cms31_overlay_done:
     mvc 81(47,%r10),80(%r10)
     xc 256(72,%r10),256(%r10)
     la %r13, 256(%r10)
+    lghi %r0, 131
+    larl %r1, cms31_second_image_va
+    lg %r1, 0(%r1)
+    lghi %r2, 0
+    svc 235                 /* second relocated CMS31 RXVM */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3b8(%r2)
+    st %r1, 0x3bc(%r2)
+    chi %r15, 0
+    jne cms31_native_release
     lgr %r1, %r10
     larl %r3, cms31_second_trampoline_va
     lg %r3, 0(%r3)
@@ -752,6 +821,13 @@ cms31_overlay_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x270(%r2)
+    lghi %r0, 0
+    llgf %r1, 0x3bc(%r2)
+    lghi %r2, 0
+    svc 236
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3c0(%r2)
     lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0
@@ -805,6 +881,17 @@ cms31_native_done:
     larl %r4, cms24_bridge
     mvc 512(16,%r10),0(%r4)
     la %r13, 256(%r10)
+    lghi %r0, 124
+    larl %r1, cms24_image_va
+    lg %r1, 0(%r1)
+    lghi %r2, 0
+    svc 235                 /* CMS24 IO24 RXVM invocation */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3c4(%r2)
+    st %r1, 0x3c8(%r2)
+    chi %r15, 0
+    jne cms24_io_release_page
     lgr %r1, %r10
     larl %r3, cms24_image_va
     lg %r3, 0(%r3)
@@ -814,12 +901,20 @@ cms31_native_done:
     lg %r2, 0(%r2)
     st %r15, 0x2c4(%r2)
     lghi %r0, 0
+    llgf %r1, 0x3c8(%r2)
+    lghi %r2, 0
+    svc 236
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3cc(%r2)
+    lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0
     svc 229                 /* snapshot/release profile-24 K files */
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x2c8(%r2)
+cms24_io_release_page:
     lghi %r0, 4096
     lgr %r1, %r10
     lghi %r15, 0x10
@@ -1146,6 +1241,7 @@ high_data_va: .quad 0x110001000
 input_data_va: .quad 0x110001080
 cms31_image_va: .quad 0x03000000
 cms24_image_va: .quad 0x20000
+cms31_second_image_va: .quad 0x05000000
 cms31_trampoline_va: .quad app_b_cms31_call
 cms31_second_trampoline_va: .quad app_b_cms31_second_call
 tso31_trampoline_va: .quad app_b_tso31_call
