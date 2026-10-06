@@ -175,6 +175,14 @@ delivery remain to be implemented.
 The [image-selection gate](../qualification/TWO-SPACE-IMAGE-SELECTION-2026-10-06.md)
 then replaced caller-declared personality and placement with a checked K
 record; normal command launch and dynamic image handles remain open.
+The subsequent [heap](../qualification/TWO-SPACE-INVOCATION-HEAP-2026-10-06.md),
+[input cursor](../qualification/TWO-SPACE-INVOCATION-FILES-2026-10-06.md) and
+[output staging](../qualification/TWO-SPACE-INVOCATION-OUTPUT-2026-10-06.md)
+checks bind selected CMS resources to the active invocation and preflight
+releases against its K handle. FINIS-closed output is held for the diagnostic
+audit. The unchanged guest workloads pass fresh IPL, but native nested-file
+and heap guest controls, personality lowcore switching, terminal leases,
+pending I/O cancellation and fault unwind remain open.
 
 ## Step 1: address and transition contract
 
