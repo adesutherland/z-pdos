@@ -231,6 +231,11 @@ The [failed-start gate](qualification/TWO-SPACE-TERMINAL-START-FAILURE-2026-10-0
 now injects an absent subchannel at SSCH after a third real AID, checks RC 12,
 and verifies that a fresh read can start and cancel. Invocation-owned pending
 I/O failure and late completion after owner exit remain separate gates.
+The [owned pending-I/O gate](qualification/TWO-SPACE-OWNED-IO-2026-10-06.md)
+now enters a real AID under a parent token, begins READ MODIFIED, suspends it
+across a nested child, and checks parent-end clear plus a fresh pending read.
+Physical late completion injection and recoverable child-fault unwind remain
+open P1 gates.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and

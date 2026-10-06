@@ -729,16 +729,22 @@ static unsigned int terminal_service(const TSGREQUEST *request)
         0xd2U,0x40U,0xc6U,0xc1U,0xc9U,0xd3U,0x40U,
         0xd9U,0xc5U,0xc1U,0xc4U,0xe8U
     };
+    static const unsigned char owner_message[] = {
+        0xd2U,0x40U,0xd6U,0xe6U,0xd5U,0xc5U,0xd9U,0x40U,
+        0xd9U,0xc5U,0xc1U,0xc4U,0xe8U
+    };
     const unsigned char *label;
     unsigned int label_length;
     unsigned char *screen;
     unsigned int ssid, i;
     int io_result;
-    if (request->length>2U || request->address.hi || request->address.lo ||
+    if (request->length>3U || request->address.hi || request->address.lo ||
         request->direction) return 8U;
-    label=request->length==2U ? fail_message :
+    label=request->length==3U ? owner_message :
+          request->length==2U ? fail_message :
           request->length ? retry_message : message;
-    label_length=request->length==2U ? (unsigned int)sizeof fail_message :
+    label_length=request->length==3U ? (unsigned int)sizeof owner_message :
+                 request->length==2U ? (unsigned int)sizeof fail_message :
                  request->length ? (unsigned int)sizeof retry_message :
                                    (unsigned int)sizeof message;
     if (*(volatile const unsigned int *)0x40bcU == 0U) return 0xfffffffbU;

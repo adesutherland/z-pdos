@@ -200,6 +200,21 @@ def run(args):
                                    fail_entered.returncode == 0)
         if not failed_start_input_sent:
             raise RuntimeError("3270 failed-start PING entry failed")
+        def owner_screen():
+            try:
+                observed = terminal_action(script_port, "Ascii()")
+                return observed.stdout if observed.returncode == 0 and \
+                    "K OWNER READY" in observed.stdout else None
+            except subprocess.TimeoutExpired:
+                return None
+        owner_view = await_condition(owner_screen, 30, "owned-read input screen")
+        out.joinpath("terminal.owner-screen").write_text(owner_view)
+        owner_typed = terminal_action(script_port, 'String("PING")')
+        owner_entered = terminal_action(script_port, "Enter()")
+        owner_input_sent = (owner_typed.returncode == 0 and
+                            owner_entered.returncode == 0)
+        if not owner_input_sent:
+            raise RuntimeError("3270 owned-read PING entry failed")
         await_wait_state(events, proc, out / "console.log")
         shown = terminal_action(script_port, "Ascii()")
         if shown.returncode == 0:
@@ -263,6 +278,7 @@ def run(args):
             judged["checks"]["terminal_retry_input_sent"] = retry_input_sent
             judged["checks"]["terminal_failed_start_input_sent"] = (
                 failed_start_input_sent)
+            judged["checks"]["terminal_owner_input_sent"] = owner_input_sent
             if args.cms24file and not args.tso31:
                 judged["checks"]["cms24_io24_summary_on_3270"] = (
                     "C24 SUMMARY: PASS=6 FAIL=0 SKIP=1" in

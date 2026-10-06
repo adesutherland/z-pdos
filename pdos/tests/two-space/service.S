@@ -539,6 +539,15 @@ terminal_owner_probe:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x44c(%r2)
+    lghi %r0, 3             /* host AID starts this owned read */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 208
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x478(%r2)
+    chi %r15, 0
+    jne terminal_owner_parent_end
     lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0
@@ -547,6 +556,25 @@ terminal_owner_probe:
     lg %r2, 0(%r2)
     st %r15, 0x41c(%r2)
     chi %r15, 0
+    jne terminal_owner_parent_end
+terminal_owner_poll:
+    lghi %r0, 256
+    larl %r1, input_data_va
+    lg %r1, 0(%r1)
+    lghi %r2, 2
+    svc 210
+    chi %r15, 1
+    jne terminal_owner_poll_error
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 241
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x474(%r2)
+    chi %r15, 1
+    je terminal_owner_poll
+    chi %r15, 2
     jne terminal_owner_parent_end
     lghi %r0, 5
     lghi %r1, 0
@@ -608,6 +636,23 @@ terminal_owner_parent_end:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x434(%r2)
+    chi %r15, 0
+    jne terminal_owner_done
+    lghi %r0, 256           /* no stale AID after the parent's clear */
+    larl %r1, input_data_va
+    lg %r1, 0(%r1)
+    lghi %r2, 2
+    svc 210
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x47c(%r2)
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 241
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x480(%r2)
     lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0
@@ -617,6 +662,11 @@ terminal_owner_parent_end:
     st %r15, 0x438(%r2)
 terminal_owner_done:
     br %r14
+terminal_owner_poll_error:
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x474(%r2)
+    j terminal_owner_parent_end
 terminal_inflight_probe:
     lghi %r0, 0             /* Begin asynchronous K-owned 3270 read */
     lghi %r1, 0
@@ -1254,6 +1304,7 @@ tso31_release_page:
     lg %r2, 0(%r2)
     st %r15, 0x2f0(%r2)
 tso31_call_done:
+    brasl %r14, terminal_owner_probe
     lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0
@@ -1425,7 +1476,6 @@ tso24_release_page:
     st %r15, 0x330(%r2)
 tso24_call_done:
     brasl %r14, nested_lowcore_probe
-    brasl %r14, terminal_owner_probe
     lghi %r0, 7            /* no K image record: deterministic failure */
     lghi %r1, 0
     lghi %r2, 0

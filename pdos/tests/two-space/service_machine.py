@@ -294,6 +294,12 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
          lease_finish == 0 and child_cancel == 8 and
          lease_parent != 0 and lease_child > lease_parent)
         if ipl else lease_begin == 8)
+    pending_phase, marker, retry_poll, retry_phase = struct.unpack_from(
+        ">4I",raw,0x12474)
+    checks["owned_pending_io_cleared_without_late_attention"] = (
+        (pending_phase == 2 and marker == 0 and
+         retry_poll == retry_phase == 1) if ipl else
+        pending_phase == marker == retry_poll == retry_phase == 0)
     image_leases=struct.unpack_from(">4I",raw,0x1244c)
     checks["shared_image_cache_leases_follow_nested_frames"] = (
         image_leases==(1,2,1,0) if ipl else image_leases==(0,0,0,0))
