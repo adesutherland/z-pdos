@@ -1,0 +1,71 @@
+/* SPDX-License-Identifier: MIT
+ * Qualify the separate native RMODE64 AL8 materializer against the unchanged
+ * beta 3 compiler, assembler and VM bodies, then link its Classic C31 object.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 7 then do
+    say "usage: crexx -nokeep pdos/scripts/two-space-tso-high.crexx --args FRESH-build/pdos/work PINNED_RXCH_RDW PINNED_RXASH_RDW PINNED_RXVMH_RDW CLASSIC_CC CLASSIC_AS CLASSIC_LD"
+    return 2
+  end
+  work = args.1; compiler = args.2; asmbody = args.3; vm = args.4
+  classiccc = args.5; classicas = args.6; classicld = args.7
+  if left(work,11) <> "build/pdos/" | length(work) <= 11 | pos("..",work) > 0 then do
+    say "fresh build/pdos/ output path required"
+    return 2
+  end
+  if left(compiler,1) <> "/" | left(asmbody,1) <> "/" | left(vm,1) <> "/" then do
+    say "absolute checked input paths required"
+    return 2
+  end
+  address crexx "run test ! -e :work"
+  if rc <> 0 then do
+    say "output path already exists"
+    return 2
+  end
+  inputs = .string[]
+  inputs.1 = compiler; inputs.2 = asmbody; inputs.3 = vm
+  expected = .string[]
+  expected.1 = "2f0d99baaaf9a6089fcaaa75de2bc945ea92eea16832f581ed9726584f43be0b"
+  expected.2 = "480cb94ea1f511956ae1df8ef3b632620c4048d690b4a922bacec599025c05f9"
+  expected.3 = "9d45e418f1ce45253ec0a09dfb3015d856c75bda96aa55cb5bf8dae411ac438f"
+  do i = 1 to 3
+    input = inputs.i
+    address crexx "run test -f :input"
+    if rc <> 0 then return 2
+    hashes = .string[]
+    address crexx "run shasum -a 256 :input" output hashes
+    if rc <> 0 | word(hashes.1,1) <> expected.i then do
+      say "pinned HIGH native member mismatch" input
+      return 2
+    end
+  end
+  lines = .string[]
+  address crexx "pwd" output lines
+  out = strip(lines.1) || "/" || work
+  address crexx "run mkdir -p :out"
+  if rc <> 0 then return rc
+  host = out || "/tso-high-host-test"
+  asm = out || "/TSTHIGH.asm"
+  obj = out || "/TSTHIGH.obj"
+  binary = out || "/TSTHIGH.bin"
+  mapfile = out || "/TSTHIGH.map"
+  legacy = out || "/legacy-loader.o"
+  address crexx "run clang -std=c89 -O1 -g -Wno-format -Wno-pointer-to-int-cast -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src -c pdos/src/pdosutil.c -o :legacy"
+  if rc <> 0 then return rc
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_tso.c pdos/tests/two-space/tso_high.c :legacy -o :host"
+  if rc <> 0 then return rc
+  address crexx "run :host :compiler :asmbody :vm"
+  if rc <> 0 then return rc
+  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src pdos/src/twospace_tso.c -o :asm"
+  if rc <> 0 then return rc
+  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :obj"
+  if rc <> 0 then return rc
+  address crexx "run :classicld --oformat binary --image-base 33554432 -Map :mapfile -o :binary :obj"
+  if rc <> 0 then return rc
+  address crexx "run test -s :binary"
+  if rc <> 0 then return rc
+  say "Pinned TSO64 HIGH AL8 images match the released loader; Classic C31 object linked."
+  return 0

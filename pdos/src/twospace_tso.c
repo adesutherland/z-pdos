@@ -76,8 +76,9 @@ int TSTSTAGEVALIDATE(const unsigned char *stage, unsigned int length,
                      unsigned int expected_mode, TSTINFO *info)
 { return stage_validate(stage,length,expected_mode,info); }
 
-int TSTHEADER(const unsigned char *raw, unsigned int bytes,
-              unsigned int expected_mode, TSTINFO *info)
+static int native_header(const unsigned char *raw, unsigned int bytes,
+                         unsigned int expected_mode, unsigned int high,
+                         TSTINFO *info)
 {
     unsigned int at=0U, rec=0U, size, max_record=0U;
     unsigned int flags=0U, entry=0U, fnv=0x811c9dc5U, i;
@@ -109,7 +110,8 @@ int TSTHEADER(const unsigned char *raw, unsigned int bytes,
                 (expected_mode==31U && (flags&3U)!=2U) ||
                 (expected_mode==64U && (flags&3U)!=1U) ||
                 (expected_mode!=24U && !(flags&0x10U)) ||
-                (flags&0x20U))
+                (high ? (expected_mode!=64U || flags!=0x31U) :
+                        (flags&0x20U)))
                 return TST_BAD;
         }
         at+=size;
@@ -120,13 +122,22 @@ int TSTHEADER(const unsigned char *raw, unsigned int bytes,
     info->records=rec;
     info->max_record=max_record;
     info->mode=expected_mode;
-    info->rmode_any=(flags&0x10U)!=0U;
+    info->rmode_any=(flags&0x10U)!=0U && !high;
+    info->rmode_high=high;
     info->flags=flags;
     info->entry_offset=entry;
     info->image_bytes=0U;
     info->input_fnv=fnv;
     return TST_OK;
 }
+
+int TSTHEADER(const unsigned char *raw, unsigned int bytes,
+              unsigned int expected_mode, TSTINFO *info)
+{ return native_header(raw,bytes,expected_mode,0U,info); }
+
+int TSTHEADER64HIGH(const unsigned char *raw, unsigned int bytes,
+                    TSTINFO *info)
+{ return native_header(raw,bytes,64U,1U,info); }
 
 static int rld31(unsigned char *image, unsigned int text_bytes,
                  unsigned int base, const unsigned char *rld,
@@ -163,20 +174,103 @@ static int rld31(unsigned char *image, unsigned int text_bytes,
     return at==length ? TST_OK : TST_BAD;
 }
 
-static int image_low(const unsigned char *raw, unsigned int bytes,
-                     unsigned int base, unsigned char *image,
-                     unsigned int capacity, unsigned int mode, TSTINFO *info)
+static int rld64_collect(const unsigned char *rld, unsigned int length,
+                         unsigned int text_bytes, const TSTSECTION *sections,
+                         unsigned int section_count, unsigned int *offsets,
+                         unsigned int maximum, unsigned int *used)
+{
+    unsigned int at=16U, source=0U, i, size, address;
+    int continuing=0, found;
+    if (length<16U || !offsets || !used) return TST_BAD;
+    while (at<length) {
+        if (!continuing) {
+            if (length-at<4U) return TST_BAD;
+            source=half(rld+at+2U);
+            found=0;
+            for (i=0U; i<section_count; ++i)
+                if (sections[i].id==source) { found=1; break; }
+            if (!found) return TST_BAD;
+            at+=4U;
+        }
+        if (length-at<4U || (rld[at]&2U) ||
+            ((rld[at]&0x30U)!=0U && (rld[at]&0x30U)!=0x10U))
+            return TST_BAD;
+        size=((rld[at]&0x0cU)>>2)+1U;
+        if (rld[at]&0x40U) size+=4U;
+        if (size!=8U) return TST_BAD;
+        continuing=(rld[at]&1U)!=0U;
+        ++at;
+        address=triple(rld+at);
+        at+=3U;
+        if (address>text_bytes || size>text_bytes-address ||
+            *used>=maximum) return TST_BAD;
+        offsets[(*used)++]=address;
+    }
+    return at==length ? TST_OK : TST_BAD;
+}
+
+static void sort_offsets(unsigned int *offsets, unsigned int count)
+{
+    unsigned int gap, i, j, value;
+    for (gap=count/2U; gap; gap/=2U)
+        for (i=gap; i<count; ++i) {
+            value=offsets[i];
+            j=i;
+            while (j>=gap && offsets[j-gap]>value) {
+                offsets[j]=offsets[j-gap];
+                j-=gap;
+            }
+            offsets[j]=value;
+        }
+}
+
+static int relocate_high(unsigned char *image, unsigned int image_bytes,
+                         TSPADDR base, unsigned int *offsets,
+                         unsigned int count)
+{
+    unsigned int i, offset, oldlo, newlo, newhi;
+    sort_offsets(offsets,count);
+    /* Preflight the whole relocation set before changing the staging image. */
+    for (i=0U; i<count; ++i) {
+        offset=offsets[i];
+        if (offset>image_bytes || 8U>image_bytes-offset ||
+            (i && offset<offsets[i-1U]+8U) ||
+            word(image+offset)!=0U) return TST_BAD;
+        oldlo=word(image+offset+4U);
+        newlo=base.lo+oldlo;
+        newhi=base.hi+(newlo<oldlo);
+        if (oldlo>=image_bytes || newhi<base.hi) return TST_BAD;
+    }
+    for (i=0U; i<count; ++i) {
+        offset=offsets[i];
+        oldlo=word(image+offset+4U);
+        newlo=base.lo+oldlo;
+        put_word(image+offset,base.hi+(newlo<oldlo));
+        put_word(image+offset+4U,newlo);
+    }
+    return TST_OK;
+}
+
+static int image_native(const unsigned char *raw, unsigned int bytes,
+                        TSPADDR base, unsigned char *image,
+                        unsigned int capacity, unsigned int mode,
+                        unsigned int high, unsigned int *relocations,
+                        unsigned int max_relocations, TSTINFO *info)
 {
     TSTSECTION sections[TST_SECTIONS];
     TSTINFO parsed;
     unsigned int at=0U, rec=0U, size, q, remaining, sublength;
     unsigned int section_count=0U, first, count, i, offset;
     unsigned int nexttext=0U, lastend=0U, imageend=0U;
+    unsigned int relocation_count=0U;
     int last_type=-1, type, done=0;
     if (!image || !info || !capacity || capacity>TST_MAX_IMAGE ||
         (mode!=24U && mode!=31U && mode!=64U) ||
-        (base&4095U) || base<(mode==24U ? 0x10000U : 0x1000000U) ||
-        TSTHEADER(raw,bytes,mode,&parsed)!=TST_OK) return TST_BAD;
+        (base.lo&4095U) ||
+        (high ? (mode!=64U || !base.hi || !relocations ||
+                 !max_relocations) :
+                (base.hi || base.lo<(mode==24U ? 0x10000U : 0x1000000U))) ||
+        native_header(raw,bytes,mode,high,&parsed)!=TST_OK) return TST_BAD;
     for (i=0U; i<capacity; ++i) image[i]=0U;
     while (at<bytes && !done) {
         size=half(raw+at);
@@ -227,8 +321,12 @@ static int image_low(const unsigned char *raw, unsigned int bytes,
                         return TST_BAD;
                     nexttext=triple(raw+q+9U);
                 } else if (type==2 || type==14) {
-                    if (rld31(image,lastend,base,raw+q,sublength,
-                              sections,section_count)!=TST_OK)
+                    if ((high ?
+                        rld64_collect(raw+q,sublength,lastend,sections,
+                                      section_count,relocations,max_relocations,
+                                      &relocation_count) :
+                        rld31(image,lastend,base.lo,raw+q,sublength,
+                              sections,section_count))!=TST_OK)
                         return TST_BAD;
                     if (type==14) done=1;
                 } else if (type==3 || type==15) {
@@ -236,8 +334,12 @@ static int image_low(const unsigned char *raw, unsigned int bytes,
                     if (sublength<16U) return TST_BAD;
                     rld_length=half(raw+q+6U)+16U;
                     if (rld_length>sublength ||
-                        rld31(image,lastend,base,raw+q,rld_length,
-                              sections,section_count)!=TST_OK ||
+                        (high ?
+                         rld64_collect(raw+q,rld_length,lastend,sections,
+                                       section_count,relocations,
+                                       max_relocations,&relocation_count) :
+                         rld31(image,lastend,base.lo,raw+q,rld_length,
+                               sections,section_count))!=TST_OK ||
                         raw[q+8U]!=6U) return TST_BAD;
                     nexttext=triple(raw+q+9U);
                 } else if (type!=0x80) {
@@ -256,8 +358,12 @@ static int image_low(const unsigned char *raw, unsigned int bytes,
     }
     if (!done || at!=bytes-16U || !imageend || imageend>capacity ||
         parsed.entry_offset>=imageend ||
-        base>(mode==24U ? 0x1000000U-imageend :
-                             0x7fffffffU-imageend)) return TST_BAD;
+        (high ? (base.hi==0xffffffffU &&
+                 base.lo>0xffffffffU-(imageend-1U)) :
+                base.lo>(mode==24U ? 0x1000000U-imageend :
+                                      0x7fffffffU-imageend))) return TST_BAD;
+    if (high && relocate_high(image,imageend,base,relocations,
+                              relocation_count)!=TST_OK) return TST_BAD;
     parsed.image_bytes=imageend;
     *info=parsed;
     return TST_OK;
@@ -267,23 +373,38 @@ int TSTIMAGE31(const unsigned char *raw, unsigned int bytes,
                unsigned int base, unsigned char *image,
                unsigned int capacity, TSTINFO *info)
 {
-    return image_low(raw,bytes,base,image,capacity,31U,info);
+    TSPADDR address;
+    address.hi=0U; address.lo=base;
+    return image_native(raw,bytes,address,image,capacity,31U,0U,0,0U,info);
 }
 
 int TSTIMAGE24(const unsigned char *raw, unsigned int bytes,
                unsigned int base, unsigned char *image,
                unsigned int capacity, TSTINFO *info)
 {
+    TSPADDR address;
     /* The selected AMODE24/RMODE24 member has low-only AL3/AL4 records.
      * Its whole image, including save areas, must end below 16 MiB. */
-    return image_low(raw,bytes,base,image,capacity,24U,info);
+    address.hi=0U; address.lo=base;
+    return image_native(raw,bytes,address,image,capacity,24U,0U,0,0U,info);
 }
 
 int TSTIMAGE64ANY(const unsigned char *raw, unsigned int bytes,
                   unsigned int base, unsigned char *image,
                   unsigned int capacity, TSTINFO *info)
 {
+    TSPADDR address;
     /* AMODE64/RMODE ANY still carries AL4 relocations in a low-resident
      * classic member. The high-resident module has a distinct AL8 format. */
-    return image_low(raw,bytes,base,image,capacity,64U,info);
+    address.hi=0U; address.lo=base;
+    return image_native(raw,bytes,address,image,capacity,64U,0U,0,0U,info);
+}
+
+int TSTIMAGE64HIGH(const unsigned char *raw, unsigned int bytes,
+                   TSPADDR base, unsigned char *image, unsigned int capacity,
+                   unsigned int *relocations, unsigned int max_relocations,
+                   TSTINFO *info)
+{
+    return image_native(raw,bytes,base,image,capacity,64U,1U,
+                        relocations,max_relocations,info);
 }

@@ -16,6 +16,11 @@ and native directory byte. The ignored extraction and receipts are under
 
 All launchers have directory byte `0x11`; all bodies have `0x31`.
 The native entry offset recorded in each of these six directories is zero.
+The existing released `fixPEHigh` loader, run under host sanitizers on these
+unchanged RDW bodies at U base `0x110000000`, produced image lengths
+3,916,064 bytes for `RXCH`, 1,775,648 for `RXASH` and 1,799,472 for
+`RXVMH`, each with entry offset zero. This is a host loader observation;
+it does not run those images in the successor guest.
 The released one-ASCE loader uses separate LOAD/DELETE for the high bodies;
 its high relocation form uses AL8. A successor materializer must use a
 full-width U base, validate every relocation before publishing any image,
@@ -37,5 +42,6 @@ one model-2064 ESAME CPU, 256 MiB real, 3390 `01B9`, 3270 `0009`, with the
 pinned toolchain and application stages in the
 [invocation gate](TWO-SPACE-INVOCATION-GATE-2026-10-06.md).
 
-This checkpoint does not stage HIGH on the diagnostic disk, materialize an
-AL8 body, or run a HIGH guest entry. Those remain P0/P3/P6 gates.
+The later [successor materializer gate](TWO-SPACE-TSO64-HIGH-LOADER-2026-10-06.md)
+matches these bodies byte for byte at a full-width U base. This inventory
+checkpoint itself did not stage or run a HIGH guest entry.

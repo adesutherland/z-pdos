@@ -6,20 +6,26 @@
 #ifndef PDOS_TWO_SPACE_TSO_H
 #define PDOS_TWO_SPACE_TSO_H
 
+#include "twospace_placement.h"
+
 #define TST_OK 0
 #define TST_BAD -1
 #define TST_MAX_RAW (5U*1024U*1024U)
 #define TST_MAX_IMAGE (5U*1024U*1024U)
+#define TST_MAX_HIGH_RELOCS 65536U
 #define TST_BLOCK 18452U
 typedef struct {
     unsigned int raw_bytes, records, max_record;
-    unsigned int mode, rmode_any, flags;
+    unsigned int mode, rmode_any, rmode_high, flags;
     unsigned int entry_offset, image_bytes;
     unsigned int input_fnv;
 } TSTINFO;
 
 int TSTHEADER(const unsigned char *raw, unsigned int bytes,
               unsigned int expected_mode, TSTINFO *info);
+/* The RMODE64 member is a distinct native format with AL8 relocations. */
+int TSTHEADER64HIGH(const unsigned char *raw, unsigned int bytes,
+                    TSTINFO *info);
 int TSTSTAGEHEADER(const unsigned char *block, unsigned int length,
                    unsigned int *raw_bytes, unsigned int *blocks);
 int TSTSTAGEHEADER24(const unsigned char *block, unsigned int length,
@@ -43,5 +49,11 @@ int TSTIMAGE31(const unsigned char *raw, unsigned int bytes,
 int TSTIMAGE64ANY(const unsigned char *raw, unsigned int bytes,
                   unsigned int base, unsigned char *image,
                   unsigned int capacity, TSTINFO *info);
+/* The caller supplies K-only image staging and a K-only relocation-offset
+ * vector. A failed call never publishes any U mapping. */
+int TSTIMAGE64HIGH(const unsigned char *raw, unsigned int bytes,
+                   TSPADDR base, unsigned char *image, unsigned int capacity,
+                   unsigned int *relocations, unsigned int max_relocations,
+                   TSTINFO *info);
 
 #endif
