@@ -6,6 +6,8 @@
          ENTRY TSCIO
          ENTRY TSCDEV
          ENTRY TSCENABL
+         ENTRY TSCSTART
+         ENTRY TSCPOLL
 TSCIO    DS    0H
          STM   2,8,28(13)
          L     2,0(,1)
@@ -62,5 +64,29 @@ TSCENABL DS    0H
 TSEFAIL  SR    15,15
          BCTR  15,0
 TSERET   LM    2,3,28(13)
+         BR    14
+TSCSTART DS    0H
+         STM   2,4,28(13)
+         L     2,0(,1)
+         L     3,4(,1)
+         L     4,8(,1)
+         LR    1,2
+         TSCH  0(4)
+         SSCH  0(3)
+         SR    15,15
+         BRCL  8,TSSRET
+         BCTR  15,0
+TSSRET   LM    2,4,28(13)
+         BR    14
+TSCPOLL  DS    0H
+         STM   2,3,28(13)
+         L     2,0(,1)
+         L     3,4(,1)
+         LR    1,2
+         TSCH  0(3)
+         SR    15,15
+         BRCL  8,TSPRET
+         LA    15,1
+TSPRET   LM    2,3,28(13)
          BR    14
          END   TSCIO

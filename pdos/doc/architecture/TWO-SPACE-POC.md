@@ -327,9 +327,16 @@ through the same K-owned low-real channel buffer. An independently connected
 `0xa000`–`0xefff` and `0x14000`–`0x1efff`; its trampoline is at K virtual
 `0x02010000`, real `0xf000`. These addresses are absent from U. The larger
 service did not add a low U page: the diagnostic U map still has only two
-pages below 16 MiB. This is a terminal output proof. Input, command
-dispatch, general CMS/TSO file APIs and unchanged application loads remain
-open.
+pages below 16 MiB.
+
+The [K terminal input result](../qualification/TWO-SPACE-INPUT-2026-10-06.md)
+waits for 3270 attention, submits `READ MODIFIED` through the K real buffer,
+then copies a bounded AID record to U with `TSGCOPY`. A connected terminal
+submitted `PING`; the U caller received its Enter AID and EBCDIC bytes.
+The service retains completed data if the destination copy fails, so the
+caller can retry with a valid U pointer. This is an input transfer proof,
+not a command interpreter. Command dispatch, general CMS/TSO file APIs and
+unchanged application loads remain open.
 
 ## Primary architecture and compatibility references
 

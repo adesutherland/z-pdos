@@ -338,6 +338,31 @@ app_high:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 100(%r2)
+    lghi %r0, 0             /* Begin asynchronous K-owned 3270 read */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 209
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 104(%r2)
+    chi %r15, 0
+    jne terminal_read_done
+    lghi %r5, 30000
+terminal_read_poll:
+    lghi %r0, 256
+    larl %r1, input_data_va
+    lg %r1, 0(%r1)
+    lghi %r2, 2
+    svc 210
+    chi %r15, 1
+    jne terminal_read_done
+    aghi %r5, -1
+    jne terminal_read_poll
+    lghi %r15, -2
+terminal_read_done:
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 108(%r2)
     larl %r3, high_data_va
     lg %r3, 0(%r3)
     l %r3, 44(%r3)
@@ -356,6 +381,7 @@ app_fault_resume:
     svc 0                    /* bounded fixture exit into K */
 .balign 8
 high_data_va: .quad 0x110001000
+input_data_va: .quad 0x110001080
 forged_va: .quad 0x100021000
 cross_va: .quad 0x110001ffe
 write_va: .quad 0x110001024
@@ -399,6 +425,10 @@ initial_nested_done:
     chi %r2, 207
     je storage_no_record
     chi %r2, 208
+    je storage_no_record
+    chi %r2, 209
+    je storage_no_record
+    chi %r2, 210
     je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore

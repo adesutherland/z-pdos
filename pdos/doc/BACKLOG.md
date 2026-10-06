@@ -156,8 +156,9 @@ The [bounded K dataset checkpoint](qualification/TWO-SPACE-DATASET-2026-10-06.md
 reads `KCORE.BIN`'s first F/18452 block through a checked VTOC/first-extent
 lookup. The [K terminal checkpoint](qualification/TWO-SPACE-TERMINAL-2026-10-06.md)
 adds a real-addressed 3270 write visible in an independently connected
-terminal after fresh IPL. General CMS/TSO file I/O, terminal input and
-command services remain open. The diagnostic C31 service uses 16 sparse
+terminal after fresh IPL. The [terminal input checkpoint](qualification/TWO-SPACE-INPUT-2026-10-06.md)
+adds attention-gated `READ MODIFIED` and a bounded K-to-U AID record copy.
+General CMS/TSO file I/O and command services remain open. The diagnostic C31 service uses 16 sparse
 K-only pages and no additional low U virtual page. This does not complete
 slice 5 or select the replacement image.
 

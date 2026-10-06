@@ -203,6 +203,17 @@ def judge(raw, log, ipl=False):
     checks["k_terminal_screen"] = (
         struct.unpack_from(">I",raw,0x12064)[0] ==
         (0 if ipl else 0xfffffffb))
+    checks["k_terminal_read_start"] = (
+        struct.unpack_from(">I",raw,0x12068)[0] ==
+        (0 if ipl else 0xfffffffb))
+    checks["k_terminal_read_finish"] = (
+        struct.unpack_from(">I",raw,0x1206c)[0] ==
+        (0 if ipl else 0xfffffffb))
+    if ipl:
+        count = struct.unpack_from(">I",raw,0x12080)[0]
+        checks["k_terminal_input_copied_to_u"] = (
+            7 <= count <= 252 and raw[0x12084] == 0x7d and
+            b"\xd7\xc9\xd5\xc7" in raw[0x12084:0x12084+count])
     checks["live_dat_mutations_purged"] = (
         struct.unpack_from(">I",raw,0x40ac)[0] == 4 and
         0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x40000)

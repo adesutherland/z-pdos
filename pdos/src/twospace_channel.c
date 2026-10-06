@@ -115,6 +115,36 @@ int TSCCHECKWRITE(const TSCSTATE *s)
     return TSC_OK;
 }
 
+int TSCBUILDCONSREAD(TSCSTATE *s, unsigned int capacity)
+{
+    unsigned char *base;
+    if (!s || !s->aperture || !capacity || capacity > TSC_MAX_INPUT)
+        return TSC_BAD;
+    base=s->aperture+s->region_real;
+    clear(base,TSC_DATA_OFFSET+capacity);
+    put32(base+4U,0x0080ff00U);
+    put32(base+8U,s->region_real+TSC_CCW_OFFSET);
+    ccw(base+TSC_CCW_OFFSET,0x06U,0x20U,capacity,
+        s->region_real+TSC_DATA_OFFSET);
+    return TSC_OK;
+}
+
+int TSCCHECKCONSREAD(const TSCSTATE *s, unsigned int capacity,
+                     unsigned int *transferred)
+{
+    const unsigned char *irb;
+    unsigned int residual;
+    if (!s || !s->aperture || !transferred || !capacity ||
+        capacity > TSC_MAX_INPUT) return TSC_BAD;
+    irb=s->aperture+s->region_real+TSC_IRB_OFFSET;
+    residual=get16(irb+10U);
+    if (irb[8U] != 0x0cU || irb[9U] != 0U || residual > capacity ||
+        get32(irb+4U) != s->region_real+TSC_CCW_OFFSET+8U)
+        return TSC_IO;
+    *transferred=capacity-residual;
+    return TSC_OK;
+}
+
 unsigned char *TSCDATA(const TSCSTATE *s)
 { return s && s->aperture ? s->aperture+s->region_real+TSC_DATA_OFFSET : 0; }
 unsigned char *TSCORB(const TSCSTATE *s)

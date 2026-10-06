@@ -14,6 +14,9 @@ static TSDSTATE u_tables;
 static TSMSTATE storage;
 static TSCSTATE channel;
 static unsigned int storage_ready;
+static unsigned int console_ssid;
+static unsigned int console_read_phase;
+static unsigned int console_read_count;
 void TSFPURGE(void *unused);
 void TSKEYSET(unsigned int real_page, unsigned int key);
 
@@ -57,6 +60,9 @@ int TSCIO(unsigned int subchannel, unsigned char *orb,
           unsigned char *irb);
 int TSCDEV(unsigned int subchannel, unsigned char *schib);
 int TSCENABL(unsigned int subchannel, unsigned char *schib);
+int TSCSTART(unsigned int subchannel, unsigned char *orb,
+             unsigned char *irb);
+int TSCPOLL(unsigned int subchannel, unsigned char *irb);
 
 static int channel_record(void *context, unsigned int cylinder,
                           unsigned int head, unsigned int record,
@@ -141,7 +147,7 @@ static unsigned int terminal_service(const TSGREQUEST *request)
     *(volatile unsigned int *)0x40c0U=ssid;
     screen=TSCDATA(&channel);
     for (i=0U; i<1773U; ++i) screen[i]=0x40U;
-    screen[0]=0x41U; screen[1]=0x11U; screen[2]=0x5dU;
+    screen[0]=0xc3U; screen[1]=0x11U; screen[2]=0x5dU;
     screen[3]=0x7fU; screen[4]=0x1dU; screen[5]=0xf0U;
     for (i=0U; i<sizeof message; ++i) screen[6U+i]=message[i];
     screen[1766]=0x1dU; screen[1767]=0U; screen[1768]=0x13U;
@@ -153,7 +159,82 @@ static unsigned int terminal_service(const TSGREQUEST *request)
     *(volatile unsigned int *)0x40c4U=(unsigned int)io_result;
     if (io_result != 0) return 21U;
     if (TSCCHECKWRITE(&channel) != TSC_OK) return 22U;
+    console_ssid=ssid;
     return 0U;
+}
+
+static unsigned int terminal_read_start(const TSGREQUEST *request)
+{
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    if (!console_ssid) return 0xfffffffbU;
+    if (console_read_phase) return 4U;
+    /* A 3270 READ MODIFIED issued before an AID returns NoAID with no
+       modified fields. Wait for attention, then submit the read CCW. */
+    console_read_phase=1U;
+    return 0U;
+}
+
+static unsigned int terminal_read_poll(const TSGREQUEST *request)
+{
+    TSGCONTEXT gate;
+    TSGREQUEST output;
+    unsigned char bytes[TSG_MAX_COPY];
+    unsigned int count, i;
+    int status;
+    if (request->length != TSG_MAX_COPY ||
+        request->direction != TSG_WRITE) return 8U;
+    if (!console_read_phase) return 0xfffffffbU;
+    if (console_read_phase != 3U) {
+        status=TSCPOLL(console_ssid,TSCIRB(&channel));
+        if (status != 0) return 1U;
+    }
+    if (console_read_phase == 1U) {
+        if ((TSCIRB(&channel)[8U] & 0x80U) == 0U) return 1U;
+        if (TSCBUILDCONSREAD(&channel,252U) != TSC_OK ||
+            TSCSTART(console_ssid,TSCORB(&channel),TSCIRB(&channel)) != 0) {
+            console_read_phase=0U;
+            return 12U;
+        }
+        console_read_phase=2U;
+        return 1U;
+    }
+    if (console_read_phase == 2U) {
+        if (TSCCHECKCONSREAD(&channel,252U,&count) != TSC_OK) {
+            /* Initial status can precede the actual READ MODIFIED data. */
+            if (TSCIRB(&channel)[8U] == 0U &&
+                TSCIRB(&channel)[9U] == 0U) return 1U;
+            console_read_phase=0U;
+            return 12U;
+        }
+        if (count == 3U && TSCDATA(&channel)[0] == 0x60U) {
+            console_read_phase=1U;
+            return 1U;
+        }
+        if (count < 3U || count > 252U) {
+            console_read_phase=0U;
+            return 12U;
+        }
+        console_read_count=count;
+        console_read_phase=3U;
+    }
+    count=console_read_count;
+    for (i=0U; i<TSG_MAX_COPY; ++i) bytes[i]=0U;
+    bytes[0]=(unsigned char)(count>>24);
+    bytes[1]=(unsigned char)(count>>16);
+    bytes[2]=(unsigned char)(count>>8);
+    bytes[3]=(unsigned char)count;
+    for (i=0U; i<count; ++i) bytes[4U+i]=TSCDATA(&channel)[i];
+    gate.u_tables=&u_tables;
+    gate.real_aperture=(unsigned char *)TSF_KAPERTURE_VA;
+    gate.real_bytes=TSF_REAL_BYTES;
+    gate.rights=user_rights;
+    gate.rights_context=0;
+    output=*request;
+    status=TSGCOPY(&gate,&output,bytes,sizeof bytes);
+    if (status == TSG_OK) console_read_phase=0U;
+    return status == TSG_OK ? 0U :
+           status == TSG_DENIED ? 0xfffffffcU : 0xfffffffdU;
 }
 
 /* The current fixture's SVC 120 path uses the active conditional GETMAIN
@@ -209,6 +290,8 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 206U) return volume_service(request);
     if (request->svc == 207U) return dataset_service(request);
     if (request->svc == 208U) return terminal_service(request);
+    if (request->svc == 209U) return terminal_read_start(request);
+    if (request->svc == 210U) return terminal_read_poll(request);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
         return 0xfffffffbU;

@@ -71,6 +71,7 @@ def run(args):
         ["s3270", "-model", "3278-2", "-codepage", "cp1047",
          "-scriptport", str(script_port)],
         stdout=terminal_log, stderr=subprocess.STDOUT)
+    input_sent = False
     try:
         deadline = time.monotonic() + 4
         while time.monotonic() < deadline:
@@ -97,6 +98,11 @@ def run(args):
                     break
             time.sleep(0.1)
         out.joinpath("terminal.screen").write_text(screen)
+        if "K SERVICE READY" in screen:
+            terminal_action(script_port, "Set(aidWait,false)")
+            typed = terminal_action(script_port, 'String("PING")')
+            entered = terminal_action(script_port, "Enter()")
+            input_sent = typed.returncode == 0 and entered.returncode == 0
         stdout, _ = proc.communicate(timeout=45)
         log = stdout
     except subprocess.TimeoutExpired as exc:
@@ -126,6 +132,7 @@ def run(args):
                 0x10000 <= struct.unpack_from(">I",raw,0x40bc)[0] < 0x10100)
             judged["checks"]["k_terminal_screen_observed"] = (
                 "K SERVICE READY" in (out / "terminal.screen").read_text())
+            judged["checks"]["terminal_input_sent"] = input_sent
             checks = judged["checks"]
             report = struct.unpack_from(">8I", raw, 0x4080)
             _, stage, launch, kpool, upool, kbytes, ubytes, real_bytes = report
