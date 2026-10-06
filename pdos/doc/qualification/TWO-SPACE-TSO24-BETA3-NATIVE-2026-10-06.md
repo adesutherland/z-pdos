@@ -13,6 +13,18 @@ only XMIT framing yields a 1,396,982-byte native RDW stream with SHA-256
 `PDTSO24` disk stage has SHA-256
 `1335bd64e276ed5fc76a6198704fdde67f7e1f0748dea2d5f25ab81a53bf666a`.
 
+The same public ZIP's `tso31/RXVM.XMI` and `tso64-any/RXVM.XMI`
+have SHA-256 values
+`c63e6acfc799f4ea21ca05cb6d31b1d363c6b0b239e2b24283a6be74ee506e1a`
+and `2038c41a7e13a573bba9b16cf4446f1eb3c29f050594ae0ce0e37715095c13a2`.
+Removing XMIT framing produces RDW SHA-256 values
+`77b689a3c64bad63996031654dfc353d357b9c2616da01c65a9ea3e2c09c2cc9`
+and `dc5210b04cabf93d22942b0955ccf9bf63f7e0d4334a88e2a04e8705484339b6`,
+exactly matching the already pinned TSO31 and TSO64 ANY native streams.
+Their existing guest checks and this TSO24 run therefore exercise the three
+address modes from the same published beta 3 package. Each selected RXVM
+version call passed an EBCDIC terminal-line check.
+
 The host materializer produced the 1,096,496-byte image at U `0x20000` and
 `0x400000`, matching the existing `fixPEMode` loader byte for byte at both
 bases. It rejected wrong mode, changed directory, unaligned placement and
