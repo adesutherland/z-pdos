@@ -33,7 +33,7 @@ one-ASCE kernel or completed implementation.
 | Personality state | Each invocation carries its CMS or TSO service profile, file handles and lowcore contract. K installs the applicable U compatibility page or state on entry and restores the previous state on return; a dormant module's profile does not define the active lowcore. A failed transition leaves the caller's map and profile intact. |
 | Application calls | The required contract is a synchronous CMS-to-CMS or TSO-to-TSO application call, with bounded parameters, a return code and restored caller state. The selected native linkage for each personality must be qualified separately. An in-space pointer is usable only when both programs' ABI and address modes permit it. A REXX `ADDRESS` operation is not a requirement of the mainframe cREXX builds. CMS-to-TSO or TSO-to-CMS application calls are optional only if a simple copied-parameter and return-code gate suffices; they cannot rely on shared raw pointers or become a prerequisite for replacement. |
 | Command processor | PCOMM, or its successor, is a U application placed above 16 MiB with its stack and heap there when its ABI permits. It is the neutral PDOS command entry point and may ask K to launch either personality with a copied command and receive its return code. K retains boot, fault and emergency console output plus checked terminal and invocation services. The command processor is not part of K merely to remain resident. |
-| Terminal and 3270 ownership | K owns the device, interrupt/completion state, bounded data transfer, one foreground screen owner and compatibility line input/output services. The K driver and 3270 data-stream encoder are C31 C, with assembler limited to privileged channel operations. A reusable U presentation library is C, with only target-specific linkage at its boundary. It provides an application header, footer, scrollable output and editable entry area through checked K screen/input requests. PCOMM should use it first. Wrapped applications redraw after a nested child returns. Existing unmodified line-oriented CMS/TSO programs continue through their native terminal calls; the wrapper does not silently impose a full-screen layout on them. |
+| Terminal and 3270 ownership | K owns the devices, interrupt/completion state, bounded data transfer, one foreground screen owner, one input owner and compatibility line input/output services. The K driver and 3270 data-stream encoder are C31 C, with assembler limited to privileged channel operations. A reusable U presentation library is C, with only target-specific linkage at its boundary. It provides an application header, footer, scrollable output and editable entry area through checked K screen/input requests. PCOMM should use it first. Wrapped applications redraw after a nested child returns. Existing unmodified line-oriented CMS/TSO programs continue through their native terminal calls; the wrapper does not silently impose a full-screen layout on them. A separately attached line monitor can receive the same logical line output while the 3270 remains the primary display. |
 
 The terminal contract must distinguish line output from a full-screen lease.
 K serializes channel operations and rejects an invalid owner or buffer before
@@ -69,6 +69,71 @@ terminal service boundary, not fictitious 3270 rows and columns. The disk and
 terminal retain independent K-owned channel workspaces and event-driven
 completion.
 
+### Operator line view and attached transcript
+
+The intended normal operator session keeps a scrollable 3270 PCOMM screen and
+may attach a second, append-only text view. PCOMM and the selected CMS/TSO
+line services produce one ordered stream of logical text and command events;
+the 3270 presentation renders it, and K can also deliver it to a separately
+configured Hercules 3215 line device reached by a Telnet client. A 3215-C
+instead writes to the integrated Hercules console and mixes host/operator
+messages with guest output, so it is not the first clean transcript target.
+The line view is a monitor, not another application address space or a second
+command processor. A
+line-only primary console is a further configuration of the same service
+boundary. The first P4 qualification must prove the actual secondary device
+attachment and capture path; the current successor has not done so.
+
+Unchanged applications that use the selected CMS or TSO line terminal calls
+keep the same ABI and return conventions whether the primary display is a
+3270 or a line console. The K terminal service routes those calls and fans
+out text records to the attached monitor. It does not expose monitor
+availability as an application-visible output failure unless an application
+explicitly requests reliable transcript delivery. A versioned capability
+query distinguishes the primary device and its active full-screen facilities
+from the presence and health of a secondary monitor. A line-only primary
+reports full-screen unavailable. A 3270 primary retains full-screen support
+when a text monitor attaches. Full-screen requests on a line-only console
+return a documented unsupported result rather than being flattened into text.
+
+There is exactly one input owner. The 3270 normally owns command input; the
+line connection may take a checked input lease only at a PCOMM command prompt
+or a line-input request, with explicit handoff and return. It cannot supply
+3270 AID keys or fields for a full-screen application. An attach, disconnect
+or late input cannot duplicate, reorder or silently replace a command. K
+serializes terminal events and completion; PCOMM publishes sequenced command
+IDs, readiness, prompts, separate OS status and application return codes after
+primary output is drained. The optional monitor cannot hold that completion
+hostage: it either receives the records or its capture is marked incomplete.
+A host client waits for those events, not a clock delay or screen coordinates.
+Output resembling control records is escaped under a versioned text grammar.
+Guest text records retain their defined bytes until a documented host
+EBCDIC-to-UTF-8 conversion; non-text data is escaped. Host capture retains
+the full transcript beyond the finite 3270 scroll region. A lost monitor,
+full queue or incomplete capture is reported as a transcript gap or a
+sequence discontinuity on reconnect; qualification fails rather than
+accepting silent loss.
+K-owned queues and buffers stay outside low U storage.
+
+Raw 3270 screen writes do not inherently carry a meaningful line transcript.
+The U presentation library can emit semantic text events for a wrapped
+application; an unmodified full-screen program may only yield a screen-change
+event in the monitor. This limitation is visible to the operator and to tests.
+It does not change that program's 3270 service behavior. IBM's
+[CMS CONSOLE interface](https://www.ibm.com/docs/SSB27U_7.2.0/com.ibm.zvm.v720.dmsa6/console.htm)
+separates full-screen 3270 operations from LINERD/LINEWRT for line mode and
+3215-type devices. IBM also describes
+[LINEWRT in full-screen and line-mode CMS](https://www.ibm.com/docs/en/zvm/7.2.0?topic=instructions-linewrt),
+and its [TSO full-screen command processor guide](https://www.ibm.com/docs/en/zos/2.5.0?topic=user-writing-full-screen-command-processor)
+distinguishes full-screen TPUT from ordinary terminal output. These are
+design precedents, not a claim that the selected z/PDOS service subset already
+implements every IBM terminal form.
+Hercules documents a [Telnet client for a 3215 console](https://hercules-390.github.io/html/hercoper.html)
+and an [integrated 3215-C console](https://hercules-390.github.io/html/hercrnot.html);
+its [sample configuration](https://github.com/SDL-Hercules-390/hyperion/blob/master/hercules.cnf)
+shows a 3270 and 3215-C defined at different addresses. Simultaneous
+3270-plus-Telnet-3215 guest service is still a z/PDOS qualification gate.
+
 IBM's [screen-size definitions](https://www.ibm.com/docs/en/gddm?topic=network-pservic-operand-modeent-macro)
 give the standard model dimensions. Its [3270 screen-size control](https://www.ibm.com/docs/en/personal-communications/15.0.0?topic=operations-3270-session-screen-size-control)
 and [buffer-address description](https://www.ibm.com/docs/en/cics-ts/5.6?topic=stream-set-buffer-address-order)
@@ -84,7 +149,8 @@ PCOMM present. The U presentation library has its own
 [delivery item](../BACKLOG.md#pd-021-reusable-3270-application-presentation);
 its header, footer, scrolling, entry and child-return repaint must be checked
 before claiming that wrapper is available. The diagnostic IPL does not yet
-implement it.
+implement it. The separate [operator line-view item](../BACKLOG.md#pd-022-attached-operator-line-view-and-transcript)
+owns the secondary device, capture, input handoff and line-only qualification.
 
 Four interface details must be fixed before implementing the remaining calls
 and console work. First, name resolution and parameter layouts must follow

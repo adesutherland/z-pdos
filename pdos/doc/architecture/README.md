@@ -21,7 +21,12 @@ retain one shared U ASCE, place the PDOS command processor and reusable C
 3270 presentation library in U, and keep the C31 C terminal driver and
 checked service handling in K. The next terminal target includes 3270 models
 2–5 with geometry and capabilities supplied by a checked query or explicit
-configuration; the present fixed 24×80 layout is a source limitation.
+configuration; the present fixed 24×80 layout is a source limitation. The
+[operator line-view decision](TWO-SPACE-POC.md#operator-line-view-and-attached-transcript)
+keeps a scrollable 3270 primary and permits an attached text monitor of the
+same line and command events, with one explicit input owner. A line-only
+primary is also planned. This is [P4 work](../BACKLOG.md#pd-003-completion-plan-6-october-2026),
+not yet a qualified successor feature.
 The [completion plan](../BACKLOG.md#pd-003-completion-plan-6-october-2026)
 orders the remaining K, native-call, C console, image and qualification work.
 Required application calls are within the same CMS or TSO personality, with
