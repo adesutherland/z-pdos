@@ -151,6 +151,9 @@ adds a reserved 64 KiB low-real K workspace and a bounded post-handover
 `VOL1` read through real-addressed CCWs. This removes the virtual-equals-real
 assumption for that one channel operation, but the remaining slice 5 service
 and application-budget criteria above stay open.
+The [channel completion checkpoint](qualification/TWO-SPACE-IO-COMPLETION-2026-10-06.md)
+uses `TSCH` status for success and an architectural-clock watchdog only for
+stalls, removing the fixed poll-count race from the diagnostic channel path.
 
 The [bounded K dataset checkpoint](qualification/TWO-SPACE-DATASET-2026-10-06.md)
 reads `KCORE.BIN`'s first F/18452 block through a checked VTOC/first-extent

@@ -338,6 +338,11 @@ caller can retry with a valid U pointer. This is an input transfer proof,
 not a command interpreter. Command dispatch, general CMS/TSO file APIs and
 unchanged application loads remain open.
 
+K's synchronous CKD/3270 helper now judges success from `TSCH` completion
+status. A TOD watchdog bounds a stalled operation, replacing its previous
+fixed poll count. The [fresh I/O completion result](../qualification/TWO-SPACE-IO-COMPLETION-2026-10-06.md)
+covers the one-CPU diagnostic profile.
+
 The [CMS24 header checkpoint](../qualification/TWO-SPACE-CMS-HEADER-2026-10-06.md)
 adds the pinned, unchanged staged RXVM MODULE as an optional dataset on the
 disposable successor disk. K finds its checked first extent and validates the

@@ -1,7 +1,8 @@
 * SPDX-License-Identifier: MIT
-* Bounded synchronous subchannel submission for K-owned CKD and 3270 I/O.
+* Completion-driven subchannel submission for K-owned CKD and 3270 I/O.
 * R1 points to three C31 words: subchannel, K ORB pointer, K IRB pointer.
 * ORB/CCW data addresses are separately encoded as low real addresses.
+* STCK only bounds a failed operation; the TSCH status event decides success.
          CSECT
          ENTRY TSCIO
          ENTRY TSCDEV
@@ -17,14 +18,19 @@ TSCIO    DS    0H
          TSCH  0(4)             Clear any prior pending status
          SSCH  0(3)
          BRCL  7,TSCREJ
-         LA    6,4095
-         BASR  8,0
-TSCOUTER LA    5,4095
-         BASR  7,0
+         LA    5,128(4)         Two aligned TOD slots after the IRB
+         STCK  0(5)
+         BRCL  7,TSCFAIL
+         L     6,0(5)           Upper TOD word; wrap-safe subtraction
 TSCWAIT  TSCH  0(4)
          BRCL  8,TSCDONE
-         BCTR  5,7
-         BCTR  6,8
+         STCK  8(5)
+         BRCL  7,TSCFAIL
+         L     7,8(5)
+         SR    7,6
+         LA    8,64
+         CR    7,8              About 67 seconds: failure watchdog only
+         BRCL  4,TSCWAIT
 TSCFAIL  SR    15,15
          BCTR  15,0
          BCTR  15,0
