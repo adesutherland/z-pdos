@@ -267,6 +267,13 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
     checks["post_start_cancel_clear_and_fresh_retry"] = (
         (phase == 2 and cancelled == redrawn == restarted == 0)
         if ipl else phase == cancelled == redrawn == restarted == 0)
+    injected, prompt, first, failed, restart, cancelled = struct.unpack_from(
+        ">6I",raw,0x1245c)
+    checks["failed_terminal_start_releases_lease_for_retry"] = (
+        (injected == prompt == first == restart == cancelled == 0 and
+         failed == 12) if ipl else
+        (injected == 0xfffffffb and
+         prompt == first == failed == restart == cancelled == 0))
     checks["k_terminal_clear_completion"] = (
         struct.unpack_from(">I",raw,0x123f0)[0] ==
         (0 if ipl else 8))

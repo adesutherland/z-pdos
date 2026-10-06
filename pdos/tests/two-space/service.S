@@ -693,6 +693,63 @@ terminal_read_done:
     lg %r2, 0(%r2)
     st %r15, 108(%r2)
     br %r14
+terminal_failed_start_probe:
+    lghi %r0, 0             /* next real AID reaches a failed SSCH */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 243
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x45c(%r2)
+    chi %r15, 0
+    jne terminal_failed_start_done
+    lghi %r0, 2             /* host observes distinct failure prompt */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 208
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x460(%r2)
+    chi %r15, 0
+    jne terminal_failed_start_done
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 209
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x464(%r2)
+    chi %r15, 0
+    jne terminal_failed_start_done
+terminal_failed_start_poll:
+    lghi %r0, 256
+    larl %r1, input_data_va
+    lg %r1, 0(%r1)
+    lghi %r2, 2
+    svc 210
+    chi %r15, 1
+    je terminal_failed_start_poll
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x468(%r2)
+    lghi %r0, 0             /* failed start released the lease and buffer */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 209
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x46c(%r2)
+    chi %r15, 0
+    jne terminal_failed_start_done
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 240
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x470(%r2)
+terminal_failed_start_done:
+    br %r14
 .section .apphigh,"ax"
 wide_heap_code_end:
     lghi %r0, 0             /* K reads VOL1 through its real channel buffer */
@@ -717,6 +774,7 @@ wide_heap_code_end:
     lg %r2, 0(%r2)
     st %r15, 100(%r2)
     brasl %r14, terminal_inflight_probe
+    brasl %r14, terminal_failed_start_probe
     lghi %r0, 0             /* idle clear needs its own TSCH completion */
     lghi %r1, 0
     lghi %r2, 0
@@ -1610,6 +1668,8 @@ trace_not_cms_fst:
     chi %r2, 241
     je storage_no_record
     chi %r2, 242
+    je storage_no_record
+    chi %r2, 243
     je storage_no_record
     chi %r2, 93
     je storage_no_record

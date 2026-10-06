@@ -185,6 +185,21 @@ def run(args):
                             retry_entered.returncode == 0)
         if not retry_input_sent:
             raise RuntimeError("3270 retry PING entry failed")
+        def fail_screen():
+            try:
+                observed = terminal_action(script_port, "Ascii()")
+                return observed.stdout if observed.returncode == 0 and \
+                    "K FAIL READY" in observed.stdout else None
+            except subprocess.TimeoutExpired:
+                return None
+        fail_view = await_condition(fail_screen, 30, "failed-start input screen")
+        out.joinpath("terminal.failed-start-screen").write_text(fail_view)
+        fail_typed = terminal_action(script_port, 'String("PING")')
+        fail_entered = terminal_action(script_port, "Enter()")
+        failed_start_input_sent = (fail_typed.returncode == 0 and
+                                   fail_entered.returncode == 0)
+        if not failed_start_input_sent:
+            raise RuntimeError("3270 failed-start PING entry failed")
         await_wait_state(events, proc, out / "console.log")
         shown = terminal_action(script_port, "Ascii()")
         if shown.returncode == 0:
@@ -246,6 +261,8 @@ def run(args):
                 "K SERVICE READY" in (out / "terminal.screen").read_text())
             judged["checks"]["terminal_input_sent"] = input_sent
             judged["checks"]["terminal_retry_input_sent"] = retry_input_sent
+            judged["checks"]["terminal_failed_start_input_sent"] = (
+                failed_start_input_sent)
             if args.cms24file and not args.tso31:
                 judged["checks"]["cms24_io24_summary_on_3270"] = (
                     "C24 SUMMARY: PASS=6 FAIL=0 SKIP=1" in

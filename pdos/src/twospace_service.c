@@ -31,6 +31,7 @@ static unsigned int console_read_count;
 static unsigned int console_read_owner;
 static unsigned int console_read_io_handle;
 static unsigned int console_next_io_handle;
+static unsigned int terminal_start_fail_once;
 static unsigned int native_image_active[32];
 static unsigned int cms31_loaded;
 static unsigned int cms31_secondary_loaded;
@@ -724,15 +725,21 @@ static unsigned int terminal_service(const TSGREQUEST *request)
         0xd2U,0x40U,0xd9U,0xc5U,0xe3U,0xd9U,0xe8U,0x40U,
         0xd9U,0xc5U,0xc1U,0xc4U,0xe8U
     };
+    static const unsigned char fail_message[] = {
+        0xd2U,0x40U,0xc6U,0xc1U,0xc9U,0xd3U,0x40U,
+        0xd9U,0xc5U,0xc1U,0xc4U,0xe8U
+    };
     const unsigned char *label;
     unsigned int label_length;
     unsigned char *screen;
     unsigned int ssid, i;
     int io_result;
-    if (request->length>1U || request->address.hi || request->address.lo ||
+    if (request->length>2U || request->address.hi || request->address.lo ||
         request->direction) return 8U;
-    label=request->length ? retry_message : message;
-    label_length=request->length ? (unsigned int)sizeof retry_message :
+    label=request->length==2U ? fail_message :
+          request->length ? retry_message : message;
+    label_length=request->length==2U ? (unsigned int)sizeof fail_message :
+                 request->length ? (unsigned int)sizeof retry_message :
                                    (unsigned int)sizeof message;
     if (*(volatile const unsigned int *)0x40bcU == 0U) return 0xfffffffbU;
     ssid=0U;
@@ -852,7 +859,9 @@ static unsigned int terminal_read_poll(const TSGREQUEST *request)
             console_read_io_handle=console_next_io_handle;
         }
         console_read_phase=2U;
-        if (TSCSTART(console_ssid,TSCORB(&console_channel),
+        status=terminal_start_fail_once ? 0x0001ffffU : console_ssid;
+        terminal_start_fail_once=0U;
+        if (TSCSTART(status,TSCORB(&console_channel),
                      TSCIRB(&console_channel)) != 0) {
             terminal_read_cancel(console_read_owner);
             return 12U;
@@ -913,6 +922,18 @@ static unsigned int terminal_phase_probe(const TSGREQUEST *request)
     if (request->length || request->address.hi || request->address.lo ||
         request->direction) return 8U;
     return console_read_phase;
+}
+
+/* Private failure injection: select an absent subchannel for the next SSCH.
+ * The real terminal remains the cancellation target. */
+static unsigned int terminal_start_failure_probe(const TSGREQUEST *request)
+{
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    if (!console_ssid || console_read_phase || terminal_start_fail_once)
+        return 0xfffffffbU;
+    terminal_start_fail_once=1U;
+    return 0U;
 }
 
 /* Diagnostic selector only: an absent subchannel must fail immediately,
@@ -2352,6 +2373,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 240U) return terminal_cancel_probe(request);
     if (request->svc == 241U) return terminal_phase_probe(request);
     if (request->svc == 242U) return native_image_lease_probe(request);
+    if (request->svc == 243U) return terminal_start_failure_probe(request);
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 223U) return high_storage_service(request);
     if (request->svc == 233U) return iarv64_service(request);

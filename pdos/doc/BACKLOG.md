@@ -227,6 +227,10 @@ now uses a real AID, clears after READ MODIFIED was submitted, redraws and
 reads a second AID. It caught and fixed repeated subchannel enable on redraw.
 Physical in-flight ordering, injected late completion after owner exit,
 failed start and child-fault unwind remain open P1 cases.
+The [failed-start gate](qualification/TWO-SPACE-TERMINAL-START-FAILURE-2026-10-06.md)
+now injects an absent subchannel at SSCH after a third real AID, checks RC 12,
+and verifies that a fresh read can start and cancel. Invocation-owned pending
+I/O failure and late completion after owner exit remain separate gates.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and

@@ -197,6 +197,10 @@ clears the subchannel before transferring its lease. The
 clears after a real AID started READ MODIFIED and reads a second AID after a
 distinct screen event. A physically in-flight cancellation and injected late
 status after owner exit still need guest proof.
+The [failed-start gate](../qualification/TWO-SPACE-TERMINAL-START-FAILURE-2026-10-06.md)
+uses a real AID followed by one deliberately absent SSCH target, then checks
+cleanup and a fresh read. It does not exercise a frame-owned pending I/O
+handle or arbitrary late status.
 The [nested lowcore gate](../qualification/TWO-SPACE-INVOCATION-LOWCORE-2026-10-06.md)
 stores a suspended parent's U compatibility page in a K-owned real frame,
 installs the child template, then restores the parent page on child end. It
