@@ -215,6 +215,9 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False):
     checks["k_cms24_full_stage"] = (
         struct.unpack_from(">I",raw,0x12074)[0] ==
         (0 if cms24 else 4 if ipl else 0xfffffffb))
+    checks["k_cms24_fixed_map"] = (
+        struct.unpack_from(">I",raw,0x1207c)[0] ==
+        (0 if cms24 else 4 if ipl else 0xfffffffb))
     checks["k_cms31_image_map"] = (
         struct.unpack_from(">I",raw,0x12078)[0] ==
         (0 if cms31 else 4 if ipl else 0xfffffffb))
@@ -231,7 +234,8 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False):
             b"\xd7\xc9\xd5\xc7" in raw[0x12084:0x12084+count])
     checks["live_dat_mutations_purged"] = (
         struct.unpack_from(">I",raw,0x40ac)[0] ==
-        (4 + 5 * ((4238296 + 4095) // 4096) if cms31 else 4) and
+        (4 + (2 + (1681088 + 4095) // 4096 if cms24 else 0) +
+         (5 * ((4238296 + 4095) // 4096) if cms31 else 0)) and
         0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x40000)
     errors = [x for x in log.splitlines() if re.search(r"HHC\d{5}E\b", x)]
     checks["no_hercules_error"] = not errors

@@ -12,7 +12,8 @@ boundaries and the [exact guest record](../qualification/QUALIFICATION.md)
 for what has run.
 
 The two-address-space successor, its K64/C31/shared-U proofs, checked guest-DAT
-IPL, bounded interruption/service gate and live storage checkpoint are in
+IPL, bounded interruption/service gate, live storage and dual CMS image
+mapping checkpoints are in
 [the two-space PoC contract](TWO-SPACE-POC.md).
 The current released disk-boot kernel described below has not yet adopted
 that layout.

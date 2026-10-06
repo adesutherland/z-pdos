@@ -54,6 +54,12 @@ static int attach(void)
     at.hi=1U; at.lo=0x10000000U;
     if (TSMRESERVE(&storage,3U,64U,at,0x3000U) != TSP_OK)
         return -1;
+    at.hi=0U; at.lo=0U;
+    if (TSMRESERVE(&storage,6U,24U,at,0x20000U) != TSP_OK)
+        return -1;
+    at.lo=0x00f00000U;
+    if (TSMRESERVE(&storage,7U,24U,at,0x100000U) != TSP_OK)
+        return -1;
     storage_ready=1U;
     return 0;
 }
@@ -156,22 +162,25 @@ static unsigned int cms24_header_service(const TSGREQUEST *request)
     return 0U;
 }
 
-/* Temporary K-only proof buffer: page aligned, never mapped in U, and
- * reserved against GETMAIN for the entire CKD read and validation. */
-#define CMS_STAGE_REAL 0x700000U
+/* Temporary K-only stage backing is sized from the checked first block.
+ * It is reserved against all U allocations until validation/materialization
+ * ends; no fixed high-real hole is consumed between service calls. */
 #define CMS_STAGE_CAPACITY 0x900000U
 #define CMS_STAGE_OWNER 0x434d5332U
 
 static unsigned int cms_stage_read(const unsigned char *name,
                                    unsigned int name_bytes,
                                    unsigned int profile,
-                                   unsigned char *stage,
+                                   unsigned char **stage_out,
+                                   unsigned int *stage_real,
                                    TSHINFO *info,
                                    unsigned int *block_count)
 {
     const unsigned char *record;
+    unsigned char *stage;
     TSKEXTENT extent;
-    unsigned int cylinder, head, number, blocks, index, offset, total;
+    unsigned int cylinder, head, number, blocks, index, offset, total, span;
+    unsigned int real;
     int found, count;
     found=TSKFIND(channel_record,&channel,name,name_bytes,&extent);
     if (found == TSK_ABSENT) return 4U;
@@ -185,11 +194,16 @@ static unsigned int cms_stage_read(const unsigned char *name,
     total=64U+info->module_bytes;
     blocks=(total+18451U)/18452U;
     if (!blocks || blocks > CMS_STAGE_CAPACITY/18452U) return 12U;
+    span=(blocks*18452U+4095U)&~4095U;
+    if (TSRALLOC(&storage.real,CMS_STAGE_OWNER,span,
+                 TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,&real) != TSR_OK)
+        return 4U;
+    stage=(unsigned char *)TSF_KAPERTURE_VA+real;
     for (index=0U; index<blocks; ++index) {
-        if (!TSKWITHIN(&extent,cylinder,head)) return 12U;
+        if (!TSKWITHIN(&extent,cylinder,head)) goto fail;
         if (index) {
             count=channel_record(&channel,cylinder,head,number,18452U,&record);
-            if (count != 18452) return 12U;
+            if (count != 18452) goto fail;
         }
         offset=index*18452U;
         { unsigned int i;
@@ -201,9 +215,14 @@ static unsigned int cms_stage_read(const unsigned char *name,
         }
     }
     if (TSHVALIDATE(stage,blocks*18452U,profile,info) != TSH_OK)
-        return 12U;
+        goto fail;
+    *stage_out=stage;
+    *stage_real=real;
     *block_count=blocks;
     return 0U;
+fail:
+    return TSRRELEASE(&storage.real,CMS_STAGE_OWNER,real) == TSR_OK ?
+           12U : 0xfffffff0U;
 }
 
 static unsigned int cms24_full_service(const TSGREQUEST *request)
@@ -212,21 +231,103 @@ static unsigned int cms24_full_service(const TSGREQUEST *request)
         0xc3U,0xd4U,0xe2U,0xf2U,0xf4U,0x4bU,0xd9U,0xe7U,
         0xe5U,0xd4U
     };
-    unsigned char *stage=(unsigned char *)TSF_KAPERTURE_VA+CMS_STAGE_REAL;
+    unsigned char *stage;
     TSHINFO info;
-    unsigned int blocks, result;
+    unsigned int blocks, result, stage_real;
     if (request->length || request->address.hi || request->address.lo ||
         request->direction) return 8U;
     if (*(volatile const unsigned int *)0x40bcU == 0U) return 0xfffffffbU;
-    if (TSRRESERVE(&storage.real,CMS_STAGE_OWNER,CMS_STAGE_REAL,
-                   CMS_STAGE_CAPACITY,TSR_RUN) != TSR_OK) return 4U;
-    result=cms_stage_read(name,sizeof name,24U,stage,&info,&blocks);
+    result=cms_stage_read(name,sizeof name,24U,&stage,&stage_real,
+                          &info,&blocks);
     if (result == 0U) {
         *(volatile unsigned int *)0x40d8U=CMS_STAGE_OWNER;
         *(volatile unsigned int *)0x40dcU=blocks;
     }
-    if (TSRRELEASE(&storage.real,CMS_STAGE_OWNER,CMS_STAGE_REAL) != TSR_OK)
+    if (result == 0U &&
+        TSRRELEASE(&storage.real,CMS_STAGE_OWNER,stage_real) != TSR_OK)
         return 12U;
+    return result;
+}
+
+/* The diagnostic fixture booted with two static U24 pages. Its U64 caller
+ * has finished using them before this service replaces that interval with
+ * the checked fixed-origin image. A normal loader starts with empty U. */
+static unsigned int cms24_map_service(const TSGREQUEST *request)
+{
+    static const unsigned char name[] = {
+        0xc3U,0xd4U,0xe2U,0xf2U,0xf4U,0x4bU,0xd9U,0xe7U,
+        0xe5U,0xd4U
+    };
+    unsigned char *stage;
+    TSPADDR first, second, expected_first, expected_second, old, placed;
+    TSHINFO info;
+    unsigned int blocks, stage_real, result, i, real=0U, entry;
+    int allocation;
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    if (*(volatile const unsigned int *)0x40bcU == 0U) return 0xfffffffbU;
+    result=cms_stage_read(name,sizeof name,24U,&stage,&stage_real,
+                          &info,&blocks);
+    if (result != 0U) return result;
+    first.hi=second.hi=expected_first.hi=expected_second.hi=0U;
+    first.lo=0x20000U; second.lo=0x21000U;
+    expected_first.lo=0x5000U; expected_second.lo=0x7000U;
+    if (TSDLOOKUP(&u_tables,first,&old) != TSD_OK ||
+        old.hi || old.lo != expected_first.lo ||
+        TSDLOOKUP(&u_tables,second,&old) != TSD_OK ||
+        old.hi || old.lo != expected_second.lo) {
+        result=12U; goto release;
+    }
+    if (TSDUNMAP(&u_tables,first,&old) != TSD_OK ||
+        old.lo != expected_first.lo) { result=12U; goto release; }
+    if (TSDUNMAP(&u_tables,second,&old) != TSD_OK ||
+        old.lo != expected_second.lo) {
+        if (TSDMAP(&u_tables,first,expected_first) != TSD_OK)
+            result=0xfffffff0U;
+        else result=12U;
+        goto release;
+    }
+    if (TSPRELS(&storage.virtuals,0x80000001U) != TSP_OK) {
+        result=12U; goto restore_pages;
+    }
+    allocation=TSMALLOC(&storage,5U,24U,first,first,
+                         info.image_bytes,1,&placed);
+    if (allocation != TSM_OK) {
+        result=allocation == TSM_NOMEM ? 4U : 12U;
+        goto restore_reservation;
+    }
+    for (i=0U; i<TSM_ALLOCS; ++i)
+        if (storage.allocations[i].handle &&
+            storage.allocations[i].task == 5U &&
+            storage.allocations[i].address.hi == placed.hi &&
+            storage.allocations[i].address.lo == placed.lo &&
+            storage.allocations[i].bytes >= info.image_bytes) {
+            real=storage.allocations[i].real;
+            break;
+        }
+    if (!real || TSHIMAGE(stage,blocks*18452U,24U,placed.lo,
+                          (unsigned char *)TSF_KAPERTURE_VA+real,
+                          info.image_bytes,&entry) != TSH_OK) {
+        if (TSMFREE(&storage,5U,placed) != TSM_OK)
+            { result=0xfffffff0U; goto release; }
+        result=12U; goto restore_reservation;
+    }
+    *(volatile unsigned int *)0x4100U=real;
+    *(volatile unsigned int *)0x4104U=entry;
+    *(volatile unsigned int *)0x4108U=info.image_bytes;
+    *(volatile unsigned int *)0x410cU=TSMLOWFREE(&storage);
+    *(volatile unsigned int *)0x4098U=u_tables.used;
+    result=0U; goto release;
+restore_reservation:
+    if (TSMRESERVE(&storage,1U,24U,first,0x2000U) != TSP_OK)
+        { result=0xfffffff0U; goto release; }
+restore_pages:
+    if (TSDMAP(&u_tables,first,expected_first) != TSD_OK ||
+        TSDMAP(&u_tables,second,expected_second) != TSD_OK)
+        result=0xfffffff0U;
+release:
+    if (TSRRELEASE(&storage.real,CMS_STAGE_OWNER,stage_real) != TSR_OK)
+        return 0xfffffff0U;
     return result;
 }
 
@@ -236,18 +337,17 @@ static unsigned int cms31_map_service(const TSGREQUEST *request)
         0xc3U,0xd4U,0xe2U,0xf3U,0xf1U,0x4bU,0xd9U,0xe7U,
         0xe5U,0xd4U
     };
-    unsigned char *stage=(unsigned char *)TSF_KAPERTURE_VA+CMS_STAGE_REAL;
+    unsigned char *stage;
     TSPADDR base, placed;
     TSHINFO info;
-    unsigned int blocks, result, i, real=0U, entry;
+    unsigned int blocks, result, i, real=0U, entry, stage_real;
     int allocation;
     if (request->length || request->address.hi || request->address.lo ||
         request->direction) return 8U;
     if (*(volatile const unsigned int *)0x40bcU == 0U) return 0xfffffffbU;
-    if (TSRRESERVE(&storage.real,CMS_STAGE_OWNER,CMS_STAGE_REAL,
-                   CMS_STAGE_CAPACITY,TSR_RUN) != TSR_OK) return 4U;
-    result=cms_stage_read(name,sizeof name,31U,stage,&info,&blocks);
-    if (result != 0U) goto release;
+    result=cms_stage_read(name,sizeof name,31U,&stage,&stage_real,
+                          &info,&blocks);
+    if (result != 0U) return result;
     base.hi=0U; base.lo=0x03000000U;
     allocation=TSMALLOC(&storage,4U,31U,base,base,info.image_bytes,1,&placed);
     if (allocation != TSM_OK) {
@@ -276,7 +376,7 @@ static unsigned int cms31_map_service(const TSGREQUEST *request)
     *(volatile unsigned int *)0x4098U=u_tables.used;
     cms31_loaded=1U;
 release:
-    if (TSRRELEASE(&storage.real,CMS_STAGE_OWNER,CMS_STAGE_REAL) != TSR_OK)
+    if (TSRRELEASE(&storage.real,CMS_STAGE_OWNER,stage_real) != TSR_OK)
         return 12U;
     return result;
 }
@@ -497,6 +597,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 215U) return cms31_overlay_push(request);
     if (request->svc == 216U) return cms31_overlay_pop(request);
     if (request->svc == 217U) return cms31_child_probe();
+    if (request->svc == 218U) return cms24_map_service(request);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
         return 0xfffffffbU;

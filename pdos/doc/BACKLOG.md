@@ -169,23 +169,20 @@ The [CMS24 header checkpoint](qualification/TWO-SPACE-CMS-HEADER-2026-10-06.md)
 adds a pinned unchanged RXVM stage to a disposable image and validates its
 first block through K C31 after IPL. The later [full-stage guest checkpoint](qualification/TWO-SPACE-CMS-FULL-GUEST-2026-10-06.md)
 reads and validates all 92 records of the v2 CMS24 stage under K and uses
-observable guest completion rather than a fixed IPL pause. U mapping,
-relocation, command dispatch and actual CMS/TSO execution remain slice 6/7
-work. Full-stage validation cannot stand in for application compatibility.
+observable guest completion rather than a fixed IPL pause.
 The [image materialization checkpoint](qualification/TWO-SPACE-CMS-IMAGE-2026-10-06.md)
 adds a C89 fixed CMS24 copy and CMS31 relocation pass over validated staged
-MODULE bytes. Fixed CMS24 U placement, executable entry and application-call
-integration are still required for slice 6.
-The [CMS31 U mapping checkpoint](qualification/TWO-SPACE-CMS31-U-MAP-2026-10-06.md)
-connects the pinned RXVM stage to live U page allocation and relocation in
-a fresh diagnostic IPL. It does not enter RXVM, supply CMS services or
-qualify unchanged applications; those slice 6 and 7 gates remain open.
+MODULE bytes. The [dual CMS mapping checkpoint](qualification/TWO-SPACE-DUAL-CMS-MAP-2026-10-06.md)
+now connects both pinned RXVM images to live U allocations in one fresh IPL,
+with dynamic K stage reservations and a measured 13,914,112-byte contiguous
+24-bit placement gap between the CMS24 image and reserved stack range.
 The [same-origin guest backing checkpoint](qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 then swaps an eight-byte AMODE31 child over the mapped RXVM interval,
 executes its nested SVC from U, restores the parent pages and propagates its
 return value to a U64 caller. It proves the mixed-mode memory and executable
-transition needed for a colliding nested call; full CMS linkage and REXX
-`ADDRESS` remain unqualified.
+transition needed for a colliding nested call. Neither RXVM executes yet;
+full CMS linkage, general file/command services, REXX `ADDRESS`, TSO programs,
+wide heap budgets and normal successor selection remain unqualified.
 
 ## PD-004: Batch-file delivery
 

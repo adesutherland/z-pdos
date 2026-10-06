@@ -280,10 +280,11 @@ The allocator's search begins at `0x20000` for 24-bit requests and skips the
 live interval inventory. With a registered CMS24 RXVM image ending at
 `0x1bb000`, the first subsequent page can start there. This retains the
 `0x1bb000`–`0x200000` gap that an artificial 2 MiB U floor would lose. The
-host interval calculation leaves 15,089,664 low virtual bytes unreserved
-after the CMS24 image and a U-owned page at zero, before a U stack or heap.
-The real guest has **not** yet loaded that CMS24 image under K64, and TSO24
-placement and heap measurements remain pending.
+current guest maps CMS24 RXVM at that fixed origin. The ledger reserves
+`0x0`–`0x1ffff` for interfaces and `0xf00000`–`0xffffff` for a future
+24-bit stack, leaving the contiguous `0x1bb000`–`0xefffff` gap of
+13,914,112 low U virtual bytes. This is a placement budget; the stack is
+not yet backed and unchanged CMS24/TSO24 heap demand is unmeasured.
 
 Fixed-origin collision handling now has a K-owned page-backing primitive.
 It keeps a suspended caller's real frames intact, maps distinct child frames
@@ -343,49 +344,28 @@ status. A TOD watchdog bounds a stalled operation, replacing its previous
 fixed poll count. The [fresh I/O completion result](../qualification/TWO-SPACE-IO-COMPLETION-2026-10-06.md)
 covers the one-CPU diagnostic profile.
 
-The [CMS24 header checkpoint](../qualification/TWO-SPACE-CMS-HEADER-2026-10-06.md)
-adds the pinned, unchanged staged RXVM MODULE as an optional dataset on the
-disposable successor disk. K finds its checked first extent and validates the
-first block's stage envelope and MODULE header through Classic C31. The
-reported fixed origin `0x20000`, end `0x1ba6c0` and entry `0x20000` agree
-with the inspected release input. This is a format and placement prerequisite:
-K has not read all MODULE records, validated the full payload, mapped the
-image into U or run RXVM. CMS31 header parsing passes a host check on its
-actual staged RXVM input; guest qualification of it is later work.
+K's C31 loader reads the checked first extent into a temporary real
+allocation sized from the validated MODULE header. It checks the v2 envelope
+FNV, zero padding, every image record, and the CMS31 map and relocation
+records before exposing an image in U. The scratch allocation is released
+after each load. [Host format tests](../qualification/TWO-SPACE-CMS-FULL-STAGE-2026-10-06.md)
+cover unchanged CMS24 RXVM and CMS31 RXVM, RXAS and RXC stages; the
+[guest dual-map check](../qualification/TWO-SPACE-DUAL-CMS-MAP-2026-10-06.md)
+loads pinned RXVM from both profiles in one fresh IPL. CMS24 stays fixed at
+`0x20000`; CMS31 is relocated to `0x03000000`. K writes image bytes through
+its real aperture, and the host gate checks their U page translations and
+distinct real backing. The 16 MiB fixture is a diagnostic real-memory
+profile, not a production 31/64-bit heap policy.
 
-The subsequent host-side full-stage parser checks v2 envelope FNV, zero
-padding, every framed image record and the CMS31 load map and ordered
-relocations. It passes the unchanged CMS24 RXVM and CMS31 RXVM, RXAS and RXC
-stage files from the pinned release contract. This is parser evidence only;
-K's guest dataset path still reaches only the first block at this point.
-
-The next guest checkpoint reads all 92 F/18452 blocks of the pinned v2
-CMS24 RXVM dataset into a K-only real-memory aperture, reserved in the real
-frame ledger for the duration of the read. K validates the complete staged
-MODULE before releasing that reservation. The selected CMS24 application
-virtual origin remains `0x20000`; this checkpoint does not map or execute
-the image in U. The IPL test now waits for an observable 3270 ready screen
-and guest disabled-wait completion before saving the core. Its time limits
-are failure watchdogs, not the criterion for completion.
-
-The shared C89 loader routine can materialize a validated CMS24 fixed image
-into caller-supplied storage and materialize CMS31 at a checked 31-bit base,
-applying each validated relocation word. Host tests exercised the pinned
-RXVM, RXAS and RXC MODULE bytes. The successor now uses this routine for
-the pinned CMS31 RXVM: after a complete CKD read into a reserved K buffer,
-K allocates 31-bit U pages at `0x03000000`, writes the relocated image through
-its own real aperture, and retains those U mappings. A fresh IPL checked
-all image page translations and the first bytes in real storage. This is a
-mapped-image proof; it does not enter RXVM or provide its CMS API surface.
-The 16 MiB fixture could accommodate this RXVM image and stage together, but
-is not a production heap budget for CMS31, TSO31 or 64-bit applications.
-On that mapped RXVM interval, a guest check now pushes a same-origin child
-backing, branches through a low U trampoline to an eight-byte AMODE31 child,
-and receives `0x3456` after its nested SVC returns through K. It then pops
-the backing and reads the original RXVM bytes again. Each page-table
-replacement is purged on the single CPU. This exercises a real mixed-mode
-guest handoff and reversible collision policy; the child is a minimal test
-program, not a CMS or REXX `ADDRESS` application.
+The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
+replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
+SVC through K, returns `0x3456` to a U64 caller, restores the parent PTEs,
+and verifies its bytes again. Each live page-table replacement is purged on
+the one CPU. This proves a mixed-mode memory and gate transition. Neither
+RXVM runs yet: CMS lowcore, file and command services and actual REXX
+`ADDRESS` behavior remain to be implemented. The IPL harness waits for the
+3270 ready screen and guest disabled-wait event; time limits only detect
+stalls.
 
 ## Primary architecture and compatibility references
 

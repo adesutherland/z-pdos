@@ -215,21 +215,38 @@ def run(args):
                     zlib.crc32(reference[0x140000:0x180000]) and
                 raw[0x100000:0x140000] == reference[0x100000:0x140000])
             checks["runtime_u_pages_released"] = (
-                page_unmapped(raw, 0x14000f, 0x22000) and
+                (bool(args.cms24) or page_unmapped(raw, 0x14000f, 0x22000)) and
                 page_unmapped(raw, 0x14000f, 0x02010000) and
-                (bool(args.cms31) or
+                (bool(args.cms24) or bool(args.cms31) or
                  raw[0x140000:0x180000] == reference[0x140000:0x180000]))
+            if args.cms24:
+                real24, entry24, image24, low_free = struct.unpack_from(
+                    ">4I", raw, 0x4100)
+                staged24 = (disk.parent / "cms24-rxvm.bin").read_bytes()
+                pages24 = (image24 + 4095) // 4096
+                checks["cms24_u_fixed_image_contract"] = (
+                    entry24 == 0x20000 and image24 == 1681088 and
+                    0x200000 <= real24 < 0x1000000 and
+                    real24 + pages24 * 4096 <= 0x1000000 and
+                    low_free == 0x00f00000 - 0x20000 - pages24 * 4096 and
+                    raw[real24:real24+16] == staged24[148:164] and
+                    all(page_real(raw,0x14000f,0x20000+i*4096) ==
+                        real24+i*4096 for i in range(pages24)))
             if args.cms31:
                 real, entry, image_bytes, blocks = struct.unpack_from(">4I",raw,0x40e0)
                 staged = (disk.parent / "cms31-rxvm.bin").read_bytes()
                 pages = (image_bytes + 4095) // 4096
                 checks["cms31_u_image_contract"] = (
-                    0x200000 <= real < 0x700000 and
+                    0x200000 <= real < 0x1000000 and
                     entry == 0x03000000 and image_bytes == 4238296 and
-                    blocks == 239 and real + pages * 4096 <= 0x700000 and
+                    blocks == 239 and real + pages * 4096 <= 0x1000000 and
                     raw[real:real+16] == staged[148:164] and
                     all(page_real(raw,0x14000f,0x03000000+i*4096) ==
                         real+i*4096 for i in range(pages)))
+                if args.cms24:
+                    checks["cms_images_independent_real_backing"] = (
+                        real24 + pages24*4096 <= real or
+                        real + pages*4096 <= real24)
                 push, parent, child, returned, restored, executed = struct.unpack_from(
                     ">6I", raw, 0x12180)
                 checks["cms31_nested_backing_restored"] = (
@@ -243,7 +260,8 @@ def run(args):
                 (kpool, upool, kbytes) ==
                 (0x100000, 0x140000, 200704) and
                 struct.unpack_from(">I",raw,0x40b8)[0] == 94208 and
-                (94208 < ubytes <= 0x40000 if args.cms31 else ubytes == 94208))
+                (94208 < ubytes <= 0x40000 if args.cms24 or args.cms31
+                 else ubytes == 94208))
             checks["guest_dat_unmap_remap_ptlb"] = struct.unpack_from(">I",raw,0x40a0)[0] == 2
             judged["handover"] = {"stage_real": hex(stage),
                                   "launcher_real": hex(launch),
