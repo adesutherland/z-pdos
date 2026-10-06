@@ -100,6 +100,11 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :dattest"
   if rc <> 0 then return rc
+  capacitytest = out || "/fixture-capacity-test"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_dat.c pdos/src/twospace_fixture.c pdos/tests/two-space/fixture_capacity.c -o :capacitytest"
+  if rc <> 0 then return rc
+  address crexx "run :capacitytest"
+  if rc <> 0 then return rc
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_placement.c pdos/tests/two-space/placement.c -o :placetest"
   if rc <> 0 then return rc
   address crexx "run :placetest"

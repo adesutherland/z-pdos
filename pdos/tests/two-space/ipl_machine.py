@@ -79,7 +79,7 @@ def page_unmapped(raw, root, virtual):
         if entry == (0x400 if level == 3 else 0x20):
             return True
         origin = entry & ~4095
-        if origin < 0x180000 or origin >= 0x1c0000:
+        if origin < 0x180000 or origin >= 0x1e0000:
             return False
     return False
 
@@ -91,7 +91,7 @@ def page_real(raw, root, virtual):
                (lo >> 20) & 2047, (lo >> 12) & 255)
     origin = root & ~4095
     for level, index in enumerate(indexes):
-        if origin < 0x180000 or origin >= 0x1c0000:
+        if origin < 0x180000 or origin >= 0x1e0000:
             return None
         entry = struct.unpack_from(">Q", raw, origin + index * 8)[0]
         if entry == (0x400 if level >= 3 else 0x20):
@@ -202,9 +202,9 @@ def run(args):
             judged["checks"]["ipl_subchannel_handover"] = (
                 0x10000 <= struct.unpack_from(">I",raw,0x40bc)[0] < 0x10100)
             judged["checks"]["independent_disk_console_channel_workspaces"] = (
-                struct.unpack_from(">I",raw,0x1c0008)[0] == 0x1c0200 and
-                struct.unpack_from(">I",raw,0x1d0008)[0] == 0x1d0200 and
-                raw[0x1c0200:0x1c0208] != raw[0x1d0200:0x1d0208])
+                struct.unpack_from(">I",raw,0x1e0008)[0] == 0x1e0200 and
+                struct.unpack_from(">I",raw,0x1f0008)[0] == 0x1f0200 and
+                raw[0x1e0200:0x1e0208] != raw[0x1f0200:0x1f0208])
             judged["checks"]["k_terminal_screen_observed"] = (
                 "K SERVICE READY" in (out / "terminal.screen").read_text())
             judged["checks"]["terminal_input_sent"] = input_sent
@@ -216,13 +216,13 @@ def run(args):
                 struct.unpack_from(">I",raw,0x40b0)[0] ==
                     zlib.crc32(reference[0x100000:0x180000]) and
                 struct.unpack_from(">I",raw,0x40b4)[0] ==
-                    zlib.crc32(reference[0x180000:0x1c0000]) and
+                    zlib.crc32(reference[0x180000:0x1e0000]) and
                 raw[0x100000:0x180000] == reference[0x100000:0x180000])
             checks["runtime_u_pages_released"] = (
                 (bool(args.cms24) or page_unmapped(raw, 0x18000f, 0x22000)) and
                 page_unmapped(raw, 0x18000f, 0x02010000) and
                 (bool(args.cms24) or bool(args.cms31) or
-                 raw[0x180000:0x1c0000] == reference[0x180000:0x1c0000]))
+                 raw[0x180000:0x1e0000] == reference[0x180000:0x1e0000]))
             if args.cms24:
                 real24, entry24, image24, low_free = struct.unpack_from(
                     ">4I", raw, 0x4100)
@@ -281,7 +281,7 @@ def run(args):
                 kpool == 0x100000 and upool == 0x180000 and
                 200704 < kbytes <= 0x80000 and
                 struct.unpack_from(">I",raw,0x40b8)[0] == 94208 and
-                (94208 < ubytes <= 0x40000 if args.cms24 or args.cms31
+                (94208 < ubytes <= 0x60000 if args.cms24 or args.cms31
                  else ubytes == 94208))
             checks["guest_dat_unmap_remap_ptlb"] = struct.unpack_from(">I",raw,0x40a0)[0] == 2
             judged["handover"] = {"stage_real": hex(stage),

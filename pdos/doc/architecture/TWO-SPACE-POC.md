@@ -372,12 +372,15 @@ real-memory profile; it did not establish a production 31/64-bit heap policy.
 
 The [64 MiB real-memory result](../qualification/TWO-SPACE-64M-2026-10-06.md)
 widens this same single-CPU successor. The K-only real aperture covers
-64 MiB through sparse 4 KiB translations. Separate K/U table pools use
-512/256 KiB within the 2 MiB final core, and disk/console buffers stay
-below the 24-bit real limit. U virtual placements and the 24-bit free
-interval do not move. This proves the wider physical map and fresh IPL;
-generous 31/64-bit application heaps still need allocation and guest
-workload measurements.
+64 MiB through sparse 4 KiB translations. The later
+[U DAT capacity checkpoint](../qualification/TWO-SPACE-U-DAT-CAPACITY-2026-10-06.md)
+keeps the 512 KiB K table pool and widens the U pool to 384 KiB within the
+2 MiB final core. Disk/console buffers remain below the 24-bit real
+limit. U virtual placements and the 24-bit free interval do not move.
+The retained host check maps simultaneous 16 MiB U31 and 32 MiB U64
+regions in 290,816 U table bytes. This proves table capacity and a fresh
+IPL; actual 31/64-bit heap allocation and access still need a guest
+workload measurement.
 
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its

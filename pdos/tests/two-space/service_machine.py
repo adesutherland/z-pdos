@@ -79,7 +79,7 @@ def make_core(elf, classic, dat_emit, out):
     application = {0x20000: 0x5000, 0x21000: 0x7000,
                    0x02000000: 0x11000, 0x110000000: 0x6000,
                    HIGH_REQUEST: 0x12000, 0x110002000: 0x13000}
-    pools = ((0x100000, 0x180000), (0x180000, 0x1c0000))
+    pools = ((0x100000, 0x180000), (0x180000, 0x1e0000))
     if any(lo <= pa < hi for pa in (*kernel.values(), *application.values())
            for lo, hi in pools):
         raise ValueError("DAT real pool overlaps image backing")
@@ -89,7 +89,7 @@ def make_core(elf, classic, dat_emit, out):
                              *(0x14000 + i * 4096 for i in range(11))}
     if private_kernel_frames.intersection(application.values()):
         raise ValueError("U maps private K real frame")
-    if any(0x1c0000 <= pa < 0x1e0000 for pa in application.values()):
+    if any(0x1e0000 <= pa < 0x200000 for pa in application.values()):
         raise ValueError("U maps low-real K channel buffer")
     image = out / "image.core"
     image.write_bytes(core)
@@ -102,14 +102,14 @@ def make_core(elf, classic, dat_emit, out):
     except ValueError as exc:
         raise ValueError("malformed DAT builder result") from exc
     if (kasce, uasce) != (0x10000f, 0x18000f) or \
-            kbytes > 0x80000 or ubytes > 0x40000:
+            kbytes > 0x80000 or ubytes > 0x60000:
         raise ValueError("DAT builder returned unexpected ASCE or size")
     built_core = image.read_bytes()
     if qword(built_core, 0x100000 + 8 * 8) == 0x20 or \
             qword(built_core, 0x180000 + 8 * 8) != 0x20:
         raise ValueError("high K R1 entry or U isolation absent")
     kstats = {"table_bytes": kbytes, "table_4k_frames": kbytes // 4096,
-              "mapped_pages": len(kernel) + 16384 + 0xc0000 // 4096}
+              "mapped_pages": len(kernel) + 16384 + 0xe0000 // 4096}
     ustats = {"table_bytes": ubytes, "table_4k_frames": ubytes // 4096,
               "mapped_pages": len(application)}
     return {"kernel_asce": hex(kasce), "application_asce": hex(uasce),
@@ -117,7 +117,7 @@ def make_core(elf, classic, dat_emit, out):
             "kernel_mappings": {hex(k): hex(v) for k, v in kernel.items()},
             "application_mappings": {hex(k): hex(v) for k, v in application.items()},
             "kernel_table_aliases": {"kernel": ["0x5000000", "0x507ffff"],
-                                     "application_tables": ["0x5080000", "0x50bffff"]},
+                                     "application_tables": ["0x5080000", "0x50dffff"]},
             "kernel_real_aperture": ["0x8000000", "0xbffffff"],
             "kernel_pages_in_application_low_virtual": 0,
             "application_low_virtual_bytes": sum(4096 for va in application if va < 0x1000000),
@@ -241,7 +241,7 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False):
         struct.unpack_from(">I",raw,0x40ac)[0] ==
         (4 + (2 + 5 * ((1681088 + 4095) // 4096) + 255 if cms24 else 0) +
          (5 * ((4238296 + 4095) // 4096) if cms31 else 0)) and
-        0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x40000)
+        0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x60000)
     errors = [x for x in log.splitlines() if re.search(r"HHC\d{5}E\b", x)]
     checks["no_hercules_error"] = not errors
     return {"pass": all(checks.values()), "checks": checks,

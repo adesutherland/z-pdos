@@ -122,6 +122,14 @@ qualification. This sequence does not add a second roadmap.
 | 6. Shared-U loader and calls | Load fixed and relocatable CMS/TSO modules with a live interval inventory and checked AMODE/RMODE. Run nested application calls, including REXX `ADDRESS`; for a fixed-origin collision, use a defined reversible suspend/restore policy and verify caller state and return code. |
 | 7. Replacement selection | Build a normal 3390 image selecting the successor explicitly. Qualify fresh IPL, unchanged CMS24/CMS31 and TSO31/TSO64 binaries, native TSO24 separately, low-memory exhaustion, bad service pointers, collisions, nested calls, faults and shutdown on named profiles before changing the default route. |
 
+After slice 7, review whether CMS and TSO workloads should continue sharing
+one U ASCE or have separate U spaces. Compare actual fixed-origin collisions,
+relocation and overlay costs, interapplication `ADDRESS`/LINK behavior,
+service-personality isolation, low 24-bit headroom and failure containment
+on qualified workloads. The present dual RXVM map and tiny nested children
+are insufficient to choose; retain this as a decision question, not an
+assumption that coexistence is straightforward or that separation is simpler.
+
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and
 real-frame ledger run in the guest. The map/unmap API and `PTLB` callback are

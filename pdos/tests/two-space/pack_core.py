@@ -36,7 +36,7 @@ def bare_core(source):
         raise ValueError("expected checked host DAT reference")
     core = bytearray(source)
     core[0x4000:0x4010] = bytes(16)
-    core[0x100000:0x1c0000] = bytes(0xc0000)
+    core[0x100000:0x1e0000] = bytes(0xe0000)
     return bytes(core)
 
 

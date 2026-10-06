@@ -173,7 +173,7 @@ int main(int argc, char **argv)
         crc32_bytes(stub,launch_len) != launch_crc) FAIL(28);
     if (be32(core+0x2000U) != 0x5044324eU ||
         !zeroes(core+0x4000U,16U) ||
-        !zeroes(core+0x100000U,0xc0000U)) FAIL(29);
+        !zeroes(core+0x100000U,0xe0000U)) FAIL(29);
     /* The real interruption/context island and all mapped service slots are
        owned even when their initial bytes are zero and omitted from disk. */
     if (TSRINIT(&final_core,CORE_SIZE) != TSR_OK) FAIL(30);
