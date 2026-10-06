@@ -107,11 +107,12 @@ remain separate work.
 - Acceptance: Separate the kernel image limit from its heap address, reserve independently backed K storage for DAT and kernel structures, eliminate PLOAD's boot-heap overlap, and audit 24-bit channel buffers plus GETMAIN low requests and fallback. Extend the real interruption island for every required interruption class; implement full-width context, PSW/key, K/U transition, bounded U-buffer access and C31 service dispatch with Classic tools. Inventory CMS lowcore/API conventions and preserve TSO SVC contracts without consuming unnecessary U low virtual pages. Add collision-checked relocatable/fixed module loading and a nested application-command gate, including a fixed-origin collision control. Qualify fresh IPL, CMS24/CMS31, TSO31/TSO64, low-memory budgets and failure recovery on named images. The Step 5 PoC IPL, [Steps 3/4 result](qualification/TWO-SPACE-STEPS3-4-2026-10-05.md), Step 2 fixture, stage 3 stack move, low-heap guard and direct shutdown wait are partial evidence, not completion.
 - Call and console scope: The required nested gate is native CMS-to-CMS and TSO-to-TSO invocation with parameters, return code and caller restoration. Mainframe cREXX does not supply a REXX `ADDRESS` requirement. Cross-personality application calls are optional only when simple. Keep PCOMM in U, K's checked terminal and emergency output in K, and track the opt-in U 3270 wrapper under [PD-021](#pd-021-reusable-3270-application-presentation).
 
-### PD-003 delivery sequence
+### PD-003 initial proof slices
 
-Each checkpoint is a bootable, reviewable increment. The one-ASCE release
-route remains selected until the replacement has its own binary and guest
-qualification. This sequence does not add a second roadmap.
+These numbered slices identify the original bootable proof checkpoints and
+their dated results below. The completion plan after this table owns the
+order of remaining implementation. The one-ASCE release route remains
+selected until the replacement has its own binary and guest qualification.
 
 | Slice | Work and acceptance checkpoint |
 | --- | --- |
@@ -131,6 +132,36 @@ the requested storage is unavailable. Revisit separate CMS and TSO U ASCEs
 only if unchanged workloads expose an unavoidable lowcore conflict, material
 24-bit headroom loss, or a failure-isolation need that cannot be met in this
 map without excessive complexity. A change requires its own machine proof.
+
+### PD-003 completion plan, 6 October 2026
+
+This is the remaining implementation sequence for the first normal two-space
+image. It uses the selected K plus one shared U architecture and incorporates
+[PD-021](#pd-021-reusable-3270-application-presentation). The diagnostic IPL
+has already proved selected DAT, storage, channel and unchanged RXVM paths;
+those proofs are inputs, not completion of a normal bootable replacement.
+Record each checkpoint as a coherent change and, when authorized, a local
+commit with its affected host, target-build and fresh-guest evidence. Pin the
+machine profile, toolchain, unchanged application bytes and image hashes in
+each dated qualification record. Do not rerun unaffected checks merely to
+repeat an earlier result.
+
+| Checkpoint | Implementation | Reviewable acceptance |
+| --- | --- | --- |
+| P0. Freeze the executable contract | Inventory the actual unchanged CMS24/CMS31 and TSO24/TSO31/TSO64 ANY/HIGH packages, load records, entry and return linkage, parameters, lowcore words, file and terminal calls, storage ranges and command paths. Define the selected service subset and distinguish a loader/service failure from an application's RC. Keep the REXX `ADDRESS` operation and CMS-to-TSO application calls outside the required contract. | An ABI/service table in the architecture guide traces each required native operation to its owning K service or U component, exact unchanged binary fixture and positive/negative control. Record the 24-bit image, stack, heap and largest free low-U interval at named points. No interface is inferred from a synthetic probe alone. |
+| P1. Make K state and ownership explicit | Replace program-counter or global-profile inference with an invocation descriptor. Make image pages, U allocations, newly opened file handles, lowcore backing, terminal lease and pending I/O owned by that invocation, except for explicit ABI-defined sharing. Complete interruption nesting, event-driven I/O completion, cancellation and recoverable U-fault unwind without sharing the disk and terminal low-real workspaces. Keep real-frame and DAT-table release checked. | Fresh IPL proves normal return and fault cleanup, including a child fault, failed channel start, late completion and retry. K remains protected, all caller state is restored, and no owned frame, handle or low-U page leaks. Completion events decide success; elapsed time only fails a stalled test. |
+| P2. Finish the selected K service surface | Complete the bounded CMS and TSO storage, dataset, file, terminal-input and command services identified in P0. Preserve their distinct ABI layouts, return conventions and encoding. Persist selected output records safely and read them back; validate every full-width U buffer before a C31 service touches it. | Unchanged selected CMS and TSO service probes pass in the diagnostic image with exact output, RC and error behavior. Invalid pointers, short buffers, missing members and failed writes leave no partial state or false success. The 24-bit U placement budget does not shrink because of K code, tables or buffers. |
+| P3. Load and call real applications | Use the K placement ledger for fixed and relocatable modules. Implement synchronous CMS-to-CMS and TSO-to-TSO calls with bounded parameters, application RC and separate OS failure status. Restore the caller's AMODE, full registers, lowcore and terminal lease; preserve its file handles and cursors while releasing child-owned handles on return or fault. A fixed-origin nested call may use a checked reversible overlay; ordinary loads preserve every live image. | Native same-personality parent and child pairs run without z/PDOS-specific binary edits and return exact parameters and RCs, including relevant 24/31/64 mode crossings. A colliding or exhausted low interval, or missing real backing, returns a deterministic error without publishing a partial image or moving 24-bit storage above 16 MiB. Co-resident applications remain mapped whenever their required virtual and real storage fits. |
+| P4. Deliver the C console and display models | Put the model-aware 3270 driver and encoder in K C31 C, leaving privileged channel instructions in assembler. Expose checked terminal capabilities and logical screen/input requests. Build the reusable U presentation code in C, first for PCOMM and an opt-in app; use explicit ABI adapters for other modes without consuming 24-bit U storage merely for the console. Keep unchanged CMS/TSO line calls working. | Qualify model 2 24×80, model 3 32×80, model 4 43×80 and model 5 27×132 with queried or explicit geometry, address encoding, long output, AID/input, header/footer/scroll/entry layout and child-return repaint. Reject unsupported or ambiguous capabilities and malformed U requests. Device completion remains event-driven and disk I/O cannot corrupt a pending terminal operation. |
+| P5. Build a selectable normal image | Integrate PLOAD handover, K64/C31, U PCOMM, native loaders and services into a source-built 3390 image with an explicit successor selection. Retain the current release boot route until the new route passes qualification. Keep K emergency output and shutdown independent of U PCOMM health. | A fresh disk IPL reaches a stable U prompt, launches both CMS and TSO commands, reports each RC, recovers from a failed command, and shuts down without stranded guest or host resources. Stopped-disk checks verify the image and persistent output after the guest stops. |
+| P6. Qualify and select the replacement | Run the unchanged released workload set through the normal successor image: CMS31 RXC/RXAS/RXVM, the bounded CMS24 IO24 path, TSO31 and TSO64 ANY/HIGH compiler/assembler/terminal/file paths, and native TSO24 separately. Exercise nested calls, low-memory exhaustion, fixed collisions, corrupt inputs, bad U pointers, failed I/O, child faults, each terminal model across fresh IPLs and repeated start/stop. Compare against the current one-ASCE acceptance without weakening its supported cases. | Record exact binary and image identities, per-case RC/output, low-U free interval and real-frame use, and a repeatable guest completion or failure event. Watchdogs only detect stalls. Select the successor as default only after all required cases pass on a named machine/toolchain and the operator and architecture guides describe the observed behavior. Publication or release is a separate decision. |
+
+P0 resolves the exact native ABI details before the dependent P2/P3 code is
+committed. P1's owner and completion model is a prerequisite for expanding
+services or screen output. P3 supplies the invocation and screen-lease stack
+used by P4. P5 is an opt-in integration route; P6 changes the default only
+after its normal image qualifies. A separate CMS or TSO U ASCE is not part of
+this plan unless the recorded shared-U review trigger is met.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and

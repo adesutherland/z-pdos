@@ -13,6 +13,8 @@ synchronous application execution. A native 64-bit C kernel is a separate goal.
 The [two-space successor proof](doc/architecture/TWO-SPACE-POC.md) exercises
 an AMODE64 assembler nucleus, protected Classic C31 services and applications
 sharing a separate 64-bit address space. The
+[remaining implementation plan](doc/BACKLOG.md#pd-003-completion-plan-6-october-2026)
+orders its production work and acceptance checkpoints. The
 [slices 3/4 qualification](doc/qualification/TWO-SPACE-SLICES3-4-2026-10-05.md)
 boots its bounded interruption and U-buffer gate through a fresh 3390 IPL;
 the [storage and overlay checkpoint](doc/qualification/TWO-SPACE-STORAGE-OVERLAY-2026-10-05.md)

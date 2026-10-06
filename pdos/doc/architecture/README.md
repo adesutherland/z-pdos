@@ -22,6 +22,8 @@ retain one shared U ASCE, place the PDOS command processor and reusable C
 checked service handling in K. The next terminal target includes 3270 models
 2–5 with geometry and capabilities supplied by a checked query or explicit
 configuration; the present fixed 24×80 layout is a source limitation.
+The [completion plan](../BACKLOG.md#pd-003-completion-plan-6-october-2026)
+orders the remaining K, native-call, C console, image and qualification work.
 Required application calls are within the same CMS or TSO personality, with
 parameters and a return code. Mainframe cREXX does not require a REXX
 `ADDRESS` operation or a CMS-to-TSO application call.
