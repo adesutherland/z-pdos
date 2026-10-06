@@ -164,9 +164,9 @@ Any newly discovered ABI form reopens the relevant P0 entry before code for
 that form is accepted. P1's owner and completion model is a prerequisite for
 expanding services or screen output. P3 supplies the invocation and
 screen-lease stack used by P4. P5 is an opt-in integration route; P6 changes
-the default only
-after its normal image qualifies. A separate CMS or TSO U ASCE is not part of
-this plan unless the recorded shared-U review trigger is met.
+the default only after its normal image qualifies. A separate CMS or TSO U
+ASCE is not part of this plan unless the recorded shared-U review trigger is
+met.
 
 The [P0 ABI inventory](architecture/TWO-SPACE-ABI.md) now pins the selected
 unchanged inputs and names the untraced forms. The first [P1 invocation
