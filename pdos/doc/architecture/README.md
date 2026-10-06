@@ -39,6 +39,9 @@ also runs IOQUAL with LIBRARY through checked K file records and transient
 output. A [selected CMS24 IO24 result](../qualification/TWO-SPACE-CMS24-IO24-2026-10-06.md)
 uses a fresh fixed-origin overlay and profile-specific K file state, with its
 13,914,112-byte low U placement gap restored after the call. The successor
+also has [bounded per-file CMS input cursors](../qualification/TWO-SPACE-CMS-CURSORS-2026-10-06.md)
+in K real storage, so a second open input does not discard the first cursor.
+The successor
 still lacks persistent output, general CMS/TSO file
 and command adapters, REXX `ADDRESS` calls and the explicitly selected
 replacement image. A post-qualification review will decide whether CMS

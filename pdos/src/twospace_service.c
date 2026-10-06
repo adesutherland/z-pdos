@@ -10,6 +10,7 @@
 #include "twospace_dataset.h"
 #include "twospace_cms.h"
 #include "twospace_cmsfile.h"
+#include "twospace_cmscursor.h"
 
 static unsigned int user_rights(unsigned int frame, void *unused);
 static TSDSTATE u_tables;
@@ -31,12 +32,8 @@ static unsigned int cms31_heap_live;
 static unsigned int cms31_heap_bytes;
 static TSPADDR cms31_heap_address;
 #define CMS_FILE_OWNER 0x434d5346U
-typedef struct {
-    unsigned char id[18];
-    unsigned int real, length, records, cursor;
-} CMSINPUT;
-/* CMS24 and CMS31 must not replace each other's active record cursor. */
-static CMSINPUT cms_inputs[2];
+/* Each open input, including one reopened by a nested app, owns its cursor. */
+static TSISTATE cms_inputs;
 #define CMS_OUTPUT_SLOTS 4U
 #define CMS_OUTPUT_BYTES 0x200000U
 typedef struct {
@@ -882,27 +879,17 @@ static void cms_put_word(unsigned char *p, unsigned int value)
     p[2]=(unsigned char)(value>>8); p[3]=(unsigned char)value;
 }
 
-static CMSINPUT *cms_input(unsigned int profile)
+static unsigned int cms_file_close(TSIINPUT *input)
 {
-    if (profile==24U) return &cms_inputs[0];
-    if (profile==31U) return &cms_inputs[1];
-    return 0;
-}
-
-static unsigned int cms_input_owner(unsigned int profile)
-{
-    return CMS_FILE_OWNER+(profile==24U ? 5U : 0U);
-}
-
-static unsigned int cms_file_close(unsigned int profile)
-{
-    CMSINPUT *input=cms_input(profile);
+    unsigned int owner;
     if (!input) return 12U;
+    owner=TSIOWNER(&cms_inputs,input,CMS_FILE_OWNER+16U);
+    if (!owner) return 12U;
     if (input->real &&
-        TSRRELEASE(&storage.real,cms_input_owner(profile),input->real)
+        TSRRELEASE(&storage.real,owner,input->real)
             !=TSR_OK)
         return 12U;
-    input->real=input->length=input->records=input->cursor=0U;
+    TSICLEAR(input);
     return 0U;
 }
 
@@ -956,7 +943,7 @@ static unsigned int cms_output_erase(CMSOUTPUT *out)
 /* The CMS file envelope is a checked sequence of variable records in a
  * fixed-block dataset. Keep its backing in K real storage, never U low VA. */
 static unsigned int cms_file_open(const unsigned char id[18],
-                                  unsigned int profile)
+                                  unsigned int profile, TSIINPUT **opened)
 {
     static const unsigned char prefix[6] =
         {0xc3U,0xd4U,0xe2U,0xf3U,0xf1U,0x4bU};
@@ -964,16 +951,17 @@ static unsigned int cms_file_open(const unsigned char id[18],
     const unsigned char *record;
     TSKEXTENT extent;
     TSIFINFO info;
-    CMSINPUT *input=cms_input(profile);
+    TSIINPUT *input;
     unsigned int i, j, n=0U, blocks, span, real;
     unsigned int cylinder, head, number;
     int found, count;
-    if (!input || id[16]!=0xc1U || id[17]!=0xf1U) return 28U;
-    if (input->real) {
-        for (i=0U; i<18U && input->id[i]==id[i]; ++i) {}
-        if (i==18U) return 0U;
-        if (cms_file_close(profile)!=0U) return 12U;
-    }
+    if (!opened || (profile!=24U && profile!=31U) ||
+        id[16]!=0xc1U || id[17]!=0xf1U) return 28U;
+    *opened=0;
+    input=TSIFIND(&cms_inputs,id,profile);
+    if (input) { *opened=input; return 0U; }
+    input=TSIEMPTY(&cms_inputs);
+    if (!input) return 4U;
     for (i=0U; i<6U; ++i) name[n++]=prefix[i];
     if (profile==24U) { name[3U]=0xf2U; name[4U]=0xf4U; }
     for (i=0U; i<8U && id[i]!=0x40U; ++i) {
@@ -1001,7 +989,8 @@ static unsigned int cms_file_open(const unsigned char id[18],
         return 12U;
     blocks=info.blocks;
     span=(blocks*18452U+4095U)&~4095U;
-    if (TSRALLOC(&storage.real,cms_input_owner(profile),span,
+    if (TSRALLOC(&storage.real,
+                 TSIOWNER(&cms_inputs,input,CMS_FILE_OWNER+16U),span,
                  TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,&real)!=TSR_OK)
         return 4U;
     stage=(unsigned char *)TSF_KAPERTURE_VA+real;
@@ -1020,12 +1009,52 @@ static unsigned int cms_file_open(const unsigned char id[18],
         goto corrupt;
     for (i=0U; i<18U; ++i) input->id[i]=id[i];
     input->real=real;
+    input->profile=profile;
     input->length=64U+info.payload_bytes;
     input->records=info.records; input->cursor=64U;
+    *opened=input;
     return 0U;
 corrupt:
-    return TSRRELEASE(&storage.real,cms_input_owner(profile),real)==TSR_OK ?
+    return TSRRELEASE(&storage.real,
+                      TSIOWNER(&cms_inputs,input,CMS_FILE_OWNER+16U),real)
+                      ==TSR_OK ?
            12U : 0xfffffff0U;
+}
+
+/* Diagnostic guest gate: real staged files must retain independent cursors
+ * while both are open, then release their distinct K real reservations. */
+static unsigned int cms_cursor_guest_probe(const TSGREQUEST *request)
+{
+    static const unsigned char first_id[18]={
+        0xc9U,0xd6U,0xd8U,0xe4U,0xc1U,0xd3U,0x40U,0x40U,
+        0xd9U,0xe7U,0xc2U,0xc9U,0xd5U,0x40U,0x40U,0x40U,
+        0xc1U,0xf1U};
+    static const unsigned char second_id[18]={
+        0xd3U,0xc9U,0xc2U,0xd9U,0xc1U,0xd9U,0xe8U,0x40U,
+        0xd9U,0xe7U,0xc2U,0xc9U,0xd5U,0x40U,0x40U,0x40U,
+        0xc1U,0xf1U};
+    TSIINPUT *first=0, *second=0;
+    unsigned int result=12U, owner_first, owner_second;
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    if (cms_file_open(first_id,31U,&first)!=0U || !first)
+        return 12U;
+    first->cursor=123U;
+    if (cms_file_open(second_id,31U,&second)!=0U || !second)
+        goto done;
+    owner_first=TSIOWNER(&cms_inputs,first,CMS_FILE_OWNER+16U);
+    owner_second=TSIOWNER(&cms_inputs,second,CMS_FILE_OWNER+16U);
+    if (first!=second && first->real!=second->real &&
+        first->cursor==123U && second->cursor==64U &&
+        owner_first && owner_second && owner_first!=owner_second &&
+        TSIFIND(&cms_inputs,first_id,31U)==first &&
+        TSIFIND(&cms_inputs,second_id,31U)==second)
+        result=0U;
+done:
+    if (second && cms_file_close(second)!=0U) result=12U;
+    if (first->cursor!=123U || cms_file_close(first)!=0U)
+        result=12U;
+    return result;
 }
 
 static unsigned int cms31_fst_lookup(TSGREQUEST *request)
@@ -1210,9 +1239,9 @@ static unsigned int cms_native_service(TSGREQUEST *request,
     unsigned int i, n, length, result, flags, cursor, size, real;
     unsigned int records;
     CMSOUTPUT *file;
-    CMSINPUT *input=cms_input(profile);
+    TSIINPUT *input=0;
     volatile unsigned char *out;
-    if (!input || request->address.hi ||
+    if ((profile!=24U && profile!=31U) || request->address.hi ||
         request->address.lo < (profile==24U ? 0x20000U : 0x1000000U) ||
         request->address.lo >= (profile==24U ? 0x1000000U : 0x80000000U))
         return 12U;
@@ -1298,7 +1327,7 @@ static unsigned int cms_native_service(TSGREQUEST *request,
         file=cms_output_find(plist+8U,profile);
         if (file) records=file->records;
         else {
-            result=cms_file_open(plist+8U,profile);
+            result=cms_file_open(plist+8U,profile,&input);
             if (result) return result;
             records=input->records;
         }
@@ -1332,7 +1361,7 @@ static unsigned int cms_native_service(TSGREQUEST *request,
                    64U : file->cursor;
             length=file->length;
         } else {
-            result=cms_file_open(plist+8U,profile);
+            result=cms_file_open(plist+8U,profile,&input);
             if (result) return result;
             real=input->real;
             cursor=(plist[26U]==0U && plist[27U]==1U) ?
@@ -1383,7 +1412,7 @@ static unsigned int cms_native_service(TSGREQUEST *request,
             return 12U;
         file=cms_output_find(plist+8U,profile);
         if (!file) {
-            result=cms_file_open(plist+8U,profile);
+            result=cms_file_open(plist+8U,profile,&input);
             if (result!=28U) return 12U;
             file=cms_output_create(plist+8U,profile);
             if (!file) return 4U;
@@ -1414,8 +1443,8 @@ static unsigned int cms_native_service(TSGREQUEST *request,
             file->closed=1U;
             return 0U;
         }
-        for (i=0U; i<18U && input->id[i]==plist[8U+i]; ++i) {}
-        return i==18U && input->real ? cms_file_close(profile) : 28U;
+        input=TSIFIND(&cms_inputs,plist+8U,profile);
+        return input ? cms_file_close(input) : 28U;
     }
     for (i=0U; i<8U && plist[i]==erase[i]; ++i) {}
     if (i==8U) {
@@ -1497,7 +1526,10 @@ static unsigned int cms_file_audit(const TSGREQUEST *request,
     }
     *(volatile unsigned int *)(TSF_KAPERTURE_VA+
         (profile==24U ? 0x254f4U : 0x254f0U))=count;
-    if (cms_file_close(profile)!=0U) result=12U;
+    for (slot=0U; slot<TSI_SLOTS; ++slot)
+        if (cms_inputs.slot[slot].real &&
+            cms_inputs.slot[slot].profile==profile &&
+            cms_file_close(&cms_inputs.slot[slot])!=0U) result=12U;
     return result;
 }
 
@@ -1555,6 +1587,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 225U) return cms31_library_probe(request);
     if (request->svc == 226U) return cms_file_audit(request,31U);
     if (request->svc == 229U) return cms_file_audit(request,24U);
+    if (request->svc == 230U) return cms_cursor_guest_probe(request);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
         return 0xfffffffbU;

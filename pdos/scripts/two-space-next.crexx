@@ -38,6 +38,7 @@ main: procedure = .int
   dsasm = out || "/TSK.asm"; dsobj = out || "/TSK.obj"
   cmsasm = out || "/TSH.asm"; cmsobj = out || "/TSH.obj"
   cmsfileasm = out || "/TSIF.asm"; cmsfileobj = out || "/TSIF.obj"
+  cmscursorasm = out || "/TSI.asm"; cmscursorobj = out || "/TSI.obj"
   datmap = out || "/TSD.map"; datbin = out || "/TSD.bin"
   address crexx "cd pdos/src"
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. -I../../pdpclib/src -DUSE_MEMMGR twospace_service.c -o :compiled"
@@ -60,6 +61,8 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_cmsfile.c -o :cmsfileasm"
   if rc <> 0 then return rc
+  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_cmscursor.c -o :cmscursorasm"
+  if rc <> 0 then return rc
   address crexx "cd :root"
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :compiled :object"
   if rc <> 0 then return rc
@@ -81,6 +84,8 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :cmsfileasm :cmsfileobj"
   if rc <> 0 then return rc
+  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :cmscursorasm :cmscursorobj"
+  if rc <> 0 then return rc
   address crexx "run :classicas --profile z900 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_channel.asm :chansupport"
   if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_tlb.asm :tlbobj"
@@ -89,7 +94,7 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_key.asm :keyobj"
   if rc <> 0 then return rc
-  address crexx "run :classicld --oformat binary --image-base 33554432 -e TSMENTRY -Map :map -o :binary :entryobj :object :gateobj :datobj :memobj :realobj :placeobj :chanobj :dsobj :cmsobj :cmsfileobj :chansupport :tlbobj :keyobj"
+  address crexx "run :classicld --oformat binary --image-base 33554432 -e TSMENTRY -Map :map -o :binary :entryobj :object :gateobj :datobj :memobj :realobj :placeobj :chanobj :dsobj :cmsobj :cmsfileobj :cmscursorobj :chansupport :tlbobj :keyobj"
   if rc <> 0 then return rc
   placemap = out || "/TSP.map"; placebin = out || "/TSP.bin"
   dattest = out || "/dat-test"; placetest = out || "/placement-test"
@@ -98,6 +103,7 @@ main: procedure = .int
   dstest = out || "/dataset-test"
   cmstest = out || "/cms-header-test"
   cmsfiletest = out || "/cms-file-test"
+  cmscursortest = out || "/cms-cursor-test"
   address crexx "run :classicld --oformat binary --image-base 50331648 -e TSDINIT -Map :datmap -o :datbin :datobj"
   if rc <> 0 then return rc
   address crexx "run :classicld --oformat binary --image-base 50331648 -e TSPINIT -Map :placemap -o :placebin :placeobj"
@@ -138,6 +144,10 @@ main: procedure = .int
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_cmsfile.c pdos/tests/two-space/cmsfile.c -o :cmsfiletest"
   if rc <> 0 then return rc
   address crexx "run :cmsfiletest"
+  if rc <> 0 then return rc
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_cmscursor.c pdos/tests/two-space/cmscursor.c -o :cmscursortest"
+  if rc <> 0 then return rc
+  address crexx "run :cmscursortest"
   if rc <> 0 then return rc
   datemit = out || "/dat-emit"
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src pdos/src/twospace_dat.c pdos/src/twospace_fixture.c pdos/src/twospace_placement.c pdos/tests/two-space/dat_emit.c -o :datemit"

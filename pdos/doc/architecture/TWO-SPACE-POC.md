@@ -456,6 +456,15 @@ entries use `0x20`, whereas page-table entries use `0x400`. This is a
 selected CMS24/CMS31 coexistence case; it does not establish TSO service
 compatibility or real cross-personality application calls.
 
+The [CMS cursor checkpoint](../qualification/TWO-SPACE-CMS-CURSORS-2026-10-06.md)
+replaces the single input cursor per personality with eight K-owned slots
+keyed by file ID and personality. Two real CMS31 input stages coexist during
+fresh IPL and retain separate cursors and real-frame owners. Their storage
+is outside U's low virtual range. `FINIS` releases only its named input;
+the fixture completion gate releases any remainder. This supports a
+necessary file-state condition for nested calls, but a real `ADDRESS` call
+has not run.
+
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
 SVC through K, returns `0x3456` to a U64 caller, restores the parent PTEs,

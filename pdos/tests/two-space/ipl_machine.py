@@ -357,6 +357,8 @@ def run(args):
                         fst[24:26] == b"\xc1\xf1" and
                         fst[32:36] == b"\x00\x00\x01\x00")
                     if args.cmslibrary:
+                        checks["cms31_two_live_file_cursors"] = (
+                            struct.unpack_from(">I",raw,0x122d8)[0] == 0)
                         second_real, second_entry, second_bytes, second_blocks = \
                             struct.unpack_from(">4I",raw,0x4120)
                         checks["cms31_second_relocated_image"] = (

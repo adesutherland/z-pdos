@@ -685,6 +685,17 @@ cms31_overlay_done:
     st %r15, 0x278(%r2)
     chi %r15, 0
     jne cms31_native_release
+    lghi %r3, 0x230
+    st %r3, 0x2d8(%r2)
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 230                 /* two real CMS31 files retain separate cursors */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x2d8(%r2)
+    chi %r15, 0
+    jne cms31_native_release
     lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0
@@ -969,6 +980,8 @@ trace_not_cms_fst:
     chi %r2, 228
     je storage_no_record
     chi %r2, 229
+    je storage_no_record
+    chi %r2, 230
     je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore

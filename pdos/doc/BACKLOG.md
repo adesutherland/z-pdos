@@ -281,6 +281,12 @@ output hashes, restored parent, and 13,914,112-byte post-run 24-bit gap pass
 entries return `TSD_MISSING`. Persistent output, TSO applications and
 cross-personality calls remain open.
 
+The [CMS input cursor checkpoint](qualification/TWO-SPACE-CMS-CURSORS-2026-10-06.md)
+keeps eight K-owned file slots keyed by profile and CMS file ID. A fresh IPL
+holds two actual CMS31 files open at once, verifies distinct cursors and real
+owners, and reruns unchanged CMS24/CMS31 workloads. It prepares nested file
+use but does not qualify an `ADDRESS` call or TSO execution in the successor.
+
 ## PD-004: Batch-file delivery
 
 - Type: improvement

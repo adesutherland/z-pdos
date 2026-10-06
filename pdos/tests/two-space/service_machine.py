@@ -290,10 +290,13 @@ def run(args):
                  "twospace_real.c", "twospace_real.h",
                  "twospace_channel.c", "twospace_channel.h",
                  "twospace_channel.asm", "twospace_dataset.c",
-                 "twospace_dataset.h", "twospace_cms.c", "twospace_cms.h"):
+                 "twospace_dataset.h", "twospace_cms.c", "twospace_cms.h",
+                 "twospace_cmsfile.c", "twospace_cmsfile.h",
+                 "twospace_cmscursor.c", "twospace_cmscursor.h"):
         manifest["source_sha256"]["pdos/src/" + name] = digest(src.parent.parent / "src" / name)
     for name in ("dat.c", "dat_emit.c", "placement.c", "gate.c", "memory.c",
-                 "channel.c", "dataset.c", "cms.c"):
+                 "channel.c", "dataset.c", "cms.c", "cmsfile.c",
+                 "cmscursor.c"):
         manifest["source_sha256"]["pdos/tests/two-space/" + name] = digest(src / name)
     manifest["source_sha256"]["pdos/scripts/two-space-next.crexx"] = digest(src.parent.parent / "scripts/two-space-next.crexx")
     manifest["elf_sha256"] = digest(args.elf)
