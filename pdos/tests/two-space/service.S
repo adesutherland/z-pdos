@@ -523,6 +523,45 @@ terminal_read_done:
     l %r4, 0(%r3)
     st %r4, 432(%r2)
 cms24_overlay_done:
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    l %r3, 124(%r2)
+    chi %r3, 0
+    jne cms24_native_done
+    lghi %r0, 4096          /* one low U page for plist, save area, bridge */
+    lghi %r1, 0
+    lghi %r15, 0x10
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    stg %r1, 0x240(%r2)
+    st %r15, 0x248(%r2)
+    chi %r15, 0
+    jne cms24_native_done
+    lgr %r10, %r1
+    larl %r4, cms31_plist_bytes
+    mvc 0(16,%r10),0(%r4)
+    mvi 16(%r10), 0xff
+    mvc 17(111,%r10),16(%r10)
+    larl %r4, cms24_bridge
+    mvc 512(16,%r10),0(%r4)
+    la %r13, 256(%r10)
+    lgr %r1, %r10
+    larl %r3, cms24_image_va
+    lg %r3, 0(%r3)
+    la %r4, 512(%r10)
+    basr %r14, %r4          /* low bridge enters fixed RXVM in AMODE24 */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x24c(%r2)
+    lghi %r0, 4096
+    lgr %r1, %r10
+    lghi %r15, 0x10
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x250(%r2)
+cms24_native_done:
     lghi %r0, 0             /* K maps checked CMS31 image in shared U */
     lghi %r1, 0
     lghi %r2, 0
@@ -627,6 +666,17 @@ wide_heap_restore_gprs:
 .quad 0x3333333300000008, 0x4444444400000009
 .quad 0x555555550000000a, 0x666666660000000b
 .quad 0x777777770000000c, 0x888888880000000d
+cms24_bridge:
+    lgr %r12, %r14
+    sam24
+    basr %r14, %r3
+    sam64
+    lgr %r14, %r12
+    br %r14
+cms24_bridge_end:
+.if cms24_bridge_end-cms24_bridge != 16
+.error "CMS24 bridge size changed"
+.endif
 high_data_va: .quad 0x110001000
 input_data_va: .quad 0x110001080
 cms31_image_va: .quad 0x03000000
@@ -675,6 +725,13 @@ initial_nested_done:
     l %r2, 0xa0(%r3)
     chi %r2, 120
     je storage_no_record
+    chi %r2, 202
+    jne trace_not_cms24
+    lghi %r3, 0x4100
+    l %r4, 0(%r3)
+    chi %r4, 0              /* before native map, retain original trace */
+    jne storage_no_record
+trace_not_cms24:
     chi %r2, 204
     jne trace_not_cms31
     lghi %r3, 0x3000
@@ -765,6 +822,24 @@ kcore_after_c:
     larl %r6, bounce_va
     lg %r6, 0(%r6)
     l %r2, 16(%r6)
+    chi %r2, 202
+    jne no_cms24_inline
+    lghi %r3, 0x4100
+    l %r4, 0(%r3)
+    chi %r4, 0
+    je no_cms24_inline
+    lghi %r3, 0x3000
+    l %r4, 0x8c(%r3)
+    larl %r7, cms24_range
+    l %r5, 0(%r7)
+    clr %r4, %r5
+    jl no_cms24_inline
+    l %r5, 4(%r7)
+    clr %r4, %r5
+    jhe no_cms24_inline
+    ahi %r4, 4              /* CMS24 SVC 202 has inline continuation word */
+    st %r4, 0x8c(%r3)
+no_cms24_inline:
     chi %r2, 120
     je copy_storage_address
     chi %r2, 204
@@ -889,6 +964,7 @@ bounce_va: .quad 0x03000080
 c_result_va: .quad 0x030000a0
 c_trampoline_va: .quad 0x02010000
 resume_va: .quad resume
+cms24_range: .long 0x20000, 0x1ba6c0
 
 .section .ktramp,"ax"
 ktrampoline:

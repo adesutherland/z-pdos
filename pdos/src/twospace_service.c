@@ -719,6 +719,54 @@ static unsigned int cms_word(const unsigned char *p)
            ((unsigned int)p[2]<<8) | (unsigned int)p[3];
 }
 
+/* The fixed-origin CMS24 entry has its own SVC and flagged 24-bit
+ * line-buffer convention. Keep it distinct from the CMS31 CMSCALL path. */
+static unsigned int cms24_native_service(TSGREQUEST *request)
+{
+    static const unsigned char line[8] =
+        {0xe3U,0xe8U,0xd7U,0xd3U,0xc9U,0xd5U,0x40U,0x40U};
+    TSGCONTEXT gate;
+    TSGREQUEST copy;
+    unsigned char plist[16], message[130];
+    unsigned int address, length, encoded, n, i;
+    volatile unsigned char *out;
+    if (request->address.hi || request->address.lo<0x20000U ||
+        request->address.lo>=0x1000000U) return 12U;
+    gate.u_tables=&u_tables;
+    gate.real_aperture=(unsigned char *)TSF_KAPERTURE_VA;
+    gate.real_bytes=TSF_REAL_BYTES;
+    gate.rights=user_rights;
+    gate.rights_context=0;
+    copy=*request;
+    copy.length=sizeof plist;
+    copy.direction=TSG_READ;
+    if (TSGCOPY(&gate,&copy,plist,sizeof plist)!=TSG_OK) return 12U;
+    for (i=0U; i<8U && plist[i]==line[i]; ++i) {}
+    if (i!=8U) return 12U;
+    encoded=cms_word(plist+8U);
+    length=cms_word(plist+12U);
+    if ((encoded&0xff000000U)!=0x01000000U ||
+        (length&0xffff0000U)!=0xc2800000U) return 12U;
+    address=encoded&0x00ffffffU;
+    length&=0xffffU;
+    if (address<0x20000U || address>=0x1000000U ||
+        length>130U || length>0x1000000U-address) return 12U;
+    if (length) {
+        copy.address.hi=0U;
+        copy.address.lo=address;
+        copy.length=length;
+        if (TSGCOPY(&gate,&copy,message,sizeof message)!=TSG_OK)
+            return 12U;
+    }
+    n=*(volatile unsigned int *)0x4300U;
+    if (n>=8U) return 12U;
+    out=(volatile unsigned char *)(0x4304U+n*136U);
+    *(volatile unsigned int *)out=length;
+    for (i=0U; i<length; ++i) out[4U+i]=message[i];
+    *(volatile unsigned int *)0x4300U=n+1U;
+    return 0U;
+}
+
 /* First live CMS31 CMSCALL subset. The saved old PSW selects the mapped
  * module, and every U parameter is copied through the checked K gate. */
 static unsigned int cms31_native_service(TSGREQUEST *request)
@@ -820,6 +868,10 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
                8U : 0xfffffffdU;
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 223U) return high_storage_service(request);
+    if (request->svc == 202U && cms24_loaded &&
+        *(volatile const unsigned int *)0x308cU >= 0x20000U &&
+        *(volatile const unsigned int *)0x308cU < 0x1ba6c0U)
+        return cms24_native_service(request);
     if (request->svc == 204U && cms31_loaded &&
         *(volatile const unsigned int *)0x308cU >= 0x03000000U &&
         *(volatile const unsigned int *)0x308cU <

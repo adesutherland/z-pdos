@@ -25,6 +25,8 @@ The release kernel has not adopted this successor. It does not yet run
 the general unchanged CMS/TSO workload or provide its file, terminal and
 command APIs. The [narrow CMS31 result](doc/qualification/TWO-SPACE-CMS31-NATIVE-2026-10-06.md)
 does run unchanged RXVM `-v` through K's checked storage and line subset.
+The [CMS24 result](doc/qualification/TWO-SPACE-CMS24-NATIVE-2026-10-06.md)
+adds the unchanged fixed-origin RXVM `-v` path in the same U space.
 
 The recorded source-built milestone runs unchanged cREXX TSO31, TSO64 ANY and
 TSO64 HIGH packages, including compiler, assembler, terminal and file workloads.

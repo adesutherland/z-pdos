@@ -409,6 +409,14 @@ heap. K's Classic C31 endpoint recognizes the selected CMSCALL storage and
 line-write requests by the caller's saved PC within the checked CMS31 image.
 It copies U parameters through the K gate and records one exact version
 line. General CMS file, input and command APIs remain open.
+The later [unchanged CMS24 entry result](../qualification/TWO-SPACE-CMS24-NATIVE-2026-10-06.md)
+runs the fixed-origin RXVM `-v` from a temporary low U24 bridge and
+preserves the same permanent low placement gap after releasing its one
+page. The separate SVC 202 path checks CMS24's flagged 24-bit line
+address and skips its inline four-byte continuation on return. Both
+unchanged RXVM images execute in the same U ASCE in that diagnostic IPL.
+This is evidence of a narrow coexistence case; file/input services,
+application commands and TSO binaries have not yet been exercised together.
 
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its

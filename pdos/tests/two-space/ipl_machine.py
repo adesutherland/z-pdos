@@ -231,6 +231,7 @@ def run(args):
                 all(page_unmapped(raw,0x28000f,at) for at in
                     (wide31,wide31+0x03fff000,
                      wide64,wide64+0x07fff000)))
+            version = "crexx-1.0.0-beta.3 (Bytecode Mode)".encode("cp037")
             if args.cms24:
                 real24, entry24, image24, low_free = struct.unpack_from(
                     ">4I", raw, 0x4100)
@@ -261,6 +262,15 @@ def run(args):
                     struct.unpack_from(">I",raw,0x4110)[0] == 24 and
                     executed24 == 0x2468 and returned24 == executed24 and
                     restored24 == parent24)
+                plist24, allocated24, rxvm24_rc, released24 = \
+                    struct.unpack_from(">Q3I", raw, 0x12240)
+                checks["cms24_native_rxvm_version"] = (
+                    0x20000 <= plist24 < 0x00f00000 and
+                    allocated24 == rxvm24_rc == released24 == 0 and
+                    page_unmapped(raw,0x28000f,plist24) and
+                    struct.unpack_from(">I",raw,0x4300)[0] == 1 and
+                    struct.unpack_from(">I",raw,0x4304)[0] == len(version) and
+                    raw[0x4308:0x4308+len(version)] == version)
             if args.cms31:
                 real, entry, image_bytes, blocks = struct.unpack_from(">4I",raw,0x40e0)
                 staged = (disk.parent / "cms31-rxvm.bin").read_bytes()
@@ -285,7 +295,6 @@ def run(args):
                     and returned == executed and restored == parent)
                 plist, allocated, rxvm_rc, released = struct.unpack_from(
                     ">Q3I", raw, 0x12220)
-                version = "crexx-1.0.0-beta.3 (Bytecode Mode)".encode("cp037")
                 checks["cms31_native_rxvm_version"] = (
                     0x01000000 <= plist < 0x80000000 and
                     allocated == rxvm_rc == released == 0 and

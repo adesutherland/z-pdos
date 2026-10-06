@@ -237,6 +237,14 @@ subset. Its one output line is captured in K diagnostic storage. This
 establishes one actual CMS31 execution path, while CMS file/input/command
 services, live 3270 application output, CMS24 execution, TSO application
 execution and REXX `ADDRESS` remain open.
+The [first native CMS24 checkpoint](qualification/TWO-SPACE-CMS24-NATIVE-2026-10-06.md)
+enters the unchanged fixed-origin RXVM `-v` through a temporary low-U
+bridge. Its distinct SVC 202 handler copies the flagged 24-bit `TYPLIN`
+buffer through K and advances past the historical four-byte inline error
+continuation. CMS24 and CMS31 each execute and return RC 0 in one fresh IPL.
+The bridge's one allocated 24-bit U page is released, so the permanent
+13,914,112-byte low placement gap does not shrink. General CMS file/input
+services and actual REXX `ADDRESS` remain open.
 
 ## PD-004: Batch-file delivery
 
