@@ -316,6 +316,11 @@ virtual `0x02006000`. This did not take any virtual address from a 24-bit
 application. Dataset extent traversal, terminal and command services and
 unchanged CMS/TSO execution remain open.
 
+The subsequent [K dataset result](../qualification/TWO-SPACE-DATASET-2026-10-06.md)
+uses that real channel path to locate `KCORE.BIN` in the checked VTOC and
+read its first record after handover. It checks one first extent and the
+F/18452 geometry; it has not exposed a general CMS/TSO dataset service.
+
 ## Primary architecture and compatibility references
 
 - IBM, *z/Architecture Principles of Operation*, SA22-7832-14:

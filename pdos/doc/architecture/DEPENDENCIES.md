@@ -11,6 +11,7 @@ core, Classic C31 endpoint and disposable `KCORE.BIN` IPL disk. Those inputs
 are outside the active three-link `image.crexx` route below. The latest
 [storage checkpoint](../qualification/TWO-SPACE-STORAGE-OVERLAY-2026-10-05.md)
 and [K channel checkpoint](../qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
+plus the [bounded dataset checkpoint](../qualification/TWO-SPACE-DATASET-2026-10-06.md)
 qualify that fixture, not a replacement `PDOS.SYS` image.
 
 ## Source inputs

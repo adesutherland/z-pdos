@@ -324,6 +324,13 @@ app_high:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 92(%r2)
+    lghi %r0, 0             /* K resolves KCORE.BIN in checked VTOC */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 207
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 96(%r2)
     larl %r3, high_data_va
     lg %r3, 0(%r3)
     l %r3, 44(%r3)
@@ -381,6 +388,8 @@ initial_nested_done:
     lghi %r3, 0x3000
     l %r2, 0xa0(%r3)
     chi %r2, 120
+    je storage_no_record
+    chi %r2, 207
     je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore

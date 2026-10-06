@@ -196,6 +196,9 @@ def judge(raw, log, ipl=False):
     checks["k_channel_vol1_read"] = (
         struct.unpack_from(">I",raw,0x1205c)[0] ==
         (0 if ipl else 0xfffffffb))
+    checks["k_dataset_kcore_header"] = (
+        struct.unpack_from(">I",raw,0x12060)[0] ==
+        (0 if ipl else 0xfffffffb))
     checks["live_dat_mutations_purged"] = (
         struct.unpack_from(">I",raw,0x40ac)[0] == 4 and
         0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x40000)
@@ -225,10 +228,11 @@ def run(args):
                  "twospace_memory.c", "twospace_memory.h",
                  "twospace_real.c", "twospace_real.h",
                  "twospace_channel.c", "twospace_channel.h",
-                 "twospace_channel.asm"):
+                 "twospace_channel.asm", "twospace_dataset.c",
+                 "twospace_dataset.h"):
         manifest["source_sha256"]["pdos/src/" + name] = digest(src.parent.parent / "src" / name)
     for name in ("dat.c", "dat_emit.c", "placement.c", "gate.c", "memory.c",
-                 "channel.c"):
+                 "channel.c", "dataset.c"):
         manifest["source_sha256"]["pdos/tests/two-space/" + name] = digest(src / name)
     manifest["source_sha256"]["pdos/scripts/two-space-next.crexx"] = digest(src.parent.parent / "scripts/two-space-next.crexx")
     manifest["elf_sha256"] = digest(args.elf)

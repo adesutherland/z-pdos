@@ -29,10 +29,12 @@ fixed-origin caller while child frames occupy the same U address. See the
 The next [K channel checkpoint](../qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
 reads one 3390 record after the K handover using a K-owned low-real channel
 workspace and explicit real CCW addresses. It leaves U's low virtual range
-free for applications.
+free for applications. The [dataset checkpoint](../qualification/TWO-SPACE-DATASET-2026-10-06.md)
+then resolves a format-1 first extent and reads the checked `KCORE.BIN`
+header through that path.
 The successor still lacks the format loaders, CMS/TSO service adapters,
-dataset and terminal I/O and command dispatch needed to become the selected
-OS.
+general dataset and terminal I/O and command dispatch needed to become the
+selected OS.
 
 ## The system at a glance
 

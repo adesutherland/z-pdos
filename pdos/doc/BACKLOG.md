@@ -152,6 +152,10 @@ adds a reserved 64 KiB low-real K workspace and a bounded post-handover
 assumption for that one channel operation, but the remaining slice 5 service
 and application-budget criteria above stay open.
 
+The [bounded K dataset checkpoint](qualification/TWO-SPACE-DATASET-2026-10-06.md)
+reads `KCORE.BIN`'s first F/18452 block through a checked VTOC/first-extent
+lookup. General CMS/TSO file I/O, terminal and command services remain open.
+
 ## PD-004: Batch-file delivery
 
 - Type: improvement

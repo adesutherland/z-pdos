@@ -19,7 +19,8 @@ the [storage and overlay checkpoint](doc/qualification/TWO-SPACE-STORAGE-OVERLAY
 adds live K-owned U allocation and a reversible fixed-origin backing swap.
 The [K channel checkpoint](doc/qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
 adds a bounded post-handover 3390 record read through K-owned low-real
-buffers.
+buffers. The [dataset checkpoint](doc/qualification/TWO-SPACE-DATASET-2026-10-06.md)
+resolves and reads the first block of a checked dataset in K.
 The release kernel has not adopted this successor. It does not yet run
 unchanged CMS/TSO binaries or provide their file, terminal and command APIs.
 

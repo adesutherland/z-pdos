@@ -7,6 +7,7 @@
 #include "twospace_fixture.h"
 #include "twospace_memory.h"
 #include "twospace_channel.h"
+#include "twospace_dataset.h"
 
 static unsigned int user_rights(unsigned int frame, void *unused);
 static TSDSTATE u_tables;
@@ -55,6 +56,22 @@ static int attach(void)
 int TSCIO(unsigned int subchannel, unsigned char *orb,
           unsigned char *irb);
 
+static int channel_record(void *context, unsigned int cylinder,
+                          unsigned int head, unsigned int record,
+                          unsigned int capacity, const unsigned char **data)
+{
+    TSCSTATE *current=(TSCSTATE *)context;
+    unsigned int count;
+    unsigned int subchannel=*(volatile const unsigned int *)0x40bcU;
+    if (!subchannel || !data || !capacity || capacity > TSC_MAX_RECORD ||
+        TSCBUILDREAD(current,cylinder,head,record,0x0eU,capacity) != TSC_OK ||
+        TSCIO(subchannel,TSCORB(current),TSCIRB(current)) != 0 ||
+        TSCCHECKREAD(current,capacity,&count) != TSC_OK)
+        return -1;
+    *data=TSCDATA(current);
+    return (int)count;
+}
+
 /* This is a K-only post-handover channel proof. A dataset service can use
  * the same real-buffer path once its extent and record policy is installed. */
 static unsigned int volume_service(const TSGREQUEST *request)
@@ -72,6 +89,30 @@ static unsigned int volume_service(const TSGREQUEST *request)
     label=TSCDATA(&channel);
     if (label[4] != 0xe5U || label[5] != 0xd6U ||
         label[6] != 0xd3U || label[7] != 0xf1U) return 8U;
+    return 0U;
+}
+
+static unsigned int dataset_service(const TSGREQUEST *request)
+{
+    static const unsigned char name[] =
+        {0xd2U,0xc3U,0xd6U,0xd9U,0xc5U,0x4bU,0xc2U,0xc9U,0xd5U};
+    const unsigned char *first;
+    TSKEXTENT extent;
+    int result, count;
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    if (*(volatile const unsigned int *)0x40bcU == 0U) return 0xfffffffbU;
+    result=TSKFIND(channel_record,&channel,name,sizeof name,&extent);
+    if (result != TSK_OK) return result == TSK_ABSENT ? 4U : 12U;
+    if (extent.record_format != 0x80U ||
+        extent.block_length != 18452U ||
+        extent.logical_length != 18452U ||
+        !TSKWITHIN(&extent,extent.start_cylinder,extent.start_head))
+        return 8U;
+    count=channel_record(&channel,extent.start_cylinder,
+                         extent.start_head,1U,18452U,&first);
+    if (count != 18452 || first[0] != 0x54U || first[1] != 0x53U ||
+        first[2] != 0x50U || first[3] != 0x32U) return 12U;
     return 0U;
 }
 
@@ -126,6 +167,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
         return request->svc == 120U ? 8U : 0xfffffffdU;
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 206U) return volume_service(request);
+    if (request->svc == 207U) return dataset_service(request);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
         return 0xfffffffbU;
