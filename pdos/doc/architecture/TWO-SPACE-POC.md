@@ -204,8 +204,16 @@ handle or arbitrary late status.
 The [owned I/O gate](../qualification/TWO-SPACE-OWNED-IO-2026-10-06.md)
 does exercise a parent-frame pending READ MODIFIED across a nested child,
 followed by parent-end clear and a fresh read without stale attention in the
-observed ordering. Injected physically late status and child-fault unwind
-still need separate proof.
+observed ordering. The [retired-completion
+gate](../qualification/TWO-SPACE-LATE-COMPLETION-2026-10-06.md) then presents
+the old I/O token to the K ledger while a distinct invocation owns a new
+phase-one read; it rejects the old completion and leaves the new owner intact.
+Physical late channel status still needs separate proof.
+The [controlled-call and child-fault
+gate](../qualification/TWO-SPACE-CONTROLLED-CALL-2026-10-06.md) proves a K
+entry and return through a registered U fixture and reaps a faulting child's
+page. Its fixture addresses and trampoline do not establish native CMS or TSO
+application linkage; fault cleanup with pending I/O remains open.
 The [nested lowcore gate](../qualification/TWO-SPACE-INVOCATION-LOWCORE-2026-10-06.md)
 stores a suspended parent's U compatibility page in a K-owned real frame,
 installs the child template, then restores the parent page on child end. It

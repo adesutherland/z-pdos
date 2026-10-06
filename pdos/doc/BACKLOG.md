@@ -149,7 +149,7 @@ repeat an earlier result.
 
 | Checkpoint | Implementation | Reviewable acceptance |
 | --- | --- | --- |
-| P0. Freeze the executable contract | Inventory the actual unchanged CMS24/CMS31 and TSO24/TSO31/TSO64 ANY/HIGH packages, load records, entry and return linkage, parameters, lowcore words, line and full-screen terminal calls, storage ranges and command paths. Define the selected service subset, capability queries and return codes; distinguish a loader/service failure from an application's RC. Keep the REXX `ADDRESS` operation and CMS-to-TSO application calls outside the required contract. | An ABI/service table in the architecture guide traces each required native operation to its owning K service or U component, exact unchanged binary fixture and positive/negative control. Record the 24-bit image, stack, heap and largest free low-U interval at named points. No interface is inferred from a synthetic probe alone. |
+| P0. Freeze the executable contract | Inventory the actual unchanged CMS24/CMS31 and TSO24/TSO31/TSO64 ANY/HIGH packages, load records, entry and return linkage, parameters, lowcore words, line and full-screen terminal calls, storage ranges and command paths. Define the selected service subset, capability queries and return codes; distinguish a loader/service failure from an application's RC. Keep the REXX `ADDRESS` operation and CMS-to-TSO application calls outside the required contract. | An ABI/service table in the architecture guide traces each required native operation to its owning K service or U component and exact unchanged binary fixture. Derive layouts and call conventions from unchanged binaries, their source and qualified one-ASCE behavior; mark unknowns explicitly and resolve them before the corresponding P2/P3 implementation. Name the positive and negative successor controls to run in P2/P3. Record the baseline 24-bit image, stack, heap and largest free low-U interval. No interface is inferred from a synthetic probe alone. |
 | P1. Make K state and ownership explicit | Replace program-counter or global-profile inference with an invocation descriptor. Make image pages, U allocations, newly opened file handles, lowcore backing, terminal lease and pending I/O owned by that invocation, except for explicit ABI-defined sharing. Complete interruption nesting, event-driven I/O completion, cancellation and recoverable U-fault unwind without sharing the disk and terminal low-real workspaces. Keep real-frame and DAT-table release checked. | Fresh IPL proves normal return and fault cleanup, including a child fault, failed channel start, late completion and retry. K remains protected, all caller state is restored, and no owned frame, handle or low-U page leaks. Completion events decide success; elapsed time only fails a stalled test. |
 | P2. Finish the selected K service surface | Complete the bounded CMS and TSO storage, dataset, file, terminal-input and command services identified in P0. Preserve their distinct ABI layouts, return conventions and encoding. Persist selected output records safely and read them back; validate every full-width U buffer before a C31 service touches it. | Unchanged selected CMS and TSO service probes pass in the diagnostic image with exact output, RC and error behavior. Invalid pointers, short buffers, missing members and failed writes leave no partial state or false success. The 24-bit U placement budget does not shrink because of K code, tables or buffers. |
 | P3. Load and call real applications | Use the K placement ledger for fixed and relocatable modules. Implement synchronous CMS-to-CMS and TSO-to-TSO calls with bounded parameters, application RC and separate OS failure status. Restore the caller's AMODE, full registers, lowcore and terminal lease; preserve its file handles and cursors while releasing child-owned handles on return or fault. A fixed-origin nested call may use a checked reversible overlay; ordinary loads preserve every live image. | Native same-personality parent and child pairs run without z/PDOS-specific binary edits and return exact parameters and RCs, including relevant 24/31/64 mode crossings. A colliding or exhausted low interval, or missing real backing, returns a deterministic error without publishing a partial image or moving 24-bit storage above 16 MiB. Co-resident applications remain mapped whenever their required virtual and real storage fits. |
@@ -157,10 +157,14 @@ repeat an earlier result.
 | P5. Build a selectable normal image | Integrate PLOAD handover, K64/C31, U PCOMM, native loaders and services into a source-built 3390 image with an explicit successor selection. Retain the current release boot route until the new route passes qualification. Configure the primary terminal and optional text monitor explicitly. Keep K emergency output and shutdown independent of U PCOMM health. | A fresh disk IPL reaches a stable U prompt, launches both CMS and TSO commands, reports each RC, recovers from a failed command, and shuts down without stranded guest or host resources. A second attached terminal can capture the complete text transcript while the 3270 remains usable. Stopped-disk checks verify the image and persistent output after the guest stops. |
 | P6. Qualify and select the replacement | Run the unchanged released workload set through the normal successor image: CMS31 RXC/RXAS/RXVM, the bounded CMS24 IO24 path, TSO31 and TSO64 ANY/HIGH compiler/assembler/terminal/file paths, and native TSO24 separately. Exercise nested calls, low-memory exhaustion, fixed collisions, corrupt inputs, bad U pointers, failed I/O, child faults, each terminal model, attached/line-only console modes, long transcripts and monitor disconnect/reconnect across fresh IPLs and repeated start/stop. Compare against the current one-ASCE acceptance without weakening its supported cases. | Record exact binary and image identities, per-case RC/output, low-U free interval and real-frame use, and a repeatable guest completion or failure event. Check that one command produces one ordered text and 3270 result, transcript gaps fail capture qualification, and 24-bit placement is unaffected by the monitor. Watchdogs only detect stalls. Select the successor as default only after all required cases pass on a named machine/toolchain and the operator and architecture guides describe the observed behavior. Publication or release is a separate decision. |
 
-P0 resolves the exact native ABI details before the dependent P2/P3 code is
-committed. P1's owner and completion model is a prerequisite for expanding
-services or screen output. P3 supplies the invocation and screen-lease stack
-used by P4. P5 is an opt-in integration route; P6 changes the default only
+P0 freezes the required native ABI subset before dependent P2/P3 code is
+committed. The successor guest controls named by P0 are executed and accepted
+in P2/P3, so P0 does not depend on an implementation it is meant to guide.
+Any newly discovered ABI form reopens the relevant P0 entry before code for
+that form is accepted. P1's owner and completion model is a prerequisite for
+expanding services or screen output. P3 supplies the invocation and
+screen-lease stack used by P4. P5 is an opt-in integration route; P6 changes
+the default only
 after its normal image qualifies. A separate CMS or TSO U ASCE is not part of
 this plan unless the recorded shared-U review trigger is met.
 
@@ -234,13 +238,15 @@ I/O failure and late completion after owner exit remain separate gates.
 The [owned pending-I/O gate](qualification/TWO-SPACE-OWNED-IO-2026-10-06.md)
 now enters a real AID under a parent token, begins READ MODIFIED, suspends it
 across a nested child, and checks parent-end clear plus a fresh pending read.
-Physical late completion injection and recoverable child-fault unwind remain
-open P1 gates.
+The [retired-completion gate](qualification/TWO-SPACE-LATE-COMPLETION-2026-10-06.md)
+injects that retired ledger handle under a different terminal owner and
+checks that the new read remains in phase one. Physical late channel status
+and fault cleanup with pending I/O remain open P1 gates.
 The [full caller-PSW gate](qualification/TWO-SPACE-CALLER-PSW-2026-10-06.md)
 now retains both old-PSW halves in the invocation frame and checks the saved
 instruction address against the actual SVC continuation in a fresh IPL. This
-is required state for K-controlled launch and fault unwind; neither is yet
-implemented by the diagnostic SVC 235/236 path.
+is required state for the later controlled-call fixture; SVC 235/236 still
+only bracket direct U diagnostic entry.
 The [K-controlled call gate](qualification/TWO-SPACE-CONTROLLED-CALL-2026-10-06.md)
 now enters registered synthetic U children from a saved K frame, restores
 the caller on normal return and a protected-page child fault, separates OS

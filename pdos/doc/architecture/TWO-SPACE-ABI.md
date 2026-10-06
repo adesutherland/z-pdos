@@ -2,7 +2,11 @@
 
 This is the P0 audit for the [K/U successor](TWO-SPACE-POC.md). It is a
 working executable contract, not a claim that the normal replacement image
-exists. The package, disk stage, mapped image and executed guest are distinct
+exists. P0 freezes the required ABI from unchanged binary/source evidence
+and qualified one-ASCE behavior; the named successor positive and negative
+controls are acceptance work for P2 and P3. An unknown form keeps its P0
+entry open and blocks the corresponding P2/P3 implementation decision.
+The package, disk stage, mapped image and executed guest are distinct
 evidence layers. The local stages named below are ignored build outputs;
 their hashes identify the unchanged bytes used by the diagnostic guest.
 The CMS stage files are under `build/pdos/cms-module-recipe-c/media/`;
@@ -37,7 +41,10 @@ An IBM compatibility name does not expand the implemented subset. The
 [P0 completion checkpoint](../BACKLOG.md#pd-003-completion-plan-6-october-2026)
 remains open until unchanged RXC/RXAS, TSO64 HIGH and same-personality
 nested-call paths have their exact parameter, return, terminal and file
-forms traced here.
+forms traced here from source/binary or one-ASCE evidence. Passing those
+paths in the successor belongs to P2/P3. Earlier P1 ownership and synthetic
+call checkpoints were built before P0 closed; they provide useful mechanism
+evidence but do not validate an untraced application ABI.
 
 | Native operation | K and U responsibility | Current proof and required control |
 | --- | --- | --- |
@@ -48,7 +55,7 @@ forms traced here.
 | Diagnostic K-controlled call SVC 245/246 | K selects a registered U entry, validates the interrupted U state, owns the invocation and its resources, enters through the saved PSW, then restores caller GPRs except result registers, PSW and ASCE on normal return or a U fault. R0 reports OS status separately from the R15 application RC. The current two entries and return trampoline belong to the diagnostic fixture. | [Fresh IPL](../qualification/TWO-SPACE-CONTROLLED-CALL-2026-10-06.md) checks normal RC, fault status, caller GPR restoration, child-page unmap, zero image leases and intact DAT checksums. Native CMS/TSO entry and return linkage, nested controlled calls and fault cleanup with pending I/O remain open. |
 | CMS and TSO program invocation | K owns the loader and invocation stack, with copied parameters, OS status and application RC; U PCOMM presents results. | Loader placement/collision and diagnostic overlays pass. Unchanged CMS-to-CMS and TSO-to-TSO calls, caller restoration and fault unwind remain open. |
 | CMS/TSO files and persistent output | K owns dataset extents and disk channel buffers. CMS input cursors and transient output buffers are keyed by the active invocation token. Open handles are reaped on return; FINIS transfers closed output to K's diagnostic store. | CMS selected read/write and transient output pass. The [input](../qualification/TWO-SPACE-INVOCATION-FILES-2026-10-06.md) and [output](../qualification/TWO-SPACE-INVOCATION-OUTPUT-2026-10-06.md) ownership checks passed unchanged IPL; nested same-name guest controls remain open. TSO file services, durable commits and stopped-disk readback remain open. |
-| 3270 display and optional 3215 monitor | K owns device capability, channel completion, screen and input leases; U C presentation builds fields and command events. | Selected 3270 line output/input, [invocation-owned waiting-read](../qualification/TWO-SPACE-TERMINAL-OWNER-2026-10-06.md) and [post-start clear and retry](../qualification/TWO-SPACE-TERMINAL-RETRY-2026-10-06.md) proofs pass. Physically in-flight and injected late-completion controls remain open. [P4](../BACKLOG.md#pd-003-completion-plan-6-october-2026), [PD-021](../BACKLOG.md#pd-021-reusable-3270-application-presentation) and [PD-022](../BACKLOG.md#pd-022-attached-operator-line-view-and-transcript) own model, transcript and line-only gates. |
+| 3270 display and optional 3215 monitor | K owns device capability, channel completion, screen and input leases; U C presentation builds fields and command events. | Selected 3270 line output/input, [invocation-owned waiting-read](../qualification/TWO-SPACE-TERMINAL-OWNER-2026-10-06.md), [post-start clear and retry](../qualification/TWO-SPACE-TERMINAL-RETRY-2026-10-06.md), and [retired ledger completion under a new owner](../qualification/TWO-SPACE-LATE-COMPLETION-2026-10-06.md) pass. Physical late-channel status remains open. [P4](../BACKLOG.md#pd-003-completion-plan-6-october-2026), [PD-021](../BACKLOG.md#pd-021-reusable-3270-application-presentation) and [PD-022](../BACKLOG.md#pd-022-attached-operator-line-view-and-transcript) own model, transcript and line-only gates. |
 
 ## Low U placement checkpoints
 
