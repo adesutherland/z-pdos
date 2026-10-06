@@ -479,12 +479,23 @@ nested_lowcore_probe:
     lghi %r1, 0
     lghi %r2, 0
     svc 235
+nested_lowcore_after_begin:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x3f4(%r2)
     st %r1, 0x3f8(%r2)
     chi %r15, 0
     jne nested_lowcore_done
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 244                 /* K retained the complete SVC old PSW */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x484(%r2)
+    stg %r1, 0x488(%r2)
+    larl %r3, nested_lowcore_after_begin
+    stg %r3, 0x490(%r2)
     lghi %r4, 0x3a0
     mvi 0(%r4), 0x5a       /* parent-private lowcore byte */
     lghi %r0, 5
@@ -519,6 +530,13 @@ nested_lowcore_parent_end:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 0x410(%r2)
+    lghi %r0, 0
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 244                 /* ended caller context must be inaccessible */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x498(%r2)
 nested_lowcore_done:
     br %r14
 terminal_owner_probe:
@@ -1721,6 +1739,8 @@ trace_not_cms_fst:
     je storage_no_record
     chi %r2, 243
     je storage_no_record
+    chi %r2, 244
+    je storage_no_record
     chi %r2, 93
     je storage_no_record
     lghi %r1, 0x2000
@@ -1802,6 +1822,8 @@ no_cms24_inline:
     chi %r2, 235
     je copy_storage_address
     chi %r2, 237
+    je copy_storage_address
+    chi %r2, 244
     jne no_storage_address
 copy_storage_address:
     llgf %r2, 0(%r6)

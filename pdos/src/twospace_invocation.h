@@ -38,7 +38,9 @@ typedef struct {
 
 typedef struct {
     TSVWORD64 gpr[16];
+    /* z/Architecture old PSW: 64-bit mask followed by 64-bit address. */
     TSVWORD64 psw;
+    TSVWORD64 psw_address;
     TSVWORD64 asce;
     unsigned int key;
 } TSVCONTEXT;

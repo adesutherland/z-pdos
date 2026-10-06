@@ -1074,6 +1074,8 @@ static unsigned int native_begin(TSGREQUEST *request)
     }
     caller.psw.hi=saved[0x80U/4U];
     caller.psw.lo=saved[0x84U/4U];
+    caller.psw_address.hi=saved[0x88U/4U];
+    caller.psw_address.lo=saved[0x8cU/4U];
     caller.asce.hi=saved[0x90U/4U];
     caller.asce.lo=saved[0x94U/4U];
     caller.key=(caller.psw.hi>>20)&15U;
@@ -1212,6 +1214,18 @@ static unsigned int native_image_lease_probe(const TSGREQUEST *request)
     if (request->direction || request->address.hi || request->address.lo ||
         !request->length || request->length>=32U) return 8U;
     return native_image_active[request->length];
+}
+
+/* Private fixture query: verify that K retained both halves of the old PSW.
+ * A normal launch will consume this saved continuation during fault unwind. */
+static unsigned int native_caller_psw_probe(TSGREQUEST *request)
+{
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
+    if (request->length || request->direction || request->address.hi ||
+        request->address.lo || !frame) return 8U;
+    request->address.hi=frame->caller.psw_address.hi;
+    request->address.lo=frame->caller.psw_address.lo;
+    return 0U;
 }
 
 static unsigned int allocation_handle(unsigned int task, TSPADDR address)
@@ -2380,6 +2394,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 241U) return terminal_phase_probe(request);
     if (request->svc == 242U) return native_image_lease_probe(request);
     if (request->svc == 243U) return terminal_start_failure_probe(request);
+    if (request->svc == 244U) return native_caller_psw_probe(request);
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 223U) return high_storage_service(request);
     if (request->svc == 233U) return iarv64_service(request);

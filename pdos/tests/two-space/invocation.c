@@ -38,11 +38,15 @@ int main(void)
     }
     parent_context.psw.hi=0x80000000U;
     parent_context.psw.lo=0x3000000U;
+    parent_context.psw_address.hi=1U;
+    parent_context.psw_address.lo=0x23456780U;
     parent_context.asce.hi=0U;
     parent_context.asce.lo=0x4000U;
     parent_context.key=8U;
     child_context.psw.hi=0x80000000U;
     child_context.psw.lo=0x5000000U;
+    child_context.psw_address.hi=0U;
+    child_context.psw_address.lo=0x00abcdefU;
     child_context.asce.hi=0U;
     child_context.asce.lo=0x4000U;
     child_context.key=8U;
@@ -54,7 +58,9 @@ int main(void)
                     &parent)==TSV_OK);
     top=TSVTOP(&stack);
     assert(top && top->token==parent && !top->parent &&
-           top->caller.gpr[15].lo==0x100fU && top->caller.key==8U);
+           top->caller.gpr[15].lo==0x100fU && top->caller.key==8U &&
+           top->caller.psw_address.hi==1U &&
+           top->caller.psw_address.lo==0x23456780U);
     assert(TSVOWN(&stack,parent,TSV_FILE,100U)==TSV_OK);
     assert(TSVHAS(&stack,parent,TSV_FILE,100U)==TSV_OK);
     assert(TSVHAS(&stack,parent,TSV_FILE,200U)==TSV_STALE);
@@ -67,7 +73,9 @@ int main(void)
                     &child)==TSV_OK);
     top=TSVTOP(&stack);
     assert(top && top->token==child && top->parent==parent &&
-           top->caller.gpr[15].lo==0x200fU);
+           top->caller.gpr[15].lo==0x200fU &&
+           top->caller.psw_address.hi==0U &&
+           top->caller.psw_address.lo==0x00abcdefU);
     assert(stack.frame[0].state==TSV_SUSPENDED);
     assert(TSVHAS(&stack,child,TSV_FILE,100U)==TSV_STALE);
     assert(TSVHAS(&stack,parent,TSV_FILE,100U)==TSV_BUSY);
@@ -86,7 +94,9 @@ int main(void)
     assert(TSVEND(&stack,child,clean_owned,&trace)==TSV_OK);
     assert(trace.count==2U && trace.order[0]==201U &&
            trace.order[1]==200U);
-    assert(TSVTOP(&stack) && TSVTOP(&stack)->token==parent);
+    assert(TSVTOP(&stack) && TSVTOP(&stack)->token==parent &&
+           TSVTOP(&stack)->caller.psw_address.hi==1U &&
+           TSVTOP(&stack)->caller.psw_address.lo==0x23456780U);
     assert(TSVCOMPLETE(&stack,child,201U)==TSV_STALE);
     assert(TSVBEGIN(&stack,TSV_TSO,31U,5U,6U,&child_context,
                     &later)==TSV_OK && later>child);

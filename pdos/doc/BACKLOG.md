@@ -236,6 +236,11 @@ now enters a real AID under a parent token, begins READ MODIFIED, suspends it
 across a nested child, and checks parent-end clear plus a fresh pending read.
 Physical late completion injection and recoverable child-fault unwind remain
 open P1 gates.
+The [full caller-PSW gate](qualification/TWO-SPACE-CALLER-PSW-2026-10-06.md)
+now retains both old-PSW halves in the invocation frame and checks the saved
+instruction address against the actual SVC continuation in a fresh IPL. This
+is required state for K-controlled launch and fault unwind; neither is yet
+implemented by the diagnostic SVC 235/236 path.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and

@@ -285,6 +285,13 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
          child_end == parent_end == 0 and parent_restored == 0x5a and
          parent_token != 0 and child_token > parent_token)
         if ipl else parent_begin == 8)
+    psw_rc=struct.unpack_from(">I",raw,0x12484)[0]
+    psw_actual,psw_expected=struct.unpack_from(">2Q",raw,0x12488)
+    psw_after_end=struct.unpack_from(">I",raw,0x12498)[0]
+    checks["invocation_retains_full_caller_psw_and_reaps_it"] = (
+        (psw_rc==0 and psw_actual==psw_expected and
+         psw_actual>=0x02000000 and psw_after_end==8) if ipl else
+        (psw_rc==psw_actual==psw_expected==psw_after_end==0))
     lease_begin, lease_parent, lease_start, lease_child_begin, lease_child, \
         child_cancel, lease_child_end, lease_parent_end, lease_retry, \
         lease_finish = struct.unpack_from(">10I",raw,0x12414)

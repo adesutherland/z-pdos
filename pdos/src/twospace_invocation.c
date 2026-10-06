@@ -54,6 +54,7 @@ int TSVBEGIN(TSVSTACK *stack, unsigned int personality, unsigned int amode,
     frame->runtime_owner=runtime_owner;
     for (i=0U; i<16U; ++i) frame->caller.gpr[i]=caller->gpr[i];
     frame->caller.psw=caller->psw;
+    frame->caller.psw_address=caller->psw_address;
     frame->caller.asce=caller->asce;
     frame->caller.key=caller->key;
     ++stack->depth;
