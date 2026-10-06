@@ -8,14 +8,24 @@
 int main(void)
 {
     unsigned char *core;
-    TSDSTATE u;
+    TSDSTATE k, u;
     TSFRESULT built;
     TSPADDR va, pa, found;
     unsigned int i;
     core=(unsigned char *)calloc(TSF_CORE_BYTES,1U);
     if (!core || TSFBUILD(core,TSF_KPOOL_REAL,TSF_UPOOL_REAL,&built,0,0) ||
+        TSDATTACH(&k,core+TSF_KPOOL_REAL,TSF_KPOOL_REAL,TSF_KPOOL_BYTES,
+                  built.kbytes,built.kasce) != TSD_OK ||
         TSDATTACH(&u,core+TSF_UPOOL_REAL,TSF_UPOOL_REAL,TSF_UPOOL_BYTES,
                   built.ubytes,built.uasce) != TSD_OK) return 1;
+    va.hi=0U; va.lo=0x0201f000U;
+    if (TSDLOOKUP(&k,va,&found) != TSD_OK || found.hi ||
+        found.lo != 0x8f000U || TSDLOOKUP(&u,va,&found) != TSD_MISSING)
+        return 5;
+    va.lo=TSF_TRAMPOLINE_VA;
+    if (TSDLOOKUP(&k,va,&found) != TSD_OK || found.hi ||
+        found.lo != 0xf000U || TSDLOOKUP(&u,va,&found) != TSD_MISSING)
+        return 6;
     va.hi=pa.hi=0U;
     for (i=0U; i<16384U; ++i) {
         va.lo=0x04000000U+i*4096U;

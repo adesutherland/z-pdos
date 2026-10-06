@@ -507,6 +507,18 @@ AMODE64 entry and service ABI are the next execution gate. The C31 fixture
 slot is near capacity; any expansion belongs in K storage, never the low
 24-bit U placement gap.
 
+The later [K service-capacity checkpoint](../qualification/TWO-SPACE-K-SERVICE-CAPACITY-2026-10-06.md)
+extends the C31 K virtual slot to 32 pages (`0x02000000`–`0x0201ffff`).
+Its first 16 pages retain their real backing; the additional 16 use reserved
+real `0x80000`–`0x8ffff`. The C31 trampoline moves to K `0x02020000`,
+still backed by real `0xf000`. The guest handover reserves even zero-filled
+service pages, and the K DAT builder maps them as K-only. U's 31-bit heap
+may still start at its own virtual `0x02010000`; the equal numerical address
+does not refer to K's service page. The service image remains 63,006 bytes
+at this checkpoint, so the added capacity is a mapped and isolated budget,
+not an implemented program-call service. No U virtual page below 16 MiB is
+consumed.
+
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its
 SVC through K, returns `0x3456` to a U64 caller, restores the parent PTEs,

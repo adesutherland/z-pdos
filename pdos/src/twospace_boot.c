@@ -181,6 +181,8 @@ int main(int argc, char **argv)
     for (i=0U; i<CORE_SIZE/PAGE;) {
         unsigned int first;
         if (i >= (TSF_SERVICE_EXT_REAL+TSF_SERVICE_EXT_BYTES)/PAGE &&
+            !(i >= TSF_SERVICE_MORE_REAL/PAGE &&
+              i < (TSF_SERVICE_MORE_REAL+TSF_SERVICE_MORE_BYTES)/PAGE) &&
             !(seen[i>>3] & (1U<<(i&7U)))) {
             ++i;
             continue;
@@ -188,6 +190,8 @@ int main(int argc, char **argv)
         first=i++;
         while (i<CORE_SIZE/PAGE &&
                (i < (TSF_SERVICE_EXT_REAL+TSF_SERVICE_EXT_BYTES)/PAGE ||
+                (i >= TSF_SERVICE_MORE_REAL/PAGE &&
+                 i < (TSF_SERVICE_MORE_REAL+TSF_SERVICE_MORE_BYTES)/PAGE) ||
                 (seen[i>>3] & (1U<<(i&7U))))) ++i;
         if (TSRRESERVE(&final_core,100U+first,first*PAGE,
                        (i-first)*PAGE,TSR_RUN) != TSR_OK) FAIL(31);

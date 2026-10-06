@@ -168,6 +168,12 @@ also passes a two-base host comparison and Classic C31 target link.
 The [TSO64 ANY fresh-IPL map](qualification/TWO-SPACE-TSO64-ANY-MAP-2026-10-06.md)
 now closes the selected transport and placement checkpoint. Native 64-bit
 entry and service behavior remain open.
+The [K service-capacity checkpoint](qualification/TWO-SPACE-K-SERVICE-CAPACITY-2026-10-06.md)
+reserves 32 K-only C31 pages with guest-built DAT and moves the K trampoline
+above them. It leaves the U 24-bit gap and U31 heap minimum unchanged.
+TSO64's native IARV64 stacking program call still needs a cross-space entry,
+checked U parameter handling and dynamically backed high U storage before
+native execution can count as qualified.
 
 The [6 October K channel checkpoint](qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
 adds a reserved 64 KiB low-real K workspace and a bounded post-handover
