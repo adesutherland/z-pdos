@@ -89,6 +89,6 @@ An earlier local TSO24 candidate, XMI SHA-256 `4159d4e6...`, returned RC 0
 but sent ASCII CLI version bytes directly to TPUT. It is not the released
 beta 3 image and is not evidence of a released encoding defect. The public
 beta 3 TSO24 result above resolves that concern for this `-v` call. It does
-not establish general TSO file/input services, a cross-application REXX
-`ADDRESS` call, arbitrary loader placement or selection of the successor as
+not establish general TSO file/input services, a native TSO-to-TSO
+application call, arbitrary loader placement or selection of the successor as
 the normal boot image. The released one-ASCE kernel remains the default.

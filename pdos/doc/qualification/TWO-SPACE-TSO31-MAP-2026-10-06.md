@@ -34,8 +34,8 @@ completion; elapsed time was only a failure watchdog.
 
 This proves checked transport, materialization and placement of one native
 TSO31 image beside CMS images. It does **not** execute RXVM or supply its
-MVS-style service API. TSO64 image loading, native TSO24, actual cross-app
-`ADDRESS`, persistent CMS output and the normal replacement image remain
+MVS-style service API. TSO64 image loading, native TSO24, TSO-to-TSO calls,
+persistent CMS output and the normal replacement image remain
 unqualified. The 64 KiB C31 fixture reservation now has limited headroom;
 further services need an explicit K capacity/layout change, not use of low U
 virtual storage.

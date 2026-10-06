@@ -21,6 +21,6 @@ buffer or K page was handed to U as an unchecked pointer.
 
 This proves a guest executable child handoff, backing swap and caller-visible
 return across the supervisor gate. The tiny child runs in U31 and uses only
-an SVC and link register. It does not prove full CMS linkage, REXX `ADDRESS`, a CMS
+an SVC and link register. It does not prove full CMS linkage, a native CMS-to-CMS call, a CMS
 command interface or application compatibility. The full slice 6 and 7
 acceptance gates remain open.

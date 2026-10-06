@@ -48,7 +48,7 @@ zeros and releases the child frames, and propagates the supplied child RC.
 The host control exercises two nested overlays, verifies the original bytes
 after both returns, and refuses a free of the suspended caller. The operation
 currently requires the child to use precisely the parent's interval. There
-is no CMS/TSO MODULE parser, command dispatcher or REXX `ADDRESS` call using
+is no CMS/TSO MODULE parser, command dispatcher or native application call using
 it yet.
 
 ## Machine and evidence
@@ -96,7 +96,7 @@ crexx -nokeep pdos/scripts/two-space-ipl.crexx --args \
 
 The new storage path is a bounded SVC 120 subset. Channel and dataset,
 terminal and command services still live in the one-ASCE kernel. The successor
-has no actual CMS/TSO loader, relocation, REXX `ADDRESS` dispatcher, normal
+has no actual CMS/TSO loader, relocation, native application-call gate, normal
 replacement-image selector or unchanged-application qualification. Its
 external and I/O entry tests are synthetic; 24-bit real channel buffers and
 native TSO24 memory remain unaudited. PD-003 slices 5–7 stay open.

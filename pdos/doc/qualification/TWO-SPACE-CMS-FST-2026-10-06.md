@@ -39,5 +39,5 @@ before and after IPL.
 
 This proves a real guest catalogue lookup through the CMS31 lowcore
 contract. It does not yet show RXVM opening IOQUAL, reading its RXBIN
-records, handling CMS file writes, running REXX `ADDRESS`, or selecting
+records, handling CMS file writes, running native CMS-to-CMS calls, or selecting
 the successor as the normal OS image.

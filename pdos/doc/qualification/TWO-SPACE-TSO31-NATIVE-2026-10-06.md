@@ -48,6 +48,6 @@ ignored `build/pdos/tso31-entry-first-*` and `tso31-ebcdic-*` directories.
 
 This qualifies only the unchanged TSO31 RXVM `-v` call and its selected
 storage/output path in the diagnostic successor. TSO file and input
-services, native TSO24, TSO64, cross-personality `ADDRESS`/LINK, collision
+services, native TSO24, TSO64, native TSO-to-TSO calls, collision
 handling with real applications and normal replacement-image selection remain
 open. No released image was changed.

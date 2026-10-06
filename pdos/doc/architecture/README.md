@@ -16,6 +16,12 @@ IPL, bounded interruption/service gate, live storage, K-owned channel and
 terminal operations, CMS and TSO image maps, native version calls and wide
 heaps are in
 [the two-space PoC contract](TWO-SPACE-POC.md).
+Its [architecture decisions](TWO-SPACE-POC.md#architecture-decisions-for-the-first-replacement)
+retain one shared U ASCE, place the PDOS command processor and reusable 3270
+presentation library in U, and keep device and checked service handling in K.
+Required application calls are within the same CMS or TSO personality, with
+parameters and a return code. Mainframe cREXX does not require a REXX
+`ADDRESS` operation or a CMS-to-TSO application call.
 The current released disk-boot kernel described below has not yet adopted
 that layout.
 
@@ -42,10 +48,12 @@ uses a fresh fixed-origin overlay and profile-specific K file state, with its
 13,914,112-byte low U placement gap restored after the call. The successor
 also has [bounded per-file CMS input cursors](../qualification/TWO-SPACE-CMS-CURSORS-2026-10-06.md)
 in K real storage, so a second open input does not discard the first cursor.
-The successor still lacks persistent output, general CMS/TSO file
-and command adapters, REXX `ADDRESS` calls and the explicitly selected
-replacement image. A post-qualification review will decide whether CMS
-and TSO continue to share one U ASCE.
+The successor still lacks persistent output, general CMS/TSO file and command
+adapters, qualified same-personality application calls, the U 3270
+presentation library and the explicitly selected replacement image. The
+shared-U choice is recorded in the architecture decision above; separate U
+ASCEs need evidence of a conflict or isolation requirement before changing
+the design.
 The [native TSO loader-core check](../qualification/TWO-SPACE-TSO-LOADER-2026-10-06.md)
 matches the existing TSO31 materialized image at two bases. The
 [fresh-IPL TSO31 map](../qualification/TWO-SPACE-TSO31-MAP-2026-10-06.md)

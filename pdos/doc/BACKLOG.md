@@ -105,6 +105,7 @@ remain separate work.
 - Evidence: Machine contract, existing 0.1 qualification, and the [stage 3 guest record](qualification/STAGE3-2026-10-05.md).
 - Direction: The [two-space contract and proofs](architecture/TWO-SPACE-POC.md) select one protected supervisor ASCE and one shared application ASCE. A small AMODE64 assembler nucleus crosses between them; Classic C services remain C31 in the supervisor space. The Steps 3/4 fixture executes a high K64 nucleus through sparse region-first DAT built by target-compatible C source, calls a Classic C31 service, returns to 24/31/64-bit callers, and runs a nested application call in shared U. A C31-compatible placement ledger rejects fixed-origin collisions and finds a free relocatable interval. The [Step 5 disk proof](qualification/TWO-SPACE-STEP5-2026-10-05.md) first booted that fixture through source-built PLOAD. The [slices 1/2 guest-DAT proof](qualification/TWO-SPACE-SLICES1-2-2026-10-05.md) adds a dedicated checked dataset, real-frame handover ledger and guest-built K/U tables. The [slices 3/4 proof](qualification/TWO-SPACE-SLICES3-4-2026-10-05.md) adds bounded five-class entry routing, two context frames, recoverable U faults and checked U transfers through K-owned C31 buffers. These component and PoC IPL results do not change the active one-ASCE release kernel.
 - Acceptance: Separate the kernel image limit from its heap address, reserve independently backed K storage for DAT and kernel structures, eliminate PLOAD's boot-heap overlap, and audit 24-bit channel buffers plus GETMAIN low requests and fallback. Extend the real interruption island for every required interruption class; implement full-width context, PSW/key, K/U transition, bounded U-buffer access and C31 service dispatch with Classic tools. Inventory CMS lowcore/API conventions and preserve TSO SVC contracts without consuming unnecessary U low virtual pages. Add collision-checked relocatable/fixed module loading and a nested application-command gate, including a fixed-origin collision control. Qualify fresh IPL, CMS24/CMS31, TSO31/TSO64, low-memory budgets and failure recovery on named images. The Step 5 PoC IPL, [Steps 3/4 result](qualification/TWO-SPACE-STEPS3-4-2026-10-05.md), Step 2 fixture, stage 3 stack move, low-heap guard and direct shutdown wait are partial evidence, not completion.
+- Call and console scope: The required nested gate is native CMS-to-CMS and TSO-to-TSO invocation with parameters, return code and caller restoration. Mainframe cREXX does not supply a REXX `ADDRESS` requirement. Cross-personality application calls are optional only when simple. Keep PCOMM in U, K's checked terminal and emergency output in K, and track the opt-in U 3270 wrapper under [PD-021](#pd-021-reusable-3270-application-presentation).
 
 ### PD-003 delivery sequence
 
@@ -118,17 +119,18 @@ qualification. This sequence does not add a second roadmap.
 | 2. Guest DAT | Carry no completed DAT tables or ASCEs in the disk package. Run the product sparse region-first builder in the C31 guest stage, assigning K and U table pools from reserved final-core frames. Compare guest-built tables and ASCEs against the existing host reference after a fresh IPL. Then add checked live map/unmap and frame-release operations with single-CPU translation invalidation; prove reuse and isolation before service migration. |
 | 3. K64 interruption path | Cover SVC, program, external, I/O and machine-check entries, nesting, full GPR/PSW/key preservation, and recoverable application faults. A malformed caller must not strand the machine in an interruption loop. |
 | 4. K/U service gate | Validate full-width U ranges, page translations, length, access direction and failures; copy through bounded K buffers. Never pass a raw U virtual pointer to Classic C31. Keep CMS and TSO personalities distinct. |
-| 5. Services in K | Move the selected storage, channel/dataset, terminal and command services into K. Audit 24-bit real channel buffers and every below-line GETMAIN fallback. Keep K code, DAT and heaps out of U's low virtual area; measure actual CMS24/TSO24 image, stack and heap headroom. |
-| 6. Shared-U loader and calls | Load fixed and relocatable CMS/TSO modules with a live interval inventory and checked AMODE/RMODE. Keep other applications resident when suitable space exists; fail a normal load explicitly if no appropriate virtual interval or real backing exists, especially below 16 MiB. Never silently promote AMODE24/RMODE24 storage. Reuse storage after application completion. Run nested application calls, including REXX `ADDRESS`; an explicitly selected fixed-origin suspend/restore path must verify caller state and return code. |
+| 5. Services in K | Move the selected storage, channel/dataset, terminal and invocation services into K; keep the PCOMM command processor in U. Audit 24-bit real channel buffers and every below-line GETMAIN fallback. Keep K code, DAT and heaps out of U's low virtual area; measure actual CMS24/TSO24 image, stack and heap headroom. |
+| 6. Shared-U loader and calls | Load fixed and relocatable CMS/TSO modules with a live interval inventory and checked AMODE/RMODE. Allow applications to coexist whenever their image and runtime storage fit the proper virtual range and real backing; never evict a live image as a normal placement policy. Fail a load explicitly if appropriate storage is unavailable, especially below 16 MiB. Never silently promote AMODE24/RMODE24 storage. Reuse storage after application completion. Qualify separate native CMS-to-CMS and TSO-to-TSO calls with bounded parameters, a return code and caller restoration. An explicitly selected fixed-origin suspend/restore path must verify caller state and return code. REXX `ADDRESS` and cross-personality application calls are not replacement gates. |
 | 7. Replacement selection | Build a normal 3390 image selecting the successor explicitly. Qualify fresh IPL, unchanged CMS24/CMS31 and TSO31/TSO64 binaries, native TSO24 separately, low-memory exhaustion, bad service pointers, collisions, nested calls, faults and shutdown on named profiles before changing the default route. |
 
-After slice 7, review whether CMS and TSO workloads should continue sharing
-one U ASCE or have separate U spaces. Compare actual fixed-origin collisions,
-relocation and overlay costs, interapplication `ADDRESS`/LINK behavior,
-service-personality isolation, low 24-bit headroom and failure containment
-on qualified workloads. Simultaneous residency of every application is not
-a requirement. The present dual RXVM map and tiny nested children are
-insufficient to choose; retain this as a decision question.
+The [architecture review](architecture/TWO-SPACE-POC.md#architecture-decisions-for-the-first-replacement)
+retains one shared U ASCE for the first replacement. The capacity of the
+proper virtual range and real backing determines whether applications can
+coexist; the loader must preserve live images and return a clear failure when
+the requested storage is unavailable. Revisit separate CMS and TSO U ASCEs
+only if unchanged workloads expose an unavoidable lowcore conflict, material
+24-bit headroom loss, or a failure-isolation need that cannot be met in this
+map without excessive complexity. A change requires its own machine proof.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and
@@ -150,7 +152,7 @@ and restored-table checks. The host control exercises two nested fixed-origin
 backing swaps and caller restoration. At that checkpoint, slice 5 still
 needed channel/dataset, terminal and command services plus the 24-bit
 channel-buffer and real CMS24/TSO24 budget audits. Slice 6 still needs actual CMS/TSO format loading,
-relocation and REXX `ADDRESS` calls. Slice 7 still needs an explicitly selected
+relocation and same-personality application calls. Slice 7 still needs an explicitly selected
 normal replacement image and unchanged CMS/TSO guest qualification. The
 release route remains the one-ASCE kernel.
 
@@ -160,7 +162,7 @@ qualified CMS24/CMS31 calls. Its selected SVC 120/93 storage and output
 surface uses K-owned real backing and bounded U copies, with no lasting
 24-bit U gap consumption. Slice 5 still needs general command, TSO file and
 terminal input services plus native TSO24 budgeting. Slice 6 still needs
-real `ADDRESS`/LINK application calls and conflicting-module qualification.
+native CMS-to-CMS and TSO-to-TSO application calls and conflicting-module qualification.
 Slice 7 still needs TSO64/native TSO24 and the explicitly selected normal
 successor image with full regression and failure controls.
 The [TSO64 ANY loader-core check](qualification/TWO-SPACE-TSO64-ANY-LOADER-2026-10-06.md)
@@ -191,7 +193,7 @@ runs the exact public TSO24 image in AMODE24, displays its EBCDIC version
 line, and releases its 1 MiB stack, 256-byte output buffer, 4 MiB heap and
 parameter page. The full low-only demand returns RC 4 with no above-line
 fallback. This closes the selected native version-call and measured runtime
-budget gate. General TSO file/input and command services, REXX `ADDRESS`/LINK,
+budget gate. General TSO file/input and command services, native TSO-to-TSO calls,
 and the normal successor image remain open.
 The same [beta 3 qualification](qualification/TWO-SPACE-TSO24-BETA3-NATIVE-2026-10-06.md)
 subsequently adds a guest loader-collision control: a live low allocation
@@ -247,7 +249,7 @@ then swaps an eight-byte AMODE31 child over the mapped RXVM interval,
 executes its nested SVC from U, restores the parent pages and propagates its
 return value to a U64 caller. It proves the mixed-mode memory and executable
 transition needed for a colliding nested call. Neither RXVM executes yet;
-full CMS linkage, general file/command services, REXX `ADDRESS`, TSO programs,
+full CMS linkage, general file/command services, native CMS-to-CMS calls, TSO programs,
 unchanged application heap requirements and normal successor selection
 remain unqualified.
 The [64 MiB real-memory checkpoint](qualification/TWO-SPACE-64M-2026-10-06.md)
@@ -282,7 +284,7 @@ stack and 64 MiB U31 heap, and returns RC 0 through K's checked CMSCALL
 subset. Its one output line is captured in K diagnostic storage. This
 establishes one actual CMS31 execution path, while CMS file/input/command
 services, live 3270 application output, CMS24 execution, TSO application
-execution and REXX `ADDRESS` remain open.
+execution and native same-personality application calls remain open.
 The [first native CMS24 checkpoint](qualification/TWO-SPACE-CMS24-NATIVE-2026-10-06.md)
 enters the unchanged fixed-origin RXVM `-v` through a temporary low-U
 bridge. Its distinct SVC 202 handler copies the flagged 24-bit `TYPLIN`
@@ -290,7 +292,7 @@ buffer through K and advances past the historical four-byte inline error
 continuation. CMS24 and CMS31 each execute and return RC 0 in one fresh IPL.
 The bridge's one allocated 24-bit U page is released, so the permanent
 13,914,112-byte low placement gap does not shrink. General CMS file/input
-services and actual REXX `ADDRESS` remain open.
+services and native same-personality application calls remain open.
 The [live CMS screen checkpoint](qualification/TWO-SPACE-CMS-LIVE-SCREEN-2026-10-06.md)
 routes the selected CMS24 and CMS31 application line writes through K's
 checked 3270 channel workspace. The final version line was observed on an
@@ -310,8 +312,8 @@ runs a fresh second CMS31 RXVM relocation on pinned IOQUAL and LIBRARY.
 Selected checked file reads and transient K-owned writes yield
 `PASS=8 FAIL=0 SKIP=3`, RC 0, in a fresh IPL; a separate run proves
 that absent LIBRARY prevents second-app dispatch. Persistent output,
-CMS24 file services, full TSO binaries in the successor, interapplication
-`ADDRESS` and the normal replacement image remain open.
+CMS24 file services, full TSO binaries in the successor, native
+same-personality application calls and the normal replacement image remain open.
 The [CMS file validation checkpoint](qualification/TWO-SPACE-CMS-FILE-VALIDATION-2026-10-06.md)
 extracts the staged envelope checks into host-tested C89 source and reruns
 the full CMS31 IOQUAL fresh IPL with the same 119 guest checks.
@@ -324,14 +326,15 @@ runs a pristine fixed-origin RXVM overlay on unchanged IO24 RXBIN in the
 same U ASCE as both CMS31 images. Its 6/0/1 guest result, two exact transient
 output hashes, restored parent, and 13,914,112-byte post-run 24-bit gap pass
 122 fresh-IPL checks. A DAT software-walker correction makes absent segment
-entries return `TSD_MISSING`. Persistent output, TSO applications and
-cross-personality calls remain open.
+entries return `TSD_MISSING`. Persistent output, TSO applications and native
+same-personality calls remain open.
 
 The [CMS input cursor checkpoint](qualification/TWO-SPACE-CMS-CURSORS-2026-10-06.md)
 keeps eight K-owned file slots keyed by profile and CMS file ID. A fresh IPL
 holds two actual CMS31 files open at once, verifies distinct cursors and real
 owners, and reruns unchanged CMS24/CMS31 workloads. It prepares nested file
-use but does not qualify an `ADDRESS` call or TSO execution in the successor.
+use but does not qualify a native application-to-application call or TSO
+execution in the successor.
 
 The [native TSO loader-core checkpoint](qualification/TWO-SPACE-TSO-LOADER-2026-10-06.md)
 materializes the pinned unchanged TSO31 load-module bytes at two bases with
@@ -501,3 +504,11 @@ be K-only and explicitly budgeted rather than consuming low U placement.
 - Observation: The unchanged fixed-origin CMS24 RXVM MODULE ran the library-free IO24 subset at `0x20000`, with live input and exact stopped-disk output. Missing-file and invalid-mode controls returned expected errors; an altered-origin MODULE was rejected with RC 8. Native TSO24 loading remains open under PD-001. The downloadable base image contains this adapter, but the local CMS24 proof names its own installed image.
 - Evidence: [Stage 3 local guest qualification](qualification/STAGE3-2026-10-05.md), the pinned PD-015 contract, and [PD-001](#pd-001-amode24rmode24-application-loading).
 - Acceptance: After PD-015, load the unchanged historical CMS24 RXVM MODULE at its required origin and run its qualified library-free IO24 subset with actual input, exact binary/text readback, expected return codes and negative service/address controls. Keep its constrained heap separate from the wider profiles. The distinct native TSO24 path remains PD-001; a full historical CMS24 compiler chain requires separate evidence and is not implied by this subset.
+
+## PD-021: Reusable 3270 application presentation
+
+- Type: improvement
+- Status: Open
+- Target: successor U command processor and opt-in 3270 applications, with a checked K terminal gate
+- Observation: The release PCOMM is an application, while the successor currently has only bounded K 3270 reads/writes and selected CMS/TSO line output. The [architecture decision](architecture/TWO-SPACE-POC.md#architecture-decisions-for-the-first-replacement) places device ownership in K and a reusable presentation library in U. No successor U library or general full-screen application contract has been qualified.
+- Acceptance: Define a bounded screen and input request with one foreground owner, deterministic busy/error results and no unchecked U pointer in K. Implement a reusable U wrapper for header, footer, scrollable output and editable entry, then use it in PCOMM and one opt-in application. Place the wrapper, PCOMM and their compatible runtime storage above 16 MiB so their own state does not shrink the 24-bit application range. Preserve native line terminal calls for unchanged CMS and TSO programs. Check long output, field limits, AID/input handling, encoding, nested-child screen return and redraw, malformed requests, and a fresh IPL without terminal races. Keep K's boot and fault output usable when U cannot run.

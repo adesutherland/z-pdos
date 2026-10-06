@@ -35,6 +35,6 @@ both before and after IPL. Guest disabled wait established positive
 completion; watchdogs served only to detect stalls.
 
 This qualifies only the CMS31 `-v` path on the named image. File, input
-and command services, actual REXX `ADDRESS`, unchanged CMS24 execution,
+and command services, native CMS-to-CMS calls, unchanged CMS24 execution,
 TSO31/TSO64 application execution and normal successor selection remain
 open. The current one-ASCE release kernel is unaffected.

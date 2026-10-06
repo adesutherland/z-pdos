@@ -16,5 +16,5 @@ header controls; a CMS31 relocation word matched its source word rebased to
 diskless machine gate passed with the same source.
 
 This is loader-component evidence. K has not mapped a MODULE image in U or
-entered unchanged CMS code under the successor; nested `ADDRESS`, TSO
+entered unchanged CMS code under the successor; native CMS-to-CMS calls, TSO
 applications and the normal replacement image remain open.

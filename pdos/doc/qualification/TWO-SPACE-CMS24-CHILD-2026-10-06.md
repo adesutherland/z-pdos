@@ -16,5 +16,5 @@ event-driven IPL gate passed, including CKD, terminal, storage, isolation
 and fail-stop controls.
 
 The child is a minimal instruction sequence, not a CMS24 application. No
-unchanged RXVM execution, CMS lowcore/file API, REXX `ADDRESS`, TSO24
+unchanged RXVM execution, CMS lowcore/file API, native CMS-to-CMS calls, TSO24
 qualification or production heap measurement follows from this check.

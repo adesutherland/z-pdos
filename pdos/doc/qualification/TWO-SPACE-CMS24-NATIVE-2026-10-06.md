@@ -39,5 +39,5 @@ completion, with watchdogs only detecting stalls.
 
 This is a narrow `-v` compatibility result for two unchanged CMS binaries
 in one U ASCE. Neither application line is yet sent to the live 3270
-screen. General CMS file/input/command services, REXX `ADDRESS`, TSO
+screen. General CMS file/input/command services, native CMS-to-CMS calls, TSO
 application execution and normal successor selection remain open.

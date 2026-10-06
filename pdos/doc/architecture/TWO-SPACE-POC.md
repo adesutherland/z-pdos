@@ -9,10 +9,66 @@ AMODE31 and AMODE64 programs, use the same U translation. Application-to-
 application calls therefore retain ordinary in-space pointers when the target
 ABI permits them. This is a design contract and a bounded machine proof, not
 a replacement disk-boot OS or a general CMS/TSO compatibility claim.
-After slice 7 qualification, we will review whether CMS and TSO should
-instead have separate U ASCEs, using measured collisions, low-memory
-headroom and cross-personality call behavior. The shared-U proof does not
-settle that design choice.
+The October 2026 architecture review retains one U ASCE for the first
+replacement. Selected CMS and TSO images already coexist in the diagnostic
+map. The design permits further applications to coexist whenever their image,
+stack and heap fit the appropriate virtual range and real backing. There is
+no residency policy that evicts a live application to make room. A load that
+cannot meet its placement and storage requirements fails explicitly, especially
+for 24-bit requests; completed applications release their allocations.
+Separate CMS and TSO U ASCEs remain a contingency if unchanged workloads
+demonstrate an unavoidable lowcore conflict, material 24-bit headroom loss,
+or failure isolation that the shared map cannot provide at acceptable
+complexity. Such a change would need fresh DAT, context and service-gate
+qualification; the present proof would not establish it.
+
+## Architecture decisions for the first replacement
+
+These are design choices for the successor, not claims about the released
+one-ASCE kernel or completed implementation.
+
+| Concern | Decision |
+| --- | --- |
+| Application space | Keep one shared 64-bit U ASCE for AMODE24/31/64 CMS and TSO applications. One foreground invocation chain executes at a time. Other live modules may remain mapped when suitable storage exists. K owns the placement ledger and real frames. No K body, heap or tables occupy low U virtual storage. |
+| Personality state | Each invocation carries its CMS or TSO service profile, file handles and lowcore contract. K installs the applicable U compatibility page or state on entry and restores the previous state on return; a dormant module's profile does not define the active lowcore. A failed transition leaves the caller's map and profile intact. |
+| Application calls | The required contract is a synchronous CMS-to-CMS or TSO-to-TSO application call, with bounded parameters, a return code and restored caller state. The selected native linkage for each personality must be qualified separately. An in-space pointer is usable only when both programs' ABI and address modes permit it. A REXX `ADDRESS` operation is not a requirement of the mainframe cREXX builds. CMS-to-TSO or TSO-to-CMS application calls are optional only if a simple copied-parameter and return-code gate suffices; they cannot rely on shared raw pointers or become a prerequisite for replacement. |
+| Command processor | PCOMM, or its successor, is a U application placed above 16 MiB with its stack and heap there when its ABI permits. It is the neutral PDOS command entry point and may ask K to launch either personality with a copied command and receive its return code. K retains boot, fault and emergency console output plus checked terminal and invocation services. The command processor is not part of K merely to remain resident. |
+| 3270 ownership | K owns the device, interrupt/completion state, bounded data transfer, one foreground screen owner and compatibility line input/output services. A reusable U presentation library can provide an application header, footer, scrollable output and editable entry area through checked K screen/input requests. PCOMM should use it first. Wrapped applications redraw after a nested child returns. Existing unmodified line-oriented CMS/TSO programs continue through their native terminal calls; the wrapper does not silently impose a full-screen layout on them. |
+
+The terminal contract must distinguish line output from a full-screen lease.
+K serializes channel operations and rejects an invalid owner or buffer before
+I/O. The U library owns field layout, scrolling, command history and display
+text conversion. A screen lease follows the foreground invocation stack and
+returns to its caller, which repaints its frame. This allows a legacy child to
+use its normal terminal calls without corrupting a suspended U renderer's
+state. A bounded output queue or an explicit busy result is required for any
+output that cannot be displayed while another owner holds the screen; the
+policy must be selected and tested before asynchronous output is enabled.
+
+Before selecting the replacement image, qualify the native call parameter and
+return conventions separately for CMS and TSO, including mixed address modes,
+fixed-origin collision failure and caller restoration after a child fault.
+Also qualify personality lowcore save/restore, native terminal ownership
+transfer, malformed terminal requests, and the 24-bit placement budget with
+PCOMM present. The U presentation library has its own
+[delivery item](../BACKLOG.md#pd-021-reusable-3270-application-presentation);
+its header, footer, scrolling, entry and child-return repaint must be checked
+before claiming that wrapper is available. The diagnostic IPL does not yet
+implement it.
+
+Four interface details must be fixed before implementing the remaining calls
+and console work. First, name resolution and parameter layouts must follow
+the selected unchanged CMS and TSO binaries; the K invocation gate must
+distinguish a load/service failure from the child's normal return code.
+Second, every invocation needs an owner for image pages, runtime allocations,
+file handles and terminal lease, with the same cleanup on return and
+recoverable fault. Third, personality must come from that invocation record,
+not an inferred program-counter range or a global mutable mode. Fourth,
+terminal completion and application wakeup must follow guest events and
+explicit states; elapsed time may detect a stall but must not decide whether
+an I/O completed. The exact parameter layouts and terminal request structures
+remain implementation gates in [PD-003](../BACKLOG.md#pd-003-two-space-supervisor-and-shared-application-memory)
+and [PD-021](../BACKLOG.md#pd-021-reusable-3270-application-presentation).
 
 ## Step 1: address and transition contract
 
@@ -71,10 +127,11 @@ addresses to Classic C. High U pointers require a 64-bit entry contract;
 silently truncating them to a C32 pointer is forbidden. This contract does
 not assert that every IBM service is already implemented.
 
-Applications share one U map while active, but the design does not require
-every application to remain resident simultaneously. The ordinary loader
-keeps existing applications mapped when a valid interval is available. If
-there is no suitable virtual interval or real backing for the module's
+Applications share one U map. They can coexist whenever appropriate virtual
+intervals and real backing are available; simultaneous residency of every
+possible application is a storage-capacity question, not a prohibition. The
+ordinary loader keeps live applications mapped when a valid interval is
+available. If there is no suitable virtual interval or real backing for the module's
 AMODE/RMODE and requested storage, it returns a placement/storage error;
 it never silently places a 24-bit module or its required storage above
 16 MiB. Completed applications release their intervals. An explicitly
@@ -88,9 +145,9 @@ any page. A relocatable CMS MODULE can carry relocation records from
 RXVM has no relocations. An arbitrary pair of fixed-origin modules cannot
 co-reside merely because U has 64-bit addresses. A future nested-command test
 must either find nonoverlapping placements or implement an explicit,
-reversible overlay policy that preserves the suspended caller. For REXX
-`ADDRESS`, the target command is dispatched in U, while OS-mediated loads,
-files and terminal operations cross to K. The required nested-call gate must
+reversible overlay policy that preserves the suspended caller. For a required
+same-personality application call, the target executes in U while OS-mediated
+loading, files and terminal operations cross to K. The nested-call gate must
 cover a relocatable pair and a conflicting fixed-origin case, including
 caller survival and return code. It is not part of this first machine proof.
 
@@ -177,9 +234,9 @@ reservations with split high/low 32-bit addresses, rejects fixed-origin
 collisions, finds a free page-aligned location for a relocatable image and
 releases a module's reservations. The fixture refuses a conflicting fixed
 module before constructing U's DAT. It does not yet relocate or load a CMS
-MODULE or TSO load module, nor does it implement the REXX `ADDRESS` dispatcher.
-The synchronous call and return path is the first machine gate for that
-dispatcher.
+MODULE or TSO load module, nor does it implement the native CMS or TSO
+application-call contracts. The synchronous call and return path is the
+first machine gate for those contracts.
 
 | PoC resource | Real backing | Virtual placement |
 | --- | --- | --- |
@@ -317,7 +374,7 @@ at exactly the same U address, and restores the caller's mapping after a
 nested child. Two levels, original byte preservation and return-code transfer
 passed a host control. The direct, nonoverlapping U call in the machine
 fixture remains separate. There is no CMS/TSO format loader, relocation pass,
-REXX `ADDRESS` integration or actual colliding guest call yet.
+native same-personality call integration or an actual colliding guest call yet.
 
 The guest bootstrap records CRC32 values for both completed DAT pools before
 K runs. The IPL oracle compares these to the host reference, then checks the
@@ -447,7 +504,7 @@ runs IOQUAL from an independently backed second RXVM relocation at U
 the earlier CMS24 and CMS31 RXVM images still mapped. Selected output
 records use transient K real buffers and are checked and released at
 completion. The positive IPL proves this noncolliding second invocation;
-disk persistence, cross-personality `ADDRESS` calls and arbitrary
+disk persistence, same-personality application calls and arbitrary
 fixed-origin coexistence remain to be qualified.
 The [file-validator checkpoint](../qualification/TWO-SPACE-CMS-FILE-VALIDATION-2026-10-06.md)
 separates the C89 envelope and record checks from the K endpoint, exercises
@@ -463,7 +520,7 @@ bytes after the overlay and temporary call page are released. The whole-gap
 check also exposed and corrected K's absent-segment software walk: segment
 entries use `0x20`, whereas page-table entries use `0x400`. This is a
 selected CMS24/CMS31 coexistence case; it does not establish TSO service
-compatibility or real cross-personality application calls.
+compatibility or native same-personality application calls.
 
 The [CMS cursor checkpoint](../qualification/TWO-SPACE-CMS-CURSORS-2026-10-06.md)
 replaces the single input cursor per personality with eight K-owned slots
@@ -471,8 +528,8 @@ keyed by file ID and personality. Two real CMS31 input stages coexist during
 fresh IPL and retain separate cursors and real-frame owners. Their storage
 is outside U's low virtual range. `FINIS` releases only its named input;
 the fixture completion gate releases any remainder. This supports a
-necessary file-state condition for nested calls, but a real `ADDRESS` call
-has not run.
+necessary file-state condition for nested calls, but a native
+application-to-application call has not run.
 
 The [native TSO loader-core checkpoint](../qualification/TWO-SPACE-TSO-LOADER-2026-10-06.md)
 adds a C89 AMODE31/RMODE ANY record and relocation path for K-private
@@ -500,7 +557,8 @@ register contract through its checked U copy gate. The exact version line
 appears on a connected 3270 and RXVM returns RC 0, while the unchanged
 CMS31 IOQUAL and CMS24 IO24 calls also pass in the same U ASCE. This is a
 narrow execution coexistence result. It does not establish a general TSO
-file/input surface, CMS-to-TSO `ADDRESS`, TSO64 or native TSO24 support.
+file/input surface, native same-personality application calls, TSO64 or
+native TSO24 support.
 
 The [TSO64 ANY host materializer](../qualification/TWO-SPACE-TSO64-ANY-LOADER-2026-10-06.md)
 now checks and relocates the selected low-resident AMODE64 member at two U
@@ -575,7 +633,7 @@ SVC through K, returns `0x3456` to a U64 caller, restores the parent PTEs,
 and verifies its bytes again. Each live page-table replacement is purged on
 the one CPU. This proves a mixed-mode memory and gate transition. The later
 CMS31 `-v` check runs after the parent image is restored; broader CMS file
-and command services and actual REXX `ADDRESS` behavior remain to be
+and command services and native same-personality application calls remain to be
 implemented. The IPL harness waits for the
 3270 ready screen and guest disabled-wait event; time limits only detect
 stalls.

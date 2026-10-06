@@ -54,6 +54,6 @@ completion; elapsed time was only a failure watchdog.
 
 This is a selected CMS24 file and fixed-origin overlay result. Persistent
 output, live CMS24 terminal input, full CMS compiler linkage, TSO binaries
-in the successor, real interapplication `ADDRESS`, and normal replacement
+in the successor, native CMS-to-CMS calls, and normal replacement
 selection remain open. The shared-U CMS result alone does not settle whether
 CMS and TSO should share one U space.

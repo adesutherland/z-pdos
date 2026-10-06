@@ -38,5 +38,5 @@ using Mainframe Classic C/Assembler/Linker, GNU Binutils 2.47 and Hercules
 This checks only the first staged block and MODULE header. The guest has
 not consumed every MODULE record, verified the entire payload digest, loaded
 the image into U, allocated its stack/heap, or executed an unchanged CMS
-application. TSO24 headroom, TSO services, REXX `ADDRESS`, collision recovery
+application. TSO24 headroom, TSO services, native same-personality calls, collision recovery
 and normal successor selection remain open in PD-003 slices 5–7.

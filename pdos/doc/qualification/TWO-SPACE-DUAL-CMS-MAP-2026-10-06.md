@@ -28,7 +28,7 @@ unchanged CMS24 application, so the number is a placement budget rather
 than a measured heap guarantee.
 
 This checkpoint does not enter either RXVM, implement the CMS lowcore or
-file APIs, run REXX `ADDRESS`, or qualify TSO programs. The diagnostic
+file APIs, run native CMS-to-CMS calls, or qualify TSO programs. The diagnostic
 16 MiB real profile is too small to establish production 31/64-bit heap
 headroom. Slice 6 application execution and slice 7 replacement selection
 remain open.

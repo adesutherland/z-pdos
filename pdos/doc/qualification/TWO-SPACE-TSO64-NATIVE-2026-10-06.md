@@ -45,6 +45,6 @@ disabled wait established completion; elapsed limits only detected stalls.
 
 This qualifies one native TSO64 ANY version invocation and its selected
 storage/output path in the diagnostic successor. It does not qualify RMODE
-HIGH, native TSO24, TSO file/input services, cross-personality `ADDRESS`,
+HIGH, native TSO24, TSO file/input services, native TSO-to-TSO calls,
 abnormal application cleanup or normal replacement-image selection. The
 released one-ASCE image was not changed.

@@ -52,6 +52,6 @@ wait and the observed terminal screen; elapsed limits were failure watchdogs.
 
 The selected CMS31 file and output path advances slice 5, and the second
 relocated invocation advances slice 6. General CMS31 input, persistent
-output, CMS24 file operations, TSO31/TSO64 in this successor, REXX
-`ADDRESS` across applications, fixed-origin collision policy for real
+output, CMS24 file operations, TSO31/TSO64 in this successor, native
+CMS-to-CMS calls, fixed-origin collision policy for real
 programs, normal-image selection and slice 7 acceptance remain open.

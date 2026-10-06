@@ -33,6 +33,6 @@ binutils 2.47, maintained Classic C/Assembler/Linker and local Hercules.
 Guest completion was event-observed; elapsed time was only a failure watchdog.
 
 This is a bounded file-state prerequisite for nested application calls. The
-guest probe does not execute REXX `ADDRESS`, and the current `STATE` path still
+guest probe does not execute a native CMS-to-CMS call, and the current `STATE` path still
 stages input eagerly. Persistent output, general CMS/TSO file APIs, TSO
 loading in the successor and the production replacement image remain open.
