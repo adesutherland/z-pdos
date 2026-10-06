@@ -222,6 +222,18 @@ app_b:
     br %r14
 .balign 8
 b_data_va: .quad 0x21000
+.balign 8
+app_b_cms31_call:
+    lgr %r12, %r14         /* preserve full-width U64 return address */
+    larl %r3, cms31_child_va32
+    l %r3, 0(%r3)
+    sam31
+    basr %r14, %r3         /* execute relocated child in U AMODE31 */
+    sam64
+    lgr %r14, %r12
+    br %r14
+.balign 4
+cms31_child_va32: .long 0x03000000
 
 .section .apphigh,"ax"
 app_high:
@@ -399,7 +411,9 @@ terminal_read_done:
     lg %r3, 0(%r3)
     l %r4, 0(%r3)
     st %r4, 392(%r2)
-    basr %r14, %r3         /* execute child in U at colliding origin */
+    larl %r3, cms31_trampoline_va
+    lg %r3, 0(%r3)
+    basr %r14, %r3         /* low U trampoline switches to AMODE31 */
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 404(%r2)
@@ -435,6 +449,7 @@ app_fault_resume:
 high_data_va: .quad 0x110001000
 input_data_va: .quad 0x110001080
 cms31_image_va: .quad 0x03000000
+cms31_trampoline_va: .quad app_b_cms31_call
 forged_va: .quad 0x100021000
 cross_va: .quad 0x110001ffe
 write_va: .quad 0x110001024
@@ -492,6 +507,8 @@ initial_nested_done:
     chi %r2, 215
     je storage_no_record
     chi %r2, 216
+    je storage_no_record
+    chi %r2, 217
     je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore

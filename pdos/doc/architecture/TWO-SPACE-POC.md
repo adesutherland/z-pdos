@@ -375,11 +375,12 @@ mapped-image proof; it does not enter RXVM or provide its CMS API surface.
 The 16 MiB fixture could accommodate this RXVM image and stage together, but
 is not a production heap budget for CMS31, TSO31 or 64-bit applications.
 On that mapped RXVM interval, a guest check now pushes a same-origin child
-backing, branches to a six-byte U64 child that returns `0x3456`, pops the
-backing with that value, and reads the original RXVM bytes again. Each
-page-table replacement is purged on the single CPU. This exercises a real
-guest executable handoff and reversible collision policy; the child is a
-minimal test program, not a CMS31 or REXX `ADDRESS` application.
+backing, branches through a low U trampoline to an eight-byte AMODE31 child,
+and receives `0x3456` after its nested SVC returns through K. It then pops
+the backing and reads the original RXVM bytes again. Each page-table
+replacement is purged on the single CPU. This exercises a real mixed-mode
+guest handoff and reversible collision policy; the child is a minimal test
+program, not a CMS or REXX `ADDRESS` application.
 
 ## Primary architecture and compatibility references
 

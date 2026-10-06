@@ -283,10 +283,10 @@ release:
 
 static unsigned int cms31_overlay_push(const TSGREQUEST *request)
 {
-    /* GNU s390 -m64 -march=z900: LGHI R15,0x3456; BR R14. The child
-       runs in U and returns through its caller's link register. */
+    /* GNU s390 -m64 -march=z900: SVC 217; LGHI R15,0x3456; BR R14.
+       The child runs AMODE31 in U and returns via its link register. */
     static const unsigned char child[] =
-        {0xa7U,0xf9U,0x34U,0x56U,0x07U,0xfeU};
+        {0x0aU,0xd9U,0xa7U,0xf9U,0x34U,0x56U,0x07U,0xfeU};
     TSPADDR base;
     int result;
     if (request->length || request->address.hi || request->address.lo ||
@@ -311,6 +311,16 @@ static unsigned int cms31_overlay_pop(const TSGREQUEST *request)
         != TSM_OK) return 12U;
     *(volatile unsigned int *)0x4098U=u_tables.used;
     return returned;
+}
+
+static unsigned int cms31_child_probe(void)
+{
+    unsigned int mask_hi=*(volatile const unsigned int *)0x3080U;
+    unsigned int mask_lo=*(volatile const unsigned int *)0x3084U;
+    unsigned int mode=(mask_hi & 1U) ? 64U :
+                      (mask_lo & 0x80000000U) ? 31U : 24U;
+    *(volatile unsigned int *)0x40f4U=mode;
+    return mode == 31U ? 0U : 8U;
 }
 
 static unsigned int terminal_service(const TSGREQUEST *request)
@@ -486,6 +496,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 214U) return cms31_map_service(request);
     if (request->svc == 215U) return cms31_overlay_push(request);
     if (request->svc == 216U) return cms31_overlay_pop(request);
+    if (request->svc == 217U) return cms31_child_probe();
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
         return 0xfffffffbU;

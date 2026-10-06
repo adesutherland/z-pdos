@@ -234,7 +234,8 @@ def run(args):
                     ">6I", raw, 0x12180)
                 checks["cms31_nested_backing_restored"] = (
                     push == 0 and parent == int.from_bytes(staged[148:152],"big")
-                    and child == 0xa7f93456 and executed == 0x3456
+                    and child == 0x0ad9a7f9 and executed == 0x3456
+                    and struct.unpack_from(">I",raw,0x40f4)[0] == 31
                     and returned == executed and restored == parent)
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
                 real_bytes == 0x1000000 and stage >= 0x400000 and

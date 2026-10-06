@@ -178,10 +178,11 @@ connects the pinned RXVM stage to live U page allocation and relocation in
 a fresh diagnostic IPL. It does not enter RXVM, supply CMS services or
 qualify unchanged applications; those slice 6 and 7 gates remain open.
 The [same-origin guest backing checkpoint](qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
-then swaps a six-byte child over the mapped RXVM interval, executes it from
-U, restores the parent pages and propagates its return value. It proves the
-memory and basic executable transition needed for a colliding nested call;
-AMODE31 CMS linkage and REXX `ADDRESS` remain unqualified.
+then swaps an eight-byte AMODE31 child over the mapped RXVM interval,
+executes its nested SVC from U, restores the parent pages and propagates its
+return value to a U64 caller. It proves the mixed-mode memory and executable
+transition needed for a colliding nested call; full CMS linkage and REXX
+`ADDRESS` remain unqualified.
 
 ## PD-004: Batch-file delivery
 
