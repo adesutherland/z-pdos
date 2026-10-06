@@ -959,7 +959,20 @@ static int native_clean(unsigned int token, const TSVRESOURCE *resource,
     const TSVFRAME *frame=(const TSVFRAME *)context;
     unsigned int i;
     (void)token;
-    if (!frame || !resource || resource->kind!=TSV_ALLOCATION) return 1;
+    if (!frame || !resource) return 1;
+    if (resource->kind==TSV_FILE) {
+        TSIINPUT *input;
+        unsigned int owner;
+        if (resource->handle>TSI_SLOTS) return 1;
+        input=&cms_inputs.slot[resource->handle-1U];
+        owner=TSIOWNER(&cms_inputs,input,CMS_FILE_OWNER+16U);
+        if (!input->real || input->token!=frame->token || !owner ||
+            TSRRELEASE(&storage.real,owner,input->real)!=TSR_OK)
+            return 1;
+        TSICLEAR(input);
+        return 0;
+    }
+    if (resource->kind!=TSV_ALLOCATION) return 1;
     for (i=0U; i<TSM_ALLOCS; ++i)
         if (storage.allocations[i].handle==resource->handle) {
             if (storage.allocations[i].task!=frame->runtime_owner ||
@@ -1214,14 +1227,22 @@ static void cms_put_word(unsigned char *p, unsigned int value)
 
 static unsigned int cms_file_close(TSIINPUT *input)
 {
-    unsigned int owner;
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
+    unsigned int owner, handle;
     if (!input) return 12U;
     owner=TSIOWNER(&cms_inputs,input,CMS_FILE_OWNER+16U);
-    if (!owner) return 12U;
+    handle=TSIOWNER(&cms_inputs,input,1U);
+    if (!owner || !handle ||
+        (input->token && (!frame || frame->token!=input->token ||
+          TSVHAS(&native_invocations,frame->token,TSV_FILE,handle)
+              !=TSV_OK))) return 12U;
     if (input->real &&
         TSRRELEASE(&storage.real,owner,input->real)
             !=TSR_OK)
         return 12U;
+    if (input->token &&
+        TSVFORGET(&native_invocations,input->token,TSV_FILE,handle)
+            !=TSV_OK) return 12U;
     TSICLEAR(input);
     return 0U;
 }
@@ -1285,16 +1306,26 @@ static unsigned int cms_file_open(const unsigned char id[18],
     TSKEXTENT extent;
     TSIFINFO info;
     TSIINPUT *input;
-    unsigned int i, j, n=0U, blocks, span, real;
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
+    unsigned int i, j, n=0U, blocks, span, real, token, handle;
     unsigned int cylinder, head, number;
     int found, count;
     if (!opened || (profile!=24U && profile!=31U) ||
         id[16]!=0xc1U || id[17]!=0xf1U) return 28U;
     *opened=0;
-    input=TSIFIND(&cms_inputs,id,profile);
-    if (input) { *opened=input; return 0U; }
+    token=frame ? frame->token : 0U;
+    input=TSIFINDOWNED(&cms_inputs,id,profile,token);
+    if (input) {
+        handle=TSIOWNER(&cms_inputs,input,1U);
+        if (token && TSVHAS(&native_invocations,token,TSV_FILE,handle)
+            !=TSV_OK) return 12U;
+        *opened=input;
+        return 0U;
+    }
     input=TSIEMPTY(&cms_inputs);
     if (!input) return 4U;
+    handle=TSIOWNER(&cms_inputs,input,1U);
+    if (!handle) return 12U;
     for (i=0U; i<6U; ++i) name[n++]=prefix[i];
     if (profile==24U) { name[3U]=0xf2U; name[4U]=0xf4U; }
     for (i=0U; i<8U && id[i]!=0x40U; ++i) {
@@ -1340,9 +1371,15 @@ static unsigned int cms_file_open(const unsigned char id[18],
     }
     if (TSIFVALIDATE(stage,blocks*18452U,profile,&info)!=TSIF_OK)
         goto corrupt;
+    if (token && TSVOWN(&native_invocations,token,TSV_FILE,handle)
+        !=TSV_OK)
+        return TSRRELEASE(&storage.real,
+                          TSIOWNER(&cms_inputs,input,CMS_FILE_OWNER+16U),
+                          real)==TSR_OK ? 4U : 0xfffffff0U;
     for (i=0U; i<18U; ++i) input->id[i]=id[i];
     input->real=real;
     input->profile=profile;
+    input->token=token;
     input->length=64U+info.payload_bytes;
     input->records=info.records; input->cursor=64U;
     *opened=input;
@@ -1973,7 +2010,8 @@ static unsigned int cms_native_service(TSGREQUEST *request,
             file->closed=1U;
             return 0U;
         }
-        input=TSIFIND(&cms_inputs,plist+8U,profile);
+        input=TSIFINDOWNED(&cms_inputs,plist+8U,profile,
+                          frame ? frame->token : 0U);
         return input ? cms_file_close(input) : 28U;
     }
     for (i=0U; i<8U && plist[i]==erase[i]; ++i) {}

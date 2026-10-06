@@ -8,7 +8,7 @@
 #define TSI_SLOTS 8U
 typedef struct {
     unsigned char id[18];
-    unsigned int profile, real, length, records, cursor;
+    unsigned int profile, real, length, records, cursor, token;
 } TSIINPUT;
 
 typedef struct {
@@ -17,6 +17,8 @@ typedef struct {
 
 TSIINPUT *TSIFIND(TSISTATE *state, const unsigned char id[18],
                   unsigned int profile);
+TSIINPUT *TSIFINDOWNED(TSISTATE *state, const unsigned char id[18],
+                       unsigned int profile, unsigned int token);
 TSIINPUT *TSIEMPTY(TSISTATE *state);
 unsigned int TSIOWNER(const TSISTATE *state, const TSIINPUT *input,
                       unsigned int owner_base);

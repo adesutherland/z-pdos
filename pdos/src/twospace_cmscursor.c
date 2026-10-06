@@ -3,12 +3,17 @@
 
 TSIINPUT *TSIFIND(TSISTATE *state, const unsigned char id[18],
                   unsigned int profile)
+{ return TSIFINDOWNED(state,id,profile,0U); }
+
+TSIINPUT *TSIFINDOWNED(TSISTATE *state, const unsigned char id[18],
+                       unsigned int profile, unsigned int token)
 {
     unsigned int slot, i;
     if (!state || !id || (profile!=24U && profile!=31U)) return 0;
     for (slot=0U; slot<TSI_SLOTS; ++slot) {
         TSIINPUT *input=&state->slot[slot];
-        if (!input->real || input->profile!=profile) continue;
+        if (!input->real || input->profile!=profile ||
+            input->token!=token) continue;
         for (i=0U; i<18U && input->id[i]==id[i]; ++i) {}
         if (i==18U) return input;
     }
@@ -40,5 +45,5 @@ void TSICLEAR(TSIINPUT *input)
     if (!input) return;
     for (i=0U; i<18U; ++i) input->id[i]=0U;
     input->profile=input->real=input->length=0U;
-    input->records=input->cursor=0U;
+    input->records=input->cursor=input->token=0U;
 }

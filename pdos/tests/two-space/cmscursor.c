@@ -32,6 +32,12 @@ int main(void)
     other->profile=24U; other->real=0x1400000U; other->cursor=55U;
     CHECK(TSIFIND(&state,first,24U)==other &&
           TSIFIND(&state,first,31U)==parent);
+    CHECK(TSIFINDOWNED(&state,first,31U,1U)==0);
+    child->token=2U;
+    for (i=0U; i<18U; ++i) child->id[i]=first[i];
+    CHECK(TSIFINDOWNED(&state,first,31U,2U)==child);
+    CHECK(TSIFIND(&state,first,31U)==parent && parent->cursor==123U);
+    CHECK(TSIFIND(&state,second,31U)==0);
     TSICLEAR(child);
     CHECK(TSIFIND(&state,second,31U)==0 && TSIFIND(&state,first,31U)==parent);
     CHECK(TSIEMPTY(&state)==child && parent->cursor==123U);

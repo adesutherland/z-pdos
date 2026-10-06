@@ -186,6 +186,10 @@ The [CMS heap ownership check](qualification/TWO-SPACE-INVOCATION-HEAP-2026-10-0
 adds per-invocation CMS31 heap state and a pre-free K handle check for CMS,
 SVC 120 and IARV64. The unchanged guest paths passed fresh IPL, but a nested
 CMS heap and child-fault guest control remain open.
+The [CMS input ownership check](qualification/TWO-SPACE-INVOCATION-FILES-2026-10-06.md)
+keys open cursors by invocation token and reaps unclosed input buffers on
+normal return. A nested same-file guest control and output ownership remain
+open.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and
