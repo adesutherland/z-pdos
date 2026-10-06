@@ -201,6 +201,10 @@ def run(args):
                            cms24=bool(args.cms24), cms31=bool(args.cms31))
             judged["checks"]["ipl_subchannel_handover"] = (
                 0x10000 <= struct.unpack_from(">I",raw,0x40bc)[0] < 0x10100)
+            judged["checks"]["independent_disk_console_channel_workspaces"] = (
+                struct.unpack_from(">I",raw,0x180008)[0] == 0x180200 and
+                struct.unpack_from(">I",raw,0x190008)[0] == 0x190200 and
+                raw[0x180200:0x180208] != raw[0x190200:0x190208])
             judged["checks"]["k_terminal_screen_observed"] = (
                 "K SERVICE READY" in (out / "terminal.screen").read_text())
             judged["checks"]["terminal_input_sent"] = input_sent

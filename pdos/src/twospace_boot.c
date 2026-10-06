@@ -191,8 +191,11 @@ int main(int argc, char **argv)
         if (TSRRESERVE(&final_core,100U+first,first*PAGE,
                        (i-first)*PAGE,TSR_RUN) != TSR_OK) FAIL(31);
     }
-    /* Reserved K-only low-real channel workspace. It is never U mapped. */
+    /* Independent low-real disk and console workspaces. An outstanding
+       terminal read must survive any intervening disk service. */
     if (TSRRESERVE(&final_core,700U,TSF_CHANNEL_REAL,
+                   TSF_CHANNEL_BYTES,TSR_RUN) != TSR_OK) FAIL(31);
+    if (TSRRESERVE(&final_core,701U,TSF_CONSOLE_REAL,
                    TSF_CHANNEL_BYTES,TSR_RUN) != TSR_OK) FAIL(31);
     if (TSRALLOC(&final_core,3U,TSF_POOL_BYTES,0x100000U,
                  CORE_SIZE,TSR_RUN,&kpool) != TSR_OK) FAIL(32);

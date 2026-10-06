@@ -54,7 +54,11 @@ int TSFBUILD(unsigned char *core, unsigned int kpool, unsigned int upool,
         (kpool < TSF_CHANNEL_REAL+TSF_CHANNEL_BYTES &&
          TSF_CHANNEL_REAL < kpool+TSF_POOL_BYTES) ||
         (upool < TSF_CHANNEL_REAL+TSF_CHANNEL_BYTES &&
-         TSF_CHANNEL_REAL < upool+TSF_POOL_BYTES)) return -1;
+         TSF_CHANNEL_REAL < upool+TSF_POOL_BYTES) ||
+        (kpool < TSF_CONSOLE_REAL+TSF_CHANNEL_BYTES &&
+         TSF_CONSOLE_REAL < kpool+TSF_POOL_BYTES) ||
+        (upool < TSF_CONSOLE_REAL+TSF_CHANNEL_BYTES &&
+         TSF_CONSOLE_REAL < upool+TSF_POOL_BYTES)) return -1;
     for (i = 0U; i < sizeof kmaps / sizeof kmaps[0]; ++i)
         if ((kmaps[i].real >= kpool && kmaps[i].real < kpool + TSF_POOL_BYTES) ||
             (kmaps[i].real >= upool && kmaps[i].real < upool + TSF_POOL_BYTES))

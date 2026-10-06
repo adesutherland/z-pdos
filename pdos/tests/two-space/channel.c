@@ -15,7 +15,7 @@ int main(void)
 {
     unsigned char *real, *base, *irb;
     unsigned int got=0U;
-    TSCSTATE channel;
+    TSCSTATE channel, console;
     real=(unsigned char *)malloc(0x1000000U);
     if (!real) return 1;
     memset(real,0xa5,0x1000000U);
@@ -76,6 +76,22 @@ int main(void)
         return 13;
     irb[9]=1U;
     if (TSCCHECKCONSREAD(&channel,252U,&got) != TSC_IO) return 14;
+    if (TSCINIT(&console,real,0x1000000U,0x190000U) != TSC_OK ||
+        TSCBUILDCONSREAD(&console,252U) != TSC_OK) return 15;
+    TSCDATA(&console)[0]=0xc1U;
+    TSCIRB(&console)[8U]=0x0cU;
+    TSCIRB(&console)[9U]=0U;
+    TSCIRB(&console)[10U]=0U;
+    TSCIRB(&console)[11U]=251U;
+    TSCIRB(&console)[4U]=0U;
+    TSCIRB(&console)[5U]=0x19U;
+    TSCIRB(&console)[6U]=0x02U;
+    TSCIRB(&console)[7U]=0x08U;
+    if (TSCBUILDREAD(&channel,0U,0U,3U,0x0eU,80U) != TSC_OK ||
+        TSCCHECKCONSREAD(&console,252U,&got) != TSC_OK || got != 1U ||
+        TSCDATA(&console)[0] != 0xc1U ||
+        word(TSCORB(&console)+8U) != 0x190200U ||
+        word(TSCORB(&channel)+8U) != 0x180200U) return 16;
     free(real);
     return 0;
 }

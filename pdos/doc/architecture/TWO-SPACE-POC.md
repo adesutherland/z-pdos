@@ -306,7 +306,7 @@ general file I/O and command handling remain work in slices 5–7.
 ## Post-handover K channel checkpoint
 
 The [6 October channel result](../qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
-adds a K-only 64 KiB workspace at real `0x180000`–`0x18ffff`. Guest bootstrap
+adds a K-only 64 KiB disk workspace at real `0x180000`–`0x18ffff`. Guest bootstrap
 reserves it before assigning DAT pools. Its K alias is part of the existing
 real aperture; U never maps it. The Classic C31 endpoint builds a format-1
 3390 read chain with real CCW/data addresses, submits it through a bounded
@@ -322,7 +322,7 @@ F/18452 geometry; it has not exposed a general CMS/TSO dataset service.
 
 The [K terminal result](../qualification/TWO-SPACE-TERMINAL-2026-10-06.md)
 uses `STSCH`/`MSCH` to enable console 0009, then writes a complete 3270 screen
-through the same K-owned low-real channel buffer. An independently connected
+through a K-owned low-real channel buffer. An independently connected
 `s3270` saw `K SERVICE READY` during a fresh IPL. K C31 currently reserves
 16 sparse pages at virtual `0x02000000`–`0x0200ffff`, backed by real
 `0xa000`–`0xefff` and `0x14000`–`0x1efff`; its trampoline is at K virtual
@@ -338,6 +338,12 @@ The service retains completed data if the destination copy fails, so the
 caller can retry with a valid U pointer. This is an input transfer proof,
 not a command interpreter. Command dispatch, general CMS/TSO file APIs and
 unchanged application loads remain open.
+
+The [disk/console isolation result](../qualification/TWO-SPACE-DUAL-IO-2026-10-06.md)
+reserves a second low-real 64 KiB workspace at `0x190000`–`0x19ffff` for
+the console. The disk and console have separate real ORB, CCW, IRB and data
+areas; an intervening K dataset read no longer overwrites a pending terminal
+operation. Both buffers cost real memory, not 24-bit U virtual space.
 
 K's synchronous CKD/3270 helper now judges success from `TSCH` completion
 status. A TOD watchdog bounds a stalled operation, replacing its previous

@@ -14,6 +14,7 @@ static unsigned int user_rights(unsigned int frame, void *unused);
 static TSDSTATE u_tables;
 static TSMSTATE storage;
 static TSCSTATE channel;
+static TSCSTATE console_channel;
 static unsigned int storage_ready;
 static unsigned int console_ssid;
 static unsigned int console_read_phase;
@@ -44,7 +45,9 @@ static int attach(void)
         TSMINIT(&storage,&u_tables,(unsigned char *)TSF_KAPERTURE_VA,
                 TSF_REAL_BYTES,TSF_CORE_BYTES,set_key,0) != TSM_OK ||
         TSCINIT(&channel,(unsigned char *)TSF_KAPERTURE_VA,
-                TSF_REAL_BYTES,TSF_CHANNEL_REAL) != TSC_OK)
+                TSF_REAL_BYTES,TSF_CHANNEL_REAL) != TSC_OK ||
+        TSCINIT(&console_channel,(unsigned char *)TSF_KAPERTURE_VA,
+                TSF_REAL_BYTES,TSF_CONSOLE_REAL) != TSC_OK)
         return -1;
     at.hi=0U; at.lo=0x20000U;
     if (TSMRESERVE(&storage,1U,24U,at,0x2000U) != TSP_OK)
@@ -482,14 +485,14 @@ static unsigned int terminal_service(const TSGREQUEST *request)
     if (*(volatile const unsigned int *)0x40bcU == 0U) return 0xfffffffbU;
     ssid=0U;
     for (i=0U; i<256U; ++i) {
-        if (TSCDEV(0x10000U+i,TSCSCHIB(&channel)) == 9) {
+        if (TSCDEV(0x10000U+i,TSCSCHIB(&console_channel)) == 9) {
             ssid=0x10000U+i;
             break;
         }
     }
     if (!ssid) return 0xfffffffbU;
     *(volatile unsigned int *)0x40c0U=ssid;
-    screen=TSCDATA(&channel);
+    screen=TSCDATA(&console_channel);
     for (i=0U; i<1773U; ++i) screen[i]=0x40U;
     screen[0]=0xc3U; screen[1]=0x11U; screen[2]=0x5dU;
     screen[3]=0x7fU; screen[4]=0x1dU; screen[5]=0xf0U;
@@ -497,12 +500,12 @@ static unsigned int terminal_service(const TSGREQUEST *request)
     screen[1766]=0x1dU; screen[1767]=0U; screen[1768]=0x13U;
     screen[1769]=0x3cU; screen[1770]=0x5dU; screen[1771]=0x7fU;
     screen[1772]=0U;
-    if (TSCBUILDCONSWRITE(&channel,1773U) != TSC_OK) return 20U;
-    if (TSCENABL(ssid,TSCSCHIB(&channel)) != 0) return 23U;
-    io_result=TSCIO(ssid,TSCORB(&channel),TSCIRB(&channel));
+    if (TSCBUILDCONSWRITE(&console_channel,1773U) != TSC_OK) return 20U;
+    if (TSCENABL(ssid,TSCSCHIB(&console_channel)) != 0) return 23U;
+    io_result=TSCIO(ssid,TSCORB(&console_channel),TSCIRB(&console_channel));
     *(volatile unsigned int *)0x40c4U=(unsigned int)io_result;
     if (io_result != 0) return 21U;
-    if (TSCCHECKWRITE(&channel) != TSC_OK) return 22U;
+    if (TSCCHECKWRITE(&console_channel) != TSC_OK) return 22U;
     console_ssid=ssid;
     return 0U;
 }
@@ -530,13 +533,14 @@ static unsigned int terminal_read_poll(const TSGREQUEST *request)
         request->direction != TSG_WRITE) return 8U;
     if (!console_read_phase) return 0xfffffffbU;
     if (console_read_phase != 3U) {
-        status=TSCPOLL(console_ssid,TSCIRB(&channel));
+        status=TSCPOLL(console_ssid,TSCIRB(&console_channel));
         if (status != 0) return 1U;
     }
     if (console_read_phase == 1U) {
-        if ((TSCIRB(&channel)[8U] & 0x80U) == 0U) return 1U;
-        if (TSCBUILDCONSREAD(&channel,252U) != TSC_OK ||
-            TSCSTART(console_ssid,TSCORB(&channel),TSCIRB(&channel)) != 0) {
+        if ((TSCIRB(&console_channel)[8U] & 0x80U) == 0U) return 1U;
+        if (TSCBUILDCONSREAD(&console_channel,252U) != TSC_OK ||
+            TSCSTART(console_ssid,TSCORB(&console_channel),
+                     TSCIRB(&console_channel)) != 0) {
             console_read_phase=0U;
             return 12U;
         }
@@ -544,14 +548,14 @@ static unsigned int terminal_read_poll(const TSGREQUEST *request)
         return 1U;
     }
     if (console_read_phase == 2U) {
-        if (TSCCHECKCONSREAD(&channel,252U,&count) != TSC_OK) {
+        if (TSCCHECKCONSREAD(&console_channel,252U,&count) != TSC_OK) {
             /* Initial status can precede the actual READ MODIFIED data. */
-            if (TSCIRB(&channel)[8U] == 0U &&
-                TSCIRB(&channel)[9U] == 0U) return 1U;
+            if (TSCIRB(&console_channel)[8U] == 0U &&
+                TSCIRB(&console_channel)[9U] == 0U) return 1U;
             console_read_phase=0U;
             return 12U;
         }
-        if (count == 3U && TSCDATA(&channel)[0] == 0x60U) {
+        if (count == 3U && TSCDATA(&console_channel)[0] == 0x60U) {
             console_read_phase=1U;
             return 1U;
         }
@@ -568,7 +572,7 @@ static unsigned int terminal_read_poll(const TSGREQUEST *request)
     bytes[1]=(unsigned char)(count>>16);
     bytes[2]=(unsigned char)(count>>8);
     bytes[3]=(unsigned char)count;
-    for (i=0U; i<count; ++i) bytes[4U+i]=TSCDATA(&channel)[i];
+    for (i=0U; i<count; ++i) bytes[4U+i]=TSCDATA(&console_channel)[i];
     gate.u_tables=&u_tables;
     gate.real_aperture=(unsigned char *)TSF_KAPERTURE_VA;
     gate.real_bytes=TSF_REAL_BYTES;

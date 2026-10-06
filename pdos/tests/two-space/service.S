@@ -359,6 +359,13 @@ app_high:
     st %r15, 104(%r2)
     chi %r15, 0
     jne terminal_read_done
+    lghi %r0, 0             /* Disk I/O may run while console AID is pending */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 207                 /* repeat omitted from the ten-entry SVC trace */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 448(%r2)
 terminal_read_poll:
     lghi %r0, 256
     larl %r1, input_data_va

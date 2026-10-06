@@ -89,7 +89,7 @@ def make_core(elf, classic, dat_emit, out):
                              *(0x14000 + i * 4096 for i in range(11))}
     if private_kernel_frames.intersection(application.values()):
         raise ValueError("U maps private K real frame")
-    if any(0x180000 <= pa < 0x190000 for pa in application.values()):
+    if any(0x180000 <= pa < 0x1a0000 for pa in application.values()):
         raise ValueError("U maps low-real K channel buffer")
     image = out / "image.core"
     image.write_bytes(core)
@@ -206,6 +206,9 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False):
     checks["k_terminal_read_start"] = (
         struct.unpack_from(">I",raw,0x12068)[0] ==
         (0 if ipl else 0xfffffffb))
+    checks["disk_service_during_terminal_attention"] = (
+        struct.unpack_from(">I",raw,0x121c0)[0] ==
+        (0 if ipl else 0))
     checks["k_terminal_read_finish"] = (
         struct.unpack_from(">I",raw,0x1206c)[0] ==
         (0 if ipl else 0xfffffffb))

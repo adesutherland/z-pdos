@@ -161,6 +161,10 @@ lookup. The [K terminal checkpoint](qualification/TWO-SPACE-TERMINAL-2026-10-06.
 adds a real-addressed 3270 write visible in an independently connected
 terminal after fresh IPL. The [terminal input checkpoint](qualification/TWO-SPACE-INPUT-2026-10-06.md)
 adds attention-gated `READ MODIFIED` and a bounded K-to-U AID record copy.
+The [disk/console isolation checkpoint](qualification/TWO-SPACE-DUAL-IO-2026-10-06.md)
+gives each device a reserved low-real workspace and passes a disk read
+between terminal-read start and completion in the fresh IPL. It removes
+cross-device buffer reuse; per-device scheduling and cancellation remain open.
 General CMS/TSO file I/O and command services remain open. The diagnostic C31 service uses 16 sparse
 K-only pages and no additional low U virtual page. This does not complete
 slice 5 or select the replacement image.
