@@ -21,5 +21,7 @@ typedef struct {
 
 int TSHHEADER(const unsigned char *block, unsigned int length,
               unsigned int expected_profile, TSHINFO *info);
+int TSHVALIDATE(const unsigned char *staged, unsigned int length,
+                unsigned int expected_profile, TSHINFO *info);
 
 #endif

@@ -57,3 +57,94 @@ int TSHHEADER(const unsigned char *block, unsigned int length,
     info->relocation_records=relocations;
     return TSH_OK;
 }
+
+static int record(const unsigned char *module, unsigned int bytes,
+                  unsigned int *cursor, unsigned int *data,
+                  unsigned int *size)
+{
+    unsigned int at=*cursor, n;
+    if (at > bytes || bytes-at < 2U) return TSH_BAD;
+    n=half(module+at);
+    if (!n || n > bytes-at-2U) return TSH_BAD;
+    *data=at+2U; *size=n; *cursor=at+2U+n;
+    return TSH_OK;
+}
+
+static unsigned int image_word(const unsigned char *module,
+                               const unsigned int *offsets,
+                               unsigned int where)
+{
+    unsigned int i, n, value=0U;
+    for (i=0U; i<4U; ++i) {
+        n=where+i;
+        value=(value<<8) | module[offsets[n/65535U]+n%65535U];
+    }
+    return value;
+}
+
+int TSHVALIDATE(const unsigned char *staged, unsigned int length,
+                unsigned int expected_profile, TSHINFO *info)
+{
+    const unsigned char *module;
+    unsigned int offsets[129], cursor=0U, at, size, i, j, count=0U;
+    unsigned int image_count, remaining, fnv=0x811c9dc5U, previous, address;
+    unsigned int old, expected, module_end;
+    TSHINFO parsed;
+    if (!staged || !info || length < 146U ||
+        TSHHEADER(staged,length < 18452U ? length : 18452U,
+                  expected_profile,&parsed) != TSH_OK ||
+        parsed.module_bytes > length-64U) return TSH_BAD;
+    module_end=64U+parsed.module_bytes;
+    for (i=module_end; i<length; ++i)
+        if (staged[i]) return TSH_BAD;
+    module=staged+64U;
+    for (i=0U; i<parsed.module_bytes; ++i)
+        fnv=(fnv ^ module[i])*0x01000193U;
+    if (fnv != word(staged+56U) ||
+        record(module,parsed.module_bytes,&cursor,&at,&size) != TSH_OK ||
+        size != 80U) return TSH_BAD;
+    ++count;
+    image_count=(parsed.image_bytes+65534U)/65535U;
+    if (image_count > 129U) return TSH_BAD;
+    remaining=parsed.image_bytes;
+    for (i=0U; i<image_count; ++i) {
+        expected=remaining < 65535U ? remaining : 65535U;
+        if (record(module,parsed.module_bytes,&cursor,&at,&size) != TSH_OK ||
+            size != expected) return TSH_BAD;
+        offsets[i]=at;
+        remaining-=size;
+        ++count;
+    }
+    if (remaining) return TSH_BAD;
+    if (expected_profile == 31U) {
+        static const unsigned char map_magic[8] =
+            {0xc5U,0xd3U,0xc6U,0xd7U,0xd6U,0xc3U,0x40U,0x40U};
+        if (record(module,parsed.module_bytes,&cursor,&at,&size) != TSH_OK ||
+            size != 72U ||
+            word(module+at+12U) != (parsed.entry | 0x80000000U) ||
+            word(module+at+20U) != parsed.origin) return TSH_BAD;
+        for (i=0U; i<8U; ++i)
+            if (module[at+i] != map_magic[i]) return TSH_BAD;
+        ++count;
+        previous=parsed.end;
+        for (i=0U; i<parsed.relocation_records; ++i) {
+            if (record(module,parsed.module_bytes,&cursor,&at,&size) != TSH_OK ||
+                size%5U || (i+1U<parsed.relocation_records && size!=65535U))
+                return TSH_BAD;
+            for (j=0U; j<size; j+=5U) {
+                address=word(module+at+j+1U);
+                if (module[at+j] != 3U || address < parsed.origin ||
+                    address > parsed.end-4U || address >= previous)
+                    return TSH_BAD;
+                previous=address;
+                old=image_word(module,offsets,address-parsed.origin);
+                if (old < parsed.origin || old > parsed.end) return TSH_BAD;
+            }
+            ++count;
+        }
+    }
+    if (count != parsed.records || cursor != parsed.module_bytes)
+        return TSH_BAD;
+    *info=parsed;
+    return TSH_OK;
+}

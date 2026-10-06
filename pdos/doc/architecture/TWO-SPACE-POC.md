@@ -348,6 +348,12 @@ K has not read all MODULE records, validated the full payload, mapped the
 image into U or run RXVM. CMS31 header parsing passes a host check on its
 actual staged RXVM input; guest qualification of it is later work.
 
+The subsequent host-side full-stage parser checks v2 envelope FNV, zero
+padding, every framed image record and the CMS31 load map and ordered
+relocations. It passes the unchanged CMS24 RXVM and CMS31 RXVM, RXAS and RXC
+stage files from the pinned release contract. This is parser evidence only;
+K's guest dataset path still reaches only the first block at this point.
+
 ## Primary architecture and compatibility references
 
 - IBM, *z/Architecture Principles of Operation*, SA22-7832-14:
