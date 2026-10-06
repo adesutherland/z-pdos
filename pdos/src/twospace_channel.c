@@ -89,9 +89,37 @@ int TSCCHECKREAD(const TSCSTATE *s, unsigned int capacity,
     return TSC_OK;
 }
 
+int TSCBUILDCONSWRITE(TSCSTATE *s, unsigned int length)
+{
+    unsigned char *base;
+    if (!s || !s->aperture || !length || length > TSC_MAX_CONSOLE)
+        return TSC_BAD;
+    base=s->aperture+s->region_real;
+    /* Preserve the caller's K-owned 3270 stream in the following data page. */
+    clear(base,TSC_DATA_OFFSET);
+    put32(base+4U,0x0080ff00U);
+    put32(base+8U,s->region_real+TSC_CCW_OFFSET);
+    ccw(base+TSC_CCW_OFFSET,0x01U,0x20U,length,
+        s->region_real+TSC_DATA_OFFSET);
+    return TSC_OK;
+}
+
+int TSCCHECKWRITE(const TSCSTATE *s)
+{
+    const unsigned char *irb;
+    if (!s || !s->aperture) return TSC_BAD;
+    irb=s->aperture+s->region_real+TSC_IRB_OFFSET;
+    if (irb[8U] != 0x0cU || irb[9U] != 0U || get16(irb+10U) != 0U ||
+        get32(irb+4U) != s->region_real+TSC_CCW_OFFSET+8U)
+        return TSC_IO;
+    return TSC_OK;
+}
+
 unsigned char *TSCDATA(const TSCSTATE *s)
 { return s && s->aperture ? s->aperture+s->region_real+TSC_DATA_OFFSET : 0; }
 unsigned char *TSCORB(const TSCSTATE *s)
 { return s && s->aperture ? s->aperture+s->region_real+TSC_ORB_OFFSET : 0; }
 unsigned char *TSCIRB(const TSCSTATE *s)
 { return s && s->aperture ? s->aperture+s->region_real+TSC_IRB_OFFSET : 0; }
+unsigned char *TSCSCHIB(const TSCSTATE *s)
+{ return s && s->aperture ? s->aperture+s->region_real+TSC_SCHIB_OFFSET : 0; }

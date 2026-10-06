@@ -55,6 +55,8 @@ static int attach(void)
 
 int TSCIO(unsigned int subchannel, unsigned char *orb,
           unsigned char *irb);
+int TSCDEV(unsigned int subchannel, unsigned char *schib);
+int TSCENABL(unsigned int subchannel, unsigned char *schib);
 
 static int channel_record(void *context, unsigned int cylinder,
                           unsigned int head, unsigned int record,
@@ -116,6 +118,44 @@ static unsigned int dataset_service(const TSGREQUEST *request)
     return 0U;
 }
 
+static unsigned int terminal_service(const TSGREQUEST *request)
+{
+    static const unsigned char message[] = {
+        0xd2U,0x40U,0xe2U,0xc5U,0xd9U,0xe5U,0xc9U,0xc3U,0xc5U,
+        0x40U,0xd9U,0xc5U,0xc1U,0xc4U,0xe8U
+    };
+    unsigned char *screen;
+    unsigned int ssid, i;
+    int io_result;
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    if (*(volatile const unsigned int *)0x40bcU == 0U) return 0xfffffffbU;
+    ssid=0U;
+    for (i=0U; i<256U; ++i) {
+        if (TSCDEV(0x10000U+i,TSCSCHIB(&channel)) == 9) {
+            ssid=0x10000U+i;
+            break;
+        }
+    }
+    if (!ssid) return 0xfffffffbU;
+    *(volatile unsigned int *)0x40c0U=ssid;
+    screen=TSCDATA(&channel);
+    for (i=0U; i<1773U; ++i) screen[i]=0x40U;
+    screen[0]=0x41U; screen[1]=0x11U; screen[2]=0x5dU;
+    screen[3]=0x7fU; screen[4]=0x1dU; screen[5]=0xf0U;
+    for (i=0U; i<sizeof message; ++i) screen[6U+i]=message[i];
+    screen[1766]=0x1dU; screen[1767]=0U; screen[1768]=0x13U;
+    screen[1769]=0x3cU; screen[1770]=0x5dU; screen[1771]=0x7fU;
+    screen[1772]=0U;
+    if (TSCBUILDCONSWRITE(&channel,1773U) != TSC_OK) return 20U;
+    if (TSCENABL(ssid,TSCSCHIB(&channel)) != 0) return 23U;
+    io_result=TSCIO(ssid,TSCORB(&channel),TSCIRB(&channel));
+    *(volatile unsigned int *)0x40c4U=(unsigned int)io_result;
+    if (io_result != 0) return 21U;
+    if (TSCCHECKWRITE(&channel) != TSC_OK) return 22U;
+    return 0U;
+}
+
 /* The current fixture's SVC 120 path uses the active conditional GETMAIN
  * register convention: R0 length, R1 zero to allocate or base to free, R15
  * X'10' below-line or X'30' above-line. The old PSW belongs to K's saved
@@ -168,6 +208,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 120U) return storage_service(request);
     if (request->svc == 206U) return volume_service(request);
     if (request->svc == 207U) return dataset_service(request);
+    if (request->svc == 208U) return terminal_service(request);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
         return 0xfffffffbU;

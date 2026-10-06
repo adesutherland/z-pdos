@@ -51,6 +51,20 @@ int main(void)
     if (TSCCHECKREAD(&channel,80U,&got) != TSC_IO) return 7;
     irb[9]=0U; irb[11]=81U;
     if (TSCCHECKREAD(&channel,80U,&got) != TSC_IO) return 8;
+    memset(TSCDATA(&channel),0xd2,1773U);
+    if (TSCBUILDCONSWRITE(&channel,1773U) != TSC_OK ||
+        TSCBUILDCONSWRITE(&channel,2049U) != TSC_BAD ||
+        word(base+4U) != 0x0080ff00U ||
+        word(base+8U) != 0x180200U ||
+        memcmp(base+0x200U,"\x01\x20\x06\xed\x00\x18\x10\x00",8U) ||
+        TSCDATA(&channel)[0] != 0xd2U ||
+        TSCSCHIB(&channel) != base+0x400U)
+        return 9;
+    irb[8]=0x0cU; irb[9]=0U; irb[10]=0U; irb[11]=0U;
+    irb[4]=0U; irb[5]=0x18U; irb[6]=0x02U; irb[7]=0x08U;
+    if (TSCCHECKWRITE(&channel) != TSC_OK) return 10;
+    irb[11]=1U;
+    if (TSCCHECKWRITE(&channel) != TSC_IO) return 11;
     free(real);
     return 0;
 }

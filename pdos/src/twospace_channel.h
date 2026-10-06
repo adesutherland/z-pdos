@@ -10,11 +10,13 @@
 #define TSC_IO -2
 #define TSC_REGION_BYTES 0x10000U
 #define TSC_MAX_RECORD 18452U
+#define TSC_MAX_CONSOLE 2048U
 #define TSC_ORB_OFFSET 0x000U
 #define TSC_IRB_OFFSET 0x100U
 #define TSC_CCW_OFFSET 0x200U
 #define TSC_SEEK_OFFSET 0x300U
 #define TSC_SEARCH_OFFSET 0x310U
+#define TSC_SCHIB_OFFSET 0x400U
 #define TSC_DATA_OFFSET 0x1000U
 
 typedef struct {
@@ -30,8 +32,11 @@ int TSCBUILDREAD(TSCSTATE *state, unsigned int cylinder, unsigned int head,
                  unsigned int capacity);
 int TSCCHECKREAD(const TSCSTATE *state, unsigned int capacity,
                  unsigned int *transferred);
+int TSCBUILDCONSWRITE(TSCSTATE *state, unsigned int length);
+int TSCCHECKWRITE(const TSCSTATE *state);
 unsigned char *TSCDATA(const TSCSTATE *state);
 unsigned char *TSCORB(const TSCSTATE *state);
 unsigned char *TSCIRB(const TSCSTATE *state);
+unsigned char *TSCSCHIB(const TSCSTATE *state);
 
 #endif

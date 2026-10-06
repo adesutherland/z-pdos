@@ -38,7 +38,7 @@ def load_elf(path):
     expected = {(0, 0), (0x1000, 0x1000), (0x2000, 0x2000), (0x4000, 0x4000),
                 (0x20000, 0x5000), (0x110000000, 0x6000),
                 (0x21000, 0x7000), (0x22000, 0x8000),
-                (KCORE, 0x9000), (0x02006000, 0xf000),
+                (KCORE, 0x9000), (0x02010000, 0xf000),
                 (0x02000000, 0x11000), (HIGH_REQUEST, 0x12000),
                 (0x110002000, 0x13000)}
     core = bytearray(0x200000)
@@ -62,8 +62,8 @@ def load_elf(path):
 def make_core(elf, classic, dat_emit, out):
     core = load_elf(elf)
     service = Path(classic).read_bytes()
-    if not 0 < len(service) <= 6 * 4096:
-        raise ValueError("Classic C service exceeds six reserved pages")
+    if not 0 < len(service) <= 16 * 4096:
+        raise ValueError("Classic C service exceeds sixteen reserved pages")
     core[0xa000:0xf000] = service[:5 * 4096].ljust(5 * 4096, b"\0")
     core[0x14000:0x14000 + max(0, len(service) - 5 * 4096)] = service[5 * 4096:]
     # Classic PDPPRLG uses R13's 76-byte slot as the next frame pointer.
@@ -71,11 +71,11 @@ def make_core(elf, classic, dat_emit, out):
     struct.pack_into(">I", core, 0x10060, 0x03000080)
     kernel = {0: 0, 0x1000: 0x1000, 0x2000: 0x2000,
               0x3000: 0x3000, 0x4000: 0x4000,
-              0x02006000: 0xf000, 0x03000000: 0x10000,
+              0x02010000: 0xf000, 0x03000000: 0x10000,
               KCORE: 0x9000}
     kernel.update({0x02000000 + 4096 * i:
-                   (0xa000 + 4096 * i if i < 5 else 0x14000)
-                   for i in range(6)})
+                   (0xa000 + 4096 * i if i < 5 else 0x14000 + (i - 5) * 4096)
+                   for i in range(16)})
     application = {0x20000: 0x5000, 0x21000: 0x7000,
                    0x02000000: 0x11000, 0x110000000: 0x6000,
                    HIGH_REQUEST: 0x12000, 0x110002000: 0x13000}
@@ -85,7 +85,8 @@ def make_core(elf, classic, dat_emit, out):
         raise ValueError("DAT real pool overlaps image backing")
     private_kernel_frames = {0, 0x1000, 0x2000, 0x3000, 0x4000,
                              0x9000, 0xa000, 0xb000, 0xc000,
-                             0xd000, 0xe000, 0xf000, 0x10000, 0x14000}
+                             0xd000, 0xe000, 0xf000, 0x10000,
+                             *(0x14000 + i * 4096 for i in range(11))}
     if private_kernel_frames.intersection(application.values()):
         raise ValueError("U maps private K real frame")
     if any(0x180000 <= pa < 0x190000 for pa in application.values()):
@@ -198,6 +199,9 @@ def judge(raw, log, ipl=False):
         (0 if ipl else 0xfffffffb))
     checks["k_dataset_kcore_header"] = (
         struct.unpack_from(">I",raw,0x12060)[0] ==
+        (0 if ipl else 0xfffffffb))
+    checks["k_terminal_screen"] = (
+        struct.unpack_from(">I",raw,0x12064)[0] ==
         (0 if ipl else 0xfffffffb))
     checks["live_dat_mutations_purged"] = (
         struct.unpack_from(">I",raw,0x40ac)[0] == 4 and

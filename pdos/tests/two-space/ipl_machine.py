@@ -3,13 +3,26 @@
 import argparse
 import json
 from pathlib import Path
+import socket
 import struct
 import subprocess
 import sys
+import time
 import zlib
 
 from machine import digest
 from service_machine import judge
+
+
+def unused_loopback_port():
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+def terminal_action(port, action):
+    return subprocess.run(["x3270if", "-t", str(port), action],
+                          capture_output=True, text=True, timeout=2)
 
 
 def page_unmapped(raw, root, virtual):
@@ -39,23 +52,69 @@ def run(args):
     core = Path(args.core).resolve()
     hercules = Path(args.hercules).resolve()
     disk_before = digest(disk)
+    console_port = unused_loopback_port()
+    script_port = unused_loopback_port()
+    while script_port == console_port:
+        script_port = unused_loopback_port()
     out.joinpath("machine.cnf").write_text(
         "ARCHLVL ESAME\nMAINSIZE 16\nNUMCPU 1\nCPUMODEL 2064\n"
         "DIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\n"
-        f"01B9 3390 {disk}\n")
+        f"CNSLPORT 127.0.0.1:{console_port}\n"
+        f"01B9 3390 {disk}\n0009 3270\n")
     out.joinpath("run.rc").write_text(
-        f"sysclear\nipl 01B9\npause 5\nstopall\npsw\ngpr\ncr\n"
+        f"sysclear\nipl 01B9\npause 8\nstopall\npsw\ngpr\ncr\n"
         f"savecore \"{out / 'result.core'}\" 0 1fffff\nquit\n")
     cmd = [str(hercules), "-t", "-f", str(out / "machine.cnf"),
            "-r", str(out / "run.rc")]
+    terminal_log = (out / "s3270.log").open("w")
+    terminal = subprocess.Popen(
+        ["s3270", "-model", "3278-2", "-codepage", "cp1047",
+         "-scriptport", str(script_port)],
+        stdout=terminal_log, stderr=subprocess.STDOUT)
     try:
-        proc = subprocess.run(cmd, cwd=out, capture_output=True, text=True,
-                              timeout=45)
-        log = proc.stdout + proc.stderr
+        deadline = time.monotonic() + 4
+        while time.monotonic() < deadline:
+            try:
+                if terminal_action(script_port, "Query(ConnectionState)").returncode == 0:
+                    break
+            except subprocess.TimeoutExpired:
+                pass
+            time.sleep(0.1)
+        proc = subprocess.Popen(cmd, cwd=out, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True)
+        for _ in range(40):
+            connected = terminal_action(
+                script_port, f"Connect(0009@127.0.0.1:{console_port})")
+            if connected.returncode == 0:
+                break
+            time.sleep(0.1)
+        screen = ""
+        for _ in range(80):
+            observed = terminal_action(script_port, "Ascii()")
+            if observed.returncode == 0:
+                screen = observed.stdout
+                if "K SERVICE READY" in screen:
+                    break
+            time.sleep(0.1)
+        out.joinpath("terminal.screen").write_text(screen)
+        stdout, _ = proc.communicate(timeout=45)
+        log = stdout
     except subprocess.TimeoutExpired as exc:
-        log = (exc.stdout or b"").decode(errors="replace") + \
-              (exc.stderr or b"").decode(errors="replace")
+        log = exc.stdout or ""
+        if isinstance(log, bytes):
+            log = log.decode(errors="replace")
+        if 'proc' in locals():
+            proc.kill()
+            proc.communicate()
         proc = None
+    finally:
+        terminal.terminate()
+        try:
+            terminal.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            terminal.kill()
+            terminal.wait()
+        terminal_log.close()
     out.joinpath("hercules.log").write_text(log)
     result_path = out / "result.core"
     if result_path.exists() and result_path.stat().st_size == 0x200000:
@@ -64,9 +123,9 @@ def run(args):
         try:
             judged = judge(raw[:0x14000], log, ipl=True)
             judged["checks"]["ipl_subchannel_handover"] = (
-                struct.unpack_from(">I",raw,0x40bc)[0] == 0x10000)
-            judged["checks"]["k_real_channel_buffer_kcore"] = (
-                raw[0x181000:0x181004] == b"TSP2")
+                0x10000 <= struct.unpack_from(">I",raw,0x40bc)[0] < 0x10100)
+            judged["checks"]["k_terminal_screen_observed"] = (
+                "K SERVICE READY" in (out / "terminal.screen").read_text())
             checks = judged["checks"]
             report = struct.unpack_from(">8I", raw, 0x4080)
             _, stage, launch, kpool, upool, kbytes, ubytes, real_bytes = report
@@ -108,12 +167,13 @@ def run(args):
     checks["source_core_marker"] = core.read_bytes()[0x2000:0x2008] == b"PD2NEXT1"
     checks["disk_unchanged"] = disk_before == digest(disk)
     judged["pass"] = all(checks.values())
-    receipt = {"profile": "ESAME, model 2064, 16 MiB, one CPU, 3390 01B9",
+    receipt = {"profile": "ESAME, model 2064, 16 MiB, one CPU, 3390 01B9, 3270 0009",
                "disk_sha256_before_ipl": disk_before,
                "disk_sha256_after_ipl": digest(disk),
                "source_core_sha256": digest(core),
                "hercules_sha256": digest(hercules),
                "hercules_argv": cmd,
+               "terminal_ports": {"console": console_port, "script": script_port},
                "host_exit_code": proc.returncode if proc else None,
                "timed_out": proc is None,
                "result": judged}

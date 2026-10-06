@@ -296,11 +296,11 @@ REXX `ADDRESS` integration or actual colliding guest call yet.
 The guest bootstrap records CRC32 values for both completed DAT pools before
 K runs. The IPL oracle compares these to the host reference, then checks the
 post-run U table state separately. This avoids mistaking a legitimate live
-map/unmap for a bad bootstrap. The fresh fixture IPL passes 79 checks. The
+map/unmap for a bad bootstrap. That fresh fixture IPL passed 79 checks. The
 successor is still a selectable test dataset on its own disposable disk, not
 the normal `PDOS.SYS` replacement selected for CMS/TSO applications. The
-service endpoint still lacks dataset, terminal and command handlers; those
-are the main integration work in slices 5–7.
+subsequent channel, dataset and terminal checkpoints extend the fixture;
+general file I/O and command handling remain work in slices 5–7.
 
 ## Post-handover K channel checkpoint
 
@@ -310,16 +310,26 @@ reserves it before assigning DAT pools. Its K alias is part of the existing
 real aperture; U never maps it. The Classic C31 endpoint builds a format-1
 3390 read chain with real CCW/data addresses, submits it through a bounded
 Classic-assembled `SSCH`/`TSCH` helper, and checks the IRB and `VOL1` record.
-The 3390 IPL ran this service after K64 had entered its separate ASCE. The
-fixture's C31 endpoint now uses six K-only pages; its trampoline is at K
-virtual `0x02006000`. This did not take any virtual address from a 24-bit
-application. Dataset extent traversal, terminal and command services and
-unchanged CMS/TSO execution remain open.
+The 3390 IPL ran this service after K64 had entered its separate ASCE. At
+that checkpoint the C31 endpoint used six K-only pages with a trampoline at
+K virtual `0x02006000`. No 24-bit application virtual address was used.
 
 The subsequent [K dataset result](../qualification/TWO-SPACE-DATASET-2026-10-06.md)
 uses that real channel path to locate `KCORE.BIN` in the checked VTOC and
 read its first record after handover. It checks one first extent and the
 F/18452 geometry; it has not exposed a general CMS/TSO dataset service.
+
+The [K terminal result](../qualification/TWO-SPACE-TERMINAL-2026-10-06.md)
+uses `STSCH`/`MSCH` to enable console 0009, then writes a complete 3270 screen
+through the same K-owned low-real channel buffer. An independently connected
+`s3270` saw `K SERVICE READY` during a fresh IPL. K C31 currently reserves
+16 sparse pages at virtual `0x02000000`–`0x0200ffff`, backed by real
+`0xa000`–`0xefff` and `0x14000`–`0x1efff`; its trampoline is at K virtual
+`0x02010000`, real `0xf000`. These addresses are absent from U. The larger
+service did not add a low U page: the diagnostic U map still has only two
+pages below 16 MiB. This is a terminal output proof. Input, command
+dispatch, general CMS/TSO file APIs and unchanged application loads remain
+open.
 
 ## Primary architecture and compatibility references
 

@@ -331,6 +331,13 @@ app_high:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 96(%r2)
+    lghi %r0, 0             /* K writes a complete 3270 screen */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 208
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 100(%r2)
     larl %r3, high_data_va
     lg %r3, 0(%r3)
     l %r3, 44(%r3)
@@ -390,6 +397,8 @@ initial_nested_done:
     chi %r2, 120
     je storage_no_record
     chi %r2, 207
+    je storage_no_record
+    chi %r2, 208
     je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore
@@ -558,7 +567,7 @@ k_table_alias_va: .quad 0x05000000
 u_table_alias_va: .quad 0x05040000
 bounce_va: .quad 0x03000080
 c_result_va: .quad 0x030000a0
-c_trampoline_va: .quad 0x02006000
+c_trampoline_va: .quad 0x02010000
 resume_va: .quad resume
 
 .section .ktramp,"ax"

@@ -177,19 +177,29 @@ int main(int argc, char **argv)
     /* The real interruption/context island and all mapped service slots are
        owned even when their initial bytes are zero and omitted from disk. */
     if (TSRINIT(&final_core,CORE_SIZE) != TSR_OK) FAIL(30);
-    for (i=0U; i<CORE_SIZE/PAGE; ++i)
-        if (i < 0x14U || (seen[i>>3] & (1U<<(i&7U))))
-            if (TSRRESERVE(&final_core,100U+i,i*PAGE,PAGE,TSR_RUN) != TSR_OK)
-                FAIL(31);
+    for (i=0U; i<CORE_SIZE/PAGE;) {
+        unsigned int first;
+        if (i >= (TSF_SERVICE_EXT_REAL+TSF_SERVICE_EXT_BYTES)/PAGE &&
+            !(seen[i>>3] & (1U<<(i&7U)))) {
+            ++i;
+            continue;
+        }
+        first=i++;
+        while (i<CORE_SIZE/PAGE &&
+               (i < (TSF_SERVICE_EXT_REAL+TSF_SERVICE_EXT_BYTES)/PAGE ||
+                (seen[i>>3] & (1U<<(i&7U))))) ++i;
+        if (TSRRESERVE(&final_core,100U+first,first*PAGE,
+                       (i-first)*PAGE,TSR_RUN) != TSR_OK) FAIL(31);
+    }
     /* Reserved K-only low-real channel workspace. It is never U mapped. */
     if (TSRRESERVE(&final_core,700U,TSF_CHANNEL_REAL,
                    TSF_CHANNEL_BYTES,TSR_RUN) != TSR_OK) FAIL(31);
     if (TSRALLOC(&final_core,3U,TSF_POOL_BYTES,0x100000U,
-                 CORE_SIZE,TSR_RUN,&kpool) != TSR_OK ||
-        TSRALLOC(&final_core,4U,TSF_POOL_BYTES,0x100000U,
-                 CORE_SIZE,TSR_RUN,&upool) != TSR_OK ||
-        TSFBUILD(core,kpool,upool,&dat,purge_callback,0) ||
-        purges != 2U) FAIL(32);
+                 CORE_SIZE,TSR_RUN,&kpool) != TSR_OK) FAIL(32);
+    if (TSRALLOC(&final_core,4U,TSF_POOL_BYTES,0x100000U,
+                 CORE_SIZE,TSR_RUN,&upool) != TSR_OK) FAIL(34);
+    if (TSFBUILD(core,kpool,upool,&dat,purge_callback,0)) FAIL(35);
+    if (purges != 2U) FAIL(36);
     if (patch_launch(stub,launch_len,launch,stage,entry)) FAIL(33);
     /* Checked handover receipt is retained in the copied core. */
     put32(core+0x4080U,0x54535232U);
