@@ -283,8 +283,10 @@ release:
 
 static unsigned int cms31_overlay_push(const TSGREQUEST *request)
 {
+    /* GNU s390 -m64 -march=z900: LGHI R15,0x3456; BR R14. The child
+       runs in U and returns through its caller's link register. */
     static const unsigned char child[] =
-        {0x4fU,0x56U,0x4cU,0x59U,0x43U,0x48U,0x49U,0x4cU};
+        {0xa7U,0xf9U,0x34U,0x56U,0x07U,0xfeU};
     TSPADDR base;
     int result;
     if (request->length || request->address.hi || request->address.lo ||

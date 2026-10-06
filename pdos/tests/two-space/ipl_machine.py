@@ -230,12 +230,12 @@ def run(args):
                     raw[real:real+16] == staged[148:164] and
                     all(page_real(raw,0x14000f,0x03000000+i*4096) ==
                         real+i*4096 for i in range(pages)))
-                push, parent, child, returned, restored = struct.unpack_from(
-                    ">5I", raw, 0x12180)
+                push, parent, child, returned, restored, executed = struct.unpack_from(
+                    ">6I", raw, 0x12180)
                 checks["cms31_nested_backing_restored"] = (
                     push == 0 and parent == int.from_bytes(staged[148:152],"big")
-                    and child == 0x4f564c59 and returned == 0x3456
-                    and restored == parent)
+                    and child == 0xa7f93456 and executed == 0x3456
+                    and returned == executed and restored == parent)
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
                 real_bytes == 0x1000000 and stage >= 0x400000 and
                 stage + 0x200000 <= launch and launch + 4096 <= real_bytes and

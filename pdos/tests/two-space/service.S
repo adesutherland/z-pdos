@@ -399,7 +399,11 @@ terminal_read_done:
     lg %r3, 0(%r3)
     l %r4, 0(%r3)
     st %r4, 392(%r2)
-    lghi %r0, 0x3456       /* child completion value */
+    basr %r14, %r3         /* execute child in U at colliding origin */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 404(%r2)
+    lgr %r0, %r15          /* child completion value */
     lghi %r1, 0
     lghi %r2, 0
     svc 216
