@@ -63,6 +63,10 @@ holds its image beside CMS24 and rejects an impossible low-only request
 with RC 4 while high-U work still succeeds. A normal load must fail if its required low
 virtual interval or real backing is unavailable. Broader TSO service
 compatibility remains open.
+The later [released beta 3 TSO24 native result](../qualification/TWO-SPACE-TSO24-BETA3-NATIVE-2026-10-06.md)
+enters the unchanged AMODE24 image, displays its EBCDIC version line and
+releases its stack, output buffer, heap and parameter page. This does not
+change the selected one-ASCE release kernel.
 
 ## The system at a glance
 

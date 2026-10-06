@@ -184,8 +184,15 @@ not yet run TSO24 after IPL or measure actual application headroom.
 The [fresh-IPL TSO24 map](qualification/TWO-SPACE-TSO24-MAP-2026-10-06.md)
 now checks and installs the image beside CMS24 when room exists and returns
 RC 4 for an impossible 16 MiB low-only request while high-U work succeeds.
-Native entry, its actual 1 MiB stack/4 MiB heap and selected TSO services
-remain the next gate; static image coexistence alone does not qualify them.
+At that mapping checkpoint, native entry and its actual stack/heap budget
+remained unqualified; static image coexistence alone did not qualify them.
+The later [released beta 3 TSO24 native checkpoint](qualification/TWO-SPACE-TSO24-BETA3-NATIVE-2026-10-06.md)
+runs the exact public TSO24 image in AMODE24, displays its EBCDIC version
+line, and releases its 1 MiB stack, 256-byte output buffer, 4 MiB heap and
+parameter page. The full low-only demand returns RC 4 with no above-line
+fallback. This closes the selected native version-call and measured runtime
+budget gate. General TSO file/input and command services, REXX `ADDRESS`/LINK,
+and the normal successor image remain open.
 
 The [6 October K channel checkpoint](qualification/TWO-SPACE-CHANNEL-2026-10-06.md)
 adds a reserved 64 KiB low-real K workspace and a bounded post-handover

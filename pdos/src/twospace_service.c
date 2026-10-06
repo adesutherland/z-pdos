@@ -846,7 +846,9 @@ static unsigned int storage_service(TSGREQUEST *request)
     flags=*(volatile const unsigned int *)0x307cU;
     mode=(mask_hi & 1U) ? 64U : (mask_lo & 0x80000000U) ? 31U : 24U;
     pc=*(volatile const unsigned int *)0x308cU;
-    task=tso31_loaded && pc>=0x07000000U &&
+    task=tso24_loaded && pc>=0x00400000U &&
+         pc-0x00400000U<*(volatile const unsigned int *)0x4684U ?
+         18U : tso31_loaded && pc>=0x07000000U &&
          pc-0x07000000U<*(volatile const unsigned int *)0x4604U ?
          16U : tso64_loaded && pc>=0x09000000U &&
          pc-0x09000000U<*(volatile const unsigned int *)0x4644U ?
@@ -866,11 +868,21 @@ static unsigned int storage_service(TSGREQUEST *request)
                         request->length,0,&base);
         if (result != TSM_OK) return result == TSM_NOMEM ? 4U : 8U;
         request->address=base;
+        if (task==18U) {
+            volatile unsigned int *receipt=(volatile unsigned int *)0x4cc0U;
+            unsigned int count=receipt[0U];
+            if (count<3U) {
+                receipt[2U+2U*count]=base.lo;
+                receipt[3U+2U*count]=request->length;
+            }
+            receipt[0U]=count+1U;
+        }
         *(volatile unsigned int *)0x4098U=u_tables.used;
         return 0U;
     }
     result=TSMFREE(&storage,task,request->address);
     if (result != TSM_OK) return 8U;
+    if (task==18U) ++*(volatile unsigned int *)0x4cc4U;
     *(volatile unsigned int *)0x4098U=u_tables.used;
     return 0U;
 }
@@ -1393,21 +1405,26 @@ static unsigned int tso_terminal_service(TSGREQUEST *request)
     TSGCONTEXT gate;
     TSGREQUEST copy;
     unsigned char message[132];
-    unsigned int i, status, mask_hi, mask_lo;
+    unsigned int i, status, mask_hi, mask_lo, mode24;
     unsigned int pc=*(volatile const unsigned int *)0x308cU;
-    unsigned int receipt_base=pc>=0x09000000U ? 0x4d00U : 0x4700U;
+    unsigned int receipt_base=pc>=0x09000000U ? 0x4d00U :
+                              pc>=0x07000000U ? 0x4700U : 0x4c00U;
     volatile unsigned char *receipt=(volatile unsigned char *)(receipt_base+16U);
     mask_hi=*(volatile const unsigned int *)0x3080U;
     mask_lo=*(volatile const unsigned int *)0x3084U;
+    mode24=receipt_base==0x4c00U;
     *(volatile unsigned int *)(receipt_base+0xa0U)+=1U;
     *(volatile unsigned int *)(receipt_base+0xa4U)=request->length;
     *(volatile unsigned int *)(receipt_base+0xa8U)=request->address.hi;
     *(volatile unsigned int *)(receipt_base+0xacU)=request->address.lo;
     *(volatile unsigned int *)(receipt_base+0xb0U)=request->direction;
     /* TPUT defines R0/R1; upper GPR halves and R2 are not arguments.
-     * The saved PSW must say AMODE31 before reducing R1 to its 31 bits. */
-    if ((mask_hi&1U) || !(mask_lo&0x80000000U) ||
+     * Check the native caller's AMODE before using its low address. */
+    if ((mask_hi&1U) ||
+        (mode24 ? (mask_lo&0x80000000U) :
+                  !(mask_lo&0x80000000U)) ||
         !request->address.lo || (request->address.lo&0x80000000U) ||
+        (mode24 && request->address.lo>=0x1000000U) ||
         request->length>132U) return 8U;
     gate.u_tables=&u_tables;
     gate.real_aperture=(unsigned char *)TSF_KAPERTURE_VA;
@@ -1809,7 +1826,9 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (!request) return 0xffffffffU;
     if (attach()) return 0xfffffffaU;
     caller_pc=*(volatile const unsigned int *)0x308cU;
-    native_tso=(tso31_loaded && caller_pc>=0x07000000U &&
+    native_tso=(tso24_loaded && caller_pc>=0x00400000U &&
+                caller_pc-0x00400000U<*(volatile const unsigned int *)0x4684U) ||
+               (tso31_loaded && caller_pc>=0x07000000U &&
                 caller_pc-0x07000000U<*(volatile const unsigned int *)0x4604U) ||
                (tso64_loaded && caller_pc>=0x09000000U &&
                 caller_pc-0x09000000U<*(volatile const unsigned int *)0x4644U);
@@ -1818,8 +1837,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
        R1 arguments independently before touching U storage. */
     if (*(volatile const unsigned int *)0x3000U != 0U &&
         !((request->svc==93U && native_tso &&
-           !(*(volatile const unsigned int *)0x3080U&1U) &&
-           (*(volatile const unsigned int *)0x3084U&0x80000000U)) ||
+           !(*(volatile const unsigned int *)0x3080U&1U)) ||
           (request->svc==233U && tso64_loaded && caller_pc==0x402U &&
            !(*(volatile const unsigned int *)0x3080U&1U) &&
            (*(volatile const unsigned int *)0x3084U&0x80000000U))))
@@ -1878,11 +1896,14 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     {
         if (native_tso &&
             *(volatile unsigned int *)(caller_pc>=0x09000000U ?
-                0x4d08U : 0x4708U)==0U) {
+                0x4d08U : caller_pc>=0x07000000U ?
+                0x4708U : 0x4c08U)==0U) {
             *(volatile unsigned int *)(caller_pc>=0x09000000U ?
-                0x4d08U : 0x4708U)=request->svc;
+                0x4d08U : caller_pc>=0x07000000U ?
+                0x4708U : 0x4c08U)=request->svc;
             *(volatile unsigned int *)(caller_pc>=0x09000000U ?
-                0x4d0cU : 0x470cU)=caller_pc;
+                0x4d0cU : caller_pc>=0x07000000U ?
+                0x470cU : 0x4c0cU)=caller_pc;
         }
         return 0xfffffffbU;
     }

@@ -551,8 +551,17 @@ subsequently installs that member at `0x400000` beside the retained CMS24
 image. Its 265 U pages have independent high-real backing, and the checked
 low placement gap retains 12,828,672 bytes before TSO24 runtime storage.
 A full 16 MiB low-only request returns RC 4 with no address while high-U
-work continues. The native TSO24 entry and its stack/heap budget are still
-unqualified.
+work continues. At this mapping checkpoint the native TSO24 entry and its
+stack/heap budget were still unqualified.
+
+The later [released beta 3 native TSO24 check](../qualification/TWO-SPACE-TSO24-BETA3-NATIVE-2026-10-06.md)
+replaces that earlier local input with the XMI from the public beta 3
+mainframe ZIP. The unchanged program returns RC 0, sends a legible EBCDIC
+version line through the selected TPUT service, and releases its 1 MiB
+stack, 256-byte output buffer, 4 MiB heap and low parameter page. The
+diagnostic IPL also rejects a full 16 MiB low-only storage request with RC 4
+and no above-line fallback. This proves one bounded native execution case;
+general load, command and file behavior remain open.
 
 The [same-origin child check](../qualification/TWO-SPACE-NESTED-BACKING-2026-10-06.md)
 replaces the mapped RXVM interval with a minimal AMODE31 child, executes its

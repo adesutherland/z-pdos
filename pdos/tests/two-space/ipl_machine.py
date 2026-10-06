@@ -334,7 +334,7 @@ def run(args):
                             for i,(name,records,source_bytes,checksum)
                             in enumerate(expected24)))
                     checks["cms24_gap_restored_after_second_run"] = all(
-                        (args.tso24 and 0x400000 <= at < 0x509000) or
+                        (args.tso24 and 0x400000 <= at < 0x50c000) or
                         page_unmapped(raw,0x28000f,at)
                         for at in range(0x1bb000,0xf00000,4096))
             if args.cms31:
@@ -511,15 +511,44 @@ def run(args):
                 t24_pages = (t24_bytes+4095)//4096
                 checks["tso24_checked_low_image_in_shared_u"] = (
                     struct.unpack_from(">I",raw,0x1230c)[0] == 0 and
-                    t24_real >= 0x400000 and t24_bytes == 1082128 and
-                    t24_entry == 0x00400000 and t24_blocks == 75 and
-                    t24_input == 0xadd8ef0d and
-                    t24_image == 0xe3810260 and
+                    t24_real >= 0x400000 and t24_bytes == 1096496 and
+                    t24_entry == 0x00400000 and t24_blocks == 76 and
+                    t24_input == 0xe7ad6705 and
+                    t24_image == 0x06b3cf06 and
                     all(page_real(raw,0x28000f,0x400000+i*4096) ==
                         t24_real+i*4096 for i in range(t24_pages)))
                 checks["tso24_oversized_low_request_fails_without_fallback"] = (
                     struct.unpack_from(">I",raw,0x12310)[0] == 4 and
                     struct.unpack_from(">Q",raw,0x12318)[0] == 0)
+                t24_arg, t24_alloc, t24_rc, t24_free = \
+                    struct.unpack_from(">Q3I",raw,0x12320)
+                t24_lines, t24_length, t24_unknown, _ = \
+                    struct.unpack_from(">4I",raw,0x4c00)
+                t24_attempts, t24_requested = struct.unpack_from(
+                    ">2I",raw,0x4ca0)
+                t24_allocations, t24_releases, stack, stack_bytes, \
+                    output, output_bytes, heap, heap_bytes = \
+                    struct.unpack_from(">8I",raw,0x4cc0)
+                checks["tso24_native_rxvm_version_and_low_storage"] = (
+                    0x20000 <= t24_arg < 0x1000000 and
+                    t24_alloc == t24_rc == t24_free == 0 and
+                    page_unmapped(raw,0x28000f,t24_arg) and
+                    t24_allocations == t24_releases == 3 and
+                    (stack_bytes,output_bytes,heap_bytes) ==
+                    (0x100000,256,0x400000) and
+                    all(0x20000 <= at < 0x1000000 and
+                        at+size <= 0x1000000 and
+                        page_unmapped(raw,0x28000f,at)
+                        for at,size in ((stack,stack_bytes),
+                                        (output,output_bytes),
+                                        (heap,heap_bytes))) and
+                    t24_attempts >= 1 and t24_requested <= 132 and
+                    t24_lines >= 1 and t24_unknown == 0 and
+                    0 < t24_length <= 132 and
+                    "crexx-1.0.0-beta.3 (Bytecode Mode)" in
+                    raw[0x4c10:0x4c10+t24_length].decode("cp037") and
+                    "crexx-1.0.0-beta.3 (Bytecode Mode)" in
+                    application_screen)
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
                 real_bytes == 0x10000000 and stage >= 0x400000 and
                 stage + 0x400000 <= launch and launch + 4096 <= real_bytes and

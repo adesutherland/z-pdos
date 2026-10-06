@@ -948,6 +948,48 @@ tso64_call_done:
     lg %r2, 0(%r2)
     st %r15, 0x310(%r2)
     stg %r1, 0x318(%r2)
+    lghi %r3, 0
+    l %r3, 0x30c(%r2)
+    chi %r3, 0
+    jne tso24_call_done
+    lghi %r0, 4096
+    lghi %r1, 0
+    lghi %r15, 0x10
+    svc 120                 /* low U parameter/save/AMODE24 bridge page */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    stg %r1, 0x320(%r2)
+    st %r15, 0x328(%r2)
+    chi %r15, 0
+    jne tso24_call_done
+    lgr %r10, %r1
+    la %r4, 64(%r10)
+    st %r4, 0(%r10)
+    mvi 64(%r10), 0
+    mvi 65(%r10), 2
+    mvi 66(%r10), 0x60
+    mvi 67(%r10), 0xa5
+    xc 256(72,%r10),256(%r10)
+    larl %r4, cms24_bridge
+    mvc 512(16,%r10),0(%r4)
+    la %r13, 256(%r10)
+    lgr %r1, %r10
+    larl %r3, tso24_image_va
+    lg %r3, 0(%r3)
+    lgr %r15, %r3
+    la %r4, 512(%r10)
+    basr %r14, %r4          /* enter unchanged RXVM in AMODE24 */
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x32c(%r2)
+    lghi %r0, 4096
+    lgr %r1, %r10
+    lghi %r15, 0x10
+    svc 120
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x330(%r2)
+tso24_call_done:
     brasl %r14, wide_heap_workload
     larl %r3, high_data_va
     lg %r3, 0(%r3)
@@ -991,6 +1033,7 @@ cms31_trampoline_va: .quad app_b_cms31_call
 cms31_second_trampoline_va: .quad app_b_cms31_second_call
 tso31_trampoline_va: .quad app_b_tso31_call
 tso64_trampoline_va: .quad app_b_tso64_call
+tso24_image_va: .quad 0x00400000
 forged_va: .quad 0x100021000
 cross_va: .quad 0x110001ffe
 write_va: .quad 0x110001024

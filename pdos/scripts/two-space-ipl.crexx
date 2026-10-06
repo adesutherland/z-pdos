@@ -95,7 +95,7 @@ main: procedure = .int
     call require rc = 0, "TSO24 stage exists"
     tso24hashes = .string[]
     address crexx "run shasum -a 256 :tso24" output tso24hashes
-    call require rc = 0 & word(tso24hashes.1,1) = "3b44272fcc56306e1c6ce03d1c15cba0cac54a638f04c66a5ee1d4c74569f3fa", "pinned unchanged TSO24 record stage"
+    call require rc = 0 & word(tso24hashes.1,1) = "1335bd64e276ed5fc76a6198704fdde67f7e1f0748dea2d5f25ab81a53bf666a", "pinned released beta 3 TSO24 record stage"
   end
   call require left(work,11) = "build/pdos/" & length(work) > 11 & pos("..",work) = 0, "fresh owned build path"
   call require left(hercdir,1) = "/", "absolute Hercules tools path"

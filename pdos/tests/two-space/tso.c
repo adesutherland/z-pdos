@@ -168,21 +168,21 @@ int main(int argc, char **argv)
     CHECK(TSTSTAGEVALIDATE(mutated,stage_bytes,31U,&info)==TST_BAD);
     if (argc==7) {
         unsigned int bytes24=read_file(argv[5],raw);
-        CHECK(bytes24==1379654U);
+        CHECK(bytes24==1396982U);
         CHECK(TSTHEADER(raw,bytes24,24U,&info)==TST_OK &&
-              info.records==1415U && info.flags==0U &&
+              info.records==1430U && info.flags==0U &&
               info.rmode_any==0U && info.entry_offset==0U &&
-              info.input_fnv==0xadd8ef0dU);
+              info.input_fnv==0xe7ad6705U);
         CHECK(TSTIMAGE24(raw,bytes24,0x00020000U,image,
                          TST_MAX_IMAGE,&info)==TST_OK &&
-              info.image_bytes==1082128U &&
-              hash_image(image,info.image_bytes)==0x2b82c5a4U);
+              info.image_bytes==1096496U &&
+              hash_image(image,info.image_bytes)==0x1eb1bd50U);
         compare_released_loader(raw,bytes24,image,info.image_bytes,
                                 0x00020000U,0,0);
         CHECK(TSTIMAGE24(raw,bytes24,0x00400000U,image,
                          TST_MAX_IMAGE,&info)==TST_OK &&
-              info.image_bytes==1082128U &&
-              hash_image(image,info.image_bytes)==0xe3810260U);
+              info.image_bytes==1096496U &&
+              hash_image(image,info.image_bytes)==0x06b3cf06U);
         compare_released_loader(raw,bytes24,image,info.image_bytes,
                                 0x00400000U,0,0);
         CHECK(TSTIMAGE24(raw,bytes24,0x00f00000U,image,
@@ -198,9 +198,9 @@ int main(int argc, char **argv)
         CHECK(TSTIMAGE24(mutated,bytes24,0x00400000U,image,
                          TST_MAX_IMAGE,&info)==TST_BAD);
         stage_bytes=read_file(argv[6],raw);
-        CHECK(stage_bytes==75U*TST_BLOCK);
+        CHECK(stage_bytes==76U*TST_BLOCK);
         CHECK(TSTSTAGEHEADER24(raw,stage_bytes,&bytes,&bytes64)==TST_OK &&
-              bytes==1379654U && bytes64==75U);
+              bytes==1396982U && bytes64==76U);
         CHECK(TSTSTAGEVALIDATE(raw,stage_bytes,24U,&info)==TST_OK);
         CHECK(TSTSTAGEVALIDATE(raw,stage_bytes,31U,&info)==TST_BAD);
         memcpy(mutated,raw,stage_bytes);

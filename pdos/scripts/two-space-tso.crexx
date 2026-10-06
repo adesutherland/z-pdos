@@ -33,7 +33,7 @@ main: procedure = .int
     end
     hashes24 = .string[]
     address crexx "run shasum -a 256 :tso24" output hashes24
-    if rc <> 0 | word(hashes24.1,1) <> "5d0159c02484f8dfd28ede0f25a3f262006b89fbee52a9ae8c9a152d6f13f356" then do
+    if rc <> 0 | word(hashes24.1,1) <> "d9ce6e48f83e0bb4096e14e6bd285d350c8f38bc19cff8671d3d9155a96fcdd0" then do
       say "TSO24 input hash mismatch"
       return 2
     end
