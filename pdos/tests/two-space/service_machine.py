@@ -224,6 +224,8 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
         checks["k_reaps_live_native_allocation"] = (
             begin == allocated == ended == 0 and token != 0 and
             0x02010000 <= address < 0x80000000 and not address % 4096)
+        checks["invalid_image_selection_has_no_fallback"] = (
+            struct.unpack_from(">II",raw,0x123e0) == (8,8))
     checks["no_low_fallback_on_real_exhaustion"] = (
         struct.unpack_from(">I",raw,0x12040)[0] == 4 and
         qword(raw,0x12044) == 0)

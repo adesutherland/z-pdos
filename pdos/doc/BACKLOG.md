@@ -177,8 +177,11 @@ check](qualification/TWO-SPACE-INVOCATION-REAP-2026-10-06.md) proves that K
 releases a live TSO31 page on end. The [CMS invocation
 gate](qualification/TWO-SPACE-CMS-INVOCATION-2026-10-06.md) wraps five CMS24
 and CMS31 entries, including the overlay child and second relocated RXVM.
-Fault-triggered unwind, pending I/O, K-controlled launch and other resource
-lifetimes remain open; these checkpoints do not close P1 or qualify P2–P6.
+The [K image-selection check](qualification/TWO-SPACE-IMAGE-SELECTION-2026-10-06.md)
+derives personality, AMODE and owners from a checked loaded-image record and
+rejects invalid or caller-placed entries. Fault-triggered unwind, pending
+I/O, a normal K-controlled launch and other resource lifetimes remain open;
+these checkpoints do not close P1 or qualify P2–P6.
 
 Slices 1 and 2 now have a checked bootstrap implementation for the named
 single-CPU, 16 MiB fixture. The table builder, bounded image format and

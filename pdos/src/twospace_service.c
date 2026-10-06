@@ -857,6 +857,16 @@ static unsigned int native_loaded(unsigned int personality,
     return 0U;
 }
 
+static unsigned int native_image_bytes(unsigned int personality,
+                                       unsigned int mode,
+                                       unsigned int image_owner)
+{
+    if (personality==TSV_CMS)
+        return *(volatile const unsigned int *)(mode==24U ? 0x4108U :
+            image_owner==8U ? 0x4128U : 0x40e8U);
+    return *(volatile const unsigned int *)(native_receipt_base(mode)+4U);
+}
+
 static const TSVFRAME *native_caller(unsigned int pc)
 {
     const TSVFRAME *frame=TSVTOP(&native_invocations);
@@ -866,13 +876,11 @@ static const TSVFRAME *native_caller(unsigned int pc)
     if (frame->personality==TSV_CMS) {
         base=frame->amode==24U ? 0x00020000U :
              frame->image_owner==8U ? 0x05000000U : 0x03000000U;
-        bytes=*(volatile const unsigned int *)(frame->amode==24U ?
-            0x4108U : frame->image_owner==8U ? 0x4128U : 0x40e8U);
     } else {
         base=native_image_base(frame->amode);
-        bytes=*(volatile const unsigned int *)(native_receipt_base(
-            frame->amode)+4U);
     }
+    bytes=native_image_bytes(frame->personality,frame->amode,
+                             frame->image_owner);
     mask_hi=*(volatile const unsigned int *)0x3080U;
     mask_lo=*(volatile const unsigned int *)0x3084U;
     if (!bytes || pc<base || pc-base>=bytes ||
@@ -887,28 +895,38 @@ static const TSVFRAME *native_caller(unsigned int pc)
 static unsigned int native_begin(TSGREQUEST *request)
 {
     TSVCONTEXT caller;
-    unsigned int i, mode=request->length, token, personality, image_owner;
-    unsigned int runtime_owner, expected_base;
+    unsigned int i, mode, token, personality, image_owner;
+    unsigned int runtime_owner;
     volatile const unsigned int *saved=(volatile const unsigned int *)0x3000U;
     int rc;
-    personality=(mode==124U || mode==131U) ? TSV_CMS : TSV_TSO;
-    if (personality==TSV_CMS) {
-        mode-=100U;
-        if (mode!=24U && mode!=31U) return 8U;
-        image_owner=mode==24U ? 5U :
-                    request->address.lo==0x05000000U ? 8U : 4U;
-        expected_base=mode==24U ? 0x00020000U :
-                      image_owner==8U ? 0x05000000U : 0x03000000U;
-        runtime_owner=1U;
-    } else {
-        if (mode!=24U && mode!=31U && mode!=64U) return 8U;
-        image_owner=mode==31U ? 15U : mode==24U ? 18U : 17U;
-        runtime_owner=mode==31U ? 16U : mode==24U ? 18U : 17U;
-        expected_base=0U;
+    /* The selector names a checked K image record. R0 never declares a
+     * service personality, AMODE, owner or placement. */
+    if (request->address.hi || request->address.lo || request->direction)
+        return 8U;
+    switch (request->length) {
+    case 1U:
+        personality=TSV_CMS; mode=24U; image_owner=5U; runtime_owner=1U;
+        break;
+    case 2U:
+        personality=TSV_CMS; mode=31U; image_owner=4U; runtime_owner=1U;
+        break;
+    case 3U:
+        personality=TSV_CMS; mode=31U; image_owner=8U; runtime_owner=1U;
+        break;
+    case 4U:
+        personality=TSV_TSO; mode=24U; image_owner=18U; runtime_owner=18U;
+        break;
+    case 5U:
+        personality=TSV_TSO; mode=31U; image_owner=15U; runtime_owner=16U;
+        break;
+    case 6U:
+        personality=TSV_TSO; mode=64U; image_owner=17U; runtime_owner=17U;
+        break;
+    default:
+        return 8U;
     }
-    if (request->address.hi ||
-        request->address.lo!=expected_base || request->direction ||
-        !native_loaded(personality,mode,image_owner)) return 8U;
+    if (!native_loaded(personality,mode,image_owner) ||
+        !native_image_bytes(personality,mode,image_owner)) return 8U;
     for (i=0U; i<16U; ++i) {
         caller.gpr[i].hi=saved[2U*i];
         caller.gpr[i].lo=saved[2U*i+1U];

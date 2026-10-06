@@ -172,6 +172,9 @@ gates connect the descriptor to selected native service calls, and the
 releases a live page on end. The diagnostic U fixture still requests entry;
 K-controlled launch, complete resource ownership, fault unwind and event
 delivery remain to be implemented.
+The [image-selection gate](../qualification/TWO-SPACE-IMAGE-SELECTION-2026-10-06.md)
+then replaced caller-declared personality and placement with a checked K
+record; normal command launch and dynamic image handles remain open.
 
 ## Step 1: address and transition contract
 

@@ -611,9 +611,8 @@ cms24_overlay_done:
     larl %r4, cms24_bridge
     mvc 512(16,%r10),0(%r4)
     la %r13, 256(%r10)
-    lghi %r0, 124
-    larl %r1, cms24_image_va
-    lg %r1, 0(%r1)
+    lghi %r0, 1            /* K-registered CMS24 image */
+    lghi %r1, 0
     lghi %r2, 0
     svc 235                 /* CMS24 RXVM invocation */
     larl %r2, high_data_va
@@ -679,9 +678,8 @@ cms24_native_done:
     lg %r3, 0(%r3)
     l %r4, 0(%r3)
     st %r4, 392(%r2)
-    lghi %r0, 131
-    larl %r1, cms31_image_va
-    lg %r1, 0(%r1)
+    lghi %r0, 2            /* K-registered first CMS31 image */
+    lghi %r1, 0
     lghi %r2, 0
     svc 235                 /* mapped CMS31 overlay child */
     larl %r2, high_data_va
@@ -737,9 +735,8 @@ cms31_overlay_done:
     mvi 16(%r10), 0xff
     mvc 17(111,%r10),16(%r10)
     la %r13, 256(%r10)
-    lghi %r0, 131
-    larl %r1, cms31_image_va
-    lg %r1, 0(%r1)
+    lghi %r0, 2
+    lghi %r1, 0
     lghi %r2, 0
     svc 235                 /* first CMS31 RXVM invocation */
     larl %r2, high_data_va
@@ -803,9 +800,8 @@ cms31_overlay_done:
     mvc 81(47,%r10),80(%r10)
     xc 256(72,%r10),256(%r10)
     la %r13, 256(%r10)
-    lghi %r0, 131
-    larl %r1, cms31_second_image_va
-    lg %r1, 0(%r1)
+    lghi %r0, 3            /* K-registered second CMS31 image */
+    lghi %r1, 0
     lghi %r2, 0
     svc 235                 /* second relocated CMS31 RXVM */
     larl %r2, high_data_va
@@ -881,9 +877,8 @@ cms31_native_done:
     larl %r4, cms24_bridge
     mvc 512(16,%r10),0(%r4)
     la %r13, 256(%r10)
-    lghi %r0, 124
-    larl %r1, cms24_image_va
-    lg %r1, 0(%r1)
+    lghi %r0, 1
+    lghi %r1, 0
     lghi %r2, 0
     svc 235                 /* CMS24 IO24 RXVM invocation */
     larl %r2, high_data_va
@@ -969,7 +964,7 @@ cms24_io_done:
     mvi 67(%r10), 0xa5
     xc 256(72,%r10),256(%r10)
     la %r13, 256(%r10)
-    lghi %r0, 31
+    lghi %r0, 5
     lghi %r1, 0
     lghi %r2, 0
     svc 235                 /* diagnostic K-owned TSO31 invocation */
@@ -1030,7 +1025,7 @@ tso31_call_done:
     mvi 67(%r10), 0xa5
     xc 256(144,%r10),256(%r10)
     la %r13, 256(%r10)
-    lghi %r0, 64
+    lghi %r0, 6
     lghi %r1, 0
     lghi %r2, 0
     svc 235                 /* diagnostic K-owned TSO64 invocation */
@@ -1137,7 +1132,7 @@ tso24_collision_done:
     larl %r4, cms24_bridge
     mvc 512(16,%r10),0(%r4)
     la %r13, 256(%r10)
-    lghi %r0, 24
+    lghi %r0, 4
     lghi %r1, 0
     lghi %r2, 0
     svc 235                 /* diagnostic K-owned TSO24 invocation */
@@ -1172,7 +1167,21 @@ tso24_release_page:
     lg %r2, 0(%r2)
     st %r15, 0x330(%r2)
 tso24_call_done:
-    lghi %r0, 31
+    lghi %r0, 7            /* no K image record: deterministic failure */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 235
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3e0(%r2)
+    lghi %r0, 5            /* caller cannot provide placement */
+    lghi %r1, 1
+    lghi %r2, 0
+    svc 235
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 0x3e4(%r2)
+    lghi %r0, 5
     lghi %r1, 0
     lghi %r2, 0
     svc 235                 /* start one K-owned cleanup probe */
@@ -1241,7 +1250,6 @@ high_data_va: .quad 0x110001000
 input_data_va: .quad 0x110001080
 cms31_image_va: .quad 0x03000000
 cms24_image_va: .quad 0x20000
-cms31_second_image_va: .quad 0x05000000
 cms31_trampoline_va: .quad app_b_cms31_call
 cms31_second_trampoline_va: .quad app_b_cms31_second_call
 tso31_trampoline_va: .quad app_b_tso31_call
