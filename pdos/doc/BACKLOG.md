@@ -165,6 +165,10 @@ The [disk/console isolation checkpoint](qualification/TWO-SPACE-DUAL-IO-2026-10-
 gives each device a reserved low-real workspace and passes a disk read
 between terminal-read start and completion in the fresh IPL. It removes
 cross-device buffer reuse; per-device scheduling and cancellation remain open.
+The [subchannel failure checkpoint](qualification/TWO-SPACE-TSCH-FAILURE-2026-10-06.md)
+repairs condition-code clobbering in the channel assembler and proves that
+an absent subchannel fails immediately while positive CKD/3270 IPL still
+passes. Hot-unplug recovery and asynchronous I/O acknowledgement remain open.
 General CMS/TSO file I/O and command services remain open. The diagnostic C31 service uses 16 sparse
 K-only pages and no additional low U virtual page. This does not complete
 slice 5 or select the replacement image.

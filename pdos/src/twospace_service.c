@@ -534,6 +534,10 @@ static unsigned int terminal_read_poll(const TSGREQUEST *request)
     if (!console_read_phase) return 0xfffffffbU;
     if (console_read_phase != 3U) {
         status=TSCPOLL(console_ssid,TSCIRB(&console_channel));
+        if (status < 0) {
+            console_read_phase=0U;
+            return 12U;
+        }
         if (status != 0) return 1U;
     }
     if (console_read_phase == 1U) {
@@ -583,6 +587,24 @@ static unsigned int terminal_read_poll(const TSGREQUEST *request)
     if (status == TSG_OK) console_read_phase=0U;
     return status == TSG_OK ? 0U :
            status == TSG_DENIED ? 0xfffffffcU : 0xfffffffdU;
+}
+
+/* Diagnostic selector only: an absent subchannel must fail immediately,
+ * rather than becoming an unbounded terminal poll or a false I/O success. */
+static unsigned int absent_channel_probe(const TSGREQUEST *request)
+{
+    unsigned char *schib;
+    if (request->length || request->address.hi || request->address.lo ||
+        request->direction) return 8U;
+    if (TSCPOLL(0x0001ffffU,TSCIRB(&channel)) != -1) return 12U;
+    schib=TSCSCHIB(&channel);
+    schib[6U]=0x12U; schib[7U]=0x34U;
+    if (TSCDEV(0x0001ffffU,schib) != 0) return 20U;
+    if (TSCSTART(0x0001ffffU,TSCORB(&channel),TSCIRB(&channel)) != -1)
+        return 24U;
+    if (TSCIO(0x0001ffffU,TSCORB(&channel),TSCIRB(&channel)) != -2)
+        return 16U;
+    return 0U;
 }
 
 /* The current fixture's SVC 120 path uses the active conditional GETMAIN
@@ -650,6 +672,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 219U) return cms24_child_probe();
     if (request->svc == 220U) return cms24_overlay_push(request);
     if (request->svc == 221U) return cms24_overlay_pop(request);
+    if (request->svc == 222U) return absent_channel_probe(request);
     if (request->svc != 1U && request->svc != 202U &&
         request->svc != 204U && request->svc != 205U)
         return 0xfffffffbU;

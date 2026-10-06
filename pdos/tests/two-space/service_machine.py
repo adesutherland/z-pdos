@@ -212,6 +212,8 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False):
     checks["k_terminal_read_finish"] = (
         struct.unpack_from(">I",raw,0x1206c)[0] ==
         (0 if ipl else 0xfffffffb))
+    checks["absent_subchannel_fails_without_wait"] = (
+        struct.unpack_from(">I",raw,0x121c4)[0] == 0)
     checks["k_cms24_module_header"] = (
         struct.unpack_from(">I",raw,0x12070)[0] ==
         (0 if cms24 else 4 if ipl else 0xfffffffb))

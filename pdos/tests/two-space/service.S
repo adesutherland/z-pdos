@@ -378,6 +378,13 @@ terminal_read_done:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 108(%r2)
+    lghi %r0, 0             /* absent subchannel fails without a timer */
+    lghi %r1, 0
+    lghi %r2, 0
+    svc 222
+    larl %r2, high_data_va
+    lg %r2, 0(%r2)
+    st %r15, 452(%r2)
     lghi %r0, 0             /* K inspects checked CMS24 MODULE first block */
     lghi %r1, 0
     lghi %r2, 0
@@ -567,6 +574,8 @@ initial_nested_done:
     chi %r2, 220
     je storage_no_record
     chi %r2, 221
+    je storage_no_record
+    chi %r2, 222
     je storage_no_record
     lghi %r1, 0x2000
     larl %r8, kcore

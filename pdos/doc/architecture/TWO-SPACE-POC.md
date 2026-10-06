@@ -349,6 +349,11 @@ K's synchronous CKD/3270 helper now judges success from `TSCH` completion
 status. A TOD watchdog bounds a stalled operation, replacing its previous
 fixed poll count. The [fresh I/O completion result](../qualification/TWO-SPACE-IO-COMPLETION-2026-10-06.md)
 covers the one-CPU diagnostic profile.
+The [subchannel failure result](../qualification/TWO-SPACE-TSCH-FAILURE-2026-10-06.md)
+also checks an absent subchannel in the guest. The assembler branches on the
+channel instruction's condition code before changing it: no pending status
+can be retried, while a nonoperational subchannel fails immediately. The
+terminal state machine abandons that read instead of polling indefinitely.
 
 K's C31 loader reads the checked first extent into a temporary real
 allocation sized from the validated MODULE header. It checks the v2 envelope
