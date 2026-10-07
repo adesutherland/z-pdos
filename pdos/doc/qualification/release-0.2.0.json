@@ -602,11 +602,111 @@
         "github_digest_verified": true,
         "source_entries": 1865,
         "exact_tag_archive": true
+      },
+      "SHA256SUMS": {
+        "bytes": 1141,
+        "sha256": "42ecf0d549fd694f56757f44956ab907d7efeaa2aecd83aa1f72221d8be4968f",
+        "github_digest_verified": true
+      },
+      "z-pdos-0.2.0-windows-x64-signed-setup.exe": {
+        "bytes": 11855984,
+        "sha256": "896d2a5ce34e39553cde68eb46bf65d18ddd15b34fffe0be3021315b470c1df9",
+        "github_digest_verified": true
+      },
+      "z-pdos-0.2.0-windows-x64-signed.zip": {
+        "bytes": 15411591,
+        "sha256": "239f4b1a0205e889da54c40792aa01754dc556c1fe8125b5961cf24dd12b1074",
+        "github_digest_verified": true,
+        "internal_inventory_files": 431,
+        "release_receipt": {
+          "format": "z-pdos-release-v1",
+          "product": "z-pdos",
+          "version": "0.2.0",
+          "platform": "windows-x64",
+          "source_commit": "83157ae4ad77c53ab2a1f2e9b25297b53bc1527a",
+          "source_dirty": false,
+          "signing": "signed",
+          "qualification": "host-tools; image and guest qualification are separate"
+        }
       }
     },
     "macos_installer_signatures_and_stapled_notarization": "passed",
-    "windows_signing": "pending refreshed SimplySign session; PKCS11 CKR_FUNCTION_FAILED twice",
-    "final_shared_checksums": "pending signed Windows replacement"
+    "windows_signing": "passed after SimplySign session refresh; signed ZIP and installer replace unsigned assets",
+    "final_shared_checksums": {
+      "pass": true,
+      "files": 11,
+      "sha256": "42ecf0d549fd694f56757f44956ab907d7efeaa2aecd83aa1f72221d8be4968f"
+    },
+    "windows_signatures": {
+      "pass": true,
+      "downloaded_payload_files": 11,
+      "downloaded_installer": true,
+      "verified_files": [
+        {
+          "file": "bin/mf-classic-as.exe",
+          "sha256": "d7e559a129c6dec0f7f6f8148a5512e3f9e06e815a1b1aa9c1b773f0f957f635",
+          "authenticode_verification": "passed"
+        },
+        {
+          "file": "bin/mf-classic-ld.exe",
+          "sha256": "3122f9955333a9a59812aba4f2f19cac66406f5f3c8cab3555b2f83c420e0833",
+          "authenticode_verification": "passed"
+        },
+        {
+          "file": "bin/mf-classic-cc.exe",
+          "sha256": "965b01bc740e7422bae3390bf47d5f0414719289c9f420b6467f263680186357",
+          "authenticode_verification": "passed"
+        },
+        {
+          "file": "bin/mf-classic-cc-cms.exe",
+          "sha256": "eb4ce49868cac9aa629e38d01298e5c041980cbceb5b8b8b6a6ef60277259d9d",
+          "authenticode_verification": "passed"
+        },
+        {
+          "file": "libexec/z-pdos/cms/libiconv-2.dll",
+          "sha256": "e0b2d1ae64c47dbf3b1b5cd17197c7a2dae565a11bbbae460495cb2afeeb5ec4",
+          "authenticode_verification": "passed"
+        },
+        {
+          "file": "libexec/z-pdos/cms/xgcc.exe",
+          "sha256": "2d880a74efe9a7ebc20a6033d011944fa4a49160291515b02d94dd99753f6d69",
+          "authenticode_verification": "passed"
+        },
+        {
+          "file": "libexec/z-pdos/cms/cc1.exe",
+          "sha256": "f2fa31a1b01884d7f9bb17688a01a7d2a2f7d012dfb19b6c0b032f482952d373",
+          "authenticode_verification": "passed"
+        },
+        {
+          "file": "libexec/z-pdos/mvs/libiconv-2.dll",
+          "sha256": "e42f782ef998456ab5e7d941d9eaea51d8d5e2473aaa4aad67b1bc3767f71578",
+          "authenticode_verification": "passed"
+        },
+        {
+          "file": "libexec/z-pdos/mvs/xgcc.exe",
+          "sha256": "21e647f6cded445fcf04546898655d9c94d6ca65e95e5c591505b57cbff77ac8",
+          "authenticode_verification": "passed"
+        },
+        {
+          "file": "libexec/z-pdos/mvs/cc1.exe",
+          "sha256": "3b6101ab44be01d1d8368c6665a08df88b239a278d67e5bb3e5c5ed40e7622df",
+          "authenticode_verification": "passed"
+        },
+        {
+          "file": "share/z-pdos/update-user-path.ps1",
+          "sha256": "a1ac7ec175a0f43888406cd76e80bd6ca3ad09824668797f5b29945364decd99",
+          "authenticode_verification": "passed"
+        },
+        {
+          "file": "z-pdos-0.2.0-windows-x64-signed-setup.exe",
+          "sha256": "896d2a5ce34e39553cde68eb46bf65d18ddd15b34fffe0be3021315b470c1df9",
+          "authenticode_verification": "passed"
+        }
+      ],
+      "nsis_plugin_and_uninstaller_signing": "three plugins and uninstaller verified by signing script before setup packaging",
+      "unsigned_release_assets_removed": true
+    },
+    "status": "complete"
   },
   "managed_adoption": {
     "status": "accepted",

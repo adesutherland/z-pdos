@@ -16,11 +16,17 @@ The release record distinguishes the locally operator-tested/installed image,
 the hosted disk container and four-host tool packages. Read the bundled K/U
 operator guide and qualification record before booting.
 
+The frozen 0.2.0 image passed ten operator acceptance gates in 143 ordered
+cases. Empty U address-translation tables are now reclaimed after application
+release, fixing exhaustion during repeated valid HIGH and 24-bit workloads.
+The operator adopted the accepted working image and updated the runbook.
+
 Classic C (MVS and CMS), Classic Assembler and Classic Linker are packaged for
 macOS Apple Silicon/Intel, Linux x64 and Windows x64. macOS PKGs are Developer
-ID signed and notarized. Windows CI assets are explicitly unsigned until the
-separate local signing operation replaces them. SHA256SUMS identifies final
-asset bytes; the source archive contains the corresponding maintained code.
+ID signed and notarized. Windows portable and installer downloads are
+Authenticode signed; their initially unsigned CI assets have been replaced.
+SHA256SUMS identifies final asset bytes; the source archive contains the
+corresponding maintained code.
 
 Paul Edwards created PDOS and PDPCLIB. Component licences and upstream notices
 accompany the downloads. The build requires no proprietary mainframe compiler,

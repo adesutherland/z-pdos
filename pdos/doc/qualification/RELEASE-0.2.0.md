@@ -13,7 +13,7 @@ acceptance gates passed before managed adoption and publication.
 | Fresh local K/U image and host package checks | Passed for the repaired image: integrated host, loader/dataset/compression and ZIP inventory checks; unchanged components retain 93/93 host results. |
 | Exact mainframe operator acceptance and managed replacement | Passed: ten gates, fourteen fresh phases, 143 ordered cases; reviewed working image adopted while stopped, old managed version retired and runbook committed. |
 | Four-host release matrix and downloadable K/U image | Passed: final tagged builds on both macOS hosts, Linux x64 and Windows x64; packaged OS payloads match the accepted build. |
-| Tag, publication and final asset verification | Published as v0.2.0; non-Windows packages and exact source archive verified. Windows signing awaits a refreshed token session. |
+| Tag, publication and final asset verification | Passed: v0.2.0 published; signed Windows replacements, final shared checksums, signatures and exact source archive verified. |
 
 The intended machine is Hercules 4.9.1.0-SDL, model 2064, one z/Architecture
 CPU and 256 MiB real storage. Bare release media contain the OS only.
@@ -268,7 +268,26 @@ All corresponding GitHub asset digests match the downloaded bytes. The source
 archive matches every entry of an independent archive of the exact tag.
 
 Windows CI initially publishes explicitly unsigned portable and installer
-assets. Local signing reached the visible certificate but failed twice with
-PKCS11 `CKR_FUNCTION_FAILED`. A refreshed SimplySign session is required
-before signed replacements and final shared checksums can close this gate.
-No further product implementation change follows the accepted freeze.
+assets. Two initial local signing attempts returned PKCS11
+`CKR_FUNCTION_FAILED`; refreshing the SimplySign session resolved the token
+failure. The retained signing script completed all 16 signing operations,
+including the eleven EXE/DLL/PowerShell payload files, three NSIS plugins,
+uninstaller and final setup. Each signature was verified before packaging.
+
+The signed portable ZIP and installer replace both unsigned release assets.
+Independent verification of the downloaded replacements passes all eleven
+payload signatures and the setup signature. The signed ZIP passes all 431
+internal checksums and records signed status, version 0.2.0, the exact tag
+commit and clean source. All eleven shared release checksum entries and all
+twelve GitHub asset digests, including the checksum file itself, match the
+actual downloaded bytes.
+
+| Final Windows/checksum asset | SHA-256 |
+| --- | --- |
+| z-pdos-0.2.0-windows-x64-signed.zip | `239f4b1a0205e889da54c40792aa01754dc556c1fe8125b5961cf24dd12b1074` |
+| z-pdos-0.2.0-windows-x64-signed-setup.exe | `896d2a5ce34e39553cde68eb46bf65d18ddd15b34fffe0be3021315b470c1df9` |
+| SHA256SUMS | `42ecf0d549fd694f56757f44956ab907d7efeaa2aecd83aa1f72221d8be4968f` |
+
+Final publication evidence is recorded after tagging; the accepted
+implementation and input freeze remain unchanged. All release gates are
+complete.
