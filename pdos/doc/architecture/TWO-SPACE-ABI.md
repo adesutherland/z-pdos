@@ -1,11 +1,14 @@
 # Two-space successor: executable ABI inventory
 
-This is the P0 audit for the [K/U successor](TWO-SPACE-POC.md). It is a
-frozen version-1 executable contract for PD-003 P0, accepted 6 October 2026.
-The normal replacement image remains P5/P6 work. P0 freezes the required ABI from unchanged binary/source evidence
-and qualified one-ASCE behavior; the named successor positive and negative
-controls are acceptance work for P2 and P3. An unknown form keeps its P0
-entry open and blocks the corresponding P2/P3 implementation decision.
+This inventory began as the frozen version-1 P0 contract, accepted 6 October
+2026. P0–P6 are now complete; [P6](../qualification/TWO-SPACE-P6-2026-10-07.md)
+qualifies the normal K/U image, wider compiler/terminal/file workloads and
+bounded CMS24/native TSO24 IO24. Full-library TSO24 and CMS24 RXC/RXAS remain
+outside that acceptance. Later tables retain their named checkpoint scope;
+references to a then-pending P2/P3/P6 gate are historical assignments, not a
+second live plan. An unrecognised service form still requires source/binary
+review before implementation or a support claim.
+
 The package, disk stage, mapped image and executed guest are distinct
 evidence layers. The local stages named below are ignored build outputs;
 their hashes identify the unchanged bytes used by the diagnostic guest.
@@ -60,10 +63,9 @@ application result in R15 through its saved return linkage. The
 unchanged RXC, RXAS and RXVM at RC 0, including file and library use; its
 negative controls include malformed RXC source and malformed RXAS input.
 
-This establishes the selected entry shape and baseline behavior. It does
-not show that the successor can run RXC/RXAS. P2 must cover the compiler
-and assembler's reached CMSCALL/file verbs and exact record outputs; P3 must
-load each original module without moving a live image or its lowcore state.
+This P0 comparison establishes the entry shape and earlier baseline only.
+P2/P3 subsequently qualify native services, placement and calls; P6 runs the
+unchanged CMS31 RXC/RXAS/RXVM chain with exact output checks.
 
 ### TSO64 HIGH SVC 8/9 source trace
 

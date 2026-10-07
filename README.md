@@ -16,50 +16,59 @@ implementation, is our first substantial application. Its compiler, assembler
 and virtual machine exercise loading, storage, files, terminal input and error
 handling together.
 
-[Download 0.1.1](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.1)
+[Version 0.2.0](https://github.com/adesutherland/z-pdos/releases/tag/v0.2.0)
 · [Run z/PDOS](pdos/doc/user/README.md)
 · [Understand the architecture](pdos/doc/architecture/README.md)
 · [Documentation](doc/README.md)
 
 ## What works today
 
-The 0.1 milestone established a complete build from maintained source using
-Mainframe Classic C, Classic Assembler and Classic Linker. It produces the
-boot loader, kernel and command processor, then constructs a fresh disk.
-**The mainframe build requires no proprietary compiler, assembler, binder,
-IBM macro library or prebuilt mainframe objects.**
+Version 0.2.0 introduces **a protected kernel address space (K) and one shared
+application address space (U)**. A 64-bit assembler nucleus handles
+interruptions; Classic C services run with 31-bit pointers inside K. PCOMM,
+the command processor, runs in U alongside the selected native applications.
+K owns loading, memory, files, terminal access and cleanup. This separation
+removes the kernel's body and tables from scarce application storage below
+16 MiB while preserving the existing synchronous command and application-call
+behavior. It does not introduce a native 64-bit C compiler or a general
+multi-user scheduler.
 
-The recorded source-built system boots under Hercules and runs unchanged
-cREXX TSO31, TSO64 ANY and TSO64 HIGH application packages. That includes
-compiling and assembling Rexx programs, running the results, interactive input
-and file-output readback. The [guest qualification record](pdos/doc/qualification/QUALIFICATION.md)
-names the exact source, binaries, machine and remaining limits.
+The [completed P0–P6 qualification](pdos/doc/qualification/TWO-SPACE-P6-2026-10-07.md)
+runs unchanged cREXX CMS31 and TSO31/TSO64 ANY/HIGH packages through fresh
+compiler → assembler → virtual-machine chains, interactive input and exact
+file-output readback. CMS24 and native TSO24 run their bounded, library-free
+RXVM IO24 workloads. Full-library TSO24 and CMS24 compiler/assembler support
+remain outside that result. Selected native CMS-to-CMS and TSO-to-TSO calls
+restore the caller's registers, file cursors, personality state and terminal
+ownership after return or a recoverable child fault.
 
-The [stage 3 source result](pdos/doc/qualification/STAGE3-2026-10-05.md)
-adds unchanged CMS cREXX applications: the 31-bit RXC compiler, RXAS assembler
-and RXVM virtual machine run a fresh source-to-execution chain, and the
-fixed-origin 24-bit RXVM runs its bounded IO24 subset. The
-[0.1.1 operator acceptance](pdos/doc/qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
-qualifies those bounded routes on a named local image; it does not establish
-general CMS services.
+The normal machine uses **one z/Architecture CPU and 256 MiB real storage**.
+The C console driver supports configured 3270 models 2–5, a line-only primary,
+and an optional Telnet 3215 text monitor. Ordered text is also committed to a
+durable store on the IPL disk; raw screens or lost monitor output produce
+explicit capture gaps. Existing mount/select/unmount, allocation, record-copy
+and raw tape operations use their shared implementation through checked K
+services. See the [operator guide](pdos/doc/user/TWO-SPACE.md) and
+[media guide](pdos/doc/user/MEDIA.md) for the accepted limits.
 
-z/PDOS currently has a **32-bit C kernel running in 31-bit addressing mode**.
-Handwritten assembler preserves and dispatches 64-bit application contexts;
-selected applications can also load code above 4 GiB. A native 64-bit C kernel
-is future work. The current system has one address space and synchronous
-application execution. It implements the MVS-style services needed by the
-qualified workloads; it is not a general replacement for z/OS or TSO.
+The build creates the boot loader, C31 handover, K64/C31 core and U command
+processor from maintained source, then constructs and reads back a fresh disk.
+**It requires no proprietary mainframe compiler, assembler, binder, IBM macro
+library or prebuilt mainframe objects.** Classic C, Classic Assembler and
+Classic Linker build the C/runtime route; GNU s390 Binutils assemble and link
+the 64-bit nucleus. Hercules supplies the emulated machine and disk utilities.
 
-The [0.1.1 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.1)
-provides macOS Apple Silicon and Intel packages, Linux x64 tools, signed
-Windows x64 packages, a source archive and a base OS disk image. All four host
-builds and relocated compiler/assembler/linker checks passed. The downloadable
-base image passed host loader and disk checks; the separate local operator acceptance
-does not claim that exact release-image ZIP was booted.
+The [0.2.0 release record](pdos/doc/qualification/RELEASE-0.2.0.md) distinguishes
+candidate review, local build, operator acceptance and published artifacts.
+Host tools are packaged for macOS Apple Silicon/Intel, Linux x64 and Windows
+x64. The base image contains the OS; application packages are separate inputs.
+The earlier [0.1.1 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.1)
+and its one-space qualification remain historical references. The explicit
+`one-space-image.crexx` recipe can still reproduce that architecture.
 
-Native TSO24 AMODE24/RMODE24 direct loading, broader file semantics and parts
-of the console interface remain open. Start with the [known issues](pdos/doc/BACKLOG.md)
-when deciding whether the present system fits an experiment.
+The system implements the CMS/TSO service forms reached by its qualified
+workloads. It is not a general replacement for CMS, TSO or z/OS. The
+[backlog](pdos/doc/BACKLOG.md) records remaining service and qualification work.
 
 ## How the pieces fit
 
@@ -73,7 +82,7 @@ PDPCLIB native code and macros ─┘
                         classic object decks
                                │ Classic Linker
                                ▼
-                     loader, kernel and shell
+                     loader, K64/C31 core and U shell
                                │ image recipe + Hercules disk utilities
                                ▼
                        bootable z/PDOS disk

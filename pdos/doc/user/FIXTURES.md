@@ -1,6 +1,6 @@
 # Checked CMS and TSO fixtures
 
-The 0.1.1 source recipe can move a bounded set of logical tape fixtures onto
+The checked fixture recipe can move a bounded set of logical tape fixtures onto
 a disposable 3390 exchange volume and export exact guest results. Keep the
 release ZIP and its tape images unchanged. The ZIP member bytes must equal the
 extracted tape image, and the manifest pins both SHA-256 values.
@@ -126,5 +126,6 @@ records and exact bytes. It writes `.records` (four-byte length-framed),
 `.bin` (concatenated bytes), and `receipt.json` with hashes. Console success
 alone is insufficient for acceptance.
 
-The [phase 2 result](../qualification/PHASE2-2026-10-04.md) records the
-guest and stopped-media proof and its limits.
+The [P6 result](../qualification/TWO-SPACE-P6-2026-10-07.md) records the K/U
+guest and stopped-media proof; [phase 2](../qualification/PHASE2-2026-10-04.md)
+retains the earlier one-space result.

@@ -17,8 +17,8 @@ The word *profile* appears at several of these boundaries in this project.
 AMODE64 permits 64-bit execution; it does not require that the code itself be
 above 2 GiB. The qualified TSO64 ANY application route has low-resident code
 and a high heap. TSO64 HIGH adds a low launcher which loads an RMODE64 body
-into the OS's high code window. The current kernel remains C32/AMODE31 in
-both cases.
+into the OS's high code window. The 0.2 kernel uses an AMODE64 assembler nucleus and protected Classic C31
+services. Application AMODE does not change the C service pointer width.
 
 ## The active OS build
 
@@ -30,7 +30,9 @@ The OS recipe selects these inputs explicitly:
   and selected native modules.
 - Classic Assembler's **z900** instruction ceiling and the source-owned
   linkage and PDOS service macros.
-- Kernel/loader **AMODE31, RMODE24**; command processor **AMODE31, RMODE ANY**.
+- PLOAD/C31 handover **AMODE31, RMODE24**, protected nucleus **AMODE64**,
+  K services **Classic C31**, and U command processor **AMODE31, RMODE ANY**.
+- GNU s390 assembler/linker for the K64 nucleus, with the z900 ISA ceiling.
 - The [documented Hercules machine](../machines/profiles/pdos-zarch.md).
 
 These are choices made by the build recipes. They are not an implemented

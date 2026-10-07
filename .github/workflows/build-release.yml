@@ -48,7 +48,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install --yes build-essential cmake ninja-build clang perl bison flex hercules
+          sudo apt-get install --yes build-essential cmake ninja-build clang perl bison flex hercules binutils-s390x-linux-gnu
       - name: Prepare native Windows build environment
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
@@ -196,7 +196,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.identity.outputs.version }}
         run: |
-          crexx -nokeep pdos/scripts/one-space-image.crexx --args build/pdos/ci-image "$(dirname "$(command -v dasdload)")"
+          crexx -nokeep pdos/scripts/image.crexx --args build/pdos/ci-image "$(dirname "$(command -v dasdload)")" "$(command -v s390x-linux-gnu-as)" "$(command -v s390x-linux-gnu-ld)"
           crexx -nokeep pdos/scripts/package-image.crexx --args build/pdos/ci-image "$RELEASE_VERSION"
       - name: Retain checked host installers and archives
         uses: actions/upload-artifact@v7

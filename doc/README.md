@@ -17,14 +17,12 @@ records identify their own inputs.
 | Find supported hardware assumptions | [Machine descriptions](../machines/README.md) |
 | Propose or implement a change | [Shared workflow](WORKFLOW.md) and the component's `doc/BACKLOG.md` |
 
-The [0.1 guest qualification](../pdos/doc/qualification/QUALIFICATION.md)
-is the detailed record of running the source-built OS and unchanged cREXX
-applications. The later
-[0.1.1 local operator acceptance](../pdos/doc/qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
-names its own managed image and CMS/TSO inputs. The
-[0.1.1 release build](https://github.com/adesutherland/z-pdos/actions/runs/37308481475)
-checked all four host packages and built a fresh base disk; that downloadable
-disk was not separately booted in the local operator run.
+The [completed P0–P6 record](../pdos/doc/qualification/TWO-SPACE-P6-2026-10-07.md)
+qualifies the protected K64/C31 kernel, shared U applications, native calls,
+console and disk/tape workflows. The
+[0.2.0 release record](../pdos/doc/qualification/RELEASE-0.2.0.md) keeps local
+build, operator acceptance and downloadable artifact identities separate.
+Earlier 0.1/0.1.1 qualification reports describe their one-space inputs.
 
 The [2 October reorganisation record](REORGANISATION-20261002.md) and
 [release preparation report](RELEASE-PREPARATION-20261002.md) preserve earlier

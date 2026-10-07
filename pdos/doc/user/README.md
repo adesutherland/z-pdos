@@ -1,18 +1,18 @@
 # Run and build z/PDOS
 
 The quickest way to explore the system is the **PDOS image ZIP** from the
-[0.1.1 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.1).
+[0.2.0 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.2.0).
 The Classic tools downloads are separate packages for building mainframe
 software on your host computer.
 
 The default source-built K/U route and its accepted scope are described in
-[the successor operator guide](TWO-SPACE.md).
+[the K/U operator guide](TWO-SPACE.md).
 
 ## Boot the supplied image
 
 You need Hercules and a 3270 terminal client on your computer. The recorded
 guest qualification used Hercules 4.9.1.0-SDL, one z/Architecture CPU and
-4096 MiB of real storage. Other emulator versions need their own evidence.
+256 MiB of real storage. Other emulator versions need their own evidence.
 
 1. Download the image ZIP and release `SHA256SUMS`. Verify the ZIP against the
    release checksum inventory. Extract it and keep an untouched copy.
@@ -24,31 +24,35 @@ guest qualification used Hercules 4.9.1.0-SDL, one z/Architecture CPU and
    hercules -f hercules.cnf
    ```
 
-4. Connect your 3270 client to **127.0.0.1, port 3270**.
+4. Connect your 3270 client to **0009@127.0.0.1, port 3270**, using model 2.
+   Connect the configured Telnet 3215 monitor as **000A@127.0.0.1:3270**
+   before IPL; see [terminal operation](TWO-SPACE.md).
 5. In the **Hercules console**, enter `IPL 01B9`.
 
 The supplied configuration selects:
 
 ```text
 ARCHMODE z/Arch
-MAINSIZE 4096
+CPUMODEL 2064
+MAINSIZE 256
 NUMCPU 1
 CNSLPORT 127.0.0.1:3270
 CODEPAGE 819/1047
 0009 3270
+000A 3215 noprompt
 01B9 3390 pdos00.cckd
 ```
 
 Run from the image directory so the relative disk path resolves correctly.
-The 100-cylinder disk contains `PLOAD.SYS`, `PDOS.SYS`, `CONFIG.SYS` and
-`COMMAND.EXE`. It includes no cREXX application packages or IBM guest system.
+The 100-cylinder disk contains `PLOAD.SYS`, the `PDOS.SYS` handover,
+`CONFIG.SYS`, `COMMAND.EXE`, the protected `KCORE.BIN`, U PCOMM in
+`U.COMMAND`, and `PDOS.STORE`. It includes no cREXX application packages
+or IBM guest system.
 
-The release image passed host construction and readback checks. The bundled
-qualification document describes the separate earlier source-built guest run;
-it is not a claim that every newly generated image has been booted. For 0.1.1,
-the release receipt's PLOAD, PDOS, PCOMM and CONFIG hashes match the locally
-accepted bare producer, while the downloadable CCKD container has a separate
-identity and was not itself booted in that operator run.
+The [0.2.0 release record](../qualification/RELEASE-0.2.0.md) distinguishes
+local operator acceptance from the hosted image archive and host packages.
+The bundled P6 record describes its exact reviewed K/U workload evidence.
+Container hashes and native payload hashes are separate identities.
 
 ## At the PCOMM prompt
 
@@ -82,27 +86,24 @@ matters.
 
 ## Running applications
 
-The recorded 0.1 guest route covers TSO31, TSO64 ANY and TSO64 HIGH cREXX
-packages. Their native load bytes were preserved when removing transport
-framing and staging them onto the test disk. The HIGH route uses a low launcher
-and a separate high-resident body. In current source, checked CMS24 RXVM and
-CMS31 RXVM/RXAS/RXC MODULEs also have a bounded `CMS CHECK`/`CMS RUN` path;
-see the [stage 3 record](../qualification/STAGE3-2026-10-05.md). Native TSO24
-loading remains a separate backlog item.
+The accepted K/U route covers unchanged CMS31 and TSO31/TSO64 ANY/HIGH
+cREXX compiler, assembler and VM chains. CMS24 and native TSO24 have separate
+library-free IO24 acceptance; full-library TSO24 and CMS24 RXC/RXAS remain
+outside it. CMS uses `CMS CHECK`/`CMS RUN` on the checked exchange disk;
+ordinary TSO names use profile-specific native stages. The
+[P6 record](../qualification/TWO-SPACE-P6-2026-10-07.md) names the exact inputs,
+results and limits.
 
 Use the application's exact packaging and installation instructions; an XMIT
 transport or ELF object is not directly executable by the z/PDOS loader.
 Application installation must preserve dataset structure and load bytes, and
 offline disk updates require the guest to be stopped. The
 [conformance candidate guide](CONFORMANCE.md) gives the checked installer and
-script runner for this bounded disk profile. The 0.1.1 base image contains the
-operator commands, while the host runner and application packages must be
-supplied separately. The locally accepted
-[0.1.1 working image](../qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
-reports 0.1.1 and retains its checked cREXX packages.
-The base image has no general package manager. The
-[qualification record](../qualification/QUALIFICATION.md) describes the actual
-cREXX workloads, storage budgets, file results and skips.
+script runner for the retained one-space disk profile. For K/U installation,
+use the checked workload/image staging described in [TWO-SPACE](TWO-SPACE.md)
+and the [release acceptance record](../qualification/RELEASE-0.2.0.md).
+The base image has no general package manager; application installation and
+its acceptance are separate from booting the base OS.
 
 The [exchange disk and tape guide](MEDIA.md) covers the current source's
 second CKD volume, guest `ALLOC` and `RCOPY`, and raw HET/AWS tape records.
@@ -117,7 +118,7 @@ exact stopped-disk export. The base image includes no fixture packages.
 
 Run these commands from the repository root. You need cREXX, CMake, a native
 C toolchain, make, Bison/Flex for the inherited compiler build, Clang and
-`shasum`, plus Hercules utilities `dasdload`, `cckd2ckd` and `ckd2cckd`.
+`shasum`, GNU s390 assembler/linker for the K64 nucleus, plus Hercules utilities `dasdload`, `cckd2ckd` and `ckd2cckd`.
 The [host build guide](../../../doc/BUILD-AND-RELEASE.md) covers tool packages
 and platform details.
 
@@ -127,7 +128,8 @@ output directory and the absolute directory containing the Hercules utilities:
 ```sh
 crexx -nokeep compiler/scripts/build.crexx --args test mvs
 crexx -nokeep scripts/build.crexx --args test
-crexx -nokeep pdos/scripts/image.crexx --args build/pdos/my-image /absolute/hercules/bin
+crexx -nokeep pdos/scripts/image.crexx --args build/pdos/my-image \
+  /absolute/hercules/bin /absolute/s390-as /absolute/s390-ld
 ```
 
 These are build-and-check recipes for developers: they include their own
@@ -136,12 +138,14 @@ checks, compilation, assembly and linking; separate preliminary OS `check` and
 `compile` commands are not required. It refuses an existing image output
 directory and does not connect to a running guest.
 
-The result is `build/pdos/my-image/media/pdos00.cckd`, with input/output hashes
-and producer versions beside the build outputs. Seventeen C units and six
-handwritten assembler modules are built afresh. The recipe reconstructs load
-modules at two bases, creates target-encoded configuration and IPL records,
-and compares every guest disk byte after compression readback. These checks
-use the maintained loader and explicit corruption controls.
+The result is `build/pdos/my-image/image/media/pdos00.cckd`. Combined
+input/output hashes and producer versions are at the build root; detailed
+manifests are in `base/`, `kernel/` and `image/`. The normal build compiles,
+assembles and links the bootstrap, K64/C31 core and U PCOMM, checks sparse
+translation/ownership and loader behavior, and compares disk bytes after
+compressed readback. It does not start a guest. A bare build needs no
+application ZIP. Use `image.crexx ... legacy` for the explicit one-space
+producer and its old `<work>/media/` layout.
 
 See [build dependencies](../architecture/DEPENDENCIES.md) for the component
 inputs and [development](../development/README.md) for how to change them.

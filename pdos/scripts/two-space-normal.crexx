@@ -1,14 +1,15 @@
-/* SPDX-License-Identifier: MIT; explicit selectable normal K/U 3390 build.
- * Released one-ASCE image selection remains separate until P6 acceptance. */
+/* SPDX-License-Identifier: MIT; normal K/U 3390 source and release build. */
 options levelb
 import rxfnsb
 main: procedure = .int
   arg args = .string[]
+  i = .int
   if args.0 <> 4 & args.0 <> 6 & args.0 <> 9 then do
     say "usage: crexx -nokeep pdos/scripts/two-space-normal.crexx --args NEW-build/pdos/output GNU_AS GNU_LD HERCULES_BIN CMS_STAGE_DIR TSO_STAGE_DIR"
     return 2
   end
   work = args.1; gnuas = args.2; gnuld = args.3; herc = args.4
+  stage = .string
   cms = ""; tso = ""
   if args.0 >= 6 then do
     cms = args.5; tso = args.6
@@ -38,6 +39,7 @@ main: procedure = .int
     stage = out || "/command/u-command.bin"
     address crexx "run crexx -nokeep pdos/scripts/two-space-ipl.crexx --args :image :core :gnuas :gnuld :herc command :stage"
     if rc <> 0 then return rc
+    call receipts out,gnuas,gnuld
     say "Normal K/U image: " || out || "/image/media/pdos00.cckd"
     return 0
   end
@@ -57,5 +59,55 @@ main: procedure = .int
   optional_child = stage
   address crexx "run crexx -nokeep pdos/scripts/two-space-ipl.crexx --args :image :core :gnuas :gnuld :herc :cms24 :cms31 :cmsfile :cmslib :cms24file :tso31 :tso64 :tso24 :stage :optional_child image-only"
   if rc <> 0 then return rc
+  call receipts out,gnuas,gnuld
   say "Selectable normal image: " || out || "/image/media/pdos00.cckd"
+  return 0
+
+receipts: procedure = .int
+  arg out = .string, gnuas = .string, gnuld = .string
+  i = .int
+  files = .string[]
+  files[1] = "VERSION"; files[2] = "pdos/src/zpdos-version.h"
+  files[3] = "pdos/scripts/image.crexx"
+  files[4] = "pdos/scripts/two-space-normal.crexx"
+  files[5] = out || "/base/inputs.sha256"
+  files[6] = out || "/kernel/inputs.sha256"
+  files[7] = out || "/image/inputs.sha256"
+  files[8] = gnuas; files[9] = gnuld
+  hashes = .string[]
+  address crexx "run shasum -a 256 :files[]" output hashes
+  if rc <> 0 then exit rc
+  do i = 1 to hashes.0
+    call lineout out || "/inputs.sha256",hashes[i]
+  end
+  call lineout out || "/inputs.sha256"
+  call arraydrop(files)
+  files[1] = out || "/image/media/pdos00.cckd"
+  files[2] = out || "/image/media/pload.sys"
+  files[3] = out || "/image/media/pdos.sys"
+  files[4] = out || "/image/media/config.sys"
+  files[5] = out || "/image/media/command.exe"
+  files[6] = out || "/image/media/kcore.bin"
+  files[7] = out || "/kernel/run/image.core"
+  files[8] = out || "/command/u-command.bin"
+  address crexx "run shasum -a 256 :files[]" output hashes
+  if rc <> 0 then exit rc
+  do i = 1 to hashes.0
+    call lineout out || "/outputs.sha256",hashes[i]
+  end
+  call lineout out || "/outputs.sha256"
+  from = out || "/base/versions.log"; target = out || "/versions.log"
+  address crexx "run cmake -E copy :from :target"
+  if rc <> 0 then exit rc
+  address crexx "run :gnuas --version" output hashes
+  if rc <> 0 then exit rc
+  do i = 1 to hashes.0
+    call lineout target,hashes[i]
+  end
+  address crexx "run :gnuld --version" output hashes
+  if rc <> 0 then exit rc
+  do i = 1 to hashes.0
+    call lineout target,hashes[i]
+  end
+  call lineout target
   return 0

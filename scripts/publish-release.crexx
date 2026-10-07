@@ -51,16 +51,24 @@ main: procedure = .int
   call require rc = 0, "combined final release hashes"
   deliver[deliver.0+1] = output_dir || "/SHA256SUMS"
   notes = "build/release/release-notes.md"
-  call lineout notes,"z/PDOS " || version || " provides Classic C (MVS and CMS), the independent Classic Assembler, the Classic Linker and a freshly built base operating-system disk image."
-  call lineout notes,""
-  call lineout notes,"Paul Edwards created PDOS and PDPCLIB. Component notices and compiler/linker lineage accompany the downloads."
-  call lineout notes,""
-  call lineout notes,"macOS downloads include Developer ID signed, notarized and stapled PKG installers. Windows ZIP and per-user NSIS installer downloads are labelled unsigned pending the separate local signing operation. Linux tools are supplied as a portable ZIP."
-  call lineout notes,""
-  call lineout notes,"All four host builds and relocated compile/assemble/link checks passed for source " || commit || ". The PDOS image passed loader/dataset/compression host checks; no new guest/application qualification is claimed. The image contains the base OS only. Read the bundled instructions and existing exact guest qualification record."
-  call lineout notes,""
-  call lineout notes,"SHA256SUMS records the final download bytes. The source archive contains the corresponding maintained source and build recipes."
-  call lineout notes
+  notes_source = "doc/RELEASE-NOTES-" || version || ".md"
+  address crexx "run test -f :notes_source"
+  if rc = 0 then do
+    address crexx "run cmake -E copy :notes_source :notes"
+    call require rc = 0, "reviewed version-specific release notes"
+  end
+  else do
+    call lineout notes,"z/PDOS " || version || " provides Classic C (MVS and CMS), the independent Classic Assembler, the Classic Linker and a freshly built base operating-system disk image."
+    call lineout notes,""
+    call lineout notes,"Paul Edwards created PDOS and PDPCLIB. Component notices and compiler/linker lineage accompany the downloads."
+    call lineout notes,""
+    call lineout notes,"macOS downloads include Developer ID signed, notarized and stapled PKG installers. Windows ZIP and per-user NSIS installer downloads are labelled unsigned pending the separate local signing operation. Linux tools are supplied as a portable ZIP."
+    call lineout notes,""
+    call lineout notes,"All four host builds and relocated compile/assemble/link checks passed for source " || commit || ". The PDOS image passed loader/dataset/compression host checks; no new guest/application qualification is claimed. The image contains the base OS only. Read the bundled instructions and existing exact guest qualification record."
+    call lineout notes,""
+    call lineout notes,"SHA256SUMS records the final download bytes. The source archive contains the corresponding maintained source and build recipes."
+    call lineout notes
+  end
   command = .string[]
   command.1 = "gh"; command.2 = "release"; command.3 = "create"; command.4 = tag
   do i = 1 to deliver.0

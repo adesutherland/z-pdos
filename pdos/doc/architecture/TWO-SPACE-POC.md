@@ -1,4 +1,4 @@
-# Two-space kernel: first contract and machine proof
+# Two-space kernel: current contract and development proofs
 
 The source-built kernel uses **one supervisor address space (K) and one shared
 application address space (U)** on one CPU for a single user. A small AMODE64
@@ -36,7 +36,8 @@ exclusive input selection and the durable transcript. The [P5 normal-image gate]
 adds source-built PLOAD-to-K boot, U PCOMM, CMS/TSO command recovery, attached
 capture and independent K emergency/shutdown. The [P6 record](../qualification/TWO-SPACE-P6-2026-10-07.md) accepts the full
 selected workload, operator media and terminal matrix and selects the source
-default. The published one-ASCE image is unchanged.
+default. Version 0.2.0 selects this K/U route; the earlier 0.1.1 one-ASCE image retains
+its own dated qualification.
 
 The frozen P6 build also carries PCOMM's existing media commands into K.
 The one-ASCE kernel and K share the command algorithms; K supplies copied
@@ -66,7 +67,7 @@ kernel has its separate qualification record.
 | Personality state | Each invocation carries its CMS or TSO service profile, file handles and lowcore contract. K installs the applicable U compatibility page or state on entry and restores the previous state on return; a dormant module's profile does not define the active lowcore. A failed transition leaves the caller's map and profile intact. |
 | Application calls | The required contract is a synchronous CMS-to-CMS or TSO-to-TSO application call, with bounded parameters, a return code and restored caller state. The selected native linkage for each personality must be qualified separately. An in-space pointer is usable only when both programs' ABI and address modes permit it. A REXX `ADDRESS` operation is not a requirement of the mainframe cREXX builds. CMS-to-TSO or TSO-to-CMS application calls are optional only if a simple copied-parameter and return-code gate suffices; they cannot rely on shared raw pointers or become a prerequisite for replacement. |
 | Command processor | PCOMM, or its successor, is a U application placed above 16 MiB with its stack and heap there when its ABI permits. It is the neutral PDOS command entry point and may ask K to launch either personality with a copied command and receive its return code. K retains boot, fault and emergency console output plus checked terminal and invocation services. The command processor is not part of K merely to remain resident. |
-| Terminal and 3270 ownership | K owns the devices, interrupt/completion state, bounded data transfer, one foreground screen owner, one input owner and compatibility line input/output services. The K driver and 3270 data-stream encoder are C31 C, with assembler limited to privileged channel operations. A reusable U presentation library is C, with only target-specific linkage at its boundary. It provides an application header, footer, scrollable output and editable entry area through checked K screen/input requests. PCOMM should use it first. Wrapped applications redraw after a nested child returns. Existing unmodified line-oriented CMS/TSO programs continue through their native terminal calls; the wrapper does not silently impose a full-screen layout on them. A separately attached line monitor can receive the same logical line output while the 3270 remains the primary display. |
+| Terminal and 3270 ownership | K owns the devices, interrupt/completion state, bounded data transfer, one foreground screen owner, one input owner and compatibility line input/output services. The K driver and 3270 data-stream encoder are C31 C, with assembler limited to privileged channel operations. A reusable U presentation library is C, with only target-specific linkage at its boundary. It provides an application header, footer, scrollable output and editable entry area through checked K screen/input requests. PCOMM uses it. Wrapped applications redraw after a nested child returns. Existing unmodified line-oriented CMS/TSO programs continue through their native terminal calls; the wrapper does not silently impose a full-screen layout on them. A separately attached line monitor can receive the same logical line output while the 3270 remains the primary display. |
 
 The maintained one-ASCE PDOS already accepts PCOMM commands, resolves CMS
 MODULEs and TSO load members, enters them and returns their results through
@@ -88,9 +89,8 @@ state. A bounded output queue or an explicit busy result is required for any
 output that cannot be displayed while another owner holds the screen; the
 policy must be selected and tested before asynchronous output is enabled.
 
-The release console's `22*80` output buffer and the successor's 2 KiB console
-write limit are implementation limits, not the 3270 architecture. The first
-expanded driver target is the standard display models 2 (24×80), 3 (32×80),
+The earlier one-space console's `22*80` output buffer and the K/U 2 KiB console
+write limit are implementation limits, not the 3270 architecture. The accepted driver supports the standard display models 2 (24×80), 3 (32×80),
 4 (43×80) and 5 (27×132), in their qualified default or alternate screen
 modes. K exposes a versioned terminal-capability result: device class, usable
 rows and columns, active/default/alternate geometry, buffer-address format,
@@ -121,7 +121,7 @@ instead writes to the integrated Hercules console and mixes host/operator
 messages with guest output, so it is not the first clean transcript target.
 The line view is a monitor, not another application address space or a second
 command processor. A line-only primary console is a further configuration of the same service
-boundary. The [P4 named-device qualification](../qualification/TWO-SPACE-P4-2026-10-07.md) now proves simultaneous attachment/capture, line-only operation and explicit prompt input selection. Normal-image acceptance remains P5/P6.
+boundary. The [P4 named-device qualification](../qualification/TWO-SPACE-P4-2026-10-07.md) now proves simultaneous attachment/capture, line-only operation and explicit prompt input selection. P5/P6 also accept these paths in the normal image.
 
 Unchanged applications that use the selected CMS or TSO line terminal calls
 keep the same ABI and return conventions whether the primary display is a
@@ -170,8 +170,8 @@ implements every IBM terminal form.
 Hercules documents a [Telnet client for a 3215 console](https://hercules-390.github.io/html/hercoper.html)
 and an [integrated 3215-C console](https://hercules-390.github.io/html/hercrnot.html);
 its [sample configuration](https://github.com/SDL-Hercules-390/hyperion/blob/master/hercules.cnf)
-shows a 3270 and 3215-C defined at different addresses. Simultaneous
-3270-plus-Telnet-3215 guest service is still a z/PDOS qualification gate.
+shows a 3270 and 3215-C defined at different addresses. Simultaneous 3270-plus-Telnet-3215 service is accepted in P4/P6;
+these external references do not themselves establish that result.
 
 IBM's [screen-size definitions](https://www.ibm.com/docs/en/gddm?topic=network-pservic-operand-modeent-macro)
 give the standard model dimensions. Its [3270 screen-size control](https://www.ibm.com/docs/en/personal-communications/15.0.0?topic=operations-3270-session-screen-size-control)
@@ -179,35 +179,22 @@ and [buffer-address description](https://www.ibm.com/docs/en/cics-ts/5.6?topic=s
 are reference inputs for the capability and address-encoding checks; the
 Hercules channel device still needs its own qualification.
 
-Before selecting the replacement image, qualify the native call parameter and
-return conventions separately for CMS and TSO, including mixed address modes,
-fixed-origin collision failure and caller restoration after a child fault.
-Also qualify personality lowcore save/restore, native terminal ownership
-transfer, malformed terminal requests, and the 24-bit placement budget with
-PCOMM present. The U presentation library has its own
-[delivery item](../BACKLOG.md#pd-021-reusable-3270-application-presentation);
-its header, footer, scrolling, entry and child-return repaint must be checked
-before claiming that wrapper is available. The diagnostic IPL does not yet
-implement it. The separate [operator line-view item](../BACKLOG.md#pd-022-attached-operator-line-view-and-transcript)
-owns the secondary device, capture, input handoff and line-only qualification.
+P3 qualifies the selected native CMS/TSO parameters, returns, mode crossings,
+fixed-origin collision behavior and caller restoration after child faults.
+P1/P2 qualify ownership, personality lowcore restoration, pending I/O and
+native file/input services. P4 qualifies the U presentation library, models,
+input handoff and monitor behavior; P5/P6 qualify the normal image. Exact
+forms and limits remain in the [ABI inventory](TWO-SPACE-ABI.md); names shared
+with IBM services do not extend those selected forms.
 
-Four interface details must be fixed before implementing the remaining calls
-and console work. First, name resolution and parameter layouts must follow
-the selected unchanged CMS and TSO binaries; the K invocation gate must
-distinguish a load/service failure from the child's normal return code.
-Second, every invocation needs an owner for image pages, runtime allocations,
-file handles and terminal lease, with the same cleanup on return and
-recoverable fault. Third, personality must come from that invocation record,
-not an inferred program-counter range or a global mutable mode. Fourth,
-terminal completion and application wakeup must follow guest events and
-explicit states; elapsed time may detect a stall but must not decide whether
-an I/O completed. The exact parameter layouts and terminal request structures
-remain implementation gates in [PD-003](../BACKLOG.md#pd-003-two-space-supervisor-and-shared-application-memory)
-and [PD-021](../BACKLOG.md#pd-021-reusable-3270-application-presentation).
 ### Earlier implementation checkpoints
 
-The following trail records the limits at each earlier checkpoint. Current
-acceptance is owned by the P0–P6 table and the dated final qualification.
+The remainder of this document preserves the development trail, including
+limits and pending work **as observed at each named checkpoint**. Statements
+about a diagnostic fixture, the then-current one-ASCE release, or work still
+remaining belong to that checkpoint. Current acceptance is P0–P6 and the
+[final P6 record](../qualification/TWO-SPACE-P6-2026-10-07.md); current operator
+instructions are in [TWO-SPACE](../user/TWO-SPACE.md).
 
 The first [K invocation-ledger component result](../qualification/TWO-SPACE-INVOCATION-2026-10-06.md)
 proved token and cleanup ordering. The subsequent [TSO](../qualification/TWO-SPACE-INVOCATION-GATE-2026-10-06.md)
@@ -382,7 +369,7 @@ mapping, not production recovery from arbitrary faults.
 
 The exact local result, source identities and limitations are in the
 [Step 2 qualification note](../qualification/TWO-SPACE-STEP2-2026-10-05.md).
-The current release kernel still has one ASCE and key-zero application
+The release kernel at this checkpoint still had one ASCE and key-zero application
 execution as described in this architecture guide. No IPL or CMS/TSO binary
 was run by this fixture.
 
@@ -394,7 +381,7 @@ The successor proof puts the assembler nucleus at K virtual
 space has a **region-first ASCE**, loaded as a full 64-bit CR1 value. Sparse
 region-first, region-second, region-third, segment and page tables support
 every 64-bit virtual bit; the high K nucleus exercises a nonzero region-first
-index. The current C32 kernel's eager 8.8 MiB table structure and 4 GiB
+index. The earlier C32 kernel's eager 8.8 MiB table structure and 4 GiB
 aliasing are not part of this design. `twospace_dat.c` builds these tables from
 an independently reserved K-accessible real pool, with 4 KiB pages and
 big-endian 64-bit entries. Both table pools and backing frames must be
@@ -538,7 +525,7 @@ is a separate integration check before services depend on it.
 The exact fresh IPL, host comparison and deliberately damaged-package result
 are in the [slices 1/2 qualification record](../qualification/TWO-SPACE-SLICES1-2-2026-10-05.md).
 Slices 3/4 add the bounded interruption and service gate described above.
-The active release kernel remains the one-ASCE C32 system.
+The release kernel at this checkpoint remained the one-ASCE C32 system.
 
 ## PD-003 storage and fixed-overlay checkpoint
 

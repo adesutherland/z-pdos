@@ -1,4 +1,4 @@
-# z/PDOS 0.1 AI guidance
+# z/PDOS AI guidance
 
 Read [the root guide](../../../AGENTS.md), [component guide](../../AGENTS.md),
 [overview](../../README.md), [upstream record](../../UPSTREAM.md) and current

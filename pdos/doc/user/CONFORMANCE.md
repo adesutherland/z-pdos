@@ -1,14 +1,16 @@
 # Run a native program conformance script
 
-This is the current source's bounded PDIO1 operator route. It creates a new
+This is the retained one-space PDIO1 operator route, qualified for 0.1.1.
+Its base-layout installer has not been accepted as a general K/U package
+installer. For 0.2, use the checked staging and normal-image gates in
+[TWO-SPACE](TWO-SPACE.md). It creates a new
 100-cylinder 3390 candidate from an untouched base image, installs checked
 native load streams and optional simple VB PDS members, builds `CONFORM.BAT`,
 and checks the stopped disk after compression. A leased 3270 run then produces
 one PASS/FAIL receipt with each command, expected and actual return code, and
 required output text. The 0.1.1 image contains the PCOMM result markers,
-console continuation and screen repair. Use a working copy of the released
-image or build a fresh one with the
-[source image recipe](README.md#build-a-fresh-disk-from-source).
+console continuation and screen repair. Use a working copy of the earlier 0.1.1 image or the explicit
+`one-space-image.crexx` recipe for the contract below.
 
 ## Inputs
 

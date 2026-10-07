@@ -1,8 +1,9 @@
 # Developing z/PDOS
 
 Read the [architecture](../architecture/README.md) before changing a service or
-memory layout. The current contract is a C32 kernel, AMODE31 execution,
-standard z/Architecture instructions and selected 31/64-bit applications.
+memory layout. The current contract is a protected AMODE64 nucleus with
+Classic C31 services in K, one shared U address space, standard z/Architecture
+instructions and selected unchanged AMODE24/31/64 applications.
 A change to one of these is a design change, even if it is only a small source
 edit.
 
@@ -18,17 +19,19 @@ All paths in this table are relative to the repository root.
 
 | Area | Start here | Important neighbors |
 | --- | --- | --- |
-| IPL and kernel loading | `pdos/src/pload.c`, `ploadsup.asm`, `install-ipl.c` | `pdos/scripts/image.crexx`; startup/heap addresses and disk records must agree. |
-| Initialization and memory | `pdos/src/pdos.c`: `pdosInit`, `pdosInitAspaces`, `ONESPACE` | `pdossup.asm`: `P64PC`; lowcore layout, DAT tables and reserved real frames. |
-| Dispatch and program completion | `pdos.c`: `pdosRun`, `pdosDispatchUntilInterrupt`, `pdosProcessSVC`, `RB` | `pdossup.asm`: `ADISP`, `ADISP64`, interruption handlers. |
-| Native load-module reconstruction | `pdos/src/pdosutil.c`: `fixPEModeBase` and public wrappers | `linker/src/`; section origins, relocation widths, entry and AMODE/RMODE metadata. |
-| Direct / high program loading | `pdos.c`: `pdosLoadExe`, `pdos64HighService`, `pdos64HighRead` | Child ownership, input/image capacities, high slot lifetime and cleanup. |
-| DD and dataset services | `pdos.c`: `pdos64SVC99`, `pdos64BindDd`, `pdos64ReadDscb`, `pdos64Pds*` | DCB/TIOT maps and the selected PDPCLIB native caller. |
-| Physical disk and terminal I/O | `pdos/src/pdossup.asm`; `pdos.c`: `write3270` and record helpers | Channel status, retry behavior, target buffer addresses and record framing. |
-| Command processor | `pdos/src/pcomm.c` | PDPCLIB `system()`/startup path and kernel command handling. |
-| C library and service macros | `pdpclib/src/`, `pdpclib/src/profiles/pdos-zarch/`, `pdpclib/src/interfaces/` | Shared component: changes may affect both OS and external SDK consumers. |
-| Build and distribution | `pdos/scripts/`, root `scripts/`, `.github/workflows/build-release.yml` | [Source-to-image dependencies](../architecture/DEPENDENCIES.md). |
-| Two-space successor memory | `pdos/src/twospace_dat.c`, `twospace_gate.c`, `twospace_real.c`, `twospace_placement.c`, `twospace_memory.c`, `twospace_key.asm` | K-owned table alias, live PTLB, U frame storage keys, real-frame and U interval ownership, fixed-origin overlay; `two-space-next.crexx` and `two-space-ipl.crexx` build its diagnostic image. |
+| IPL and kernel loading | `pload.c`, `ploadsup.asm`, `twospace_boot.c`, `install-ipl.c` | `image.crexx`, normal core configuration and KCORE.BIN packing. |
+| K entry, dispatch and completion | `twospace_normal.S`, `twospace_entry64.inc`, `twospace_nucleus64.inc`, `twospace_entry.asm` | Full architectural state, K/U ASCE and invocation return/fault handling. |
+| DAT, frames and placement | `twospace_dat.c`, `twospace_gate.c`, `twospace_real.c`, `twospace_memory.c`, `twospace_placement.c` | K-private aliases, storage keys, interval ownership and fixed-origin overlays. |
+| Native loading and calls | `pdosutil.c`, `twospace_tso.c`, `twospace_cms.c`, `twospace_load.inc`, `twospace_call.inc`, `twospace_high.inc` | Declared modes, image leases, copied parameters, native linkage and caller restoration. |
+| Files and durable output | `twospace_file.inc`, `twospace_cmsfile.c`, `twospace_store.c`, `twospace_service.c` | Invocation handles, cursors, DD/device binding and banked store commits. |
+| Shared operator media | `media_commands.inc`, `twospace_media.inc`, `media_dscb.h` | One-space `pdos.c` consumes the same algorithms; K supplies private buffers and channel completion. |
+| Channel and console | `twospace_channel.c`, `twospace_channel.asm`, `twospace_console.c`, `twospace_console.inc`, `twospace_transcript.c` | Separate low-real workspaces, matching interruptions, terminal/input leases and capture gaps. |
+| U PCOMM and presentation | `pcomm.c`, `twospace_pcomm.c`, `twospace_ui.c` and their native linkage | Existing system/ATTACH behavior and checked terminal capability/screen requests. |
+| Runtime | `pdpclib/src/`, `profiles/pdos-zarch/`, `interfaces/` | Shared owner; changes may affect SDK consumers. |
+| Build and distribution | `pdos/scripts/`, root `scripts/`, `.github/workflows/build-release.yml` | [Dependencies](../architecture/DEPENDENCIES.md). |
+
+Source filenames without a prefix are under `pdos/src/`. The explicit legacy
+producer retains `pdos.c`/`pdossup.asm`; it is not the active K service dispatcher.
 
 ## Follow a request across the boundary
 
@@ -56,7 +59,8 @@ module's declared AMODE/RMODE rather than silently changing its contract.
   the kernel LP64. Saved registers and PSWs must survive a round trip.
 - **Memory ownership.** Low allocation, high heap and high code have separate
   backing ranges. Account for failure, child return, DELETE and repeated runs.
-  The high loader currently has one active owner, not a general module cache.
+  Native images and HIGH bodies have explicit invocation owners; a live image
+  cannot be silently evicted.
 - **Service scope.** Implement the selected form precisely and identify
   unsupported forms. A macro name shared with MVS is not evidence that every
   operand or control-block field has the same behavior.
@@ -74,6 +78,10 @@ implemented behavior. In particular, increasing a storage limit does not
 create a 64-bit C kernel, and `ATTACH`/`WAIT` names do not establish multitasking.
 
 ## Evidence for a change
+
+Complete whole-change code review and focused checks before expensive guest
+qualification, then record a source/input freeze and a bounded matrix. A
+repair returns to review before affected requalification.
 
 Use the existing [build contract](BUILD-CONTRACT.md) and
 [shared workflow](../../../doc/WORKFLOW.md). Match checks to what changed:

@@ -18,4 +18,4 @@ Record defects and future work only in doc/BACKLOG.md; Open does not authorise
 implementation. Preserve behaviour during structural work and repair only
 migration regressions. Do not commit, push or publish without session authority.
 
-The published 0.1.1 C32 kernel is AMODE31/RMODE24. The source default uses a K64 nucleus, protected K C31 services and shared U application space; PD-003 P0–P6 own its accepted scope. Consume only maintained PDPCLIB with the explicit pdos-zarch selection; do not copy another library into source control. Preserve unchanged-binary behaviour and the recorded 0.1 inputs. Guest operation requires Mainframe Lab guides and leases.
+The earlier 0.1.1 C32 kernel is AMODE31/RMODE24. The 0.2 source/release default uses a K64 nucleus, protected K C31 services and shared U application space; PD-003 P0–P6 own its accepted scope. Consume only maintained PDPCLIB with the explicit pdos-zarch selection; do not copy another library into source control. Preserve unchanged-binary behaviour and the recorded 0.1 inputs. Guest operation requires Mainframe Lab guides and leases.

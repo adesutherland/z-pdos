@@ -4,14 +4,17 @@ Read the [user guide](user/README.md) to boot the image, then the
 [architecture](architecture/README.md) to understand what happens between IPL
 and an application's service call.
 
-- [Architecture](architecture/README.md): boot, C32/64-bit boundaries, storage,
-  program loading, datasets and terminal services.
-- [Two-space successor](architecture/TWO-SPACE-POC.md): K64/C31/shared-U
-  contract and bounded implementation; the [256 MiB heap result](qualification/TWO-SPACE-256M-HEAPS-2026-10-06.md)
-  records the latest combined CMS-image and memory proof, with the remaining
-  compatibility gates in the [backlog](BACKLOG.md).
+- [Architecture](architecture/README.md): protected K64/C31, shared U,
+  ownership, native loading, storage, file and terminal services.
+- [K/U contract](architecture/TWO-SPACE-POC.md) and
+  [ABI inventory](architecture/TWO-SPACE-ABI.md): design decisions, native
+  entry/service forms and the separately labelled development checkpoints.
+- [P0–P6 qualification](qualification/TWO-SPACE-P6-2026-10-07.md): completed
+  normal-image workload, media, console and lifecycle results.
+- [0.2.0 release record](qualification/RELEASE-0.2.0.md): candidate review,
+  build, operator acceptance and publication status.
 - [Source-to-image dependencies](architecture/DEPENDENCIES.md): selected inputs,
-  the three linked programs and disk construction.
+  Classic/GNU links and disk construction.
 - [Development guide](development/README.md): source map and change contracts.
 - [Build contract](development/BUILD-CONTRACT.md): recorded acceptance stages.
 - [0.1 guest qualification](qualification/QUALIFICATION.md): exact historical

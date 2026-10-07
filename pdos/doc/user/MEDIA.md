@@ -1,6 +1,8 @@
 # Exchange disks and tape records
 
-This guide describes the z/PDOS 0.1.1 media commands. Use a disposable image
+This guide describes the shared media commands used by z/PDOS 0.2 K/U and
+the retained one-space producer. The [P6 record](../qualification/TWO-SPACE-P6-2026-10-07.md)
+qualifies their normal K/U route. Use a disposable image
 and keep the original disk and distribution tapes unchanged. A Hercules
 attachment is a host action; `MOUNT` and `TAPE MOUNT` register an already
 attached device inside z/PDOS.
@@ -134,7 +136,9 @@ Native allocation accepts `TAP:0560` only for the registered tape address.
 A short native read through PCOMM `COPY TAP:0561 OUT.DAT` also passed guest and
 stopped-disk byte checks. The reverse `COPY PROBE.DAT TAP:0561` wrote one
 80-byte record to a separate writable image and passed stopped-tape readback.
-Larger application records need their own qualification. The inherited
+The K/U P6 native COPY round trip also preserves one 160-byte physical tape
+record as two FB80 logical disk records. Larger application records need
+their own qualification. The inherited
 `TAV:` path is not admitted by this route.
 
 Tape transport preserves the original distribution image. A CMS VMFPLC2 HET
@@ -143,5 +147,11 @@ report physical records and file marks. The [fixture recipe](FIXTURES.md)
 decodes a bounded logical subset on the host and verifies z/PDOS output
 records after guest shutdown. It does not make CMS MODULEs executable.
 
-The [phase 2 qualification record](../qualification/PHASE2-2026-10-04.md)
-states which paths have actually run on a guest.
+Native CMS/TSO application output and transcripts use banked `PDOS.STORE`
+on the IPL disk, even when an exchange volume is selected. Native sequential
+COPY and RCOPY to exchange datasets write their physical target. Verify the
+stopped store and physical media separately.
+
+The [P6 record](../qualification/TWO-SPACE-P6-2026-10-07.md) states the current
+K/U results; [phase 2](../qualification/PHASE2-2026-10-04.md) retains the earlier
+one-space media proof.

@@ -1,21 +1,22 @@
 # Install, build and release the Classic tools
 
-The [0.1.1 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.1.1)
-contains tools for macOS Apple Silicon, macOS Intel, Linux x64 and Windows x64,
-plus a source archive and a separate z/PDOS base disk image.
+Version 0.2.0 packages the protected K64/C31 kernel and shared-U base image,
+plus Classic tools for macOS Apple Silicon/Intel, Linux x64 and Windows x64.
+The [release record](../pdos/doc/qualification/RELEASE-0.2.0.md) distinguishes
+review, local source build, exact operator acceptance, hosted builds and
+publication. The [P6 record](../pdos/doc/qualification/TWO-SPACE-P6-2026-10-07.md)
+contains the completed architecture/workload qualification.
 
-The [release workflow](https://github.com/adesutherland/z-pdos/actions/runs/37308481475)
-passed for source `69b638d38dc4221cbed399d8fde5bf4883673901`: both compiler
-variants, the required host suite and a relocated compile/assemble/link check
-on all four hosts, plus the Linux source-to-image checks. macOS packages were
-signed and notarized. CI built the Windows packages unsigned; the separate
-local signing step completed for 0.1.1. The published Windows ZIP and installer
-are Authenticode signed and timestamped. The
-[local operator acceptance](../pdos/doc/qualification/0.1.1-OPERATOR-UAT-2026-10-05.md)
-and downloadable Linux-built base image have distinct image identities.
-The released image receipt pins the same PLOAD, PDOS, PCOMM and CONFIG payload
-hashes as the locally accepted bare producer. Its CCKD container has a separate
-hash and was not itself used for that guest run.
+The hosted matrix builds both compiler variants, runs required host checks
+and a relocated compile/assemble/link check on four hosts. Linux additionally
+builds and checks the K/U disk with GNU s390 Binutils. macOS release packages
+require Developer ID signing and notarization. Windows initially has explicitly
+unsigned CI downloads; the separate local signing operation replaces them
+with verified signed assets. Consult the release record for actual completion.
+
+The [0.1.1 workflow](https://github.com/adesutherland/z-pdos/actions/runs/37308481475)
+and operator acceptance remain historical one-space results; they do not
+establish 0.2.0 artifact acceptance.
 
 ## Choose a download
 
@@ -28,7 +29,7 @@ hash and was not itself used for that guest run.
 | Run the operating system | `pdos-image.zip` | Follow the [OS boot guide](../pdos/doc/user/README.md). |
 | Inspect or rebuild the release | `source.tar.gz` | Corresponding maintained source and recipes. |
 
-These are filename suffixes; release assets start with `z-pdos-0.1.1-`.
+These are filename suffixes; release assets start with `z-pdos-0.2.0-`.
 Verify downloads against the release's `SHA256SUMS` before use. The image ZIP
 also has an internal inventory for its extracted files.
 
@@ -84,9 +85,9 @@ crexx -nokeep scripts/build.crexx --args full-test
 To stage, verify and create a local macOS development package:
 
 ```sh
-crexx -nokeep scripts/release.crexx --args stage macos-arm64 0.1.1-dev.local
-crexx -nokeep scripts/release.crexx --args verify macos-arm64 0.1.1-dev.local
-PDOS_APPLE_SIGNING=unsigned crexx -nokeep scripts/release.crexx --args package macos-arm64 0.1.1-dev.local
+crexx -nokeep scripts/release.crexx --args stage macos-arm64 0.2.0-dev.local
+crexx -nokeep scripts/release.crexx --args verify macos-arm64 0.2.0-dev.local
+PDOS_APPLE_SIGNING=unsigned crexx -nokeep scripts/release.crexx --args package macos-arm64 0.2.0-dev.local
 ```
 
 Use the corresponding platform key `macos-x86_64`, `linux-x64` or
@@ -97,7 +98,10 @@ path. Staging and packaging require new output directories under
 and signing status. A local dirty package is development evidence.
 
 For the operating-system image, use the [OS build recipe](../pdos/doc/user/README.md#build-a-fresh-disk-from-source).
-It additionally requires Clang, `shasum` and Hercules disk utilities. The four
+It additionally requires Clang, Python 3, `shasum`, GNU s390 assembler/linker
+and Hercules disk utilities. Pass absolute GNU tool paths to `image.crexx`,
+or use `ZPDOS_GNU_AS`/`ZPDOS_GNU_LD`; Linux CI uses the distribution
+`binutils-s390x-linux-gnu` package. The four
 host-tool packages do not imply a source-to-image build on every host: the
 release image job runs on Linux, and the original local source-to-image
 milestone ran on Apple Silicon macOS.
@@ -132,7 +136,7 @@ configuration and boot instructions. It has only the base OS; no private disk
 or cREXX application package is copied into it. These host checks do not start
 a guest or establish new application execution.
 
-A pushed version tag such as `v0.1.1` runs the release matrix. Publication waits
+A pushed version tag such as `v0.2.0` runs the release matrix. Publication waits
 for all required host and image jobs; prerelease suffixes produce prereleases.
 The workflow creates neither the tag nor a development commit. Trusted branch
 and manual builds can exercise signing, but only version-tag pushes publish a

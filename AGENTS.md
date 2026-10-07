@@ -115,7 +115,7 @@ PDPCLIB is maintained only in pdpclib/src/. OS/application consumers use its
 explicit service profiles. Mainframe Lab keeps references and guest evidence;
 the modern SDK is a consumer. Kernel changes belong in pdos/src/; relocation
 changes belong in linker/src/; compiler changes belong in compiler/src/.
-The current z/PDOS 0.1 route is recorded in pdos/doc/qualification/.
+The current z/PDOS K/U route and historical 0.1 results are recorded in pdos/doc/qualification/.
 
 Use portable C89/C90 for the bootstrap assembler core, supplied-storage and
 explicit host-service interfaces. No mandatory POSIX, native 64-bit integer,

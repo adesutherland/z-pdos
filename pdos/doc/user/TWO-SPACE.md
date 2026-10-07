@@ -1,13 +1,15 @@
-# Selectable K/U source-built image
+# K/U source-built image and operator route
 
-The PD-003 successor has accepted P0–P6 results and is the default
+The PD-003 kernel has accepted P0–P6 results and is the default
 source-built kernel. Final code review and the recorded source freeze precede
 its accepted qualification.
-The published 0.1.1 image keeps its recorded one-ASCE boot route.
+Version 0.2.0 selects this route for release builds; the
+[release record](../qualification/RELEASE-0.2.0.md) names its operator acceptance.
+The earlier 0.1.1 image keeps its recorded one-ASCE boot route.
 
 The published 0.1.1 producer remains available explicitly as
 `pdos/scripts/one-space-image.crexx`; `image.crexx ... legacy` selects it.
-Publication of a successor release is a separate decision.
+Legacy results remain separate from K/U qualification.
 
 Use the owning checkout on develop, prepared Classic C/assembler/linker tools,
 GNU s390 assembler/linker, Hercules and, for workload qualification, the frozen beta-3 CMS/TSO stage inputs
@@ -111,7 +113,6 @@ have independent stopped-media verification.
 `two-space-media-gate.crexx` reproduces the accepted mounted CMS, fixture
 record-copy and tape workflow using the pinned workload and fixture inputs.
 The [P6 record](../qualification/TWO-SPACE-P6-2026-10-07.md) identifies those
-inputs, exact results and current final-selection status. General CMS/TSO
-services and unqualified low-level development commands remain outside this
-replacement contract; use the explicit one-space producer for that older
-operator environment.
+inputs, exact results and current final-selection status. General CMS/TSO services and unqualified low-level development commands remain
+outside this replacement contract. The explicit one-space producer retains
+its older operator environment and qualification.

@@ -5,6 +5,7 @@ options levelb
 import rxfnsb
 main: procedure = .int
   arg args = .string[]
+  i = .int
   if args.0 <> 2 then return 2
   work = args.1; version = args.2
   call require left(work,11) = "build/pdos/" & pos("..",work) = 0, "owned image output"
@@ -14,7 +15,7 @@ main: procedure = .int
   call require rc = 1, "new image payload"
   address crexx "run cmake -E make_directory :payload :assets"
   call require rc = 0, "image output directories"
-  source = work || "/media/pdos00.cckd"
+  source = work || "/image/media/pdos00.cckd"
   address crexx "run cmake -E copy :source :payload"
   call require rc = 0, "fresh compressed disk"
   do i = 1 to 3
@@ -22,9 +23,19 @@ main: procedure = .int
     address crexx "run cmake -E copy :source :payload"
     call require rc = 0, "image producer identities"
   end
-  source = "pdos/doc/qualification/QUALIFICATION.md"
+  do i = 1 to 3
+    component = word("base kernel image",i)
+    source = work || "/" || component || "/inputs.sha256"
+    target = payload || "/" || component || "-inputs.sha256"
+    address crexx "run cmake -E copy :source :target"
+    call require rc = 0, "component producer identities"
+  end
+  source = "pdos/doc/qualification/TWO-SPACE-P6-2026-10-07.md"
   address crexx "run cmake -E copy :source :payload"
-  call require rc = 0, "labelled historical guest scope"
+  call require rc = 0, "labelled K/U guest scope"
+  source = "pdos/doc/user/TWO-SPACE.md"
+  address crexx "run cmake -E copy :source :payload"
+  call require rc = 0, "K/U operator guide"
   source = "pdos/LICENSE"
   address crexx "run cmake -E copy :source :payload"
   call require rc = 0, "OS licence"
@@ -33,22 +44,27 @@ main: procedure = .int
   call require rc = 0, "Paul Edwards and upstream attribution"
   record = payload || "/hercules.cnf"
   call lineout record,"ARCHMODE z/Arch"
-  call lineout record,"MAINSIZE 4096"
+  call lineout record,"CPUMODEL 2064"
+  call lineout record,"MAINSIZE 256"
   call lineout record,"NUMCPU 1"
   call lineout record,"CNSLPORT 127.0.0.1:3270"
   call lineout record,"CODEPAGE 819/1047"
   call lineout record,"0009 3270"
+  call lineout record,"000A 3215 noprompt"
   call lineout record,"01B9 3390 pdos00.cckd"
   call lineout record
   record = payload || "/README.txt"
   call lineout record,"z/PDOS " || version || " base operating-system image"
   call lineout record,"Paul Edwards created PDOS; this is the maintained z/PDOS fork."
   call lineout record,"Built afresh from the selected source, with loader/dataset/compression checks."
-  call lineout record,"This image has host checks; no new guest/application qualification is claimed."
-  call lineout record,"Read QUALIFICATION.md for the distinct existing 4.9.1 guest evidence and limits."
+  call lineout record,"K64 nucleus, protected C31 kernel services and shared U application space."
+  call lineout record,"This archive's image has host checks; operator acceptance pins its own disk identity."
+  call lineout record,"Read TWO-SPACE-P6-2026-10-07.md and TWO-SPACE.md for guest scope and limits."
   call lineout record,"Keep an untouched copy; use a private writable disk copy for execution."
   call lineout record,"Run Hercules from this directory: hercules -f hercules.cnf"
-  call lineout record,"Connect a 3270 terminal to 127.0.0.1:3270, then issue IPL 01B9."
+  call lineout record,"Connect a model-2 3270 terminal as 0009@127.0.0.1:3270."
+  call lineout record,"Connect a Telnet 3215 monitor as 000A@127.0.0.1:3270 before IPL 01B9."
+  call lineout record,"EXIT commits the transcript, reports K SHUTDOWN and enters disabled wait."
   call lineout record,"No cREXX applications or shared Lab guest assets are bundled."
   call lineout record,"inputs.sha256 and outputs.sha256 retain producer paths for provenance."
   call lineout record,"Use SHA256SUMS to verify the files in this distributed image archive."

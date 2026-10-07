@@ -4,6 +4,6 @@
 #ifndef ZPDOS_VERSION_H
 #define ZPDOS_VERSION_H
 
-#define ZPDOS_VERSION "0.1.1"
+#define ZPDOS_VERSION "0.2.0"
 
 #endif

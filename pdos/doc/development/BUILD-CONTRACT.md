@@ -1,6 +1,13 @@
 # z/PDOS build and qualification contract
 
-1 October 2026. I selected the qualified PDIO1 source as our first OS rebuild
+The current 0.2 contract is the protected K64/C31 kernel and shared U image
+described in [architecture](../architecture/README.md).
+[P0–P6](../qualification/TWO-SPACE-P6-2026-10-07.md) are complete. The
+[0.2.0 release record](../qualification/RELEASE-0.2.0.md) owns the separate
+review, source freeze, build, operator and publication gates.
+
+The following initial toolchain gates retain the **1 October 2026 baseline**.
+I selected the qualified PDIO1 source as our first OS rebuild
 target. We preserve its accepted behavior and drive the Classic Tools work
 from its actual compiler, runtime and support inputs. Source preservation,
 C compilation, assembly, linking, source-built boot and application execution
@@ -59,7 +66,7 @@ may offer bounded compiler changes, but require separate review and tests.
 The [Classic compiler backlog](../../../compiler/doc/BACKLOG.md) records
 this decision policy and the existing alias/profile limitations.
 
-The OS machine contract is standard z/Architecture, one CPU, 4,096 MiB real
+That initial OS machine contract was standard z/Architecture, one CPU, 4,096 MiB real
 storage, a 100-cylinder 3390 and the qualified IBM1047 console behavior.
 The kernel's AMODE31/RMODE24 metadata and 32-bit C pointers do not restrict
 its support instructions to System/370. The named `pdos-zarch` kernel contract selects the z900 base ISA ceiling.
@@ -72,9 +79,9 @@ ABI or claim a new instruction facility. Later selectors must use the same
 hardware ceiling in Classic and ELF tools.
 The SDK's historical integer application profiles remain separate contracts.
 Retain the existing generous high heap and code/stack mappings for 64-bit
-applications. The proposed [two-space successor](../architecture/TWO-SPACE-POC.md)
-uses an AMODE64 assembler nucleus with C31 supervisor services; integrating it
-into a native boot image remains separate work.
+applications. The implemented [K/U kernel](../architecture/TWO-SPACE-POC.md) now uses an
+AMODE64 assembler nucleus with C31 supervisor services and a 256 MiB normal
+profile. Its source-to-IPL and application/media gates are accepted in P6.
 
 ## Boot and application evidence
 

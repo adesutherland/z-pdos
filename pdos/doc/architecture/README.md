@@ -1,277 +1,148 @@
-# How z/PDOS works
+# How z/PDOS 0.2 works
 
-z/PDOS is a small mainframe operating system descended from Paul Edwards's
-PDOS. Its current purpose is to boot from a disk built entirely from source
-and run useful native mainframe applications through a defined subset of
-MVS-style interfaces. cREXX supplies the first substantial workload.
+z/PDOS boots from a source-built 3390 disk and runs selected native CMS and
+TSO applications. Version 0.2 uses two translations on one z/Architecture
+CPU: a protected supervisor address space **K**, and one shared application
+address space **U**. The [P0–P6 record](../qualification/TWO-SPACE-P6-2026-10-07.md)
+identifies the accepted workloads. The [release record](../qualification/RELEASE-0.2.0.md)
+identifies the 0.2.0 candidate and operator acceptance separately.
 
-This guide describes the active `pdos-zarch` build. The source retains other
-historical configurations, but their presence does not give them the same
-support or qualification. See [profiles](../../../doc/PROFILES.md) for those
-boundaries and the [exact guest record](../qualification/QUALIFICATION.md)
-for what has run.
-
-The source-built successor has a protected K address space and one shared
-64-bit U address space. The AMODE64 nucleus saves full architectural state
-and switches ASCEs; most checked services and the terminal encoder run as
-Classic C31 in K. PCOMM and its C presentation library run in U. K owns
-placement, real frames, native image leases, file handles, terminal leases
-and interruption-driven completion. A native child may use the same CMS or
-TSO personality at another qualified address mode; caller files, cursors,
-lowcore and full context are restored on return or recoverable U fault.
-
-The [two-space contract](TWO-SPACE-POC.md) and [ABI inventory](TWO-SPACE-ABI.md)
-record that design. P0–P6 are accepted; [P6](../qualification/TWO-SPACE-P6-2026-10-07.md)
-records final reviewed qualification and source-default selection. Models 2–5, the line-only
-primary, optional attached monitor and explicit capture gaps have normal-image
-results. K code, stack and table storage use no low-U virtual reservation.
-The shared-U choice remains; separate personality ASCEs require the recorded
-conflict or isolation trigger.
-
-The following boot and execution description records the published 0.1.1
-one-ASCE kernel. Its exact earlier results remain in the dated qualification
-records. The [successor operator guide](../user/TWO-SPACE.md) describes the
-source-built K/U route and its current selection status.
-
-## The system at a glance
+## Boot and execution
 
 ```text
-Hercules: CPU, memory, channel subsystem, 3390 disk and 3270 terminal
-  │ IPL from the disk
+Hercules: one z/Architecture CPU, 256 MiB, 3390 and terminal devices
+  │ IPL 01B9
   ▼
-PLOAD.SYS       Find, reconstruct and enter PDOS.SYS
-  │
-  ▼
-PDOS.SYS       Initialize memory, devices and application context
-  │
-  ├── COMMAND.EXE (PCOMM) ── command / ATTACH ──► native application
-  │                                                 │
-  ◄────────────────── return / service request ──────┘
-  │
-  └── kernel service handlers ── channel I/O ──► disk or console
+PLOAD.SYS → PDOS.SYS C31 handover → KCORE.BIN
+                                    │ protected K
+                                    ├─ AMODE64 interruption nucleus
+                                    ├─ Classic C31 services and channel I/O
+                                    │ checked dispatch and U-buffer transfers
+                                    ▼ shared U
+                              U.COMMAND (PCOMM)
+                                    │ existing ATTACH/WAIT/DETACH route
+                                    ▼
+                         native CMS or TSO application
+                                    │ service, return or recoverable fault
+                                    └──────────────────────────────► K
 ```
 
-Hercules emulates the machine. z/PDOS supplies the guest operating system:
-it issues channel operations, reads the disk's structures and handles
-application requests. Guest file operations are not direct calls to the
-host's filesystem API. A host file holds the emulated disk, but the guest sees
-a 3390 device with its own records and volume metadata.
+The IPL records and channel commands are explicitly encoded by the source
+image builder. `PLOAD.SYS` locates and reconstructs `PDOS.SYS`. That C31
+handover loads the checked `KCORE.BIN`, establishes K/U translation and enters
+the K64 nucleus. K starts the native U PCOMM stage from `U.COMMAND`.
+`COMMAND.EXE` remains a bootstrap/legacy payload in the base disk;
+`CONFIG.SYS` and the normal core configuration identify terminal setup.
+`PDOS.STORE` supplies the preformatted durable output banks.
 
-There are three linked programs in the base image:
+An **ASCE** selects the address-space translation tables; an **AMODE** selects
+24-, 31- or 64-bit execution addressing. All applications use the same U
+ASCE regardless of AMODE. On interruption the nucleus saves the full GPR,
+FPR, access-register, floating-point-control and PSW state, selects K, and
+calls checked C31 services. Dispatch restores the selected U context and
+ASCE. High U addresses cross explicit two-word address interfaces; C31
+pointers do not become 64-bit pointers.
 
-| Disk dataset | Responsibility | Runtime |
-| --- | --- | --- |
-| `PLOAD.SYS` | Initial boot and kernel loading. Installed as a flat image with explicit IPL records. | PDPCLIB standalone startup/support, plus `PLOADSUP`. |
-| `PDOS.SYS` | Kernel: memory, application execution, loading, disk, terminal and service handling. | PDPCLIB standalone startup/support, plus `PDOSSUP`. |
-| `COMMAND.EXE` | PCOMM command processor. Runs as an application and requests kernel services. | PDPCLIB MVS-style startup and the selected `MVSSUPA` service layer. |
+PCOMM uses its existing PDPCLIB `system()` and ATTACH/completion behavior.
+One foreground invocation chain executes at a time. K records each child's
+personality, parent state, loaded image, allocations, open files and terminal
+lease. Return or a recoverable U fault releases child resources and restores
+the caller, including file cursors and personality lowcore. Pending I/O is
+completed or cancelled through its owned operation before reclamation.
+K can emit emergency output and shut down even if the U command processor
+faults. This is a single-user development OS, without a general multitasking
+scheduler or isolation between applications sharing U.
 
-`CONFIG.SYS` selects the console. The release image contains these four
-datasets; cREXX applications are external consumers.
+## Memory and native loading
 
-## Boot: from IPL to the prompt
+Dynamic address translation maps sparse U virtual pages to separately owned
+real frames. K administers those frames and its table aliases; U cannot map
+K's body, stack or private tables. The normal profile uses 256 MiB real
+storage. K's original 4 MiB bootstrap reservation contains its 96-page C31
+code bank and protected 128 KiB C stack, plus low-real channel resources.
+Disk I/O uses a separate workspace at real `0x3e0000`; terminal I/O uses
+`0x3f0000`. These real reservations consume no low-U virtual interval.
 
-**IPL** is the machine's initial program load. The image recipe uses Hercules
-disk utilities to create a new volume, then
-[`install-ipl.c`](../../src/install-ipl.c) writes and checks the target IPL
-records and channel command words. It encodes target bytes explicitly rather
-than dumping host C structures onto disk.
+Placement respects each native image's declared addressing and residence
+mode. Fixed CMS24 images keep their checked origin; relocatable CMS31 and
+TSO images use suitable U intervals. A live module is not silently displaced
+to load another. Checked fixed-origin overlays restore a suspended caller's
+backing; a collision that cannot be supported fails explicitly. Normal-image
+loading has a 32-entry image registry and bounded native input/reconstruction
+capacities. HIGH uses the unchanged low launcher, native LOAD/DELETE and a
+separately placed AMODE64 body above 4 GiB. It is not arbitrary dynamic linking.
 
-PLOAD begins at address zero. Its assembler support establishes a stack;
-[`pload.c`](../../src/pload.c) obtains the IPL device, locates `PDOS.SYS` in
-the volume table of contents (VTOC), and reads its records into storage at
-2 MiB. The shared load-module reader reconstructs the kernel and applies
-relocations for that address. PLOAD calls the resolved entry, passing a
-standalone-runtime parameter block with a heap starting at 3 MiB.
+PCOMM's C arena is 16 MiB above the line, with low control blocks placed beyond
+the declared fixed CMS24 image. The qualified cREXX runtime heaps are 64 MiB
+for 31-bit profiles and 128 MiB for 64-bit profiles. Their backing fits the
+selected sequential/nested workloads; these numbers do not promise that every
+combination fits simultaneously. AMODE24 images, stacks, control blocks and
+heap must fit below 16 MiB. Native TSO24's 4 MiB heap qualifies the library-free
+IO24 route; full-library IOQUAL remains unqualified.
 
-The kernel then initializes the console from `CONFIG.SYS`, builds its memory
-translation tables and service control blocks, and enters PCOMM from
-`COMMAND.EXE`. PCOMM is a 31-bit application placed above 16 MiB. It may probe
-for `AUTOEXEC.BAT`; an absent startup file is normal in the base image.
+The shared load-module reader in `pdosutil.c` reconstructs native sections and
+relocations. `twospace_tso.c`, the CMS reader and K placement/invocation code
+preserve native entry and return conventions. An XMIT envelope is transport,
+not the executed format. An ELF object needs its SDK export/native-entry route.
+The [ABI inventory](TWO-SPACE-ABI.md) pins the unchanged package bytes and
+reached service forms.
 
-The loader and kernel are linked **AMODE31/RMODE24**: they execute with 31-bit
-addressing but reside below 16 MiB. PCOMM is **AMODE31/RMODE ANY**, allowing its
-code above 16 MiB and below 2 GiB. Residence and execution mode are separate
-properties.
+## Services, files and media
 
-## Execution: a C32 kernel with 64-bit application support
+The selected TSO surface includes ATTACH/LINK and completion, low storage,
+HIGH LOAD/DELETE and IARV64-style storage, terminal calls, DD binding,
+dataset metadata, OPEN/CLOSE and native sequential/PDS access. CMS uses its
+selected SVC 202/204/205 entry, terminal, storage and file forms. These names
+identify the reached compatibility subset; they do not imply general IBM
+service support. Unknown services in the normal image return unsupported
+status 20. PCOMM reports a launch/service failure as OS status with
+`RC=unavailable`, separately from an application's normal return code.
 
-Classic C builds the kernel with 32-bit pointers. A 64-bit application therefore
-cannot enter arbitrary C kernel code with full-width pointers and expect a
-compatible call. The boundary is implemented explicitly in
-[`pdossup.asm`](../../src/pdossup.asm) and the service dispatcher in
-[`pdos.c`](../../src/pdos.c).
+K validates complete U buffers and control blocks against the invocation and
+address mode before transfer. The driver submits channel work, then publishes
+data and completion after the matching I/O interruption. A watchdog detects
+failure; elapsed time cannot manufacture a successful completion.
 
-The main structures are:
+Native CMS/TSO application output and the ordered transcript commit to banked
+`PDOS.STORE` on the IPL disk. A selected exchange volume does not redirect
+those journaled outputs. Stopped-store adapters independently verify text,
+binary bytes, record order and empty-file semantics. The store is bounded;
+it is not a general filesystem or unlimited logging service.
 
-| Structure | What it holds |
-| --- | --- |
-| `PDOS` | Global kernel state, the current address-space selection and current application context. |
-| `ONESPACE` | Translation tables, below/above-line storage managers, request-block chain and task control block. The active z/Architecture build has one address space. |
-| `RB` | A request block for an executing program: saved registers and PSW, parent linkage, entry/return state and owned load image. The z/Architecture fields also hold full 64-bit register and PSW state. |
+The existing `DEVICES`, `VOLUMES`, `MOUNT`, `SELECT`, `UNMOUNT`, `DIR`,
+`ALLOC`, `RCOPY` and `TAPE` algorithms live once in `media_commands.inc`.
+The K port supplies private buffers and interruption-driven channel I/O.
+A DD retains its actual device binding across volume selection. Qualified
+native sequential COPY writes/readbacks its physical exchange target;
+raw tape preserves physical records and file marks. See [MEDIA](../user/MEDIA.md)
+for the allocator, extent, record and tape limits. Exact stopped readback,
+not console success alone, establishes the output.
 
-`pdosRun` repeatedly dispatches the current context and processes the event
-that returns control. `pdosDispatchUntilInterrupt` prepares the low-memory
-handoff area. The assembler entry `ADISP` resumes a 31-bit context; `ADISP64`
-restores full-width registers and a 16-byte PSW for a 64-bit context. SVC and
-program-interruption handlers save the application state and return to C.
-The C/assembler boundary preserves register high halves when a service updates
-only a 32-bit result.
+## Console and text
 
-An **SVC**, or supervisor call, is how an application asks the OS for a service.
-The current `ATTACH` path is synchronous: it creates a child context and leaves
-the parent suspended until that child completes. SVC 3 performs return and
-cleanup, reports the result and resumes the parent. `WAIT` is currently a
-no-op; `DETACH` provides limited storage cleanup. These names do not imply a
-complete MVS task scheduler.
+A C31 K driver owns channel devices and encodes checked 3270 data streams.
+The reusable C presentation library runs in U and provides PCOMM's header,
+footer, scrollable output and editable prompt. Configured models 2–5, a
+line-only primary and an optional Telnet 3215 monitor have accepted results.
+Child entry suspends the caller's screen lease; return restores it and the
+caller repaints. There is one input owner, with explicit line-prompt handoff.
 
-The accepted machine has one CPU. Applications share the current mappings;
-the native application PSW uses problem state with storage key zero. This is
-a development system without a general process-isolation or multi-user
-security model. Some child program interruptions are converted into a failing
-return and cleanup; that is not a promise that every faulty application can
-be recovered safely.
+The monitor captures ordered logical text while the 3270 remains interactive.
+Raw screens and monitor disconnects produce explicit gaps; a passing loss or
+recovery control is not complete capture. EXIT commits durable text, reports
+`K SHUTDOWN` and enters disabled wait. Connect the configured primary and
+monitor before IPL.
 
-## Memory: what is mapped and what is allocated
+Native terminal/batch text uses IBM1047 and hex `15` line delimiters; Hercules
+uses `CODEPAGE 819/1047`. Classic C's execution text, application UTF-8,
+console conversion and binary dataset bytes are distinct. No generic text
+conversion is applied to binary records.
 
-The layout is deliberately fixed. Dynamic address translation (DAT) maps
-virtual addresses to real storage; the storage managers then allocate blocks
-within the supplied ranges. There is no demand pager or general virtual-memory
-object manager behind these calls.
+## Implementation and qualification
 
-| Region in the active disk-boot configuration | Current placement |
-| --- | --- |
-| PLOAD, boot stack and boot heap | PLOAD starts at 0; the z/Architecture standalone stack starts in the reserved 15–16 MiB system range; PLOAD heap starts at 1 MiB. Other standalone profiles retain their historical 0.5 MiB stack. |
-| Kernel image and standalone heap | Kernel starts at 2 MiB; its heap starts at 3 MiB and shares the 3–12 MiB range with its large DAT tables. |
-| Below-line application allocation | 12 MiB to 15 MiB, managed by `btlmem` in the active z/Architecture build. CMS24 MODULE images use their checked fixed origin at `0x20000` and must end by 2 MiB. “The line” is the 16 MiB boundary. |
-| Above-line application allocation | 16 MiB to 512 MiB, managed by `atlmem`. PCOMM and direct native loads use low-address storage in this area. |
-| High application heap | Virtual `0x100000000` (4 GiB), backed by 128 MiB of real storage starting at `0x30000000` (768 MiB). |
-| High code/stack windows | Two 16 MiB slots starting at virtual `0x110000000` (4 GiB + 256 MiB), backed by 32 MiB starting at real `0x38000000` (896 MiB). |
-
-The qualified Hercules configuration supplies **4096 MiB of real storage**.
-The linked kernel is 0x2f628 bytes in its one MiB slot at 2–3 MiB. Its
-compiled `PDOS` structure is 8,802,304 bytes, mostly eager DAT tables. The
-initial allocation requests another 4,096 bytes for alignment, leaving at
-most 630,784 bytes before the 12 MiB application pool, even before allocator
-overhead and later kernel allocations. The boot check rejects layouts where
-that initial allocation crosses the pool; the standalone heap itself has no
-general upper bound. The reserved 15–16 MiB stack is a bounded CMS24
-compatibility bridge. A CMS24 fixed-origin image also covers PLOAD's 1 MiB
-boot heap. After the kernel has run, z/Architecture shutdown loads its own
-`0444` wait PSW instead of returning through PLOAD's C exit path. This avoids
-using the overwritten boot heap during shutdown; it does not give that heap
-separate storage. Moving the kernel body above the line, while retaining
-below-line entry and channel-I/O resources, belongs to
-[PD-003](../BACKLOG.md#pd-003-two-space-supervisor-and-shared-application-memory).
-High virtual addresses do not require physical storage at the same address:
-the tables map those windows to the real ranges above. The selected code
-initially maps the low 4 GiB directly and aliases it into the next 4 GiB,
-then replaces the high heap and code-window mappings. These aliases are
-another reason not to infer isolation from the existence of DAT.
-
-The assembler `P64PC` entry implements a bounded IARV64-style interface for
-high storage. It accepts the selected version-zero GETSTOR requests for 32 or
-128 segments, tracks one allocation, and returns the fixed 4 GiB address.
-DETACH validates and releases that allocation state. This is the interface
-needed by the selected application route, not general IARV64 support.
-
-Changing this layout affects more than a C constant. The DAT tables, allocator
-limits, assembler service constants, image sizes and application's storage
-requests must agree. A source-review concern in the unused region-table
-initialization is recorded as [PD-011](../BACKLOG.md#pd-011-region-first-table-padding).
-
-## Loading a program
-
-The program loader consumes the native load format produced by the supported
-linker/exporter route. `fixPE`, `fixPEMode` and `fixPEHigh` in
-[`pdosutil.c`](../../src/pdosutil.c) reconstruct sections and apply relocation
-records with explicit capacity limits. The inherited `PE` name here refers
-to the mainframe load representation; it does not mean Windows Portable
-Executable support.
-
-**Direct load.** `pdosLoadExe` looks for the executable dataset, reads its
-record stream and reconstructs an image in above-line storage. The current
-input and reconstruction buffers are bounded at 8 MiB. The native directory supplies
-AMODE and RMODE. This path accepts the supported 31/64-bit, RMODE ANY route;
-it rejects AMODE24 or low-residence requirements before dispatch. Retained
-flat `.COM` handling is a separate legacy path, outside the native-module
-qualification described here.
-
-**High load.** An AMODE64/RMODE ANY launcher requests a high body through the
-selected SVC 8 `LOAD` path. The caller temporarily enters AMODE31 for this
-parameter-list interface; the handler checks that mode and the low-address
-module-name pointer. `pdos64HighService` reads an executable within its
-recorded first extent, reconstructs it with `fixPEHigh`, and places it in one
-of the 16 MiB high slots. Its input and reconstruction buffer is capped at
-5 MiB; the larger slot does not lift that limit. There is one active
-high load at a time; the slots alternate between loads. The service returns
-a full-width entry address. SVC 9 `DELETE`, or owning-task cleanup, releases
-the high body and clears its loaded bytes. This supports the recorded cREXX
-HIGH launcher/body arrangement, not arbitrary dynamic linking.
-
-An **XMIT** file is a transport envelope for native mainframe content. It is
-not the executable format dispatched by the CPU. The cREXX qualification
-removed that envelope while preserving the native load bytes; it did not
-recompile or patch the application for z/PDOS. Likewise, ELF source and
-objects need their SDK's export/entry route before this loader can use them.
-
-## Services supplied to applications
-
-The kernel implements a selected compatibility surface, not every form of
-the IBM services sharing these names. The principal cases in
-`pdosProcessSVC` are:
-
-| Area | Selected implementation and boundary |
-| --- | --- |
-| Execution | SVC 42 `ATTACH` and SVC 3 completion form a synchronous parent/child chain. |
-| Storage below 2 GiB | SVC 10/120 GETMAIN/FREEMAIN forms use the two storage managers. Invalid-request behavior remains a qualification item. High storage uses `P64PC` separately. |
-| High program loading | SVC 8/9 LOAD/DELETE serve the bounded launcher/body route above. |
-| Terminal | SVC 93 TGET/TPUT and SVC 35 WTO. Native terminal buffers stay below 2 GiB; selected reads are limited to 256 bytes and writes to 132. |
-| DD binding | SVC 99 binds selected DD names to existing disk datasets through a 32-entry TIOT. It is not a general dataset-creation or allocation service. |
-| Dataset metadata | Selected SVC 18 BLDL/FIND, SVC 27 OBTAIN, SVC 24 DEVTYPE and SVC 64 RDJFCB forms supply the metadata needed by the runtime. |
-| Dataset access | SVC 22 OPEN and SVC 20 CLOSE establish and finish supported DCB operations. Native read/write callbacks use project-specific SVC 251/250. |
-
-A **DD name** is a program's logical name for a dataset; the **TIOT** holds
-those bindings. A **DCB** is the runtime/OS data-control block for an open
-file. A **DSCB** describes a dataset on disk. The kernel supplies a small
-set of these structures, along with a synthetic device control block for
-`PDOS00`, so the selected native runtime can use familiar interfaces.
-
-Some inherited callbacks are placeholders: `CHECK` is a no-op in the
-synchronous route, and NOTE/POINT/TRKCALC must not be read as evidence of full
-positioning support. Unhandled SVCs in the selected native RMODE ANY context
-print a diagnostic and return 12 in registers 15 and 0. Other retained
-contexts do not necessarily have that same fallback behavior.
-
-## Disk records, datasets and character encoding
-
-The base disk is a 100-cylinder 3390. Its count-key-data (CKD) records and VTOC
-are interpreted inside z/PDOS. `rdblock` and `wrblock` in the assembler support
-perform channel I/O; the C kernel handles dataset lookup, sequential access,
-selected partitioned-dataset member operations and directory updates.
-
-A partitioned dataset (PDS) has a directory pointing to members by track and
-record. The selected PDS writer retains pending state and commits the directory
-entry after writing the member and its end-of-file record. The recorded repair
-checks complete data and directory results, including full-track handling;
-a successful OPEN alone is not sufficient evidence. The implementation remains
-bounded by its selected extent and directory handling. It is not a complete
-MVS access-method implementation.
-
-Text conversion belongs at the appropriate runtime boundary. The Classic
-compiler's selected execution character set is EBCDIC CP037, with hex `15`
-used for newline; the supplied Hercules console configuration uses IBM1047.
-Binary files must preserve bytes. cREXX's UTF-8 handling is application/runtime
-behavior, not a claim that every z/PDOS dataset is UTF-8 text.
-
-## Where to work next
-
-The [development guide](../development/README.md) maps changes to source and
-interfaces. [Build dependencies](DEPENDENCIES.md) trace the source-to-image
-route. The [single backlog](../BACKLOG.md) owns known defects and next steps,
-including AMODE24 loading, storage errors and operator improvements.
-
-The longer-term direction includes a native 64-bit C kernel. That requires
-explicit decisions about the compiler ABI, pointer-bearing control blocks,
-bootstrap, low-address service interfaces and memory ownership. Existing
-64-bit application execution provides useful experience; it does not complete
-that conversion.
+The [development guide](../development/README.md) maps these roles to source;
+[dependencies](DEPENDENCIES.md) describes the Classic/GNU source-to-disk route.
+The [K/U contract](TWO-SPACE-POC.md) contains decisions and dated development
+checkpoints. Dated 0.1/0.1.1 reports retain the previous one-ASCE layout; their
+4096 MiB machine and eager tables are not the 0.2 memory contract.
+The [backlog](../BACKLOG.md) owns remaining compatibility and qualification work.
