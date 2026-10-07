@@ -515,6 +515,13 @@ static unsigned int native_line_input(unsigned int address,unsigned int capacity
 {
     TSGREQUEST request;unsigned char raw[256],text[256];unsigned int rc,n,i;
     if(!count||!capacity||capacity>256U||sf_span(address,capacity,1U,0,0U))return 8U;
+    if(console_v1_enabled()){
+        unsigned int aid;
+        rc=console_v1_read(text,capacity,&n,&aid,0U);if(rc)return rc;
+        for(i=n;i<capacity;++i)text[i]=0x40U;
+        if(sf_span(address,capacity,1U,text,1U))return 8U;
+        *count=n;return 0U;
+    }
     request.address.hi=request.address.lo=request.length=request.direction=0U;
     request.svc=209U;rc=terminal_read_start(&request);if(rc)return rc;
     request.length=256U;request.direction=TSG_WRITE;

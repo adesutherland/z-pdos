@@ -11,6 +11,7 @@
          ENTRY TSCPOLL
          ENTRY TSCCLEAR
          ENTRY TSCWAITR
+         ENTRY TSCWAITI
 TSCIO    DS    0H
          STM   2,10,28(13)
 * No armed wait state until SSCH succeeds
@@ -33,6 +34,9 @@ TSCARM   LA    5,128(4)
 * STCTG C0,C0,184(R4)
          DC    X'EB0040B80025'
          MVC   208(8,4),184(4)
+         LA    7,2
+         CR    9,7
+         BRCL  8,TSCNOPRM
 * CR0 bit52 enables the clock-comparator interruption.
          OI    214(4),X'08'
 * LCTLG C0,C0,208(R4)
@@ -44,6 +48,7 @@ TSCARM   LA    5,128(4)
          ST    6,176(4)
 * SCKC 176(R4)
          DC    X'B20640B0'
+TSCNOPRM DS    0H
 * EPSW R6,R7
          DC    X'B98D0067'
          STM   6,7,192(4)
@@ -61,13 +66,21 @@ TSCARM   LA    5,128(4)
          LA    8,1
 * First completion is delivered through the real I/O interruption path.
          DC    X'B2B240A0'
-TSCWAIT  LR    1,2
+TSCWAIT  LA    7,2
+         CR    9,7
+* Prompt wait only notifies C of an interruption. C owns the status routing
+* and still requires the exact channel completion before reporting success.
+         BRCL  8,TSCOK
+         LR    1,2
          TSCH  0(4)
          BRCL  8,TSCDONE
          BRCL  4,TSCNOST
          BRCL  15,TSCFAIL
 TSCNOST  STCK  8(5)
          BRCL  7,TSCFAIL
+         LA    7,2
+         CR    9,7
+         BRCL  8,TSCIDLE
          L     7,8(5)
          L     6,0(5)
          SR    7,6
@@ -76,6 +89,7 @@ TSCNOST  STCK  8(5)
 * Deadline only reports a stalled operation
          BRCL  10,TSCFAIL
 * Wake only on an actual interruption event
+TSCIDLE  DS    0H
          DC    X'B2B240A0'
 TSCFAIL  SR    15,15
          BCTR  15,0
@@ -86,8 +100,9 @@ TSCREJ   SR    15,15
          BCTR  15,0
          BCTR  15,0
          BRCL  15,TSCRET
-TSCDONE  LTR   9,9
-         BRCL  8,TSCOK
+TSCDONE  LA    7,1
+         CR    9,7
+         BRCL  7,TSCOK
 * Clear completion is required before a cancelled workspace can be reused.
          TM    2(4),X'10'
          BRCL  8,TSCNOST
@@ -170,6 +185,15 @@ TSCWAITR DS  0H
          STM   2,10,28(13)
          SR    8,8
          SR    9,9
+         L     2,0(,1)
+         L     4,4(,1)
+         BRCL  15,TSCARM
+* A line prompt may legitimately remain idle. This returns a wake notification;
+* C routes status and judges completion. Qualification has its own watchdog.
+TSCWAITI DS    0H
+         STM   2,10,28(13)
+         SR    8,8
+         LA    9,2
          L     2,0(,1)
          L     4,4(,1)
          BRCL  15,TSCARM

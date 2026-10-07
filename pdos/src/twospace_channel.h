@@ -10,8 +10,8 @@
 #define TSC_IO -2
 #define TSC_REGION_BYTES 0x10000U
 #define TSC_MAX_RECORD 18452U
-#define TSC_MAX_CONSOLE 2048U
-#define TSC_MAX_INPUT 256U
+#define TSC_MAX_CONSOLE 16384U
+#define TSC_MAX_INPUT 16384U
 #define TSC_ORB_OFFSET 0x000U
 #define TSC_IRB_OFFSET 0x100U
 #define TSC_CCW_OFFSET 0x200U
@@ -39,6 +39,8 @@ int TSCCHECKREAD(const TSCSTATE *state, unsigned int capacity,
 /* CKD zero-length record: CE/DE/UE, no channel error, full residual. */
 int TSCCHECKEND(const TSCSTATE *state, unsigned int capacity);
 int TSCBUILDCONSWRITE(TSCSTATE *state, unsigned int length);
+int TSCBUILDCONSCMD(TSCSTATE *state,unsigned int command,unsigned int length,
+                     unsigned int input);
 int TSCCHECKWRITE(const TSCSTATE *state);
 int TSCBUILDCONSREAD(TSCSTATE *state, unsigned int capacity);
 int TSCCHECKCONSREAD(const TSCSTATE *state, unsigned int capacity,

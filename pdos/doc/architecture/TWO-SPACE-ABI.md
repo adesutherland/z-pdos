@@ -356,8 +356,7 @@ provides that flag layout. K validates and owns the complete raw stream,
 serializes it with the screen lease and rejects malformed orders/addresses.
 The normal line paths retain their qualified 130/132-byte limits. The
 versioned PDOS presentation route supports full-width U pointers without
-requiring a resident low-U console image. This is a selected interface,
-not a current native full-screen guest qualification.
+requiring a resident low-U console image. [P4 qualification](../qualification/TWO-SPACE-P4-2026-10-07.md) now accepts this selected native full-screen interface and records its non-text capture gap.
 
 `twospace_abi.h` freezes neutral PDOS SVC200 version 1: R0 request byte count,
 full R1 U address, R2 operation. Operations 0/1/2 query capabilities/write
@@ -368,6 +367,8 @@ record contains version/size, primary device class/address, active/default/
 alternate geometry, address encoding, attributes, features, line/screen
 limits and generation. Every offset is in the header. Unknown versions,
 short buffers and unreported features return explicit errors.
+
+The native line adapters retain their selected 130/132-byte output limits. Neutral 3270 input supports 256 bytes; the named Telnet 3215 input limit is 148 bytes because its 150-byte backend buffer includes CRLF. Longer logical output is split into no-CR channel writes plus one final CR write.
 
 Line requests have a 32-byte version/size/flags/capacity/full-U-address/
 returned-count/AID record, with native EBCDIC bytes. Flags are zero for the
@@ -390,7 +391,28 @@ command-end with the separate 32-byte K result, raw screen-change and gap.
 Sequence discontinuity and disconnect are visible; raw screens never imply
 complete text. A monitor is optional, has no input ownership until an
 explicit handoff at a line prompt, and cannot reduce the 24-bit U interval.
-P4 qualifies loss, reconnect and every advertised feature on named devices.
+[P4](../qualification/TWO-SPACE-P4-2026-10-07.md) accepts loss/reconnect and the selected features on named devices; full normal workloads remain P6.
+
+The P4 native FULLSCR buffer begins with escape `27`, then its command and
+WCC. The selected commands are write `f1`, erase/write `f5` and alternate
+erase/write `7e`; K converts the command to its channel opcode and validates
+the complete remaining stream before submission. This follows IBM's
+[TPUT guidance](https://www.ibm.com/docs/en/zos/3.1.0?topic=io-using-tput-macro-instruction-write-line-terminal)
+and [passthrough data layout](https://www.ibm.com/docs/en/zos/2.5.0?topic=requests-tso3270-passthrough-mode-data-stream).
+The basic logical field attributes are input `00`, protected/skip `30` and
+bright protected/skip `38`; K encodes their six-bit field value. Extended
+attributes are not advertised. Geometry and SF/SBA placement follow IBM's
+[output stream](https://www.ibm.com/docs/en/cics-ts/5.5.0?topic=terminals-output-datastream)
+and [buffer-address description](https://www.ibm.com/docs/en/cics-ts/5.6?topic=stream-set-buffer-address-order).
+
+The separate 32-byte monitor status record reports version/length at 0/4,
+address at 8, state at 12 (disabled/online/offline), gap count at 16, input
+selection at 20 and sequence high/low words at 24/28. Handoff's 32-byte
+request has version/length at 0/4, source at 8 (primary 0, monitor 1), zero
+flags at 12, returned owning token/state at 16/20 and zero reserved words
+at 24/28. It selects the next owned line prompt; it grants no input lease
+before LINE_READ and is rejected during full-screen input or another owned
+read. The selected device obtains an exclusive lease for that prompt.
 
 ### P0 controls assigned to later steps
 

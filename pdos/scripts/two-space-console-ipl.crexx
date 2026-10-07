@@ -1,0 +1,85 @@
+/* SPDX-License-Identifier: MIT; fresh P4 console configuration and named IPL. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i = .int
+  if args.0 <> 9 & args.0 <> 10 then return 2
+  work = args.1; prior = args.2; core = args.3; app = args.4; packer = args.5
+  herc = args.6; model = args.7; primary = args.8; monitor = args.9
+  if model <> "2" & model <> "3" & model <> "4" & model <> "5" then return 2
+  if primary <> "3270" & primary <> "line" then return 2
+  if monitor <> "monitor" & monitor <> "none" then return 2
+  mode = ""
+  if args.0 = 10 then do
+    mode = args.10
+    if mode <> "handoff" & mode <> "raw" & mode <> "disconnect" then return 2
+  end
+  if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
+  address crexx "run test ! -e :work"
+  if rc <> 0 then return 2
+  locations = .string[]
+  address crexx "pwd" output locations
+  root = strip(locations.1); out = root || "/" || work; input = out || "-inputs"
+  media = input || "/media"; support = input || "/base"; package = input || "/console"
+  address crexx "run test ! -e :input"
+  if rc <> 0 then return 2
+  address crexx "run mkdir -p :media :support"
+  if rc <> 0 then return rc
+  flags = ""
+  if primary = "line" then flags = flags || " --line-primary"
+  if monitor = "monitor" then flags = flags || " --monitor"
+  address system "env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_media.py " || quote(core) || " " || quote(app) || " " || quote(packer) || " " || quote(package) || " --model " || model || flags
+  if rc <> 0 then return rc
+  files = .string[]; source = prior || "/media"
+  address crexx "run find :source -maxdepth 1 -type f" output files
+  if rc <> 0 then return rc
+  do i = 1 to files.0
+    source = files[i]
+    if right(source,4) = ".bin" | right(source,4) = ".sys" | right(source,4) = ".exe" then do
+      address crexx "run cmake -E copy :source :media"
+      if rc <> 0 then return rc
+    end
+  end
+  source = package || "/d4conapp.bin"
+  address crexx "run cmake -E copy :source :media"
+  if rc <> 0 then return rc
+  source = package || "/p4cap64.bin"
+  address crexx "run test -f :source"
+  if rc = 0 then do
+    address crexx "run cmake -E copy :source :media"
+    if rc <> 0 then return rc
+  end
+  ctl = media || "/ctl.txt"; before = prior || "/media/ctl.txt"
+  do while lines(before) > 0
+    row = linein(before)
+    if word(row,1) = "TSO31.D4CONAPP" | word(row,1) = "TSO64.P4CAP64" then iterate
+    if word(row,1) = "PDOS.STORE" then do
+      extra = package || "/datasets.ctl"
+      do while lines(extra) > 0
+        call lineout ctl,linein(extra)
+      end
+    end
+    call lineout ctl,row
+  end
+  call lineout ctl
+  source = prior || "/launch.bin"
+  address crexx "run cmake -E copy :source :input"
+  if rc <> 0 then return rc
+  source = prior || "/base/install-ipl"
+  address crexx "run cmake -E copy :source :support"
+  if rc <> 0 then return rc
+  configured_core = package || "/console.core"
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :input :configured_core :herc"
+  if rc <> 0 then return rc
+  transient = .string[]
+  transient[1] = out || "/media/datasets.ckd"; transient[2] = out || "/media/pdos00.ckd"; transient[3] = out || "/media/readback.ckd"
+  address crexx "run cmake -E rm :transient[]"
+  if rc <> 0 then return rc
+  disk = out || "/media/pdos00.cckd"; runout = out || "/run"; hercules = herc || "/hercules"
+  if mode <> "" then flags = flags || " --" || mode
+  address system "env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_machine.py " || quote(disk) || " " || quote(configured_core) || " " || quote(hercules) || " " || quote(runout) || " --model " || model || flags
+  return rc
+quote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'",value,"'\''") || "'"

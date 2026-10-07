@@ -214,6 +214,18 @@ synthetic_io_psw:
 .section .app,"ax"
 .global app_a
 app_a:
+.ifdef CONSOLE_LAUNCH
+    sam64
+    lghi %r0,543
+    larl %r1,console_app_name
+    lghi %r2,0
+    svc 254
+    larl %r2,console_result_va
+    lg %r2,0(%r2)
+    st %r0,0x880(%r2)
+    st %r15,0x884(%r2)
+    svc 0
+.else
 .ifdef PCOMM_LAUNCH
     lghi %r0, 0
     lghi %r1, 0
@@ -261,6 +273,12 @@ app_a:
     larl %r2, app_high_va
     lg %r2, 0(%r2)
     br %r2
+.endif
+.endif
+.ifdef CONSOLE_LAUNCH
+.section .appdata,"aw"
+console_app_name: .byte 0xc4,0xf4,0xc3,0xd6,0xd5,0xc1,0xd7,0xd7
+console_result_va: .quad 0x110001000
 .endif
 .balign 8
 app_data_va: .quad 0x21000

@@ -22,14 +22,17 @@ or failure isolation that the shared map cannot provide at acceptable
 complexity. Such a change would need fresh DAT, context and service-gate
 qualification; the present proof would not establish it.
 
-P0 through P3 now have accepted results in the [completion plan](../BACKLOG.md#pd-003-completion-plan-6-october-2026).
+P0 through P4 now have accepted results in the [completion plan](../BACKLOG.md#pd-003-completion-plan-6-october-2026).
 The [P1 fresh IPL](../qualification/TWO-SPACE-P1-2026-10-06.md) closes active
 invocation ownership, full architectural caller state and interruption-driven
 completion/cancellation. The [P2 service gate](../qualification/TWO-SPACE-P2-2026-10-07.md) adds native
 file/input and durable output/readback. The [P3 native call gate](../qualification/TWO-SPACE-P3-2026-10-07.md)
 adds checked co-resident loading, CMS/TSO calls and mode crossings, HIGH
 LOAD/DELETE, and caller file-cursor preservation across child return/fault.
-Display models and the normal image remain P4–P6 work.
+The [P4 C console gate](../qualification/TWO-SPACE-P4-2026-10-07.md) qualifies all four
+display models, U presentation, the attached and line-only 3215 paths,
+exclusive input selection and the durable transcript. The selectable normal
+image and full workload/default selection remain P5/P6.
 
 ## Architecture decisions for the first replacement
 
@@ -97,8 +100,7 @@ instead writes to the integrated Hercules console and mixes host/operator
 messages with guest output, so it is not the first clean transcript target.
 The line view is a monitor, not another application address space or a second
 command processor. A line-only primary console is a further configuration of the same service
-boundary. The first P4 qualification must prove the actual secondary device
-attachment and capture path; the current successor has not done so.
+boundary. The [P4 named-device qualification](../qualification/TWO-SPACE-P4-2026-10-07.md) now proves simultaneous attachment/capture, line-only operation and explicit prompt input selection. Normal-image acceptance remains P5/P6.
 
 Unchanged applications that use the selected CMS or TSO line terminal calls
 keep the same ABI and return conventions whether the primary display is a

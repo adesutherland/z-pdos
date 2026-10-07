@@ -113,16 +113,22 @@ int TSCCHECKEND(const TSCSTATE *s,unsigned int capacity)
 }
 
 int TSCBUILDCONSWRITE(TSCSTATE *s, unsigned int length)
+{return TSCBUILDCONSCMD(s,1U,length,0U);}
+
+int TSCBUILDCONSCMD(TSCSTATE *s,unsigned int command,unsigned int length,
+                     unsigned int input)
 {
     unsigned char *base;
     if (!s || !s->aperture || !length || length > TSC_MAX_CONSOLE)
         return TSC_BAD;
+    if(command!=1U&&command!=5U&&command!=13U&&command!=9U&&
+       command!=10U&&command!=0xe4U&&command!=4U&&command!=6U)return TSC_BAD;
     base=s->aperture+s->region_real;
     /* Preserve the caller's K-owned 3270 stream in the following data page. */
-    clear(base,TSC_DATA_OFFSET);
+    clear(base,TSC_DATA_OFFSET+(input?length:0U));
     put32(base+4U,0x0080ff00U);
     put32(base+8U,s->region_real+TSC_CCW_OFFSET);
-    ccw(base+TSC_CCW_OFFSET,0x01U,0x20U,length,
+    ccw(base+TSC_CCW_OFFSET,command,0x20U,length,
         s->region_real+TSC_DATA_OFFSET);
     return TSC_OK;
 }

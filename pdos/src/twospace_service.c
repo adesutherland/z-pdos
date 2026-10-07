@@ -15,6 +15,8 @@
 #include "twospace_invocation.h"
 #include "twospace_store.h"
 #include "twospace_abi.h"
+#include "twospace_console.h"
+#include "twospace_transcript.h"
 
 static unsigned int user_rights(unsigned int frame, void *unused);
 static unsigned int cms_word(const unsigned char *p);
@@ -25,6 +27,16 @@ static unsigned int native_line_input(unsigned int address,unsigned int capacity
 static void sf_compat(void);
 static int sf_cleanup(unsigned int handle,const TSVFRAME *frame);
 static int high_cleanup(unsigned int handle,const TSVFRAME *frame);
+static int console_v1_enabled(void);
+static unsigned int console_v1_init(void);
+static unsigned int console_v1_line(const unsigned char *text,unsigned int length);
+static unsigned int console_v1_read(unsigned char *,unsigned int,unsigned int *,unsigned int *,unsigned int);
+static unsigned int console_v1_cancel(unsigned int token);
+static void console_v1_begin(const TSVFRAME *frame);
+static void console_v1_end(unsigned int token,const unsigned char *result);
+static void call_result(unsigned int,unsigned int,unsigned int,unsigned int,unsigned int,unsigned int);
+static unsigned int console_v1_native_raw(TSGREQUEST *request,unsigned int input);
+static unsigned char call_last_result[TSA_RESULT_BYTES];
 static int native_clean(unsigned int token, const TSVRESOURCE *resource,
                         void *context);
 static TSDSTATE u_tables;
@@ -155,6 +167,7 @@ int TSCSTART(unsigned int subchannel, unsigned char *orb,
 int TSCPOLL(unsigned int subchannel, unsigned char *irb);
 int TSCCLEAR(unsigned int subchannel, unsigned char *irb);
 int TSCWAITR(unsigned int subchannel, unsigned char *irb);
+int TSCWAITI(unsigned int subchannel, unsigned char *irb);
 
 static int channel_record(void *context, unsigned int cylinder,
                           unsigned int head, unsigned int record,
@@ -831,6 +844,7 @@ static unsigned int terminal_service(const TSGREQUEST *request)
     unsigned char *screen;
     unsigned int ssid, i;
     int io_result;
+    if(console_v1_enabled())return console_v1_init();
     if (request->length>4U || request->address.hi || request->address.lo ||
         request->direction) return 8U;
     label=request->length==4U ? fault_message : request->length==3U ? owner_message :
@@ -1185,14 +1199,19 @@ static unsigned int native_begin(TSGREQUEST *request)
     TSVCONTEXT caller;
     unsigned int i, mode, token, personality, image_owner, saved_real=0U;
     unsigned int runtime_owner;
-    unsigned char *lowcore=(unsigned char *)TSF_KAPERTURE_VA+
-                           cms31_lowcore_real;
+    unsigned char *lowcore;
     volatile const unsigned int *saved=(volatile const unsigned int *)0x3000U;
     int rc;
     /* The selector names a checked K image record. R0 never declares a
      * service personality, AMODE, owner or placement. */
     if (request->address.hi || request->address.lo || request->direction)
         return 8U;
+    if(!cms_lowcore_template_ready&&cms31_setup_lowcore())return 4U;
+    lowcore=(unsigned char *)TSF_KAPERTURE_VA+cms31_lowcore_real;
+    if(console_v1_enabled()){
+        unsigned int console_status=console_v1_init();
+        if(console_status)return console_status;
+    }
     switch (request->length) {
     case 1U:
         personality=TSV_CMS; mode=24U; image_owner=5U; runtime_owner=1U;
@@ -1291,6 +1310,7 @@ static unsigned int native_begin(TSGREQUEST *request)
     request->address.hi=0U;
     request->address.lo=token;
     *(volatile unsigned int *)0x4f50U=token;
+    console_v1_begin(&native_invocations.frame[native_invocations.depth-1U]);
     return 0U;
 }
 
@@ -1372,6 +1392,7 @@ static unsigned int native_end(const TSGREQUEST *request)
         &native_invocations.frame[native_invocations.depth-1U] : 0;
     if (!frame || frame->token!=request->address.lo) return 12U;
     if (frame->controlled) return 8U;
+    if(console_v1_cancel(frame->token))return 12U;
     if (console_read_phase && console_read_owner==frame->token &&
         terminal_read_cancel(frame->token)!=0U) return 12U;
     rc=TSVEND(&native_invocations,request->address.lo,native_clean,
@@ -2271,6 +2292,7 @@ static unsigned int cms_line_screen(const unsigned char *message,
 {
     unsigned char *screen;
     unsigned int i;
+    if(console_v1_enabled())return console_v1_line(message,length);
     if (pcomm_loaded) return pcomm_display(message,length);
     if (!console_ssid || console_read_phase || !message || length>130U)
         return 12U;
@@ -2306,6 +2328,10 @@ static unsigned int tso_terminal_service(TSGREQUEST *request)
     mask_hi=*(volatile const unsigned int *)0x3080U;
     mask_lo=*(volatile const unsigned int *)0x3084U;
     mode24=frame && frame->amode==24U;
+    if(console_v1_enabled()&&(request->address.lo&0xff000000U)==0x03000000U)
+        return console_v1_native_raw(request,0U);
+    if(console_v1_enabled()&&(request->address.lo&0xff000000U)==0x83000000U)
+        return console_v1_native_raw(request,1U);
     if((request->address.lo&0xff000000U)==0x80000000U){
         unsigned int count=0U;
         if(mask_hi&1U)return 8U;
@@ -2811,6 +2837,7 @@ static unsigned int cms_file_audit(const TSGREQUEST *request,
 #include "twospace_file.inc"
 #include "twospace_call.inc"
 #include "twospace_high.inc"
+#include "twospace_console.inc"
 
 unsigned int pdosTwoSpaceService(TSGREQUEST *request)
 {
@@ -2821,6 +2848,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     int result;
     if (!request) return 0xffffffffU;
     if (attach()) return 0xfffffffaU;
+    if(request->svc==TSA_IO_SVC)return console_v1_service(request);
     if((request->svc==3U||request->svc==246U)&&TSVTOP(&native_invocations)&&
        TSVTOP(&native_invocations)->controlled==3U)return native_call_finish();
     if(request->svc==255U)return native_load_probe(request);

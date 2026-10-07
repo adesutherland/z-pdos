@@ -16,6 +16,9 @@
 #include <time.h>
 #include <stdlib.h>
 #include "zpdos-version.h"
+#ifdef PDOS_TWO_SPACE
+#include "twospace_ui.h"
+#endif
 
 static char buf[200];
 static size_t len;
@@ -25,7 +28,11 @@ static char prompt[50] = ">";
 static int singleCommand = 0;
 static int primary = 0;
 static int term = 0;
+#ifdef PDOS_TWO_SPACE
+static int showrc = 1;
+#else
 static int showrc = 0;
+#endif
 static int echo = 1;
 static unsigned int commandNumber = 0;
 static int batchDepth = 0;
@@ -52,6 +59,9 @@ static int ins_strncmp(char *one, char *two, size_t len);
 int main(int argc, char **argv)
 {
     if (!parseArgs(argc, argv)) return 2;
+#ifdef PDOS_TWO_SPACE
+    if (TUIOPEN((const unsigned char *)"z/PDOS PCOMM",12U)) return 2;
+#endif
     if (singleCommand)
     {
         processInput();
@@ -73,6 +83,9 @@ int main(int argc, char **argv)
         processInput();
     }
     printf("thankyou for using pcomm!\n");
+#ifdef PDOS_TWO_SPACE
+    if (TUICLOSE()) return 2;
+#endif
     return (0);
 }
 

@@ -156,6 +156,8 @@ static unsigned int pcomm_exit(void)
     end.length=end.direction=0; end.svc=236U;
     status=native_end(&end);
     if (status) return status;
+    call_result(0U,0U,0U,1U,0U,end.address.lo);
+    console_v1_end(end.address.lo,call_last_result);
     command_restore(&caller);
     *(volatile unsigned int *)0x4f5cU=1U;
     *(volatile unsigned int *)0x4f60U=native_invocations.depth;
@@ -341,16 +343,20 @@ static unsigned int command_finish(void)
     TSVCONTEXT caller=frame->caller;
     TSGREQUEST end;
     unsigned int kind=saved[39], app_rc=kind==1U ? saved[31] : 0xffffffffU;
-    unsigned int child_owner=frame->runtime_owner, i;
+    unsigned int child_owner=frame->runtime_owner, i,child_lowcore=0U;
     unsigned char result[4];
     if (native_invocations.depth!=2U || frame->controlled!=2U ||
         !command_tcb || (kind!=1U && kind!=2U)) return 12U;
     command_os_status=kind==2U ? 12U : 0U;
+    for(i=0U;i<frame->resources;++i)
+        if(frame->resource[i].kind==TSV_LOWCORE)child_lowcore=frame->resource[i].handle;
     if (kind==2U) ++*(volatile unsigned int *)0x4f68U;
     end.address.hi=0; end.address.lo=frame->token;
     end.length=end.direction=0; end.svc=236U;
     frame->controlled=0;
     if (native_end(&end)) { frame->controlled=2U; return 12U; }
+    call_result(command_os_status,kind==2U?1U:0U,0U,kind==1U,app_rc,end.address.lo);
+    console_v1_end(end.address.lo,call_last_result);
     --controlled_launches;
     *(volatile unsigned int *)0x4f00U=controlled_launches;
     for (i=0;i<TSM_ALLOCS;++i)
@@ -359,7 +365,8 @@ static unsigned int command_finish(void)
             !(child_owner==22U && storage.allocations[i].address.lo==0x0c000000U))
             return 12U;
     for (i=0;i<storage.real.count;++i)
-        if (storage.real.ranges[i].owner==CMS_LOWCORE_SAVE_OWNER ||
+        if ((storage.real.ranges[i].owner==CMS_LOWCORE_SAVE_OWNER&&
+             storage.real.ranges[i].start==child_lowcore) ||
             storage.real.ranges[i].owner==CMS_STAGE_OWNER ||
             storage.real.ranges[i].owner==TSO_STAGE_OWNER ||
             storage.real.ranges[i].owner==TSO_IMAGE_OWNER) return 12U;
@@ -408,6 +415,17 @@ static unsigned int pcomm_terminal(TSGREQUEST *request)
     unsigned char message[256], input[256];
     unsigned int i, n, status;
     if (request->address.hi || request->length>252U) return 8U;
+    if(console_v1_enabled()){
+        if(request->address.lo&0x80000000U){
+            unsigned int count,aid;
+            if(command_probe(request->address.lo&0x7fffffffU,request->length))return 8U;
+            status=console_v1_read(message,request->length,&count,&aid,0U);if(status)return status;
+            if(command_copy(request->address.lo&0x7fffffffU,count,message,1U))return 8U;
+            saved[2U]=0U;saved[3U]=count;return 0U;
+        }
+        if(command_copy(request->address.lo,request->length,message,0U))return 8U;
+        return console_v1_line(message,request->length);
+    }
     if (request->address.lo&0x80000000U) {
         /* Suspend on a saved SVC continuation, then retry by explicit SVC.
          * The U adapter never guesses I/O completion from elapsed time. */

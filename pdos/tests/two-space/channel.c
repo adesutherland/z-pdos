@@ -58,7 +58,7 @@ int main(void)
     if(TSCCHECKEND(&channel,80U)!=TSC_IO)return 18;
     memset(TSCDATA(&channel),0xd2,1773U);
     if (TSCBUILDCONSWRITE(&channel,1773U) != TSC_OK ||
-        TSCBUILDCONSWRITE(&channel,2049U) != TSC_BAD ||
+        TSCBUILDCONSWRITE(&channel,TSC_MAX_CONSOLE+1U) != TSC_BAD ||
         word(base+4U) != 0x0080ff00U ||
         word(base+8U) != 0x3e0200U ||
         memcmp(base+0x200U,"\x01\x20\x06\xed\x00\x3e\x10\x00",8U) ||
@@ -71,7 +71,7 @@ int main(void)
     irb[11]=1U;
     if (TSCCHECKWRITE(&channel) != TSC_IO) return 11;
     if (TSCBUILDCONSREAD(&channel,252U) != TSC_OK ||
-        TSCBUILDCONSREAD(&channel,257U) != TSC_BAD ||
+        TSCBUILDCONSREAD(&channel,TSC_MAX_INPUT+1U) != TSC_BAD ||
         memcmp(base+0x200U,"\x06\x20\x00\xfc\x00\x3e\x10\x00",8U) ||
         TSCDATA(&channel)[0] != 0U)
         return 12;

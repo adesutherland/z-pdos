@@ -1,0 +1,60 @@
+/* SPDX-License-Identifier: MIT; native U31 presentation client for P4. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i = .int
+  source = .string; object = .string; asm = .string
+  if args.0 <> 5 & args.0 <> 6 then return 2
+  work = args.1; library = args.2; cc = args.3; classicas = args.4; linker = args.5
+  mode = "0"
+  if args.0 = 6 then do
+    if args.6 = "handoff" then mode = "1"
+    else if args.6 = "raw" then mode = "2"
+    else if args.6 = "disconnect" then mode = "3"
+    else return 2
+  end
+  if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
+  address crexx "run test ! -e :work"
+  if rc <> 0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc <> 0 then return rc
+  sources = .string[]; objects = .string[]
+  sources[1] = "pdos/tests/two-space/p4/console-app.c"
+  sources[2] = "pdos/src/twospace_ui.c"
+  sources[3] = "pdos/src/twospace_console.c"
+  do i = 1 to 3
+    source = sources[i]; asm = work || "/part" || i || ".asm"; object = work || "/part" || i || ".obj"
+    flag = "-DP4_TEST_MODE=" || mode
+    address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR :flag -S -I pdpclib/src -I pdos/src :source -o :asm"
+    if rc <> 0 then return rc
+    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+    if rc <> 0 then return rc
+    objects[i] = object
+  end
+  sources[4] = "pdos/src/twospace_ui.asm"
+  sources[5] = "pdos/tests/two-space/p4/console-native.asm"
+  do i = 4 to 5
+    source = sources[i]; object = work || "/part" || i || ".obj"
+    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :source :object"
+    if rc <> 0 then return rc
+    objects[i] = object
+  end
+  native = .string[]
+  native[1] = library || "/entry.obj"; native[2] = library || "/stdio.obj"; native[3] = library || "/console.obj"
+  base = library || "/base"
+  /* Caller supplies a prepared source-built C31 library directory. */
+  common = "START STDLIB CTYPE STRING TIME ERRNO ASSERT LOCALE MATH SETJMP SIGNAL MEMMGR"
+  do i = 1 to words(common)
+    native[i+3] = base || "/c/objects/" || word(common,i) || ".obj"
+  end
+  native[16] = base || "/support/MVSSUPA.obj"
+  module = work || "/D4CONAPP.rdw"; map = work || "/D4CONAPP.map"
+  address crexx "run :linker --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@MAIN -Map :map -o :module :native[] :objects[]"
+  if rc <> 0 then return rc
+  wide_source = "pdos/tests/two-space/p4/console-wide.asm"; wide_object = work || "/P4CAP64.obj"
+  wide_module = work || "/P4CAP64.rdw"
+  address crexx "run :classicas --profile z900 --literal-limit 4096 --macros :wide_source :wide_object"
+  if rc <> 0 then return rc
+  address crexx "run :linker --oformat mvs --image-base 0 --amode 64 --rmode ANY -e @@MAIN -o :wide_module :wide_object"
+  return rc

@@ -3,7 +3,6 @@
  * K invocation, allocation and return machinery as PCOMM ATTACH. */
 static unsigned int call_overlay_task[TSV_MAX_DEPTH];
 static TSPADDR call_overlay_address[TSV_MAX_DEPTH];
-static unsigned char call_last_result[TSA_RESULT_BYTES];
 
 static void call_result(unsigned int status,unsigned int reason,unsigned int abend,
                          unsigned int valid,unsigned int app_rc,unsigned int token)
@@ -154,6 +153,7 @@ static unsigned int native_call_finish(void)
     --controlled_launches;*(volatile unsigned int *)0x4f00U=controlled_launches;
     command_restore(&caller);saved[0U]=0U;saved[1U]=status;saved[30U]=0U;saved[31U]=app_rc;
     call_result(status,kind==2U?1U:0U,0U,kind==1U,app_rc,token);
+    console_v1_end(token,call_last_result);
     if(!native_invocations.depth)
         *(volatile unsigned int *)0x4f9cU=*(volatile const unsigned int *)0x40acU;
     *(volatile unsigned int *)0x4f54U=1U;
