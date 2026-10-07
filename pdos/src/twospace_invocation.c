@@ -80,7 +80,7 @@ int TSVOWN(TSVSTACK *stack, unsigned int token, unsigned int kind,
 {
     TSVFRAME *frame;
     unsigned int i, j;
-    if (!stack || !handle || kind<TSV_IMAGE || kind>TSV_IO)
+    if (!stack || !handle || kind<TSV_IMAGE || kind>TSV_HIGH_IMAGE)
         return TSV_BAD;
     frame=find_frame(stack,token);
     if (!frame) return TSV_STALE;
@@ -103,7 +103,7 @@ int TSVHAS(const TSVSTACK *stack, unsigned int token, unsigned int kind,
 {
     const TSVFRAME *frame;
     unsigned int i;
-    if (!stack || !token || !handle || kind<TSV_IMAGE || kind>TSV_IO)
+    if (!stack || !token || !handle || kind<TSV_IMAGE || kind>TSV_HIGH_IMAGE)
         return TSV_BAD;
     if (!stack->depth) return TSV_STALE;
     frame=&stack->frame[stack->depth-1U];
@@ -120,7 +120,7 @@ int TSVFORGET(TSVSTACK *stack, unsigned int token, unsigned int kind,
 {
     TSVFRAME *frame;
     unsigned int i, j;
-    if (!stack || !handle || kind<TSV_IMAGE || kind>TSV_IO)
+    if (!stack || !handle || kind<TSV_IMAGE || kind>TSV_HIGH_IMAGE)
         return TSV_BAD;
     frame=find_frame(stack,token);
     if (!frame) return TSV_STALE;

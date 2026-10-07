@@ -34,6 +34,7 @@ int TSTSTAGEHEADER64(const unsigned char *block, unsigned int length,
                      unsigned int *raw_bytes, unsigned int *blocks);
 int TSTSTAGEVALIDATE(const unsigned char *stage, unsigned int length,
                      unsigned int expected_mode, TSTINFO *info);
+int TSTSTAGEHIGH(const unsigned char *stage, unsigned int length,TSTINFO *info);
 /* AMODE24/RMODE24 native member at a page-aligned low U base. The entire
  * image must end below 16 MiB; the caller reserves placement separately. */
 int TSTIMAGE24(const unsigned char *raw, unsigned int bytes,

@@ -59,7 +59,7 @@ int TSTSTAGEHEADER64(const unsigned char *block, unsigned int length,
 { return stage_header(block,length,64U,raw_bytes,blocks); }
 
 static int stage_validate(const unsigned char *stage, unsigned int length,
-                          unsigned int expected_mode, TSTINFO *info)
+                          unsigned int expected_mode,unsigned int high,TSTINFO *info)
 {
     unsigned int bytes, blocks, i, fnv=0x811c9dc5U;
     if (!stage || !info ||
@@ -69,12 +69,16 @@ static int stage_validate(const unsigned char *stage, unsigned int length,
         fnv=(fnv^stage[64U+i])*0x01000193U;
     if (fnv!=word(stage+16U)) return TST_BAD;
     for (i=64U+bytes; i<length; ++i) if (stage[i]) return TST_BAD;
-    return TSTHEADER(stage+64U,bytes,expected_mode,info);
+    return high?TSTHEADER64HIGH(stage+64U,bytes,info):
+                TSTHEADER(stage+64U,bytes,expected_mode,info);
 }
 
 int TSTSTAGEVALIDATE(const unsigned char *stage, unsigned int length,
                      unsigned int expected_mode, TSTINFO *info)
-{ return stage_validate(stage,length,expected_mode,info); }
+{ return stage_validate(stage,length,expected_mode,0U,info); }
+
+int TSTSTAGEHIGH(const unsigned char *stage,unsigned int length,TSTINFO *info)
+{ return stage_validate(stage,length,64U,1U,info); }
 
 static int native_header(const unsigned char *raw, unsigned int bytes,
                          unsigned int expected_mode, unsigned int high,

@@ -14,14 +14,17 @@
 #include "twospace_tso.h"
 #include "twospace_invocation.h"
 #include "twospace_store.h"
+#include "twospace_abi.h"
 
 static unsigned int user_rights(unsigned int frame, void *unused);
 static unsigned int cms_word(const unsigned char *p);
 static void cms_put_word(unsigned char *p, unsigned int value);
+static unsigned int native_cms_call(const TSGREQUEST *request,unsigned int profile);
 static unsigned int native_line_input(unsigned int address,unsigned int capacity,
                                        unsigned int *count);
 static void sf_compat(void);
 static int sf_cleanup(unsigned int handle,const TSVFRAME *frame);
+static int high_cleanup(unsigned int handle,const TSVFRAME *frame);
 static int native_clean(unsigned int token, const TSVRESOURCE *resource,
                         void *context);
 static TSDSTATE u_tables;
@@ -1119,10 +1122,15 @@ static unsigned int native_receipt_base(unsigned int mode)
 { return mode==24U ? 0x4680U :
          mode==31U ? 0x4600U : 0x4640U; }
 
+#include "twospace_load.inc"
+
 static unsigned int native_loaded(unsigned int personality,
                                   unsigned int mode,
                                   unsigned int image_owner)
 {
+    if(image_owner<TSL_IMAGES && native_images[image_owner].bytes)
+        return native_images[image_owner].personality==personality &&
+               native_images[image_owner].mode==mode;
     if (personality==TSV_PDOS) return pcomm_loaded;
     if (personality==TSV_TSO && image_owner==22U) return command_test_loaded;
     if (personality==TSV_TSO)
@@ -1138,6 +1146,8 @@ static unsigned int native_image_bytes(unsigned int personality,
                                        unsigned int mode,
                                        unsigned int image_owner)
 {
+    if(image_owner<TSL_IMAGES && native_images[image_owner].bytes)
+        return native_images[image_owner].bytes;
     if (personality==TSV_PDOS) return pcomm_bytes;
     if (personality==TSV_TSO && image_owner==22U) return command_test_bytes;
     if (personality==TSV_CMS)
@@ -1209,7 +1219,12 @@ static unsigned int native_begin(TSGREQUEST *request)
         personality=TSV_PDOS; mode=31U; image_owner=20U; runtime_owner=20U;
         break;
     default:
-        return 8U;
+        if(request->length<256U||request->length>=256U+TSL_IMAGES)return 8U;
+        image_owner=request->length-256U;
+        if(!native_images[image_owner].bytes)return 8U;
+        personality=native_images[image_owner].personality;
+        mode=native_images[image_owner].mode;runtime_owner=native_images[image_owner].runtime;
+        break;
     }
     if (!native_loaded(personality,mode,image_owner) ||
         !native_image_bytes(personality,mode,image_owner)) return 8U;
@@ -1264,6 +1279,7 @@ static unsigned int native_begin(TSGREQUEST *request)
             return rc==TSV_OK ? 4U : 12U;
         }
         for (i=0U; i<U_COMPAT_BYTES; ++i) lowcore[i]=cms_lowcore_template[i];
+        lowcore[0xb80U]=0x0aU;lowcore[0xb81U]=246U;lowcore[0xb82U]=0x07U;lowcore[0xb83U]=0xfeU;
         if (personality!=TSV_CMS || mode!=31U)
             for (i=0x14U; i<0x18U; ++i) lowcore[i]=0U;
     }
@@ -1285,6 +1301,7 @@ static int native_clean(unsigned int token, const TSVRESOURCE *resource,
     unsigned int i;
     (void)token;
     if (!frame || !resource) return 1;
+    if(resource->kind==TSV_HIGH_IMAGE)return high_cleanup(resource->handle,frame);
     if (resource->kind==TSV_IMAGE) {
         if (resource->handle!=frame->token || frame->image_owner>=32U ||
             !native_image_active[frame->image_owner]) return 1;
@@ -1366,6 +1383,7 @@ static unsigned int native_end(const TSGREQUEST *request)
         cms_heaps[native_invocations.depth].address.lo=0U;
         cms_heaps[native_invocations.depth].bytes=0U;
         cms_heaps[native_invocations.depth].handle=0U;
+        if(!parent)load_snapshot();
     }
     return rc==TSV_OK ? 0U : 12U;
 }
@@ -1661,13 +1679,15 @@ static unsigned int iarv64_service(const TSGREQUEST *request)
     unsigned char plist[88], result_bytes[8];
     unsigned int segments, status, opcode, handle;
     volatile unsigned int *receipt=(volatile unsigned int *)0x4e00U;
-    if (!tso64_loaded || !frame || frame->personality!=TSV_TSO ||
-        frame->amode!=64U || frame->runtime_owner!=17U ||
+    if (!frame || frame->personality!=TSV_TSO ||
+        frame->amode!=64U || !native_loaded(frame->personality,frame->amode,frame->image_owner) ||
         (*(volatile const unsigned int *)0x3080U&1U) ||
         !(*(volatile const unsigned int *)0x3084U&0x80000000U) ||
         *(volatile const unsigned int *)0x308cU!=0x402U ||
-        request->address.hi || request->address.lo<0x09000000U ||
+        request->address.hi || request->address.lo<0x01000000U ||
         request->address.lo>=0x80000000U-88U) return 8U;
+    if(frame->image_owner<TSL_IMAGES&&native_images[frame->image_owner].bytes)
+        receipt=(volatile unsigned int *)(TSF_KAPERTURE_VA+0x38000U+128U*frame->image_owner);
     gate.u_tables=&u_tables;
     gate.real_aperture=(unsigned char *)TSF_KAPERTURE_VA;
     gate.real_bytes=TSF_REAL_BYTES;
@@ -1680,25 +1700,25 @@ static unsigned int iarv64_service(const TSGREQUEST *request)
     opcode=plist[1]; segments=cms_word(plist+12U);
     receipt[0U]+=1U; receipt[1U]=opcode; receipt[2U]=segments;
     if (opcode==1U) {
-        if (segments!=32U && segments!=128U) return 8U;
+        if (!segments || segments>128U) return 8U;
         receipt[6U]=segments;
         copy.address.lo+=40U; copy.length=8U; copy.direction=TSG_WRITE;
         if (TSGPROBE(&gate,&copy)!=TSG_OK) return 8U;
         minimum.hi=maximum.hi=1U;
         minimum.lo=0x20000000U; maximum.lo=0x7fffffffU;
-        status=TSMALLOC(&storage,17U,64U,minimum,maximum,
+        status=TSMALLOC(&storage,frame->runtime_owner,64U,minimum,maximum,
                        segments*0x100000U,0,&base);
         if (status!=TSM_OK) return status==TSM_NOMEM ? 4U : 8U;
-        handle=allocation_handle(17U,base);
+        handle=allocation_handle(frame->runtime_owner,base);
         if (!handle || TSVOWN(&native_invocations,frame->token,
                               TSV_ALLOCATION,handle)!=TSV_OK) {
-            if (TSMFREE(&storage,17U,base)!=TSM_OK) return 12U;
+            if (TSMFREE(&storage,frame->runtime_owner,base)!=TSM_OK) return 12U;
             return 4U;
         }
         cms_put_word(result_bytes,base.hi);
         cms_put_word(result_bytes+4U,base.lo);
         if (TSGCOPY(&gate,&copy,result_bytes,sizeof result_bytes)!=TSG_OK) {
-            if (TSMFREE(&storage,17U,base)!=TSM_OK) return 0xfffffff0U;
+            if (TSMFREE(&storage,frame->runtime_owner,base)!=TSM_OK) return 0xfffffff0U;
             if (TSVFORGET(&native_invocations,frame->token,
                           TSV_ALLOCATION,handle)!=TSV_OK) return 12U;
             return 8U;
@@ -1710,11 +1730,11 @@ static unsigned int iarv64_service(const TSGREQUEST *request)
     if (opcode==3U) {
         base.hi=cms_word(plist+56U);
         base.lo=cms_word(plist+60U);
-        handle=allocation_handle(17U,base);
+        handle=allocation_handle(frame->runtime_owner,base);
         if (base.hi!=1U || base.lo<0x20000000U || !handle ||
             TSVHAS(&native_invocations,frame->token,
                    TSV_ALLOCATION,handle)!=TSV_OK ||
-            TSMFREE(&storage,17U,base)!=TSM_OK) return 8U;
+            TSMFREE(&storage,frame->runtime_owner,base)!=TSM_OK) return 8U;
         if (TSVFORGET(&native_invocations,frame->token,
                       TSV_ALLOCATION,handle)!=TSV_OK) return 12U;
         receipt[5U]+=1U;
@@ -2280,6 +2300,8 @@ static unsigned int tso_terminal_service(TSGREQUEST *request)
     unsigned int i, status, mask_hi, mask_lo, mode24;
     unsigned int receipt_base=frame && frame->amode==64U ? 0x4d00U :
                               frame && frame->amode==31U ? 0x4700U : 0x4c00U;
+    if(frame&&frame->image_owner<TSL_IMAGES&&native_images[frame->image_owner].bytes)
+        receipt_base=TSF_KAPERTURE_VA+0x36000U+256U*frame->image_owner;
     volatile unsigned char *receipt=(volatile unsigned char *)(receipt_base+16U);
     mask_hi=*(volatile const unsigned int *)0x3080U;
     mask_lo=*(volatile const unsigned int *)0x3084U;
@@ -2319,6 +2341,16 @@ static unsigned int tso_terminal_service(TSGREQUEST *request)
     *(volatile unsigned int *)receipt_base+=1U;
     *(volatile unsigned int *)(receipt_base+4U)=request->length;
     for (i=0U; i<request->length; ++i) receipt[i]=message[i];
+    if(receipt_base>=TSF_KAPERTURE_VA){
+        volatile unsigned char *history=(volatile unsigned char *)(TSF_KAPERTURE_VA+0x3c000U);
+        unsigned int n=*(volatile unsigned int *)history;
+        if(n<32U){
+            *(volatile unsigned int *)(history+4U+n*140U)=frame->image_owner;
+            *(volatile unsigned int *)(history+8U+n*140U)=request->length;
+            for(i=0U;i<request->length;++i)history[12U+n*140U+i]=message[i];
+            *(volatile unsigned int *)history=n+1U;
+        }
+    }
     return 0U;
 }
 
@@ -2699,14 +2731,8 @@ static unsigned int cms_native_service(TSGREQUEST *request,
            TSSERASE(&native_store,profile,plist+8U,18U)!=TSS_OK)return 12U;
         return cms_file_close(input);
     }
-    {
-        volatile unsigned char *diag=(volatile unsigned char *)(
-            TSF_KAPERTURE_VA+0x25000U);
-        ++*(volatile unsigned int *)diag;
-        for (i=0U; i<8U; ++i) diag[4U+i]=plist[i];
-        *(volatile unsigned int *)(diag+12U)=flags;
-    }
-    return 12U;
+    return native_cms_call(request,profile);
+
 }
 
 static unsigned int cms31_library_probe(const TSGREQUEST *request)
@@ -2783,6 +2809,8 @@ static unsigned int cms_file_audit(const TSGREQUEST *request,
 
 #include "twospace_command.inc"
 #include "twospace_file.inc"
+#include "twospace_call.inc"
+#include "twospace_high.inc"
 
 unsigned int pdosTwoSpaceService(TSGREQUEST *request)
 {
@@ -2793,13 +2821,16 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     int result;
     if (!request) return 0xffffffffU;
     if (attach()) return 0xfffffffaU;
+    if((request->svc==3U||request->svc==246U)&&TSVTOP(&native_invocations)&&
+       TSVTOP(&native_invocations)->controlled==3U)return native_call_finish();
+    if(request->svc==255U)return native_load_probe(request);
     if (pcomm_loaded && (request->svc==3U || request->svc==246U) &&
         TSVTOP(&native_invocations) &&
         TSVTOP(&native_invocations)->controlled==2U)
         return command_finish();
     if (request->svc == 253U) return sf_probe_receipt(0U);
     if (request->svc == 249U) return store_failure_probe(request);
-    if (request->svc == 254U) return sf_probe_receipt(1U);
+    if (request->svc == 254U) return request->length?native_entry_probe(request):sf_probe_receipt(1U);
     if (request->svc == 246U) return native_controlled_finish();
     if (request->svc == 247U) return pcomm_start(request);
     if (pcomm_loaded && TSVTOP(&native_invocations)) {
@@ -2827,6 +2858,8 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     diagnostic_receipt=native_frame && native_frame->amode==64U ?
                        0x4d08U : native_frame && native_frame->amode==31U ?
                        0x4708U : 0x4c08U;
+    if(native_tso&&request->svc==6U)return native_tso_link();
+    if(native_tso&&(request->svc==8U||request->svc==9U))return native_high_service(request->svc);
     if(native_tso&&request->svc==10U)return command_storage10(request);
     if(native_tso&&(request->svc==1U||request->svc==99U||request->svc==64U||request->svc==22U||
        request->svc==20U||request->svc==18U||request->svc==24U||request->svc==27U||
@@ -2943,7 +2976,8 @@ static unsigned int user_rights(unsigned int frame, void *unused)
     if (TSMRIGHTS(frame,&storage)) return TSG_READ | TSG_WRITE;
     if (frame == 0x7000U || frame == 0x12000U || frame == 0x13000U)
         return TSG_READ | TSG_WRITE;
-    if (frame == 0x5000U || frame == 0x6000U || frame == 0x11000U)
+    if (frame == 0x5000U || frame == 0x6000U || frame == 0x11000U ||
+        frame == 0x1f000U)
         return TSG_READ;
     return 0U;
 }

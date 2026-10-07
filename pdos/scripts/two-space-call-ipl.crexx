@@ -1,0 +1,94 @@
+/* SPDX-License-Identifier: MIT
+ * P3 native calls, HIGH and file ownership on a fresh disposable 3390 IPL.
+ * Binary format handling remains in the checked native media adapter. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i = .int
+  if args.0 <> 8 & args.0 <> 9 then do
+    say "usage: crexx -nokeep pdos/scripts/two-space-call-ipl.crexx --args FRESH-build/pdos/work ABS_BOOT_INPUT_BUILD ABS_CORE ABS_P0_FIXTURES ABS_HIGH_INPUTS ABS_FILE_FIXTURES HERCULES_BIN CLANG [ordinary|cross|missing]"
+    return 2
+  end
+  work = args.1; prior = args.2; core = args.3; fixtures = args.4
+  high = args.5; files = args.6; herc = args.7; clang = args.8
+  kind = "ordinary"
+  if args.0 = 9 then kind = args.9
+  if kind <> "ordinary" & kind <> "cross" & kind <> "missing" then return 2
+  if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
+  address crexx "run test ! -e :work"
+  if rc <> 0 then return 2
+  lines = .string[]
+  address crexx "pwd" output lines
+  root = strip(lines.1); out = root || "/" || work; prepared = out || "-inputs"
+  media = prepared || "/media"; pairs = prepared || "/pairs"; support = prepared || "/base"
+  address crexx "run test ! -e :prepared"
+  if rc <> 0 then return 2
+  address crexx "run mkdir -p :media :support"
+  if rc <> 0 then return rc
+  packer = prepared || "/tso-pack"
+  address crexx "run :clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src pdos/src/twospace_tso.c pdos/tests/two-space/tso_pack.c -o :packer"
+  if rc <> 0 then return rc
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/native_pairs_media.py :fixtures :packer :pairs :high :files"
+  if rc <> 0 then return rc
+  source = prior || "/media"; paths = .string[]
+  address crexx "run find :source -maxdepth 1 -type f" output paths
+  if rc <> 0 then return rc
+  do i = 1 to paths.0
+    source = paths[i]
+    if right(source,4) = ".bin" | right(source,4) = ".sys" | right(source,4) = ".exe" then do
+      address crexx "run cmake -E copy :source :media"
+      if rc <> 0 then return rc
+    end
+  end
+  address crexx "run find :pairs -maxdepth 1 -type f" output paths
+  if rc <> 0 then return rc
+  do i = 1 to paths.0
+    source = paths[i]
+    if right(source,4) <> ".bin" then iterate
+    address crexx "run cmake -E copy :source :media"
+    if rc <> 0 then return rc
+  end
+  ctl = media || "/ctl.txt"; input_ctl = prior || "/media/ctl.txt"
+  do while lines(input_ctl) > 0
+    value = linein(input_ctl); dsn = word(value,1)
+    if pos(".D0",dsn) > 0 | dsn = "D0IO.CUR" | dsn = "TSO64.LAC65O" | dsn = "TSO64.LAU65O" | dsn = "TSO64.LAVM65O" | dsn = "RXCH.EXE" | dsn = "RXASH.EXE" | dsn = "RXVMH.EXE" then iterate
+    if dsn = "PDOS.STORE" then do
+      extra = pairs || "/datasets.ctl"
+      do while lines(extra) > 0
+        row = linein(extra); member = word(row,1)
+        if kind = "cross" then if member = "CMS31.D0CMCH" | member = "TSO31.D0TSCH" | member = "TSO64.D0TSCH" then iterate
+        if kind = "missing" then if right(member,7) = ".D0CMCH" | right(member,7) = ".D0TSCH" then iterate
+        call lineout ctl,row
+      end
+    end
+    call lineout ctl,value
+  end
+  call lineout ctl
+  source = prior || "/launch.bin"
+  address crexx "run cmake -E copy :source :prepared"
+  if rc <> 0 then return rc
+  source = prior || "/base/install-ipl"
+  address crexx "run cmake -E copy :source :support"
+  if rc <> 0 then return rc
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :prepared :core :herc"
+  if rc <> 0 then return rc
+  transient = .string[]
+  transient[1] = out || "/media/datasets.ckd"
+  transient[2] = out || "/media/pdos00.ckd"
+  transient[3] = out || "/media/readback.ckd"
+  hashes = .string[]
+  address crexx "run shasum -a 256 :transient[]" output hashes
+  if rc <> 0 then return rc
+  do i = 1 to hashes.0
+    call lineout out || "/flat-intermediates.sha256",hashes[i]
+  end
+  call lineout out || "/flat-intermediates.sha256"
+  address crexx "run cmake -E rm :transient[]"
+  if rc <> 0 then return rc
+  disk = out || "/media/pdos00.cckd"; hercules = herc || "/hercules"; runout = out || "/run"
+  tso_file_probe = files || "/D0TFPA.rdw"
+  address crexx "run test -f :tso_file_probe"
+  if rc = 0 then address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/ipl_machine.py :disk :core :hercules :runout cms24 cms31 cmsfile cmslibrary cms24file tso31 tso64 tso24 --native-pairs --native-high --native-file-pairs --native-tso-file-pairs --native-case :kind"
+  else address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/ipl_machine.py :disk :core :hercules :runout cms24 cms31 cmsfile cmslibrary cms24file tso31 tso64 tso24 --native-pairs --native-high --native-file-pairs --native-case :kind"
+  return rc

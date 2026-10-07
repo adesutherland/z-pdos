@@ -22,12 +22,14 @@ or failure isolation that the shared map cannot provide at acceptable
 complexity. Such a change would need fresh DAT, context and service-gate
 qualification; the present proof would not establish it.
 
-P0, P1 and P2 now have accepted results in the [completion plan](../BACKLOG.md#pd-003-completion-plan-6-october-2026).
+P0 through P3 now have accepted results in the [completion plan](../BACKLOG.md#pd-003-completion-plan-6-october-2026).
 The [P1 fresh IPL](../qualification/TWO-SPACE-P1-2026-10-06.md) closes active
 invocation ownership, full architectural caller state and interruption-driven
 completion/cancellation. The [P2 service gate](../qualification/TWO-SPACE-P2-2026-10-07.md) adds native
-file/input and durable output/readback. Native application calls, display
-models and the normal image remain P3–P6 work.
+file/input and durable output/readback. The [P3 native call gate](../qualification/TWO-SPACE-P3-2026-10-07.md)
+adds checked co-resident loading, CMS/TSO calls and mode crossings, HIGH
+LOAD/DELETE, and caller file-cursor preservation across child return/fault.
+Display models and the normal image remain P4–P6 work.
 
 ## Architecture decisions for the first replacement
 

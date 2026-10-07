@@ -9,7 +9,7 @@
 #define PDOS_TWO_SPACE_INVOCATION_H
 
 #define TSV_MAX_DEPTH 8U
-#define TSV_MAX_RESOURCES 24U
+#define TSV_MAX_RESOURCES 128U
 
 #define TSV_OK 0
 #define TSV_BAD -1
@@ -30,6 +30,7 @@
 #define TSV_LOWCORE 4U
 #define TSV_TERMINAL 5U
 #define TSV_IO 6U
+#define TSV_HIGH_IMAGE 7U
 #define TSV_IO_PENDING 0U
 #define TSV_IO_COMPLETE 1U
 

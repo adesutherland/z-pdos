@@ -181,8 +181,8 @@ decision. Required failure controls stay bounded to the named plan cases.
 | P0 | Done | [Frozen native contract and inventory](architecture/TWO-SPACE-ABI.md), [P0 source/object qualification](qualification/TWO-SPACE-P0-2026-10-06.md), native call fixtures and versioned PDOS I/O/result byte layouts. |
 | P1 | Done | [Complete ownership, caller context and interruption-driven return/fault cleanup](qualification/TWO-SPACE-P1-2026-10-06.md); 159-check fresh IPL, including a child fault with a submitted owned read and clean retry. |
 | P2 | Done | [Selected native services, input and durable output/readback](qualification/TWO-SPACE-P2-2026-10-07.md); 169-check fresh IPL, unchanged CMS/TSO31 probes, exact input, failed-write preservation and complete runtime release. |
-| P3 | In progress | General native loading and unchanged same-personality parent/child calls, including selected modes and caller restoration. |
-| P4 | Open | Four 3270 models, C presentation, monitor/line primary and transcript/input-handoff gates. |
+| P3 | Done | [Native loading/calls, mode crossings, HIGH and caller file preservation](qualification/TWO-SPACE-P3-2026-10-07.md); 187/190/189-check fresh IPL matrix, exact RC/parameters, both personalities' return/fault cursor controls and co-resident backing. |
+| P4 | In progress | Four 3270 models, C presentation, monitor/line primary and transcript/input-handoff gates. |
 | P5 | Open | Explicit normal successor image with independent K emergency output and shutdown. |
 | P6 | Open | Full unchanged workload and failure matrix; qualify before selecting the default. |
 

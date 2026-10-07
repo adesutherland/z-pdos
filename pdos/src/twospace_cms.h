@@ -16,6 +16,7 @@ typedef struct {
     unsigned int origin;
     unsigned int end;
     unsigned int relocation_records;
+    unsigned int format; /* 0: qualified ELF MODULE; 1: classic loader table */
 } TSHINFO;
 
 int TSHHEADER(const unsigned char *block, unsigned int length,

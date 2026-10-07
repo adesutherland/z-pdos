@@ -7,7 +7,7 @@
          LR    10,14
          LA    1,D0LIST
          SVC   202
-         DC    A(D0ERROR)
+         DC    AL4(D0ERROR)
          BR    10
 D0ERROR  BR    10
          DS    0D

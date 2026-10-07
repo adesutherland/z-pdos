@@ -30,6 +30,19 @@ int TSHHEADER(const unsigned char *block, unsigned int length,
         return TSH_BAD;
     h=block+66U;
     entry=word(h); origin=word(h+4U); end=word(h+8U);
+    if(h[44U]==(expected_profile==31U?0x82U:2U)&&
+       h[45U]==0xc5U&&h[46U]==0xe2U&&h[47U]==0xc4U){
+        unsigned int last=half(h+8U),tail=half(h+10U),calculated;
+        if(last<2U||last>130U||half(h+12U)!=last||half(h+14U)!=tail)return TSH_BAD;
+        calculated=(last-2U)*65535U+(tail?tail:65535U);
+        if(!calculated||calculated!=image_bytes||origin<0x20000U||
+           entry<origin||entry-origin>=image_bytes||origin>0x7fffffffU-image_bytes||
+           (expected_profile==24U&&origin+image_bytes>0x1000000U)||records<last)return TSH_BAD;
+        info->profile=profile;info->module_bytes=module_bytes;info->image_bytes=image_bytes;
+        info->records=records;info->entry=entry;info->origin=origin;
+        info->end=origin+image_bytes;info->relocation_records=0U;info->format=1U;
+        return TSH_OK;
+    }
     if (origin < 0x20000U || (origin & 7U) || end != word(h+12U) ||
         end <= origin || end-origin != image_bytes ||
         entry < origin || entry >= end || (end & 7U)) return TSH_BAD;
@@ -55,6 +68,7 @@ int TSHHEADER(const unsigned char *block, unsigned int length,
     info->origin=origin;
     info->end=end;
     info->relocation_records=relocations;
+    info->format=0U;
     return TSH_OK;
 }
 
@@ -103,7 +117,7 @@ int TSHVALIDATE(const unsigned char *staged, unsigned int length,
     if (fnv != word(staged+56U) ||
         record(module,parsed.module_bytes,&cursor,&at,&size) != TSH_OK ||
         size != 80U) return TSH_BAD;
-    if (expected_profile == 24U)
+    if (expected_profile == 24U && !parsed.format)
         for (i=16U; i<80U; ++i)
             if (i != 43U && module[at+i]) return TSH_BAD;
     ++count;
@@ -119,7 +133,15 @@ int TSHVALIDATE(const unsigned char *staged, unsigned int length,
         ++count;
     }
     if (remaining) return TSH_BAD;
-    if (expected_profile == 31U) {
+    if(parsed.format){
+        /* The selected Classic producer emits a trailing symbol table and
+         * no base relocations. Treat it as fixed, never infer relocation. */
+        while(cursor<parsed.module_bytes){
+            if(record(module,parsed.module_bytes,&cursor,&at,&size)!=TSH_OK||size%20U)
+                return TSH_BAD;
+            ++count;
+        }
+    } else if (expected_profile == 31U) {
         static const unsigned char map_magic[8] =
             {0xc5U,0xd3U,0xc6U,0xd7U,0xd6U,0xc3U,0x40U,0x40U};
         if (record(module,parsed.module_bytes,&cursor,&at,&size) != TSH_OK ||
@@ -169,6 +191,7 @@ int TSHIMAGE(const unsigned char *staged, unsigned int length,
     if (!destination || !entry ||
         TSHVALIDATE(staged,length,expected_profile,&info) != TSH_OK ||
         capacity < info.image_bytes ||
+        (info.format && base!=info.origin) ||
         (expected_profile == 24U && base != info.origin) ||
         (expected_profile == 31U &&
          ((base & 7U) || base < 0x1000000U ||
@@ -183,7 +206,7 @@ int TSHIMAGE(const unsigned char *staged, unsigned int length,
         for (j=0U; j<size; ++j) destination[offset+j]=module[at+j];
         offset+=size;
     }
-    if (expected_profile == 31U) {
+    if (expected_profile == 31U && !info.format) {
         if (record(module,info.module_bytes,&cursor,&at,&size) != TSH_OK)
             return TSH_BAD;
         for (i=0U; i<info.relocation_records; ++i) {

@@ -1586,6 +1586,9 @@ tso31_call_done:
 .endif
     brasl %r14, terminal_owner_probe
     brasl %r14, controlled_call_probe
+ .ifdef NATIVE_PAIRS
+    brasl %r14,native_pairs_probe
+.endif
     lghi %r0, 0
     lghi %r1, 0
     lghi %r2, 0
@@ -2432,4 +2435,171 @@ native_files_tail:
 .byte 0x60,0x93,0x40,0xc2,0xf3,0xc9,0xd6,0x40,0xc9,0xd6,0xd8,0xe4,0xc1,0xd3,0x40,0x60,0x81,0x40,0x81,0xa4,0xa3,0x96,0x40,0xc2,0xf3,0xc9,0xd6,0x61,0xe3,0xc5,0xe7,0xe3,0x4b,0xd9,0xe7,0xc1,0xe2,0x40,0xc2,0xf3,0xc9,0xd6,0x61,0xc2,0xe8,0xe3,0xc5,0xe2,0x4b,0xd9,0xe7,0xc2,0xc9,0xd5,0x40,0xc2,0xf3,0xc9,0xd6,0x61,0xc5,0xd4,0xd7,0xe3,0xe8,0x4b,0xd9,0xe7,0xc1,0xe2,0x40,0xc2,0xf3,0xc9,0xd6,0x61,0xd4,0xc9,0xe2,0xe2,0xc9,0xd5,0xc7,0x4b,0xd9,0xe7,0xc1,0xe2,0x40,0xa3,0xa2,0x96
 .endif
 native_files_tail_end:
+.endif
+
+.ifdef NATIVE_PAIRS
+.section .apphelper,"ax"
+native_pairs_probe:
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    stg %r14,0x700(%r2)
+    larl %r5,native_pair_sentinels
+    lg %r3,0(%r5)
+    lg %r4,8(%r5)
+    lghi %r0,280
+    larl %r1,native_pair_name_0
+    lghi %r2,0
+    svc 254
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r0,0x710(%r2)
+    st %r15,0x714(%r2)
+    st %r3,0x718(%r2)
+    st %r4,0x71c(%r2)
+    stg %r3,0x790(%r2)
+    stg %r4,0x798(%r2)
+    larl %r5,native_pair_sentinels
+    lg %r3,0(%r5)
+    lg %r4,8(%r5)
+    lghi %r0,287
+    larl %r1,native_pair_name_1
+    lghi %r2,0
+    svc 254
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r0,0x720(%r2)
+    st %r15,0x724(%r2)
+    st %r3,0x728(%r2)
+    st %r4,0x72c(%r2)
+    stg %r3,0x7a0(%r2)
+    stg %r4,0x7a8(%r2)
+    larl %r5,native_pair_sentinels
+    lg %r3,0(%r5)
+    lg %r4,8(%r5)
+    lghi %r0,536
+    larl %r1,native_pair_name_2
+    lghi %r2,0
+    svc 254
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r0,0x730(%r2)
+    st %r15,0x734(%r2)
+    st %r3,0x738(%r2)
+    st %r4,0x73c(%r2)
+    stg %r3,0x7b0(%r2)
+    stg %r4,0x7b8(%r2)
+    larl %r5,native_pair_sentinels
+    lg %r3,0(%r5)
+    lg %r4,8(%r5)
+    lghi %r0,543
+    larl %r1,native_pair_name_3
+    lghi %r2,0
+    svc 254
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r0,0x740(%r2)
+    st %r15,0x744(%r2)
+    st %r3,0x748(%r2)
+    st %r4,0x74c(%r2)
+    stg %r3,0x7c0(%r2)
+    stg %r4,0x7c8(%r2)
+    larl %r5,native_pair_sentinels
+    lg %r3,0(%r5)
+    lg %r4,8(%r5)
+    lghi %r0,576
+    larl %r1,native_pair_name_4
+    lghi %r2,0
+    svc 254
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r0,0x750(%r2)
+    st %r15,0x754(%r2)
+    st %r3,0x758(%r2)
+    st %r4,0x75c(%r2)
+    stg %r3,0x7d0(%r2)
+    stg %r4,0x7d8(%r2)
+.ifdef NATIVE_HIGH
+    lghi %r0,576
+    larl %r1,native_high_name_0
+    lghi %r2,0
+    svc 254
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r0,0x760(%r2)
+    st %r15,0x764(%r2)
+    lghi %r0,576
+    larl %r1,native_high_name_1
+    lghi %r2,0
+    svc 254
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r0,0x770(%r2)
+    st %r15,0x774(%r2)
+    lghi %r0,576
+    larl %r1,native_high_name_2
+    lghi %r2,0
+    svc 254
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r0,0x780(%r2)
+    st %r15,0x784(%r2)
+.endif
+.ifdef NATIVE_FILE_PAIRS
+    lghi %r0,287
+    larl %r1,native_file_name_0
+    lghi %r2,0
+    svc 254
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r0,0x7e0(%r2)
+    st %r15,0x7e4(%r2)
+    lghi %r0,287
+    larl %r1,native_file_name_1
+    lghi %r2,0
+    svc 254
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r0,0x7f0(%r2)
+    st %r15,0x7f4(%r2)
+.endif
+.ifdef NATIVE_TSO_FILE_PAIRS
+    lghi %r0,543
+    larl %r1,native_tso_file_name_0
+    lghi %r2,0
+    svc 254
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r0,0x800(%r2)
+    st %r15,0x804(%r2)
+    lghi %r0,543
+    larl %r1,native_tso_file_name_1
+    lghi %r2,0
+    svc 254
+    larl %r2,high_data_va
+    lg %r2,0(%r2)
+    st %r0,0x810(%r2)
+    st %r15,0x814(%r2)
+.endif
+    lg %r14,0x700(%r2)
+    br %r14
+.balign 8
+native_pair_sentinels: .quad 0x13579bdf00001357,0x2468ace000002468
+native_pair_name_0: .byte 0xc4,0xf0,0xc3,0xd4,0xd7,0xc1,0x40,0x40
+native_pair_name_1: .byte 0xc4,0xf0,0xc3,0xd4,0xd7,0xc1,0x40,0x40
+native_pair_name_2: .byte 0xc4,0xf0,0xe3,0xe2,0xd7,0xc1,0x40,0x40
+native_pair_name_3: .byte 0xc4,0xf0,0xe3,0xe2,0xd7,0xc1,0x40,0x40
+native_pair_name_4: .byte 0xc4,0xf0,0xe3,0xe2,0xd7,0xc1,0x40,0x40
+.ifdef NATIVE_HIGH
+native_high_name_0: .byte 0xd3,0xc1,0xc3,0xf6,0xf5,0xd6,0x40,0x40
+native_high_name_1: .byte 0xd3,0xc1,0xe4,0xf6,0xf5,0xd6,0x40,0x40
+native_high_name_2: .byte 0xd3,0xc1,0xe5,0xd4,0xf6,0xf5,0xd6,0x40
+.endif
+.ifdef NATIVE_FILE_PAIRS
+native_file_name_0: .byte 0xc4,0xf0,0xc6,0xc9,0xd3,0xc5,0xd7,0xc1
+native_file_name_1: .byte 0xc4,0xf0,0xc6,0xd3,0xe3,0xd7,0xc1,0x40
+.endif
+.ifdef NATIVE_TSO_FILE_PAIRS
+native_tso_file_name_0: .byte 0xc4,0xf0,0xe3,0xc6,0xd7,0xc1,0x40,0x40
+native_tso_file_name_1: .byte 0xc4,0xf0,0xe3,0xc6,0xd3,0xd7,0xc1,0x40
+.endif
 .endif

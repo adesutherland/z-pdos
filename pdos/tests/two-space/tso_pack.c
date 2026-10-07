@@ -20,11 +20,12 @@ int main(int argc, char **argv)
     unsigned char *raw, *stage;
     FILE *input, *output;
     size_t read_bytes;
-    unsigned int i, blocks, length, mode, fnv=0x811c9dc5U;
+    unsigned int i, blocks, length, mode, high,fnv=0x811c9dc5U;
     TSTINFO info;
     if (argc!=3 && argc!=4) return 2;
-    mode=argc==4 && strcmp(argv[3],"64")==0 ? 64U :
-         argc==4 && strcmp(argv[3],"24")==0 ? 24U : 31U;
+    high=argc==4&&strcmp(argv[3],"high")==0;
+    mode=argc==4 && (high || strcmp(argv[3],"64")==0 || strcmp(argv[3],"classic64")==0) ? 64U :
+         argc==4 && (strcmp(argv[3],"24")==0 || strcmp(argv[3],"classic24")==0) ? 24U : 31U;
     if (argc==4 && mode==31U && strcmp(argv[3],"classic31")!=0) return 2;
     raw=(unsigned char *)malloc(TST_MAX_RAW+1U);
     if (!raw) return 3;
@@ -39,7 +40,7 @@ int main(int argc, char **argv)
      * The selected XMIT extraction adds a 16-byte transport EOF record.
      * Add that record explicitly for the source-built PCOMM profile; no
      * instruction, relocation or directory bytes are changed. */
-    if (argc==4 && strcmp(argv[3],"classic31")==0) {
+    if (argc==4 && strncmp(argv[3],"classic",7)==0) {
         unsigned char *larger;
         if (read_bytes>TST_MAX_RAW-16U) { free(raw); return 5; }
         larger=(unsigned char *)realloc(raw,read_bytes+16U);
@@ -47,7 +48,8 @@ int main(int argc, char **argv)
         raw=larger; memset(raw+read_bytes,0,16U);
         raw[read_bytes+1U]=16U; read_bytes+=16U;
     }
-    if (TSTHEADER(raw,(unsigned int)read_bytes,mode,&info)!=TST_OK) {
+    if ((high?TSTHEADER64HIGH(raw,(unsigned int)read_bytes,&info):
+              TSTHEADER(raw,(unsigned int)read_bytes,mode,&info))!=TST_OK) {
         free(raw); return 5;
     }
     blocks=((unsigned int)read_bytes+64U+TST_BLOCK-1U)/TST_BLOCK;
@@ -63,7 +65,8 @@ int main(int argc, char **argv)
         fnv=(fnv^raw[i])*0x01000193U;
     put_word(stage+16U,fnv);
     memcpy(stage+64U,raw,read_bytes);
-    if (TSTSTAGEVALIDATE(stage,length,mode,&info)!=TST_OK) {
+    if ((high?TSTSTAGEHIGH(stage,length,&info):
+              TSTSTAGEVALIDATE(stage,length,mode,&info))!=TST_OK) {
         free(stage); free(raw); return 7;
     }
     output=fopen(argv[2],"wb");

@@ -103,6 +103,20 @@ def page_real(raw, root, virtual):
     return None
 
 
+def registered_cache_page(raw, virtual):
+    if len(raw) < 0x35420 or struct.unpack_from(">I",raw,0x35000)[0]!=0x4c4f4144:
+        return False
+    count=struct.unpack_from(">I",raw,0x35010)[0]
+    if count>32:
+        return False
+    for i in range(count):
+        owner,mode,hi,lo,size,real,active,entry=struct.unpack_from(">8I",raw,0x35020+32*i)
+        address=(hi<<32)|lo
+        if address<=virtual<address+((size+4095)&~4095):
+            return real>=0x400000 and not active and page_real(raw,0x28000f,virtual)==real+virtual-address
+    return False
+
+
 def run(args):
     out = Path(args.output).resolve()
     if out.exists():
@@ -116,7 +130,9 @@ def run(args):
         "disk_sha256_before_ipl":disk_before,
         "source_core_sha256":digest(core),
         "hercules_sha256":digest(hercules),
-        "native_files":args.native_files,"native_input":args.native_input},indent=2)+"\n")
+        "native_files":args.native_files,"native_input":args.native_input,
+        "native_case":args.native_case,"native_pairs":args.native_pairs,
+        "native_high":args.native_high,"native_file_pairs":args.native_file_pairs},indent=2)+"\n")
     console_port = unused_loopback_port()
     script_port = unused_loopback_port()
     while script_port == console_port:
@@ -305,7 +321,13 @@ def run(args):
         raw = result_path.read_bytes()
         reference = core.read_bytes()
         try:
-            judged = judge(raw[:0x14000], log, ipl=True,
+            scoped=bytearray(raw[:0x14000])
+            if args.native_pairs:
+                before,after=struct.unpack_from(">2I",raw,0x4f98)
+                total=struct.unpack_from(">I",raw,0x40ac)[0]
+                if before and before<after<=total:
+                    struct.pack_into(">I",scoped,0x40ac,total-(after-before))
+            judged = judge(scoped, log, ipl=True,
                            cms24=bool(args.cms24), cms31=bool(args.cms31),
                            cmsfile=bool(args.cmsfile),
                            cmslibrary=bool(args.cmslibrary),
@@ -396,7 +418,8 @@ def run(args):
                 checks["cms24_native_rxvm_version"] = (
                     0x20000 <= plist24 < 0x00f00000 and
                     allocated24 == rxvm24_rc == released24 == 0 and
-                    page_unmapped(raw,0x28000f,plist24) and
+                    (page_unmapped(raw,0x28000f,plist24) or
+                     args.native_pairs and registered_cache_page(raw,plist24)) and
                     struct.unpack_from(">I",raw,0x4300)[0] ==
                     ((19 if args.cms_input else 14) if args.cms24file else 1) and
                     struct.unpack_from(">I",raw,0x4304)[0] == len(version) and
@@ -413,7 +436,8 @@ def run(args):
                         io_probe == push == allocated == io_rc ==
                         audit == released == returned == 0 and
                         0x1bb000 <= io_plist < 0xf00000 and
-                        page_unmapped(raw,0x28000f,io_plist) and
+                        (page_unmapped(raw,0x28000f,io_plist) or
+                         args.native_pairs and registered_cache_page(raw,io_plist)) and
                         restored == int.from_bytes(staged24[148:152],"big") and
                         extra == (18 if args.cms_input else 13) and
                         struct.unpack_from(">I",raw,last)[0] == len(summary) and
@@ -430,6 +454,7 @@ def run(args):
                             in enumerate(expected24)))
                     checks["cms24_gap_restored_after_second_run"] = all(
                         (args.tso24 and 0x400000 <= at < 0x50c000) or
+                        (args.native_pairs and registered_cache_page(raw,at)) or
                         page_unmapped(raw,0x28000f,at)
                         for at in range(0x1bb000,0xf00000,4096))
             if args.cms31:
@@ -751,11 +776,90 @@ def run(args):
                 checks["native_binary_stopped_readback"]=binary is not None and b"".join(binary)==bytes(range(256))
                 checks["native_empty_stopped_readback"]=native_records("RXAS","EMPTY")==[]
             flat.unlink()
+    if args.native_pairs:
+        for index, label in enumerate(("cms24", "cms31", "tso24", "tso31", "tso64")):
+            at = 0x12710 + 16 * index
+            expected=37 if args.native_case!="missing" else 0xfffffffd if index<2 else 39
+            checks["native_pair_" + label + "_parameter_rc_and_caller"] = (
+                len(raw) >= at + 16 and
+                struct.unpack_from(">4I", raw, at) == (0, expected, 0x1357, 0x2468))
+            checks["native_pair_"+label+"_full_width_caller_registers"]=(
+                len(raw)>=0x127a0+16*index and
+                struct.unpack_from(">2Q",raw,0x12790+16*index)==
+                (0x13579bdf00001357,0x2468ace000002468))
+        checks["native_pairs_invocation_stack_empty"] = (
+            len(raw) >= 0x4f54 and
+            struct.unpack_from(">I", raw, 0x4f00)[0] == 0 and
+            struct.unpack_from(">I", raw, 0x4f50)[0] == 0)
+        checks["native_pair_owned_runtime_and_overlays_released"] = (
+            len(raw)>=0x35020 and
+            struct.unpack_from(">2I",raw,0x35000)==(0x4c4f4144,0) and
+            struct.unpack_from(">I",raw,0x3500c)[0]==0)
+        before,after=struct.unpack_from(">2I",raw,0x4f98) if len(raw)>=0x4fa0 else (0,0)
+        checks["native_pair_dat_activity_separately_recorded"]=0<before<after
+        count=struct.unpack_from(">I",raw,0x35010)[0] if len(raw)>=0x35014 else 0
+        resident=0<count<=32
+        for i in range(min(count,32)):
+            owner,mode,hi,lo,size,real,leases,entry=struct.unpack_from(">8I",raw,0x35020+32*i)
+            address=(hi<<32)|lo
+            resident &= bool(owner and size and not leases and real>=0x400000 and
+                             address<=entry<address+size and
+                             (mode!=24 or address+size<=0x1000000) and
+                             all(page_real(raw,0x28000f,address+offset)==real+offset
+                                 for offset in range(0,(size+4095)&~4095,4096)))
+        checks["native_co_resident_images_keep_exact_real_backing"]=bool(resident)
+        if args.native_case=="missing":
+            n=struct.unpack_from(">I",raw,0x3a000)[0] if len(raw)>=0x3a004 else 0
+            errors=[struct.unpack_from(">8I",raw,0x3a004+32*i) for i in range(min(n,16))]
+            checks["native_missing_cms_status_distinct_from_app_rc"]=(
+                n==5 and [row[:4] for row in errors[:2]]==[(24,12,3,0),(31,12,3,0)])
+            checks["native_missing_tso_erret_reason_and_abend"]=(
+                n==5 and [row[:6] for row in errors[2:]]==[
+                    (24,12,4,0x806,4,0x806),(31,12,4,0x806,4,0x806),(64,12,4,0x806,4,0x806)] and
+                all(row[6] and not row[6]&1 for row in errors[2:]))
+        if args.native_case=="cross":
+            count=struct.unpack_from(">I",raw,0x39000)[0] if len(raw)>=0x39004 else 0
+            calls=[struct.unpack_from(">6I",raw,0x39004+24*i) for i in range(min(count,64))]
+            for personality,parent in ((1,31),(2,31),(2,64)):
+                checks["native_mode_cross_"+str(personality)+"_"+str(parent)+"_to_24"]=any(
+                    row[:3]==(parent,24,personality) for row in calls)
+    if args.native_high:
+        for index,label in enumerate(("rxc","rxas","rxvm")):
+            at=0x12760+16*index
+            checks["native_high_"+label+"_launcher_application_rc"]=(
+                len(raw)>=at+8 and struct.unpack_from(">2I",raw,at)==(0,0))
+        checks["native_high_load_delete_three_bodies"]=(
+            len(raw)>=0x4f90 and struct.unpack_from(">3I",raw,0x4f80)==(3,3,1))
+        address=struct.unpack_from(">Q",raw,0x4f88)[0] if len(raw)>=0x4f90 else 0
+        checks["native_high_last_body_unmapped_after_delete"]=address>=0x130000000 and page_unmapped(raw,0x28000f,address)
+        lines=[]
+        if len(raw)>=0x3d184:
+            count=struct.unpack_from(">I",raw,0x3c000)[0]
+            for i in range(min(count,32)):
+                at=0x3c004+140*i;size=struct.unpack_from(">I",raw,at+4)[0]
+                if size<=132:lines.append(raw[at+8:at+8+size])
+        checks["native_high_three_exact_version_lines"]=lines==[
+            "crexx-1.0.0-beta.3".encode("cp037"),
+            "crexx-1.0.0-beta.3".encode("cp037"),
+            "crexx-1.0.0-beta.3 (Bytecode Mode)".encode("cp037")]
+    if args.native_file_pairs:
+        for index,label in enumerate(("return","fault")):
+            checks["native_parent_file_cursor_survives_child_"+label]=(
+                len(raw)>=0x127f8 and struct.unpack_from(">2I",raw,0x127e0+16*index)==(0,37))
+        checks["native_child_file_faults_observed"]=(len(raw)>=0x4f94 and struct.unpack_from(">I",raw,0x4f90)[0]==(2 if args.native_tso_file_pairs else 1))
+        checks["native_parent_and_child_file_handles_released"]=(
+            len(raw)>=0x3501c and struct.unpack_from(">2I",raw,0x35014)==(0,0))
+    if args.native_tso_file_pairs:
+        for index,label in enumerate(("return","fault")):
+            checks["native_tso_parent_file_cursor_survives_child_"+label]=(
+                len(raw)>=0x12818 and struct.unpack_from(">2I",raw,0x12800+16*index)==(0,37))
     judged["pass"] = all(checks.values())
     receipt = {"profile": "ESAME, model 2064, 256 MiB, one CPU, 3390 01B9, 3270 0009",
                "disk_sha256_before_ipl": disk_before,
                "disk_sha256_after_ipl": digest(disk),
                "source_core_sha256": digest(core),
+               "native_case":args.native_case,"native_pairs":args.native_pairs,
+               "native_high":args.native_high,"native_file_pairs":args.native_file_pairs,
                "hercules_sha256": digest(hercules),
                "hercules_argv": cmd,
                "terminal_ports": {"console": console_port, "script": script_port},
@@ -782,6 +886,11 @@ def main():
     p.add_argument("--native-files", action="store_true")
     p.add_argument("--native-input", action="store_true")
     p.add_argument("--cms-input", action="store_true")
+    p.add_argument("--native-pairs", action="store_true")
+    p.add_argument("--native-high", action="store_true")
+    p.add_argument("--native-file-pairs", action="store_true")
+    p.add_argument("--native-tso-file-pairs", action="store_true")
+    p.add_argument("--native-case",choices=("ordinary","cross","missing"),default="ordinary")
     try:
         return run(p.parse_args())
     except (OSError, ValueError) as exc:
