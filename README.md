@@ -74,16 +74,18 @@ workloads. It is not a general replacement for CMS, TSO or z/OS. The
 
 ```text
 OS + PDPCLIB C ── Classic C ──► assembler source
-                               │
-handwritten assembler ─────────┤
-PDPCLIB native code and macros ─┘
+handwritten C31/native assembler + PDPCLIB macros
                                │ Classic Assembler
                                ▼
                         classic object decks
                                │ Classic Linker
                                ▼
-                     loader, K64/C31 core and U shell
-                               │ image recipe + Hercules disk utilities
+                     loader, C31 services and U shell
+
+K64 nucleus assembler ── GNU s390 assembler/linker ──► K64 core
+
+                   both routes + image recipe
+                               │ Hercules disk utilities
                                ▼
                        bootable z/PDOS disk
 ```

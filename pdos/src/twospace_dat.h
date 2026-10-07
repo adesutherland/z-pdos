@@ -22,7 +22,7 @@ typedef struct {
     unsigned char *pool;      /* K31 pointer to independently backed pool */
     unsigned int pool_real;   /* real origin, 4 KiB aligned, below 2 GiB */
     unsigned int capacity;    /* multiple of 4 KiB */
-    unsigned int used;
+    unsigned int used;        /* high-water bytes; unlinked holes are reusable */
     unsigned int asce_lo;    /* region-first ASCE; high word is zero */
     TSDPURGE purge;
     void *purge_context;
@@ -39,6 +39,8 @@ int TSDMAP(TSDSTATE *state, TSPADDR virtual_page, TSPADDR real_page);
 /* Privileged K-only alias after the caller proves table-frame ownership. */
 int TSDMAPTABLE(TSDSTATE *state, TSPADDR virtual_page,
                 TSPADDR real_page);
+/* Unmap also unlinks empty tables; live translation is purged before their
+ * frames can be reused. The ASCE root remains allocated. */
 int TSDUNMAP(TSDSTATE *state, TSPADDR virtual_page,
              TSPADDR *old_real_page);
 /* Translate a complete U address through a K-accessible table alias. The

@@ -56,6 +56,17 @@ its 16 MiB C arena remains above the line. Application heap targets remain
 64 MiB for 31-bit and 128 MiB for 64-bit profiles. Exact observations and
 accepted P6 gates are in the [P6 record](../qualification/TWO-SPACE-P6-2026-10-07.md).
 
+The DAT pools have fixed real capacities. When an allocation is released,
+K unlinks empty page, segment and region tables, purges the single CPU's
+translations, then makes those frames reusable. The region-first ASCE root
+remains allocated. Table construction reserves the entire missing path before
+publishing it, so insufficient table storage leaves mappings unchanged.
+Reusable frames are recorded inside unlinked pool storage; bootstrap and
+`TSDATTACH` retain the same state layout. A full pool can still reject a set of
+simultaneously live mappings; completed mappings no longer consume tables
+indefinitely. [PD-023](../BACKLOG.md#pd-023-recycle-empty-dat-tables) records the
+mixed-workload release regression and its separate qualification gate.
+
 ## Architecture decisions for the first replacement
 
 These choices govern the source-built successor. The published one-ASCE

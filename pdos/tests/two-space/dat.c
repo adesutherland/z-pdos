@@ -1,6 +1,7 @@
 /* Host controls for product C89 full-width region-first DAT builder. */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "twospace_dat.h"
 
 #define CHECK(x) do { if (!(x)) { fprintf(stderr,"dat:%d: %s\n",__LINE__,#x); return 1; } } while (0)
@@ -11,6 +12,98 @@ static unsigned int word(const unsigned char *p)
          ((unsigned int)p[2]<<8)|(unsigned int)p[3]; }
 static void purge(void *context)
 { ++*(unsigned int *)context; }
+
+typedef struct {
+    TSDSTATE *state;
+    TSPADDR va;
+    unsigned int unmapping, calls, failures;
+} PURGEORDER;
+
+static void purge_order(void *context)
+{
+    PURGEORDER *o = (PURGEORDER *)context;
+    TSPADDR found;
+    ++o->calls;
+    if (o->unmapping &&
+        (TSDLOOKUP(o->state,o->va,&found) != TSD_MISSING ||
+         o->state->used != 69632U ||
+         word(o->state->pool+16384U) != 0U)) ++o->failures;
+}
+
+static int recycling(void)
+{
+    TSDSTATE s, attached;
+    TSPADDR old, stable = address(0x00200000U,0x20000U), transient;
+    unsigned int i, used;
+    unsigned char *pool, *snapshot;
+    PURGEORDER order;
+    /* Exactly two independent full paths: root + 2*(3 regions + page). */
+    pool = (unsigned char *)calloc(122880U,1U);
+    snapshot = (unsigned char *)malloc(122880U);
+    CHECK(pool && snapshot);
+    CHECK(TSDINIT(&s,pool,0x200000U,122880U) == TSD_OK);
+    CHECK(TSDMAP(&s,address(0U,0x20000U),address(0U,0x9000U)) == TSD_OK);
+    CHECK(TSDMAP(&s,stable,address(0U,0xa000U)) == TSD_OK);
+    CHECK(s.used == s.capacity);
+    CHECK(TSDUNMAP(&s,address(0U,0x20000U),&old) == TSD_OK);
+    CHECK(old.lo == 0x9000U && s.used == s.capacity);
+    CHECK(TSDATTACH(&attached,pool,s.pool_real,s.capacity,s.used,s.asce_lo)
+          == TSD_OK);
+    s = attached; /* Free holes survive reopening through the K alias. */
+    for (i = 0U; i < 100U; ++i) {
+        transient = address((i + 2U) << 21,0x20000U);
+        CHECK(TSDMAP(&s,transient,address(0U,0xb000U)) == TSD_OK);
+        CHECK(TSDLOOKUP(&s,stable,&old) == TSD_OK && old.lo == 0xa000U);
+        CHECK(TSDLOOKUP(&s,transient,&old) == TSD_OK && old.lo == 0xb000U);
+        CHECK(s.used == s.capacity);
+        CHECK(TSDUNMAP(&s,transient,&old) == TSD_OK);
+        CHECK(TSDLOOKUP(&s,transient,&old) == TSD_MISSING);
+    }
+    CHECK(TSDMAP(&s,address(stable.hi,stable.lo+4096U),
+                 address(0U,0xc000U)) == TSD_OK);
+    CHECK(TSDUNMAP(&s,stable,&old) == TSD_OK);
+    CHECK(TSDLOOKUP(&s,address(stable.hi,stable.lo+4096U),&old)
+          == TSD_OK && old.lo == 0xc000U);
+    CHECK(TSDUNMAP(&s,address(stable.hi,stable.lo+4096U),&old) == TSD_OK);
+    CHECK(s.used == 16384U);
+
+    /* Reuse an interior page-table hole without disturbing adjacent tables. */
+    CHECK(TSDMAP(&s,address(0U,0U),address(0U,0x9000U)) == TSD_OK);
+    CHECK(TSDMAP(&s,address(0U,0x100000U),address(0U,0xa000U)) == TSD_OK);
+    used = s.used;
+    CHECK(TSDUNMAP(&s,address(0U,0U),&old) == TSD_OK);
+    CHECK(s.used == used);
+    CHECK(TSDMAP(&s,address(0U,0x200000U),address(0U,0xb000U)) == TSD_OK);
+    CHECK(s.used == used);
+    CHECK(TSDLOOKUP(&s,address(0U,0x100000U),&old) == TSD_OK);
+    CHECK(old.lo == 0xa000U);
+
+    /* A plan can reserve storage and still run out: preserve the whole pool. */
+    CHECK(TSDUNMAP(&s,address(0U,0x200000U),&old) == TSD_OK);
+    s.capacity = s.used + 32768U;
+    memcpy(snapshot,pool,s.capacity);
+    used = s.used;
+    CHECK(TSDMAP(&s,address(0x00200000U,0U),address(0U,0xd000U))
+          == TSD_FULL);
+    CHECK(s.used == used && memcmp(snapshot,pool,s.capacity) == 0);
+    CHECK(TSDLOOKUP(&s,address(0U,0x100000U),&old) == TSD_OK);
+    CHECK(old.lo == 0xa000U);
+    CHECK(TSDUNMAP(&s,address(0U,0x100000U),&old) == TSD_OK);
+    CHECK(s.used == 16384U);
+    order.state = &s; order.calls = order.failures = order.unmapping = 0U;
+    CHECK(TSDLIVE(&s,purge_order,&order) == TSD_OK);
+    for (i = 0U; i < 100U; ++i) {
+        transient = address(i << 21,0x20000U);
+        order.va = transient; order.unmapping = 0U;
+        CHECK(TSDMAP(&s,transient,address(0U,0x9000U)) == TSD_OK);
+        order.unmapping = 1U;
+        CHECK(TSDUNMAP(&s,transient,&old) == TSD_OK);
+        CHECK(s.used == 16384U);
+    }
+    CHECK(order.calls == 200U && order.failures == 0U);
+    free(snapshot); free(pool);
+    return 0;
+}
 
 int main(void)
 {
@@ -64,6 +157,7 @@ int main(void)
     CHECK(TSDMAP(&attached,address(0,0x20000U),
                  address(0,0x5000U)) == TSD_OK && purges == 4U);
     free(kp); free(up); free(tiny);
-    puts("full-width sparse DAT: high K, separate U, live purge, unmap and remap pass");
+    CHECK(recycling() == 0);
+    puts("full-width sparse DAT: separate spaces, live purge, table recycling and atomic mapping pass");
     return 0;
 }

@@ -47,6 +47,15 @@ starts U PCOMM; an ordinary EXIT returns to K, commits the transcript and
 prints K SHUTDOWN before disabled wait. The monitor remains output-only
 unless a U application explicitly hands off its next line prompt.
 
+For a human operator, select the primary 3270 device as
+`0009@HOST:PORT` with a terminal model matching the image configuration.
+The separate text console is a Telnet connection to the same host and port:
+set its negotiated terminal type to `ANSI@000A` to select the 3215 monitor.
+For a line-only primary, use `ANSI@0009` and a core configured with `line`;
+changing the Hercules device alone does not change the kernel's selection.
+The monitor is normally output-only. Its input is used only for an application
+prompt that explicitly requests the monitor handoff.
+
 The accepted normal command route includes:
 
 ```text
