@@ -454,7 +454,160 @@
     "CMS24 compiler/assembler",
     "general CMS/TSO compatibility"
   ],
-  "publication": "tag/assets/signing separate from guest acceptance",
+  "publication": {
+    "tag": "v0.2.0",
+    "source_commit": "83157ae4ad77c53ab2a1f2e9b25297b53bc1527a",
+    "release_url": "https://github.com/adesutherland/z-pdos/releases/tag/v0.2.0",
+    "tag_run_url": "https://github.com/adesutherland/z-pdos/actions/runs/37658640352",
+    "four_host_matrix": "passed",
+    "publisher": "passed",
+    "tag_image_comparison": {
+      "ci_zip_sha256": "faba11ecb94a5dc6c9282b0276d7ac24967f6269707895f98a4ae2d98ddc0faa",
+      "source_commit": "83157ae4ad77c53ab2a1f2e9b25297b53bc1527a",
+      "payloads": {
+        "PLOAD.SYS": {
+          "bytes": 129760,
+          "ci_sha256": "4edbbee1140b53a95a570af723322ecc31ee74dc72c62c7b0b14cc92bb20ec16",
+          "local_sha256": "4edbbee1140b53a95a570af723322ecc31ee74dc72c62c7b0b14cc92bb20ec16",
+          "identical": true
+        },
+        "PDOS.SYS": {
+          "bytes": 145524,
+          "ci_sha256": "170addf91b7561409a97b485d9b23cbb7ecdcc7333e6f24bb4dfce1227a6de46",
+          "local_sha256": "8cff28f471788a3ee2ad8400bcad1033e7dbf979885b5a9038f0262f4c7f4774",
+          "identical": false
+        },
+        "CONFIG.SYS": {
+          "bytes": 10,
+          "ci_sha256": "cb71c77537873856995ed4e9b7d936da9cf3fcd8abea17c5ab64146330c8a19d",
+          "local_sha256": "cb71c77537873856995ed4e9b7d936da9cf3fcd8abea17c5ab64146330c8a19d",
+          "identical": true
+        },
+        "COMMAND.EXE": {
+          "bytes": 109760,
+          "ci_sha256": "5b923367889938de0c774710376c0ec735c7c8cb3fb40dd2f744465d53fca85f",
+          "local_sha256": "5b923367889938de0c774710376c0ec735c7c8cb3fb40dd2f744465d53fca85f",
+          "identical": true
+        },
+        "KCORE.BIN": {
+          "bytes": 313684,
+          "ci_sha256": "fd100145682c783883968f7ae5ca29c0b8c897bcfd6519b44415dbeb7690c77e",
+          "local_sha256": "fd100145682c783883968f7ae5ca29c0b8c897bcfd6519b44415dbeb7690c77e",
+          "identical": true
+        },
+        "U.COMMAND": {
+          "bytes": 129164,
+          "ci_sha256": "ea2cb6542359a178908bda508ce89c1bee2ff495985a110febc6491545e7c38b",
+          "local_sha256": "ea2cb6542359a178908bda508ce89c1bee2ff495985a110febc6491545e7c38b",
+          "identical": true
+        }
+      },
+      "handover_difference_offsets": [
+        363,
+        364,
+        365,
+        366,
+        367,
+        368,
+        369
+      ],
+      "loaded_handover": {
+        "bytes": 127336,
+        "entry_offset": "0x146d4",
+        "amode": 31,
+        "rmode": 24,
+        "sha256": "f500f68f68e04d617f376ff4ded69d4199d7e1f63f362e43a6aa07d7dfda2b00",
+        "identical_materialization": true
+      }
+    },
+    "verified_assets": {
+      "z-pdos-0.2.0-linux-x64.zip": {
+        "bytes": 7826029,
+        "sha256": "b4a8a3690632729eaae9a95cd99c2dadabe9a1e12c94dd03c8b92ed17d4a5c1f",
+        "github_digest_verified": true,
+        "internal_inventory_files": 422,
+        "release_receipt": {
+          "format": "z-pdos-release-v1",
+          "product": "z-pdos",
+          "version": "0.2.0",
+          "platform": "linux-x64",
+          "source_commit": "83157ae4ad77c53ab2a1f2e9b25297b53bc1527a",
+          "source_dirty": false,
+          "signing": "unsigned",
+          "qualification": "host-tools; image and guest qualification are separate"
+        }
+      },
+      "z-pdos-0.2.0-macos-arm64-signed.pkg": {
+        "bytes": 4108400,
+        "sha256": "7e495d0dfc761baeebe1bc2c160676ac97369c64c178f9b74d1e6d67fb241634",
+        "github_digest_verified": true
+      },
+      "z-pdos-0.2.0-macos-arm64-signed.pkg.notarization.json": {
+        "bytes": 98,
+        "sha256": "b2060bf8341fca975a80a43c3b5a9a04c6da784c3b3f3f5f0af40e758dad5a86",
+        "github_digest_verified": true
+      },
+      "z-pdos-0.2.0-macos-arm64-signed.zip": {
+        "bytes": 4281512,
+        "sha256": "f131e9276c5a29870b24a799eec1b888ede34f4d008f982460050cc35040518d",
+        "github_digest_verified": true,
+        "internal_inventory_files": 422,
+        "release_receipt": {
+          "format": "z-pdos-release-v1",
+          "product": "z-pdos",
+          "version": "0.2.0",
+          "platform": "macos-arm64",
+          "source_commit": "83157ae4ad77c53ab2a1f2e9b25297b53bc1527a",
+          "source_dirty": false,
+          "signing": "signed",
+          "qualification": "host-tools; image and guest qualification are separate"
+        }
+      },
+      "z-pdos-0.2.0-macos-x86_64-signed.pkg": {
+        "bytes": 4095978,
+        "sha256": "164336671ad61b17c9ff3757d985b674a079b3578c6e2ed22a121361e872b00b",
+        "github_digest_verified": true
+      },
+      "z-pdos-0.2.0-macos-x86_64-signed.pkg.notarization.json": {
+        "bytes": 98,
+        "sha256": "f274a6e7a8e2a117da8b055a66768376f57759ec0152faab4f3723c286433964",
+        "github_digest_verified": true
+      },
+      "z-pdos-0.2.0-macos-x86_64-signed.zip": {
+        "bytes": 4278862,
+        "sha256": "80098262a252aa35a624c7b63a090fdd754e35aa3627da7554e1168c8884eb43",
+        "github_digest_verified": true,
+        "internal_inventory_files": 422,
+        "release_receipt": {
+          "format": "z-pdos-release-v1",
+          "product": "z-pdos",
+          "version": "0.2.0",
+          "platform": "macos-x86_64",
+          "source_commit": "83157ae4ad77c53ab2a1f2e9b25297b53bc1527a",
+          "source_dirty": false,
+          "signing": "signed",
+          "qualification": "host-tools; image and guest qualification are separate"
+        }
+      },
+      "z-pdos-0.2.0-pdos-image.zip": {
+        "bytes": 299629,
+        "sha256": "faba11ecb94a5dc6c9282b0276d7ac24967f6269707895f98a4ae2d98ddc0faa",
+        "github_digest_verified": true,
+        "internal_inventory_files": 13,
+        "same_as_compared_tag_image": true
+      },
+      "z-pdos-0.2.0-source.tar.gz": {
+        "bytes": 13362251,
+        "sha256": "3258acae8e4cc574269bc3d4b56e46384068d3188746b9f1369817cdd705efb3",
+        "github_digest_verified": true,
+        "source_entries": 1865,
+        "exact_tag_archive": true
+      }
+    },
+    "macos_installer_signatures_and_stapled_notarization": "passed",
+    "windows_signing": "pending refreshed SimplySign session; PKCS11 CKR_FUNCTION_FAILED twice",
+    "final_shared_checksums": "pending signed Windows replacement"
+  },
   "managed_adoption": {
     "status": "accepted",
     "version": "0.2.0",

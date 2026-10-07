@@ -12,8 +12,8 @@ acceptance gates passed before managed adoption and publication.
 | Code review and source freeze | Passed for DAT recycling repair and release plumbing; new exact source/input freeze precedes repaired-image guest qualification. |
 | Fresh local K/U image and host package checks | Passed for the repaired image: integrated host, loader/dataset/compression and ZIP inventory checks; unchanged components retain 93/93 host results. |
 | Exact mainframe operator acceptance and managed replacement | Passed: ten gates, fourteen fresh phases, 143 ordered cases; reviewed working image adopted while stopped, old managed version retired and runbook committed. |
-| Four-host release matrix and downloadable K/U image | Branch matrix passed on both macOS hosts, Linux x64 and Windows x64; final tag matrix pending. |
-| Tag, publication and final asset verification | Pending. |
+| Four-host release matrix and downloadable K/U image | Passed: final tagged builds on both macOS hosts, Linux x64 and Windows x64; packaged OS payloads match the accepted build. |
+| Tag, publication and final asset verification | Published as v0.2.0; non-Windows packages and exact source archive verified. Windows signing awaits a refreshed token session. |
 
 The intended machine is Hercules 4.9.1.0-SDL, model 2064, one z/Architecture
 CPU and 256 MiB real storage. Bare release media contain the OS only.
@@ -238,5 +238,37 @@ handback records 31 unrelated working-tree files preserved; no Lab push was
 requested. Its SHA-256 is
 `c9b0bdefe42c28a9aa10364ba51025eeda64148aa7dec62eba721175b8b21249`.
 
-Final tagged artifacts and signing remain the publication gate. No further
-product implementation change follows this accepted freeze.
+## Tagged publication
+
+Tag `v0.2.0` selects acceptance-record commit
+`83157ae4ad77c53ab2a1f2e9b25297b53bc1527a`. Its implementation and all 459
+frozen input identities remain identical to the accepted repair commit;
+the additional three paths record acceptance and managed adoption.
+All four host jobs and the publisher passed in the
+[tagged run](https://github.com/adesutherland/z-pdos/actions/runs/37658640352).
+The [0.2.0 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.2.0)
+is published. The Windows job includes native install, reinstall, PATH and
+uninstall checks; each host validates relocated tools as well as its builds.
+
+The downloaded tagged image ZIP SHA-256 is
+`faba11ecb94a5dc6c9282b0276d7ac24967f6269707895f98a4ae2d98ddc0faa`.
+All 13 internal inventory entries pass. PLOAD, CONFIG, bootstrap COMMAND,
+KCORE and U PCOMM match the accepted local inputs byte for byte. The C31
+handover has the same seven host-directory metadata differences as the branch
+build and loads through the actual product loader to the identical 127,336
+bytes, entry `0x146d4`, AMODE31/RMODE24 and SHA-256
+`f500f68f68e04d617f376ff4ded69d4199d7e1f63f362e43a6aa07d7dfda2b00`.
+The public ZIP matches the compared tagged artifact, so this evidence binds
+the packaged OS to the accepted build without repeating unchanged guest runs.
+
+The downloaded Linux and both macOS portable packages each pass all 422
+internal checksums and pin version 0.2.0, the exact tag commit and clean source.
+Both macOS installer signatures and stapled notarization tickets validate.
+All corresponding GitHub asset digests match the downloaded bytes. The source
+archive matches every entry of an independent archive of the exact tag.
+
+Windows CI initially publishes explicitly unsigned portable and installer
+assets. Local signing reached the visible certificate but failed twice with
+PKCS11 `CKR_FUNCTION_FAILED`. A refreshed SimplySign session is required
+before signed replacements and final shared checksums can close this gate.
+No further product implementation change follows the accepted freeze.
