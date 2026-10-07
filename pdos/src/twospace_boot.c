@@ -185,6 +185,8 @@ int main(int argc, char **argv)
               i < (TSF_SERVICE_MORE_REAL+TSF_SERVICE_MORE_BYTES)/PAGE) &&
             !(i >= TSF_SERVICE_EXTRA_REAL/PAGE &&
               i < (TSF_SERVICE_EXTRA_REAL+TSF_SERVICE_EXTRA_BYTES)/PAGE) &&
+            !(i >= TSF_KSTACK_EXT_REAL/PAGE &&
+              i < (TSF_KSTACK_EXT_REAL+TSF_KSTACK_EXT_BYTES)/PAGE) &&
             !(i >= TSF_PC_REAL/PAGE &&
               i < (TSF_PC_REAL+TSF_PC_BYTES)/PAGE) &&
             !(seen[i>>3] & (1U<<(i&7U)))) {
@@ -198,6 +200,8 @@ int main(int argc, char **argv)
                  i < (TSF_SERVICE_MORE_REAL+TSF_SERVICE_MORE_BYTES)/PAGE) ||
                 (i >= TSF_SERVICE_EXTRA_REAL/PAGE &&
                  i < (TSF_SERVICE_EXTRA_REAL+TSF_SERVICE_EXTRA_BYTES)/PAGE) ||
+                (i >= TSF_KSTACK_EXT_REAL/PAGE &&
+                 i < (TSF_KSTACK_EXT_REAL+TSF_KSTACK_EXT_BYTES)/PAGE) ||
                 (i >= TSF_PC_REAL/PAGE &&
                  i < (TSF_PC_REAL+TSF_PC_BYTES)/PAGE) ||
                 (seen[i>>3] & (1U<<(i&7U))))) ++i;

@@ -1,14 +1,15 @@
 # Two-space kernel: first contract and machine proof
 
-The next kernel direction is **one supervisor address space (K) and one shared
+The source-built kernel uses **one supervisor address space (K) and one shared
 application address space (U)** on one CPU for a single user. A small AMODE64
 assembler nucleus enters K on interruptions and dispatches services. Most OS
 services can continue as Classic C with 31-bit pointers in K; their code and
 data use K virtual addresses below 2 GiB. All applications, including AMODE24,
 AMODE31 and AMODE64 programs, use the same U translation. Application-to-
 application calls therefore retain ordinary in-space pointers when the target
-ABI permits them. This is a design contract and a bounded machine proof, not
-a replacement disk-boot OS or a general CMS/TSO compatibility claim.
+ABI permits them. This contract now has a source-built disk-boot implementation and accepted
+P0–P6 results. P6 records final reviewed qualification and source-default selection. The native
+service subset remains bounded; it is not general CMS/TSO compatibility.
 The October 2026 architecture review retains one U ASCE for the first
 replacement. Selected CMS and TSO images already coexist in the diagnostic
 map. The design permits further applications to coexist whenever their image,
@@ -22,7 +23,7 @@ or failure isolation that the shared map cannot provide at acceptable
 complexity. Such a change would need fresh DAT, context and service-gate
 qualification; the present proof would not establish it.
 
-P0 through P5 now have accepted results in the [completion plan](../BACKLOG.md#pd-003-completion-plan-6-october-2026).
+P0 through P6 now have accepted results in the [completion plan](../BACKLOG.md#pd-003-completion-plan-6-october-2026).
 The [P1 fresh IPL](../qualification/TWO-SPACE-P1-2026-10-06.md) closes active
 invocation ownership, full architectural caller state and interruption-driven
 completion/cancellation. The [P2 service gate](../qualification/TWO-SPACE-P2-2026-10-07.md) adds native
@@ -33,13 +34,31 @@ The [P4 C console gate](../qualification/TWO-SPACE-P4-2026-10-07.md) qualifies a
 display models, U presentation, the attached and line-only 3215 paths,
 exclusive input selection and the durable transcript. The [P5 normal-image gate](../qualification/TWO-SPACE-P5-2026-10-07.md)
 adds source-built PLOAD-to-K boot, U PCOMM, CMS/TSO command recovery, attached
-capture and independent K emergency/shutdown. Full workload/default selection
-remains P6; the published one-ASCE image is unchanged.
+capture and independent K emergency/shutdown. The [P6 record](../qualification/TWO-SPACE-P6-2026-10-07.md) accepts the full
+selected workload, operator media and terminal matrix and selects the source
+default. The published one-ASCE image is unchanged.
+
+The frozen P6 build also carries PCOMM's existing media commands into K.
+The one-ASCE kernel and K share the command algorithms; K supplies copied
+parameters, protected buffers and channel completion. Selected-volume lookup
+and invocation-owned DD bindings identify the actual device. The durable
+banked output store and transcript remain on the IPL disk when an exchange
+volume is selected. Native sequential exchange COPY writes and verifies its
+physical target; native raw tape retains U/32767 record attributes.
+
+K C31 uses a 96-page bank and a 128 KiB protected stack within the original
+4 MiB real core. Its trampoline is K `0x02060000`. The larger stack accommodates
+the existing record-copy routine; tape dispatch is factored so its buffers
+do not accumulate on that copy stack. These mappings have no U alias.
+PCOMM's below-line control storage starts after the declared fixed CMS24 image;
+its 16 MiB C arena remains above the line. Application heap targets remain
+64 MiB for 31-bit and 128 MiB for 64-bit profiles. Exact observations and
+accepted P6 gates are in the [P6 record](../qualification/TWO-SPACE-P6-2026-10-07.md).
 
 ## Architecture decisions for the first replacement
 
-These are design choices for the successor, not claims about the released
-one-ASCE kernel or completed implementation.
+These choices govern the source-built successor. The published one-ASCE
+kernel has its separate qualification record.
 
 | Concern | Decision |
 | --- | --- |
@@ -185,6 +204,11 @@ explicit states; elapsed time may detect a stall but must not decide whether
 an I/O completed. The exact parameter layouts and terminal request structures
 remain implementation gates in [PD-003](../BACKLOG.md#pd-003-two-space-supervisor-and-shared-application-memory)
 and [PD-021](../BACKLOG.md#pd-021-reusable-3270-application-presentation).
+### Earlier implementation checkpoints
+
+The following trail records the limits at each earlier checkpoint. Current
+acceptance is owned by the P0–P6 table and the dated final qualification.
+
 The first [K invocation-ledger component result](../qualification/TWO-SPACE-INVOCATION-2026-10-06.md)
 proved token and cleanup ordering. The subsequent [TSO](../qualification/TWO-SPACE-INVOCATION-GATE-2026-10-06.md)
 and [CMS](../qualification/TWO-SPACE-CMS-INVOCATION-2026-10-06.md) guest

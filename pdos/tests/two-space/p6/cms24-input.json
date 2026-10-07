@@ -1,0 +1,28 @@
+[
+  [
+    "CMS RUN 24 RXVM IO24 -a INTERACT QTEXT.D QBIN.D QMISS.D CMSREC",
+    "PCOMM END 1 RC=0",
+    [
+      [
+        "C24 INPUT 1:",
+        "Mixed café!"
+      ],
+      [
+        "C24 INPUT 2:",
+        ""
+      ],
+      [
+        "C24 INPUT 3:",
+        "  padded  "
+      ],
+      [
+        "C24 INPUT 4:",
+        "é"
+      ]
+    ],
+    [
+      "C24 SUMMARY: PASS=7 FAIL=0 SKIP=0",
+      "C24 INPUT LENGTHS: 11 0 10 1"
+    ]
+  ]
+]

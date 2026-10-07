@@ -1,0 +1,34 @@
+[
+  [
+    "D4CONAPP",
+    "PCOMM END 1 RC=0",
+    [
+      [
+        "CONSOLE INPUT 1:",
+        "QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+      ],
+      [
+        "CONSOLE INPUT 2:",
+        ""
+      ],
+      [
+        "CONSOLE INPUT 3:",
+        "  padded  "
+      ],
+      [
+        "DISCONNECT MONITOR",
+        "NEXT",
+        "disconnect"
+      ],
+      [
+        "RECONNECT MONITOR",
+        "NEXT",
+        "reconnect"
+      ]
+    ],
+    [
+      "CONSOLE PASS:",
+      "LINE 079:"
+    ]
+  ]
+]

@@ -196,7 +196,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.identity.outputs.version }}
         run: |
-          crexx -nokeep pdos/scripts/image.crexx --args build/pdos/ci-image "$(dirname "$(command -v dasdload)")"
+          crexx -nokeep pdos/scripts/one-space-image.crexx --args build/pdos/ci-image "$(dirname "$(command -v dasdload)")"
           crexx -nokeep pdos/scripts/package-image.crexx --args build/pdos/ci-image "$RELEASE_VERSION"
       - name: Retain checked host installers and archives
         uses: actions/upload-artifact@v7

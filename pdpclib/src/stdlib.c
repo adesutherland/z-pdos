@@ -77,7 +77,12 @@ int __mmgid = 0; /* memmgr id to use - normally 0 */
 /* But bump it up to almost 64 MiB so that if CMS is misconfigured */
 /* it tries to get almost 16 MiB (and from subpool 3) so should fail */
 
-#if defined(MULMEM)
+#if defined(PDP_HEAP_CHUNK_BYTES)
+/* A source-built service profile may select its measured arena size.
+   Existing ports retain their default; native application bytes are unchanged. */
+#define MAX_CHUNK PDP_HEAP_CHUNK_BYTES
+#define REQ_CHUNK PDP_HEAP_CHUNK_BYTES
+#elif defined(MULMEM)
 #define MAX_CHUNK 67100672
 #define REQ_CHUNK 67100672
 #elif defined(__ZPDOSGPB__)

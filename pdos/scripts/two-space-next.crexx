@@ -254,6 +254,10 @@ main: procedure = .int
   source_inputs[39] = "pdos/src/twospace_entry64.inc"
   source_inputs[40] = "pdos/src/twospace_nucleus64.inc"
   source_inputs[41] = "pdos/src/twospace_normal.S"
+  source_inputs[42] = "pdos/src/twospace_media.inc"
+  source_inputs[43] = "pdos/src/media_commands.inc"
+  source_inputs[44] = "pdos/src/media_dscb.h"
+  source_inputs[45] = "pdos/src/twospace_channel.h"
   hashes = .string[]
   address crexx "run shasum -a 256 :source_inputs[]" output hashes
   if rc <> 0 then return rc

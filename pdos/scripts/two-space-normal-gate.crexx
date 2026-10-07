@@ -8,8 +8,9 @@ main: procedure = .int
   work = args.1; prior = args.2; core = args.3; herc = args.4
   fault = ""
   if args.0 = 5 then do
-    if args.5 <> "rootfault" then return 2
-    fault = " --rootfault"
+    if args.5 = "rootfault" then fault = " --rootfault"
+    else if args.5 = "bare" then fault = " --commands pdos/tests/two-space/p6/bare.json"
+    else return 2
   end
   if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
   address crexx "run test ! -e :work"
@@ -36,7 +37,7 @@ main: procedure = .int
   source = prior || "/base/install-ipl"
   address crexx "run cmake -E copy :source :support"
   if rc <> 0 then return rc
-  if fault <> "" then do
+  if fault = " --rootfault" then do
     classicas = root || "/build/tools/assembler/mf-classic-as"; linker = root || "/build/tools/linker/mf-classic-ld"
     object = input || "/ROOTFAULT.obj"; module = input || "/ROOTFAULT.rdw"
     address crexx "run :classicas --profile s370 --macros pdos/tests/two-space/p5/root-fault.asm :object"

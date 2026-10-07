@@ -1,0 +1,18 @@
+[
+  [
+    "CMS RUN 24 D0CMPA D003ARG",
+    "PCOMM END 1 RC=-4"
+  ],
+  [
+    "CMS RUN 31 RXVM -v",
+    "PCOMM END 2 OS=12 RC=unavailable"
+  ],
+  [
+    "RXVM -v",
+    "PCOMM END 3 OS=12 RC=unavailable"
+  ],
+  [
+    "D0TSPA",
+    "PCOMM END 4 RC=37"
+  ]
+]

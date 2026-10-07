@@ -45,7 +45,7 @@ static void compare_released_loader(const unsigned char *raw,
                                     unsigned int base,
                                     int mode, int rmode_any)
 {
-    char *legacy=(char *)calloc(TST_MAX_IMAGE,1U);
+    char *legacy=(char *)calloc(TST_MAX_RAW>TST_MAX_IMAGE?TST_MAX_RAW:TST_MAX_IMAGE,1U);
     int length=(int)raw_bytes, entry, amode, rmode;
     CHECK(legacy!=0);
     memcpy(legacy,raw,raw_bytes);

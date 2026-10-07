@@ -107,6 +107,11 @@ int TSFBUILD(unsigned char *core, unsigned int kpool, unsigned int upool,
                               TSF_SERVICE_EXTRA_REAL+(i-32U)*4096U;
         if (TSDMAP(&k,va,pa) != TSD_OK) return -1;
     }
+    for(i=4U;i<TSF_KSTACK_PAGES;++i){
+        va.hi=pa.hi=0U;va.lo=0x03000000U+i*4096U;
+        pa.lo=TSF_KSTACK_EXT_REAL+(i-4U)*4096U;
+        if(TSDMAP(&k,va,pa)!=TSD_OK)return -1;
+    }
     /* K31 can revisit both table pools after the real bootstrap is gone.
        U has no such alias. The ledger has already reserved these frames. */
     for (i = 0U; i < TSF_KPOOL_BYTES / 4096U; ++i) {

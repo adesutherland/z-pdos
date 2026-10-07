@@ -93,6 +93,24 @@ qualified and released.
 
 ## Engineering and qualification
 
+Complete the final code review before expensive qualification runs. Review
+the whole change against the approved scope, architecture/ABI and acceptance
+criteria, including error paths, ownership, cleanup, shared-code reuse,
+build selection and coverage. Resolve actionable findings and run necessary
+focused implementation checks first.
+
+Then record a source freeze with exact source/input identities, the review
+outcome and the bounded qualification matrix. Qualification tests that
+reviewed candidate. Do not defer final code review until after guest or release
+qualification, or continue unrelated implementation during qualification.
+
+If a qualification failure requires a code change, return to review, check
+the repair and record a new freeze before affected requalification. Reuse
+unchanged results where recorded identities and dependency review justify it;
+do not repeat the whole matrix by habit. Review the final evidence and
+documentation before committing or selecting the candidate. That acceptance
+review does not substitute for the earlier code review.
+
 PDPCLIB is maintained only in pdpclib/src/. OS/application consumers use its
 explicit service profiles. Mainframe Lab keeps references and guest evidence;
 the modern SDK is a consumer. Kernel changes belong in pdos/src/; relocation

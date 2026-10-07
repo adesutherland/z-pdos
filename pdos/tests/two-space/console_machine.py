@@ -5,14 +5,25 @@ import hashlib
 import json
 from pathlib import Path
 import queue
+import re
 import socket
 import struct
 import subprocess
+import shutil
 import threading
 import time
 from ipl_machine import unused_loopback_port, terminal_action, drain_output
 from machine import digest
 from store_check import inspect
+_TABLE=(Path(__file__).resolve().parents[2]/"scripts/ibm1047.table").read_text().splitlines()
+_1047=[int(word,16) for row in _TABLE if not row.startswith("#") for word in row.split()]
+if len(_1047)!=256:raise ValueError("checked IBM1047 decoding table")
+def text1047(raw):return "".join(chr(_1047[b]) for b in raw)
+
+def ordered_results(texts,cases):
+    expected=[case[1] for case in cases if case[1].startswith("PCOMM END ")]
+    observed=[text for text in texts if re.match(r"^PCOMM END [0-9]+ ",text)]
+    return observed==expected
 
 class LineClient:
     def __init__(self,port,device):
@@ -78,7 +89,7 @@ def parse_transcript(raw):
         version,event,shi,slo,size,token,encoding,flags=struct.unpack_from(">8I",data,at)
         if version!=1 or size>len(data)-at-32 or (shi<<32|slo)!=sequence+1:raise ValueError("transcript gap/framing")
         sequence+=1;payload=data[at+32:at+32+size];item={"type":event,"sequence":sequence,"token":token,"encoding":encoding,"flags":flags,"payload_hex":payload.hex()}
-        if event==2:item["text"]=payload.decode("cp037")
+        if event==2:item["text"]=text1047(payload)
         if event==3 and len(payload)==32:item["result"]=struct.unpack(">8I",payload)
         events.append(item);at+=32+size
     return {"events":events,"gaps":gaps,"monitor":monitor,"read_owner":read_owner,
@@ -90,8 +101,23 @@ def run(a):
     disk=Path(a.disk).resolve();core=Path(a.core).resolve();herc=Path(a.hercules).resolve()
     port=unused_loopback_port();script=unused_loopback_port();before=digest(disk)
     primary="3215 noprompt" if a.line_primary else "3270"
-    cfg="ARCHLVL ESAME\nMAINSIZE 256\nNUMCPU 1\nCPUMODEL 2064\nDIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\n"
+    cfg="ARCHLVL ESAME\nMAINSIZE 256\nNUMCPU 1\nCPUMODEL 2064\nDIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\nCODEPAGE 819/1047\n"
     cfg+=f"CNSLPORT 127.0.0.1:{port}\n01B9 3390 {disk}\n0009 {primary}\n"
+    attachments=[]
+    for option,address in (("cms_exchange","01BA"),("fixture_exchange","01BB")):
+        source=getattr(a,option,None)
+        if source:
+            source=Path(source).resolve();target=out/(option+".cckd")
+            shutil.copyfile(source,target)
+            attachments.append({"address":address,"source_sha256":digest(source),"path":str(target)})
+            cfg+=f"{address} 3390 {target}\n"
+    if a.tape_input:
+        source=Path(a.tape_input).resolve();target=out/"input.aws";shutil.copyfile(source,target)
+        attachments.append({"address":"0560","source_sha256":digest(source),"path":str(target)})
+        cfg+=f"0560 3420 {target} RO\n"
+    if a.tape_output:
+        target=out/"output.aws";target.write_bytes(struct.pack("<HHBB",0,0,0x40,0)*2)
+        cfg+=f"0561 3420 {target}\n"
     if a.monitor:cfg+="000A 3215 noprompt\n"
     (out/"machine.cnf").write_text(cfg);(out/"run.rc").write_text("sysclear\n")
     cmd=[str(herc),"-t","-f",str(out/"machine.cnf"),"-o",str(out/"console.log"),"-r",str(out/"run.rc")]
@@ -119,12 +145,47 @@ def run(a):
             if client:until(lambda:"welcome to pcomm" in client.text(),proc,log)
             else:until(lambda:"welcome to pcomm" in terminal_action(script,"Ascii()").stdout,proc,log,60)
             cases=json.loads(Path(a.commands).read_text()) if a.commands else [["VERSION","PDIO1"],["CMS RUN 31 RXVM -v","PCOMM END 1 RC=0"],["RXVM -v","PCOMM END 2 RC=0"],["MISSING","PCOMM END 3 OS=28 RC=unavailable"],["RXVM -v","PCOMM END 4 RC=0"]]
-            for command,marker in cases:
+            for case in cases:
+                command,marker=case[:2]
+                responses=case[2] if len(case)>2 else []
+                prompt_case=len(case)>4 and case[4]=="prompt"
+                prompt_capture=client if client else monitor
+                if prompt_case and not prompt_capture:raise ValueError("prompt completion requires line capture")
+                prompt_before=prompt_capture.text().splitlines().count(marker) if prompt_case else 0
                 if client:client.enter(command)
                 else:
                     terminal_action(script,'String('+json.dumps(command)+')');terminal_action(script,"Enter()")
-                if client:shown=until(lambda:client.text() if marker in client.text() else None,proc,log)
-                else:shown=until(lambda:terminal_action(script,"Ascii()").stdout if marker in terminal_action(script,"Ascii()").stdout else None,proc,log)
+                for response in responses:
+                    prompt,text=response[:2]
+                    source=response[2] if len(response)>2 else "primary"
+                    def input_ready():
+                        shown=client.text() if client else terminal_action(script,"Ascii()").stdout
+                        if prompt in shown:return True
+                        prefix=re.match(r"PCOMM END [0-9]+",marker)
+                        if prefix and prefix[0] in shown:raise RuntimeError("application ended before input: "+prefix[0])
+                        return False
+                    until(input_ready,proc,log)
+                    if source=="disconnect":
+                        if not monitor:raise ValueError("monitor already absent")
+                        monitor_parts.append(monitor.text());monitor.close();monitor=None
+                    elif source=="reconnect":
+                        monitor=LineClient(port,10)
+                        until(lambda:log.read_text(errors="replace").count("0:000A COMM: client")>=2,proc,log,20)
+                    if source=="monitor":
+                        if not monitor:raise ValueError("monitor input source unavailable")
+                        monitor.enter(text)
+                    elif client:client.enter(text)
+                    else:terminal_action(script,'String('+json.dumps(text)+')');terminal_action(script,"Enter()")
+                def completed():
+                    shown=client.text() if client else terminal_action(script,"Ascii()").stdout
+                    if prompt_case and prompt_capture.text().splitlines().count(marker)<=prompt_before:return None
+                    if marker in shown:return shown
+                    prefix=re.match(r"PCOMM END [0-9]+",marker)
+                    if prefix:
+                        actual=re.search(re.escape(prefix[0])+r" (?:RC|OS)=[^\n]*",shown)
+                        if actual:raise RuntimeError("command result: "+actual[0]+"; expected "+marker)
+                    return None
+                shown=until(completed,proc,log)
                 screens.append(shown)
             if client:client.enter("EXIT")
             else:terminal_action(script,'String("EXIT")');terminal_action(script,"Enter()")
@@ -144,14 +205,14 @@ def run(a):
             else:
                 if text and terminal_action(script,'String('+json.dumps(text)+')').returncode:raise RuntimeError("3270 text entry")
                 if terminal_action(script,"Enter()").returncode:raise RuntimeError("3270 AID entry")
-        if a.handoff:
+        if a.handoff and not a.normal:
             if not monitor:raise ValueError("handoff needs monitor")
             until(lambda:"MONITOR INPUT: handoff" in monitor.text(),proc,log)
             monitor.enter("MONITOR-ACCEPT")
-        if a.raw:
+        if a.raw and not a.normal:
             until(lambda:"NATIVE FULL SCREEN" in terminal_action(script,"Ascii()").stdout,proc,log)
             terminal_action(script,'String("RAW")');terminal_action(script,"Enter()")
-        if a.disconnect:
+        if a.disconnect and not a.normal:
             if not monitor or client:raise ValueError("disconnect proof requires 3270 plus monitor")
             until(lambda:"DISCONNECT MONITOR" in terminal_action(script,"Ascii()").stdout,proc,log)
             monitor_parts.append(monitor.text());monitor.close();monitor=None
@@ -166,6 +227,12 @@ def run(a):
             time.sleep(.05)
     except (OSError,RuntimeError,TimeoutError,ValueError) as exc:error=str(exc)
     finally:
+        if error and a.normal and not a.rootfault and proc.poll() is None:
+            try:
+                if client:client.enter("EXIT")
+                else:terminal_action(script,'String("EXIT")');terminal_action(script,"Enter()")
+                until(lambda:"disabled wait state" in log.read_text(errors="replace"),proc,log,30)
+            except (OSError,RuntimeError,TimeoutError,subprocess.TimeoutExpired):pass
         if proc.poll() is None:
             proc.stdin.write(f'stopall\npsw\ngpr\ncr\nsavecore "{out/"result.core"}" 0 fffffff\nquit\n');proc.stdin.flush()
             try:proc.wait(timeout=30)
@@ -178,9 +245,14 @@ def run(a):
         if monitor:monitor_parts.append(monitor.text());monitor.close()
         if monitor_parts:(out/"monitor.txt").write_text("".join(monitor_parts))
     checks={"guest_event_sequence_completed":error is None,"hercules_exit_zero":proc.returncode==0}
-    raw=(out/"result.core").read_bytes();transcript=None
+    raw=(out/"result.core").read_bytes();transcript=None;metrics=None
     if len(raw)==0x10000000:
-        checks["native_console_app_rc_zero"]=(struct.unpack_from(">2I",raw,0x4f5c)==(1,0) if a.pcomm else struct.unpack_from(">2I",raw,0x12880)==(0,0))
+        observed=struct.unpack_from(">8I",raw,0x3c800)
+        if observed[0]==0x4d455431:
+            metrics=dict(zip(("magic","real_bytes_at_stop","observed_peak_real_bytes","total_free_low_u_bytes","largest_low_u_start","largest_low_u_bytes","minimum_observed_largest_low_u_bytes","invocation_depth"),observed))
+            checks["observed_real_frames_within_guest"]=observed[1]<=observed[2]<=0x10000000
+            checks["final_observed_invocation_depth_zero"]=observed[7]==0
+        checks["native_console_app_rc_zero"]=(struct.unpack_from(">2I",raw,0x4f5c)==(1,0) if a.pcomm or a.normal else struct.unpack_from(">2I",raw,0x12880)==(0,0))
         try:
             transcript=parse_transcript(raw);(out/"transcript.json").write_text(json.dumps(transcript,indent=2)+"\n")
             rows,cols=({2:(24,80),3:(32,80),4:(43,80),5:(27,132)}[a.model] if not a.line_primary else (0,0))
@@ -190,15 +262,20 @@ def run(a):
             if a.normal:
                 checks["normal_ipl_and_kernel_shutdown"]=struct.unpack_from(">Q",raw,0x2010)[0]==1 and struct.unpack_from(">2I",raw,0x2018)==((12,0xffffffff) if a.rootfault else (0,0)) and texts[-1]==("K EMERGENCY: PCOMM FAULT" if a.rootfault else "K SHUTDOWN")
                 checks["controlled_invocations_released"]=struct.unpack_from(">I",raw,0x4f00)[0]==0
-                checks["complete_text_or_explicit_gap"]=transcript["gaps"]==0
+                checks["complete_text_or_explicit_gap"]=transcript["gaps"]==(1 if a.raw or a.disconnect else 0)
                 ends=[e for e in transcript["events"] if e["type"]==3]
                 begins=[e for e in transcript["events"] if e["type"]==1]
                 checks["balanced_typed_invocation_results"]=len(ends)==len(begins) and len(ends)>=(1 if a.rootfault else 2) and all(e["result"][0]==1 for e in ends)
                 if a.rootfault:checks["kernel_unwinds_unhealthy_pcomm"]=len(ends)==1 and tuple(ends[0]["result"][1:6])==(12,1,0,0,0xffffffff)
-                checks["ordered_command_results"]=all(any(marker in text for text in texts) for command,marker in cases)
+                checks["ordered_command_results"]=ordered_results(texts,cases) and all(any(marker in text for text in texts) for case in cases for marker in [case[1]])
+                checks["expected_native_output"]=all(text in "\n".join(texts) for case in cases if len(case)>3 for text in case[3])
                 if a.monitor:
                     captured=(out/"monitor.txt").read_text()
                     checks["attached_line_capture_complete"]=all(captured.splitlines().count(text)==texts.count(text) for text in set(texts) if text) and texts[-1] in captured
+                    if a.disconnect:
+                        checks["attached_line_capture_complete"]=False
+                        checks["monitor_gap_explicit_and_recovery_visible"]="TRANSCRIPT GAP" in captured and "AFTER GAP" in captured and "DURING GAP" not in captured
+                        del checks["attached_line_capture_complete"]
                 if not a.line_primary and screens:
                     checks["screen_geometry_observed"]=len(screens[0].splitlines())>=rows and max(map(len,screens[0].splitlines()))>=cols
                     checks["usable_3270_after_commands"]="z/PDOS PCOMM" in screens[-1] and cases[-1][1] in screens[-1]
@@ -222,7 +299,8 @@ def run(a):
                     checks["scroll_and_child_return_repaint"]=all(x in screens[-1] for x in ("z/PDOS PCOMM","PCOMM END 2 RC=0","crexx-1.0.0-beta.3")) if a.pcomm else all(x in screens[0] for x in ("Console qualification","LINE 079:","crexx-1.0.0-beta.3","CONSOLE INPUT 1:"))
         except (ValueError,struct.error) as exc:checks["transcript_framing"]=False;error=error or str(exc)
     else:checks["stopped_core_complete"]=False
-    receipt={"profile":{"model":a.model,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error}
+    receipt={"profile":{"model":a.model,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
+    if attachments:receipt["attachments"]=[dict(row,stopped_sha256=digest(Path(row["path"]))) for row in attachments]
     before_store=disk.parent.parent/"store-before.json"
     if transcript is not None and before_store.exists():
         flat=out/"stopped.ckd"
@@ -244,4 +322,6 @@ if __name__=="__main__":
     p.add_argument("--model",type=int,choices=(2,3,4,5),default=2)
     for flag in ("monitor","line-primary","handoff","raw","disconnect","pcomm","normal","rootfault"):p.add_argument("--"+flag,action="store_true")
     p.add_argument("--commands")
+    for name in ("cms-exchange","fixture-exchange","tape-input"):p.add_argument("--"+name)
+    p.add_argument("--tape-output",action="store_true")
     raise SystemExit(run(p.parse_args()))

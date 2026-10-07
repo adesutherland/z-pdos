@@ -1,0 +1,30 @@
+[
+  [
+    "CMS RUN 31 RXC -v",
+    "PCOMM END 1 RC=0"
+  ],
+  [
+    "CMS RUN 31 RXAS -v",
+    "PCOMM END 2 RC=0"
+  ],
+  [
+    "CMS RUN 31 RXVM -v",
+    "PCOMM END 3 RC=0"
+  ],
+  [
+    "CMS RUN 31 RXC -i A1 -o FRESH IOQUAL",
+    "PCOMM END 4 RC=0"
+  ],
+  [
+    "CMS RUN 31 RXAS -l A1 FRESH",
+    "PCOMM END 5 RC=0"
+  ],
+  [
+    "CMS RUN 31 RXVM -l A1 FRESH -a AUTO T.TXT B.BIN E.TXT M.TXT CMS CMSREC",
+    "PCOMM END 6 RC=0",
+    [],
+    [
+      "SUMMARY: PASS=8 FAIL=0 SKIP=3"
+    ]
+  ]
+]

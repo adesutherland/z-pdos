@@ -305,6 +305,31 @@ release; the LP64 file bridge marshals into those bounded low native lists.
 K must preserve these tables and callbacks; it does not substitute a new C
 calling convention for the native application interface.
 
+### P6 reached file forms and operator compatibility
+
+The normal-image P6 comparison reaches the same CAMLST SEARCH layout on an
+exchange disk. Its six-byte volume names a checked registered device; the
+96-byte DSCB destination is probed before publication. DD bindings preserve
+that device across subsequent selection. The reached DEVTYPE, TIOT/JFCB,
+DEB+32 UCB pointer and DCB+44 DEB pointer retain the maintained runtime layouts.
+Raw `TAP:hhhh` DDs require the registered tape address and retain the one-ASCE
+U/32767 attributes, with no DASD organisation or fake dataset extent.
+
+Native TSO24's unchanged z/OS 1.5 file adapter also reaches SWAREQ through
+CVT+296, then +100 and +88. The selected read-only FCODE-RL form has one
+28-byte EPA; K validates it and returns the active caller's JFCB at queue+16.
+The U entry veneer invokes checked SVC201, without exposing a privileged K
+helper. Hardware AMODE31 helpers retain their active AMODE24 invocation and
+below-16-MiB address/storage limits. The released library-free IO24 run is
+the positive control; this does not establish general SWAREQ or full-library
+native TSO24 compatibility.
+
+The [P6 normal qualification](../qualification/TWO-SPACE-P6-2026-10-07.md)
+records these source-derived forms and their exact unchanged binary results.
+Operator media dispatch retains SVC42/1/62 and the copied command tail;
+successful dispatch returns the media command RC in the same typed result.
+It does not define another application launcher.
+
 ### Native application-call fixture freeze
 
 `pdos/tests/two-space/p0/` owns independent native parent/child source.

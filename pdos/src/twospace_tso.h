@@ -10,7 +10,8 @@
 
 #define TST_OK 0
 #define TST_BAD -1
-#define TST_MAX_RAW (5U*1024U*1024U)
+/* Frozen beta-3 TSO31 RXC has 5,551,326 native record bytes. */
+#define TST_MAX_RAW (6U*1024U*1024U)
 #define TST_MAX_IMAGE (5U*1024U*1024U)
 #define TST_MAX_HIGH_RELOCS 65536U
 #define TST_BLOCK 18452U

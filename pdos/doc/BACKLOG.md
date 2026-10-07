@@ -99,7 +99,7 @@ remain separate work.
 ## PD-003: Two-space supervisor and shared application memory
 
 - Type: improvement
-- Status: In progress
+- Status: Done
 - Target: pdos-zarch nucleus, C31 supervisor services and shared AMODE24/31/64 application space
 - Observation: The current C32 kernel runs AMODE31 below 16 MiB with a one-MiB linked image slot. Its `PDOS` structure, mostly eager DAT and address-space tables, is 8,802,304 bytes; the initial aligned allocation leaves at most 630,784 bytes before the 12 MiB below-line application pool. Stage 3 exposed an overlap between the CMS24 fixed-origin image and its inherited low stack; the bounded bridge moves that stack to the reserved 15–16 MiB range. The image also covers PLOAD's 1 MiB boot heap. An initial 0.1.1 operator candidate returned from PCOMM but failed in PLOAD's C exit; the repaired z/Architecture kernel reaches its own `0444` wait after DAT is off. A trial with an 8 MiB heap start and 10 MiB application-pool start booted PCOMM but stalled at CMS24 execution; its initial kernel allocation could not fit in that gap, so the trial did not isolate the image-slot limit. Existing 31/64 application loads use above-line storage, but GETMAIN can still use or fall back to `btlmem`. Dropping CMS24 alone would not remove that dependency or bound the kernel heap. Kernel growth requires an independently backed K home for its body and bulky structures, with the real interruption island and 24-bit channel buffers handled separately. Moving the current linked image wholesale would put its 24-bit channel addresses and startup assumptions out of contract.
 - Evidence: Machine contract, existing 0.1 qualification, and the [stage 3 guest record](qualification/STAGE3-2026-10-05.md).
@@ -184,7 +184,7 @@ decision. Required failure controls stay bounded to the named plan cases.
 | P3 | Done | [Native loading/calls, mode crossings, HIGH and caller file preservation](qualification/TWO-SPACE-P3-2026-10-07.md); 187/190/189-check fresh IPL matrix, exact RC/parameters, both personalities' return/fault cursor controls and co-resident backing. |
 | P4 | Done | [C display/device models, U presentation, monitor and durable transcript](qualification/TWO-SPACE-P4-2026-10-07.md); all four model IPLs, line-only, input handoff, loss/reconnect, raw-screen gap, PCOMM and a full-width U64 request. |
 | P5 | Done | [Selectable source-built normal K/U image](qualification/TWO-SPACE-P5-2026-10-07.md); stable U PCOMM, CMS/TSO commands, explicit OS failure, complete attached capture, durable output and independent K emergency/shutdown. |
-| P6 | Open | Full unchanged workload and failure matrix; qualify before selecting the default. |
+| P6 | Done | [Reviewed replacement qualification and source-default selection](qualification/TWO-SPACE-P6-2026-10-07.md): unchanged workloads, bounded native TSO24, calls/faults, four models, monitor controls, 47-command media workflow, exact exports and reviewed-image repeated/normal/fault shutdown. Local commit; publication remains separate. |
 
 The later [HIGH launcher linkage check](qualification/TWO-SPACE-TSO64-HIGH-LOADER-2026-10-06.md)
 ties all three frozen low launchers to their corresponding high bodies and

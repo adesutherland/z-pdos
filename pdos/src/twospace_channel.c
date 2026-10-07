@@ -102,6 +102,42 @@ int TSCBUILDUPDATE(TSCSTATE *s,unsigned int cylinder,unsigned int head,
     return TSC_OK;
 }
 
+int TSCBUILDBLOCK(TSCSTATE *s,unsigned int cylinder,unsigned int head,
+                   unsigned int record,unsigned int command,unsigned int bytes)
+{
+    unsigned char *base;
+    if((command!=0x05U&&command!=0x0dU&&command!=0x1dU)||
+       record>255U||(!record&&command!=0x1dU)||
+       TSCBUILDREAD(s,cylinder,head,record?record:1U,0x06U,bytes)!=TSC_OK)return TSC_BAD;
+    base=s->aperture+s->region_real;
+    base[TSC_SEARCH_OFFSET+4U]=(unsigned char)record;
+    base[TSC_CCW_OFFSET+24U]=(unsigned char)command;
+    base[TSC_CCW_OFFSET+25U]=0U;
+    return TSC_OK;
+}
+int TSCBUILDTAPE(TSCSTATE *s,unsigned int command,unsigned int bytes)
+{
+    unsigned char *base;
+    if(!s||!s->aperture||!bytes||bytes>TSC_MAX_RECORD||
+       (command!=1U&&command!=2U&&command!=7U&&command!=0x1fU))return TSC_BAD;
+    base=s->aperture+s->region_real;clear(base,TSC_REGION_BYTES);
+    put32(base+4U,0x0080ff00U);put32(base+8U,s->region_real+TSC_CCW_OFFSET);
+    ccw(base+TSC_CCW_OFFSET,command,0x20U,bytes,s->region_real+TSC_DATA_OFFSET);
+    return TSC_OK;
+}
+int TSCCHECKTAPE(const TSCSTATE *s,unsigned int command,unsigned int bytes,
+                 unsigned int *got)
+{
+    const unsigned char *irb;unsigned int residual;
+    if(!s||!s->aperture||!got||!bytes||bytes>TSC_MAX_RECORD)return TSC_BAD;
+    irb=s->aperture+s->region_real+TSC_IRB_OFFSET;residual=get16(irb+10U);
+    if(irb[9U]||get32(irb+4U)!=s->region_real+TSC_CCW_OFFSET+8U||residual>bytes)return TSC_IO;
+    if(command==2U&&irb[8U]==0x0dU&&residual==bytes){*got=0U;return TSC_OK;}
+    if(irb[8U]!=0x0cU)return TSC_IO;
+    *got=command==1U||command==2U?bytes-residual:0U;
+    return command!=1U||*got==bytes?TSC_OK:TSC_IO;
+}
+
 int TSCCHECKEND(const TSCSTATE *s,unsigned int capacity)
 {
     const unsigned char *irb;

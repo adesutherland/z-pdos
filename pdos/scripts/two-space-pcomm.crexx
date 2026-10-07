@@ -29,7 +29,7 @@ main: procedure = .int
   end
   cms = cms || "/"; tso = tso || "/"
   base = work || "/base"
-  address crexx "run crexx -nokeep pdos/scripts/image.crexx --args :base :hercdir"
+  address crexx "run crexx -nokeep pdos/scripts/one-space-image.crexx --args :base :hercdir"
   if rc <> 0 then return rc
   source = root || "/" || base || "/check/source/pdpclib/stdio.c"
   nativec = out || "/pcomm-console.asm"; nativeobj = out || "/pcomm-console.obj"

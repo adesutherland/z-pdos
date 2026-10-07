@@ -38,7 +38,7 @@ def load_elf(path):
     expected = {(0, 0), (0x1000, 0x1000), (0x2000, 0x2000), (0x4000, 0x4000),
                 (0x20000, 0x5000), (0x110000000, 0x6000),
                 (0x21000, 0x7000), (0x22000, 0x8000),
-                (KCORE, 0x9000), (0x02040000, 0xf000),
+                (KCORE, 0x9000), (0x02060000, 0xf000),
                 (0x02000000, 0x11000), (HIGH_REQUEST, 0x12000),
                 (0x110002000, 0x13000), (0x110003000, 0x1f000)}
     core = bytearray(0x400000)
@@ -64,18 +64,18 @@ def make_core(elf, classic, dat_emit, out, normal=False):
     if normal:
         struct.pack_into(">I",core,0x95020,0x54534e31)
     service = Path(classic).read_bytes()
-    if not 0 < len(service) <= 64 * 4096:
-        raise ValueError("Classic C service exceeds 64 reserved pages")
+    if not 0 < len(service) <= 96 * 4096:
+        raise ValueError("Classic C service exceeds 96 reserved pages")
     core[0xa000:0xf000] = service[:5 * 4096].ljust(5 * 4096, b"\0")
     core[0x14000:0x1f000] = service[5 * 4096:16 * 4096].ljust(11 * 4096, b"\0")
     core[0x80000:0x90000] = service[16 * 4096:32 * 4096].ljust(16 * 4096, b"\0")
-    core[0xa0000:0xc0000] = service[32 * 4096:].ljust(32 * 4096, b"\0")
+    core[0xa0000:0xe0000] = service[32 * 4096:].ljust(64 * 4096, b"\0")
     # Classic PDPPRLG uses R13's 76-byte slot as the next frame pointer.
     struct.pack_into(">I", core, 0x1004c, 0x03000100)
     struct.pack_into(">I", core, 0x10060, 0x03000080)
     kernel = {0: 0, 0x1000: 0x1000, 0x2000: 0x2000,
               0x3000: 0x3000, 0x4000: 0x4000,
-              0x02040000: 0xf000, 0x03000000: 0x10000,
+              0x02060000: 0xf000, 0x03000000: 0x10000,
               0x03001000: 0x92000, 0x03002000: 0x93000,
               0x03003000: 0x94000, KCORE: 0x9000}
     kernel.update({0x02000000 + 4096 * i:
@@ -83,7 +83,8 @@ def make_core(elf, classic, dat_emit, out, normal=False):
                     0x14000 + (i - 5) * 4096 if i < 16 else
                     0x80000 + (i - 16) * 4096 if i < 32 else
                     0xa0000 + (i - 32) * 4096)
-                   for i in range(64)})
+                   for i in range(96)})
+    kernel.update({0x03000000+4096*i:0xe0000+4096*(i-4) for i in range(4,32)})
     application = {0x20000: 0x5000, 0x21000: 0x7000,
                    0x02000000: 0x11000, 0x110000000: 0x6000,
                    HIGH_REQUEST: 0x12000, 0x110002000: 0x13000,
@@ -99,7 +100,8 @@ def make_core(elf, classic, dat_emit, out, normal=False):
                              0xd000, 0xe000, 0xf000, 0x10000,
                              *(0x14000 + i * 4096 for i in range(11)),
                              *(0x80000 + i * 4096 for i in range(21)),
-                             *(0xa0000 + i * 4096 for i in range(32))}
+                             *(0xa0000 + i * 4096 for i in range(64)),
+                             *(0xe0000 + i * 4096 for i in range(28))}
     if private_kernel_frames.intersection(application.values()):
         raise ValueError("U maps private K real frame")
     if any(0x3e0000 <= pa < 0x400000 for pa in application.values()):

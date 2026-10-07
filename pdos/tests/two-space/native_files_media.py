@@ -12,9 +12,10 @@ import sys
 import zipfile
 
 def main():
-    if len(sys.argv) != 6:
+    if len(sys.argv) not in (6,7):
         return 2
-    archive,writer_path,source,output,receipt=map(Path,sys.argv[1:])
+    archive,writer_path,source,output,receipt=map(Path,sys.argv[1:6])
+    profile=sys.argv[6] if len(sys.argv)==7 else "tso31"
     raw=archive.read_bytes()
     if hashlib.sha256(raw).hexdigest() != "fd11ae260bba169653126a861ecae545cee9bcfbe1fad4083c4a913241e3aedd":
         raise ValueError("pinned P0 package required")
@@ -46,11 +47,11 @@ def main():
         writer.write_track(disk,cylinder,head,directory)
         allowed.add(cylinder*15+head)
     with zipfile.ZipFile(archive) as release:
-        for suffix,kind,members in (("RXBIN","binary",("IOQUAL","LIBRARY","RXCEXITS")),
+        for suffix,kind,members in (("RXBIN","binary",(("IOQUAL","LIBRARY","RXCEXITS","IO24") if profile=="tso24" else ("IOQUAL","LIBRARY","RXCEXITS"))),
                                     ("CREXX","text",("IOQUAL",))):
             items=[]
             for member in members:
-                name="tso31/"+member+"."+suffix.lower()
+                name=profile+"/"+member+"."+suffix.lower()
                 data=release.read(name)
                 items.append(({"member":member,"kind":kind},data))
                 identities.append({"package_member":name,"sha256":hashlib.sha256(data).hexdigest()})

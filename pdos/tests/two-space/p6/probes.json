@@ -1,0 +1,10 @@
+[
+  [
+    "QAPROBE",
+    "PCOMM END 1 RC=37"
+  ],
+  [
+    "RXVM -v",
+    "PCOMM END 2 RC=0"
+  ]
+]

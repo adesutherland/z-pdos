@@ -1,0 +1,47 @@
+/* SPDX-License-Identifier: MIT; existing operator media workflow on K/U. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 8 then return 2
+  work = args.1; prior = args.2; core = args.3; cms = args.4
+  inventory = args.5; archive = args.6; herc = args.7; fixtures = args.8
+  if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
+  address crexx "run test ! -e :work"
+  if rc <> 0 then return 2
+  lines = .string[]
+  address crexx "pwd" output lines
+  root = strip(lines.1); out = root || "/" || work
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :prior :core :herc"
+  if rc <> 0 then return rc
+  input = out || "/cms-inputs"; pack = out || "/pack-tso"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src pdos/src/twospace_tso.c pdos/tests/two-space/tso_pack.c -o :pack"
+  if rc <> 0 then return rc
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_workload_media.py :prior :cms :inventory :archive :pack :input cms-exchange"
+  if rc <> 0 then return rc
+  media = input || "/media"; dasdload = herc || "/dasdload"
+  address crexx "cd :media"
+  address crexx "run :dasdload -bz2 ctl.txt exchange.cckd"
+  if rc <> 0 then return rc
+  address crexx "cd :root"
+  prepared = out || "/prepared"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/media_workload.py prepare :fixtures :prepared"
+  if rc <> 0 then return rc
+  disk = out || "/media/pdos00.cckd"; hercules = herc || "/hercules"; runout = out || "/run"
+  commands = prepared || "/commands.json"; exchange = media || "/exchange.cckd"
+  fixture_disk = fixtures || "/exchange.cckd"; tape = prepared || "/input.aws"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_machine.py :disk :core :hercules :runout --normal --monitor --commands :commands --cms-exchange :exchange --fixture-exchange :fixture_disk --tape-input :tape --tape-output"
+  if rc <> 0 then return rc
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/media_workload.py tape :fixtures :prepared :runout"
+  if rc <> 0 then return rc
+  expand = herc || "/cckd2ckd"; stopped = runout || "/fixture_exchange.cckd"
+  flat = out || "/fixture-stopped.ckd"; baseline = out || "/fixture-baseline.ckd"
+  address crexx "run :expand -q -cyls 100 :stopped :flat"
+  if rc <> 0 then return rc
+  address crexx "run :expand -q -cyls 100 :fixture_disk :baseline"
+  if rc <> 0 then return rc
+  lock = prepared || "/lock.json"; sources = fixtures || "/media"; exported = out || "/export"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/scripts/fixture-media.py verify --disk :flat --base :baseline --lock :lock --media :sources --out :exported"
+  if rc <> 0 then return rc
+  address crexx "run cmake -E rm :flat :baseline"
+  return rc

@@ -249,11 +249,13 @@ done:
     if(console_v1_cancel(f->token))return 12U;
     return rc;
 }
+static unsigned int tc_suspended_screen[TSV_MAX_DEPTH+1U];
 static void console_v1_begin(const TSVFRAME *frame)
 {
     const unsigned char *name;unsigned int n,i,depth;
     if(!tc_ready||!frame)return;
     depth=native_invocations.depth;
+    tc_suspended_screen[depth]=tc_screen_owner;tc_screen_owner=0U;
     name=frame->image_owner<TSL_IMAGES&&native_images[frame->image_owner].bytes?
          native_images[frame->image_owner].name:tc_default_header;
     n=frame->image_owner<TSL_IMAGES&&native_images[frame->image_owner].bytes?8U:sizeof tc_default_header;
@@ -265,6 +267,13 @@ static void console_v1_failed(unsigned int token,const unsigned char *name,unsig
     if(!tc_ready)return;
     TTXAPPEND(&tc_log,TSA_TRANSCRIPT_COMMAND_BEGIN,token,TSA_ENCODING_1047,0U,name,length);
     TTXAPPEND(&tc_log,TSA_TRANSCRIPT_COMMAND_END,token,0U,0U,call_last_result,TSA_RESULT_BYTES);
+    tc_snapshot();
+}
+static void console_v1_operator(unsigned int token,const unsigned char *name,unsigned int length,unsigned int end)
+{
+    if(!tc_ready)return;
+    TTXAPPEND(&tc_log,end?TSA_TRANSCRIPT_COMMAND_END:TSA_TRANSCRIPT_COMMAND_BEGIN,
+              token,end?0U:TSA_ENCODING_1047,0U,end?call_last_result:name,end?TSA_RESULT_BYTES:length);
     tc_snapshot();
 }
 static void console_v1_flush(void)
@@ -279,6 +288,11 @@ static void console_v1_end(unsigned int token,const unsigned char *result)
     if(!tc_ready)return;
     TTXAPPEND(&tc_log,TSA_TRANSCRIPT_COMMAND_END,token,0U,0U,result,TSA_RESULT_BYTES);
     if(tc_screen_owner==token)tc_screen_owner=0U;
+    {const TSVFRAME *parent=TSVTOP(&native_invocations);
+     unsigned int depth=native_invocations.depth+1U;
+     if(depth<=TSV_MAX_DEPTH&&parent&&tc_suspended_screen[depth]==parent->token)
+         tc_screen_owner=parent->token;
+     if(depth<=TSV_MAX_DEPTH)tc_suspended_screen[depth]=0U;}
     if(tc_raw_owner==token){tc_raw_owner=0U;TTCCONFIG(&tc_cap,tc_cap.device_class,tc_cap.address,tc_cap.model,tc_cap.monitor);}
     if(!native_invocations.depth)console_v1_flush();
     tc_render();tc_snapshot();

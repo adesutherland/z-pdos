@@ -6,14 +6,19 @@ import rxfnsb
 main: procedure = .int
   arg args = .string[]
   i = .int
-  if args.0 <> 8 & args.0 <> 9 then do
+  if args.0 <> 8 & args.0 <> 9 & args.0 <> 10 then do
     say "usage: crexx -nokeep pdos/scripts/two-space-call-ipl.crexx --args FRESH-build/pdos/work ABS_BOOT_INPUT_BUILD ABS_CORE ABS_P0_FIXTURES ABS_HIGH_INPUTS ABS_FILE_FIXTURES HERCULES_BIN CLANG [ordinary|cross|missing]"
     return 2
   end
   work = args.1; prior = args.2; core = args.3; fixtures = args.4
   high = args.5; files = args.6; herc = args.7; clang = args.8
   kind = "ordinary"
-  if args.0 = 9 then kind = args.9
+  if args.0 >= 9 then kind = args.9
+  normal = 0
+  if args.0 = 10 then do
+    if args.10 <> "normal" then return 2
+    normal = 1
+  end
   if kind <> "ordinary" & kind <> "cross" & kind <> "missing" then return 2
   if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
   address crexx "run test ! -e :work"
@@ -60,6 +65,10 @@ main: procedure = .int
         if kind = "cross" then if member = "CMS31.D0CMCH" | member = "TSO31.D0TSCH" | member = "TSO64.D0TSCH" then iterate
         if kind = "missing" then if right(member,7) = ".D0CMCH" | right(member,7) = ".D0TSCH" then iterate
         call lineout ctl,row
+        if normal = 1 then do
+          if member = "TSO24.D0TSPA" then call lineout ctl,changestr("TSO24.D0TSPA",row,"TSO24.D0TP24")
+          if member = "TSO64.D0TSPA" then call lineout ctl,changestr("TSO64.D0TSPA",row,"TSO64.D0TP64")
+        end
       end
     end
     call lineout ctl,value
@@ -87,6 +96,11 @@ main: procedure = .int
   address crexx "run cmake -E rm :transient[]"
   if rc <> 0 then return rc
   disk = out || "/media/pdos00.cckd"; hercules = herc || "/hercules"; runout = out || "/run"
+  if normal = 1 then do
+    commands = root || "/pdos/tests/two-space/p6/calls-" || kind || ".json"
+    address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_machine.py :disk :core :hercules :runout --normal --monitor --commands :commands"
+    return rc
+  end
   tso_file_probe = files || "/D0TFPA.rdw"
   address crexx "run test -f :tso_file_probe"
   if rc = 0 then address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/ipl_machine.py :disk :core :hercules :runout cms24 cms31 cmsfile cmslibrary cms24file tso31 tso64 tso24 --native-pairs --native-high --native-file-pairs --native-tso-file-pairs --native-case :kind"

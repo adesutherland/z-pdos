@@ -1,0 +1,42 @@
+[
+  [
+    "CMS RUN 24 D0CMPA D003ARG",
+    "PCOMM END 1 RC=-3"
+  ],
+  [
+    "CMS RUN 31 D0CMPA D003ARG",
+    "PCOMM END 2 RC=-3"
+  ],
+  [
+    "D0TP24",
+    "PCOMM END 3 RC=39"
+  ],
+  [
+    "D0TSPA",
+    "PCOMM END 4 RC=39"
+  ],
+  [
+    "D0TP64",
+    "PCOMM END 5 RC=39"
+  ],
+  [
+    "CMS RUN 31 D0FILEPA X",
+    "PCOMM END 6 RC=37"
+  ],
+  [
+    "CMS RUN 31 D0FLTPA X",
+    "PCOMM END 7 RC=37"
+  ],
+  [
+    "D0TFPA",
+    "PCOMM END 8 RC=37"
+  ],
+  [
+    "D0TFLPA",
+    "PCOMM END 9 RC=37"
+  ],
+  [
+    "RXVM -v",
+    "PCOMM END 10 RC=0"
+  ]
+]

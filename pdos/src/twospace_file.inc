@@ -7,7 +7,7 @@
 #define SF_FILE_HANDLE 0x400U
 #define SF_REAL_OWNER 0x54534600U
 typedef struct {
-    unsigned int token,bytes;
+    unsigned int token,bytes,device,tape;
     unsigned char dd[8],dsn[44],dscb[96];
     TSKEXTENT extent;
 } SFDD;
@@ -21,6 +21,25 @@ static SFFILE sf_file[TSV_MAX_DEPTH*SFFILES];
 static unsigned int sf_next_dd;
 static unsigned int sf_exit_token[TSV_MAX_DEPTH];
 static unsigned int sf_exit_saved[TSV_MAX_DEPTH][128];
+static unsigned int sf_store_profile(const SFDD *dd)
+{return 0x54534fU^(dd->device==*(volatile const unsigned int *)0x40bcU?0U:dd->device);}
+static int media_busy(unsigned int device)
+{
+    unsigned int i,j;
+    if(!device)return 0;
+    for(i=0U;i<TSV_MAX_DEPTH*SFFILES;++i)
+        if(sf_file[i].token&&sf_dd[sf_file[i].dd].device==device)return 1;
+    for(i=0U;i<TSL_IMAGES;++i)
+        if(native_images[i].device==device&&native_image_active[i])return 1;
+    /* Closed bindings are removed before their volume registration retires. */
+    for(i=0U;i<TSV_MAX_DEPTH*SFDDS;++i)if(sf_dd[i].token&&sf_dd[i].device==device){
+        for(j=0U;j<native_invocations.depth;++j)if(native_invocations.frame[j].token==sf_dd[i].token)break;
+        if(j==native_invocations.depth||TSVFORGET(&native_invocations,sf_dd[i].token,
+            TSV_FILE,SF_DD_HANDLE+i+1U)!=TSV_OK)return 1;
+        sf_dd[i].token=0U;
+    }
+    sf_compat();return 0;
+}
 
 static unsigned int sf_half(const unsigned char *p)
 {return ((unsigned int)p[0]<<8)|p[1];}
@@ -32,7 +51,9 @@ static unsigned int sf_span(unsigned int address,unsigned int n,unsigned int wri
                              unsigned char *bytes,unsigned int perform)
 {
     TSGCONTEXT gate;TSGREQUEST r;unsigned int at,take;
-    if(!address||address>=0x80000000U||!n||n>0x80000000U-address)return 8U;
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
+    unsigned int limit=frame&&frame->amode==24U?0x1000000U:0x80000000U;
+    if(!address||address>=limit||!n||n>limit-address)return 8U;
     gate.u_tables=&u_tables;gate.real_aperture=(unsigned char *)TSF_KAPERTURE_VA;
     gate.real_bytes=TSF_REAL_BYTES;gate.rights=user_rights;gate.rights_context=0;
     r.address.hi=0U;r.direction=write?TSG_WRITE:TSG_READ;r.svc=0U;
@@ -86,8 +107,13 @@ static void sf_compat(void)
         sf_put_half(j+104U,sf_dd[i].extent.logical_length);
         u=p+4096U+0xc00U+slot*64U;
         {unsigned int k;for(k=0U;k<64U;++k)u[k]=0U;}
-        u[17U]=0x10U;u[18U]=0x20U;
-        u[28U]=0xd7U;u[29U]=0xc4U;u[30U]=0xd6U;u[31U]=0xe2U;u[32U]=0xf0U;u[33U]=0xf0U;
+        u[17U]=0x10U;u[18U]=sf_dd[i].tape?0x80U:0x20U;
+        {unsigned char *deb=p+4096U+0xe00U+slot*40U;
+         unsigned int k;for(k=0U;k<40U;++k)deb[k]=0U;
+         cms_put_word(deb+32U,ucb);}
+        {int volume=pdosVolumeIndex(&media_state,(int)sf_dd[i].device);unsigned int k;
+         static const unsigned char boot_name[6]={0xd7U,0xc4U,0xd6U,0xe2U,0xf0U,0xf0U};
+         for(k=0U;k<6U;++k)u[28U+k]=volume>=0?(unsigned char)media_state.volumes[volume].volser[k]:boot_name[k];}
     }
     /* Supervisor instruction veneers are never exposed to U. */
     p[0xb00U]=0x0aU;p[0xb01U]=250U;p[0xb02U]=0x07U;p[0xb03U]=0xfeU;
@@ -97,6 +123,10 @@ static void sf_compat(void)
     p[0xb14U]=0x41U;p[0xb15U]=0x10U;p[0xb16U]=0U;p[0xb17U]=0U;
     p[0xb18U]=0x07U;p[0xb19U]=0xfeU;
     p[0xb80U]=0x0aU;p[0xb81U]=246U;p[0xb82U]=0x07U;p[0xb83U]=0xfeU;
+    /* z/OS 1.5 UNAUTH SWAREQ path: CVT+296 -> +100 -> +88. */
+    cms_put_word(p+0x628U,0x700U);cms_put_word(p+0x764U,0x800U);
+    cms_put_word(p+0x858U,0xb20U);
+    p[0xb20U]=0x0aU;p[0xb21U]=201U;p[0xb22U]=0x07U;p[0xb23U]=0xfeU;
     p[0xb40U]=0x0aU;p[0xb41U]=252U;p[0xb42U]=0x07U;p[0xb43U]=0xfeU;
     /* The frozen native AOPEN calls CVT+232, entry+12, for TRKCALC.
      * Preserve the qualified one-space conservative result: R0=3, R15=0.
@@ -131,7 +161,7 @@ static unsigned int sf_dynalloc(void)
     volatile unsigned int *saved=(volatile unsigned int *)0x3000U;
     unsigned char ptr[4],rb[20],tu[50],dd[8],dsn[44],back[8];
     unsigned int address,rbaddr,list,at,n,key,raw,ret=0U,have=0U,dsbytes=0U,disp=0U;
-    unsigned int i,slot,handle;SFDD *binding;TSKEXTENT extent;unsigned char dscb[96];
+    unsigned int i,slot,handle,device,tape=0U;SFDD *binding;TSKEXTENT extent;unsigned char dscb[96];
     if(!f||sf_span(saved[3]&0x7fffffffU,4U,0U,ptr,1U))return 12U;
     rbaddr=cms_word(ptr)&0x7fffffffU;
     if(sf_span(rbaddr,20U,0U,rb,1U)||rb[0]!=20U||
@@ -168,14 +198,27 @@ static unsigned int sf_dynalloc(void)
         dd[0U]=0xd7U;dd[1U]=0xc4U;
         for(i=8U;i>2U;){--i;dd[i]=(unsigned char)(0xf0U+n%10U);n/=10U;}have=1U;
     }
-    if(!have||sf_find_dd(dd)||TSKDSCB(channel_record,&channel,dsn,dsbytes,&extent,dscb)!=TSK_OK)
-        goto fail;
+    device=media_selected_device?media_selected_device:*(volatile const unsigned int *)0x40bcU;
+    if(!have||sf_find_dd(dd))goto fail;
+    if(normal_boot()&&dsbytes==8U&&sf_equal(dsn,(const unsigned char *)"TAP:",4U)){
+        int address;char text[5];
+        for(i=0U;i<4U;++i)text[i]=(char)dsn[4U+i];text[4]=0;
+        if(media_scan(text,"%x",&address)!=1||!media_state.tape_device||
+           address!=media_state.tape_address)goto fail;
+        tape=1U;device=(unsigned int)media_state.tape_device;
+        for(i=0U;i<96U;++i)dscb[i]=0U;
+        extent.start_cylinder=extent.start_head=extent.end_cylinder=extent.end_head=0U;
+        /* Retain the one-space raw tape binding: U/32767, no DASD DSORG. */
+        extent.record_format=0xc0U;extent.block_length=32767U;extent.logical_length=extent.organisation=0U;
+        dscb[40U]=0xc0U;sf_put_half(dscb+42U,32767U);
+    }else if(TSKDSCB(channel_record,&channel,dsn,dsbytes,&extent,dscb)!=TSK_OK)goto fail;
     for(slot=(native_invocations.depth-1U)*SFDDS;
         slot<native_invocations.depth*SFDDS&&sf_dd[slot].token;++slot){}
     if(slot==native_invocations.depth*SFDDS)goto fail;
     handle=SF_DD_HANDLE+slot+1U;
     if(TSVOWN(&native_invocations,f->token,TSV_FILE,handle)!=TSV_OK)goto fail;
     binding=&sf_dd[slot];binding->token=f->token;binding->bytes=dsbytes;
+    binding->device=device;binding->tape=tape;
     for(i=0U;i<8U;++i)binding->dd[i]=dd[i];
     for(i=0U;i<dsbytes;++i)binding->dsn[i]=dsn[i];
     for(i=0U;i<96U;++i)binding->dscb[i]=dscb[i];binding->extent=extent;
@@ -189,6 +232,61 @@ fail:
     sf_span(rbaddr+4U,4U,1U,back,1U);saved[0U]=0U;saved[1U]=12U;return 12U;
 }
 
+/* Selected SWAREQ FCODE=RL, one EPA and the caller's current TIOT token.
+ * Return a checked U JFCB address; this exposes no supervisor storage. */
+static unsigned int sf_swa(void)
+{
+    const TSVFRAME *f=TSVTOP(&native_invocations);
+    volatile const unsigned int *saved=(volatile const unsigned int *)0x3000U;
+    unsigned char request[8],pointer[4],entry[28],answer[4];
+    unsigned int address,epa,param,queue,i,n=0U;
+    if(!f||f->personality!=TSV_TSO||f->amode!=24U||
+       (saved[32U]&1U)||!(saved[33U]&0x80000000U))return 8U;
+    address=saved[3U]&0x7fffffffU;
+    if(sf_span(address,8U,0U,request,1U))return 8U;
+    epa=cms_word(request);if(sf_span(epa,4U,0U,pointer,1U))return 8U;
+    param=cms_word(pointer);
+    if(sf_span(param,28U,0U,entry,1U)||sf_span(param,4U,1U,0,0U))return 8U;
+    queue=((unsigned int)entry[4U]<<16)|((unsigned int)entry[5U]<<8)|entry[6U];
+    if(entry[7U])return 8U;
+    for(i=0U;i<TSV_MAX_DEPTH*SFDDS;++i)if(sf_dd[i].token==f->token){
+        if(queue==0x10000U+n*192U){
+            cms_put_word(answer,queue+16U);
+            return sf_span(param,4U,1U,answer,1U)?8U:0U;
+        }
+        ++n;
+    }
+    return 8U;
+}
+
+static int sf_exchange_commit(const SFDD *dd,const SFFILE *file)
+{
+    unsigned char block[TSC_MAX_RECORD+8U];const unsigned char *verify;
+    const unsigned char *data=(const unsigned char *)TSF_KAPERTURE_VA+file->real;
+    unsigned int at=0U,n,c=dd->extent.start_cylinder,h=dd->extent.start_head,r=1U,i;
+    if(dd->extent.organisation!=0x4000U)return 12;
+    /* Validate the complete staged block inventory before any physical write. */
+    while(at<file->length){
+        if(!TSKWITHIN(&dd->extent,c,h))return 12;
+        if(at>file->length-2U)return 12;n=sf_half(data+at);
+        if(!n||n>dd->extent.block_length||n>TSC_MAX_RECORD||n>file->length-at-2U)return 12;
+        at+=n+2U;if(n>18452U||++r>3U){r=1U;if(++h==15U){h=0U;++c;}}
+    }
+    if(!TSKWITHIN(&dd->extent,c,h))return 12;
+    at=0U;c=dd->extent.start_cylinder;h=dd->extent.start_head;r=1U;
+    for(;;){
+        if(!TSKWITHIN(&dd->extent,c,h))return 12;
+        n=at<file->length?sf_half(data+at):0U;
+        for(i=0U;i<8U;++i)block[i]=0U;
+        sf_put_half(block,c);sf_put_half(block+2U,h);block[4U]=(unsigned char)r;sf_put_half(block+6U,n);
+        for(i=0U;i<n;++i)block[8U+i]=data[at+2U+i];
+        if(media_wrblock((int)dd->device,(int)c,(int)h,(int)r-1,block,(int)n+8,0x1d)!=(int)n+8)return 12;
+        if(!n)return 0;
+        if(channel_record_ssid(&channel,dd->device,c,h,r,n,&verify)!=(int)n||!sf_equal(verify,data+at+2U,n))return 12;
+        at+=n+2U;
+        if(n>18452U||++r>3U){r=1U;if(++h==15U){h=0U;++c;}}
+    }
+}
 static unsigned int sf_dcb(unsigned int svc)
 {
     const TSVFRAME *f=TSVTOP(&native_invocations);volatile unsigned int *saved=(volatile unsigned int *)0x3000U;
@@ -198,18 +296,21 @@ static unsigned int sf_dcb(unsigned int svc)
     if(!f||sf_span(saved[3]&0x7fffffffU,4U,0U,list,1U))return 12U;
     va=cms_word(list)&0xffffffU;mode=list[0U];
     if(sf_span(va,88U,0U,dcb,1U)||sf_span(va,88U,1U,0,0U))return 12U;
-    dd=sf_find_dd(dcb+40U);if(!dd)return 12U;
     file=sf_find_file(va);
+    dd=file?&sf_dd[file->dd]:sf_find_dd(dcb+40U);if(!dd)return 12U;
     if(svc==20U){
         if(!file)return 12U;slot=(unsigned int)(file-sf_file);
         if(file->mode==0x8fU&&file->real){
             unsigned char *data=(unsigned char *)TSF_KAPERTURE_VA+file->real;
-            if(store_attach()!=TSS_OK||TSSPUT(&native_store,0x54534fU,file->key,52U,
-                                              data,file->length)!=TSS_OK)return 12U;
+            if(normal_boot()&&dd->device!=*(volatile const unsigned int *)0x40bcU&&dd->extent.organisation==0x4000U){
+                if(sf_exchange_commit(dd,file))return 12U;
+            }else if(store_attach()!=TSS_OK||TSSPUT(&native_store,sf_store_profile(dd),file->key,52U,
+                                                   data,file->length)!=TSS_OK)return 12U;
         }
         handle=SF_FILE_HANDLE+slot+1U;
         if(sf_cleanup(handle,f)||TSVFORGET(&native_invocations,f->token,TSV_FILE,handle)!=TSV_OK)
             return 12U;dcb[48U]&=0xefU;
+        for(i=0U;i<8U;++i)dcb[40U+i]=dd->dd[i];
         return sf_span(va,88U,1U,dcb,1U)?12U:0U;
     }
     /* Dataset attributes override the native template's U/default fields.
@@ -243,13 +344,14 @@ static unsigned int sf_dcb(unsigned int svc)
     }
     if(svc==64U)return sf_span(va,88U,1U,dcb,1U)?12U:0U;
     if(mode!=0x80U&&mode!=0x8fU&&mode!=0x83U)return 12U;
+    if(dd->tape&&(mode==0x83U||(mode==0x8fU&&!media_state.tape_writable)))return 12U;
     if(file)return 12U;
     if(exittarget&&sf_span(exittarget,2U,0U,extra,1U))return 12U;
     for(slot=(native_invocations.depth-1U)*SFFILES;
         slot<native_invocations.depth*SFFILES&&sf_file[slot].token;++slot){}
     if(slot==native_invocations.depth*SFFILES)return 4U;
     file=&sf_file[slot];file->real=0U;
-    if(mode==0x8fU && TSRALLOC(&storage.real,SF_REAL_OWNER+slot,TSS_LIMIT,
+    if(mode==0x8fU && !dd->tape && TSRALLOC(&storage.real,SF_REAL_OWNER+slot,TSS_LIMIT,
                                 TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,&file->real)!=TSR_OK)return 4U;
     handle=SF_FILE_HANDLE+slot+1U;
     if(TSVOWN(&native_invocations,f->token,TSV_FILE,handle)!=TSV_OK){
@@ -263,7 +365,13 @@ static unsigned int sf_dcb(unsigned int svc)
            file->key[44U]==0x40U){sf_cleanup(handle,f);TSVFORGET(&native_invocations,f->token,TSV_FILE,handle);return 12U;}
         file->member=1U;
     }
-    sf_compat();cms_put_word(dcb+48U,mode==0x8fU?0x10000b00U:0x10000b04U);
+    sf_compat();
+    {unsigned int k,n=0U;
+     for(k=0U;k<TSV_MAX_DEPTH*SFDDS;++k)if(sf_dd[k].token==f->token){
+         if(&sf_dd[k]==dd)break;++n;}
+     if(n>=SFDDS)return 12U;
+     cms_put_word(dcb+44U,0x10e00U+n*40U);}
+    cms_put_word(dcb+48U,mode==0x8fU?0x10000b00U:0x10000b04U);
     cms_put_word(dcb+52U,0xb08U);cms_put_word(dcb+84U,0xb10U);
     if(sf_span(va,88U,1U,dcb,1U))return 12U;
     if(exittarget){
@@ -290,7 +398,7 @@ static unsigned int sf_exit_finish(void)
 
 static int sf_record(SFFILE *file,unsigned int capacity,unsigned int *got)
 {
-    SFDD *dd=&sf_dd[file->dd];unsigned int subchannel=*(volatile const unsigned int *)0x40bcU;
+    SFDD *dd=&sf_dd[file->dd];unsigned int subchannel=dd->device;
     unsigned int attempt;
     for(attempt=0U;attempt<2U;++attempt){
         if(++file->record>255U){file->record=1U;if(++file->head==15U){file->head=0U;++file->cylinder;}}
@@ -322,7 +430,19 @@ static unsigned int sf_io(unsigned int write)
        sf_span(va,88U,0U,dcb,1U)||sf_span(buffer,length,write?0U:1U,0,0U))return 12U;
     slot=(unsigned int)(file-sf_file);iobva=0x10a00U+(slot%SFFILES)*32U;
     if(sf_span(iobva,16U,1U,0,0U))return 12U;
-    if(write){
+    if(sf_dd[file->dd].tape){
+        SFDD *tape=&sf_dd[file->dd];unsigned char block[TSC_MAX_RECORD];
+        if(write){
+            if(file->mode!=0x8fU||!media_state.tape_writable||
+               sf_span(buffer,length,0U,block,1U))return 12U;
+            rc=media_wrtape((int)tape->device,block,(int)length);
+        }else{
+            if(file->mode!=0x80U)return 12U;
+            rc=media_rdtape((int)tape->device,block,(int)length);
+            if(rc>0&&sf_span(buffer,(unsigned int)rc,1U,block,1U))return 12U;
+        }
+        if(rc<0)return 12U;got=(unsigned int)rc;
+    }else if(write){
         if(file->mode!=0x8fU&&file->mode!=0x83U)return 12U;
         if(!file->real||file->length>TSS_LIMIT-length-2U)return 12U;
         data=(unsigned char *)TSF_KAPERTURE_VA+file->real;
@@ -334,7 +454,7 @@ static unsigned int sf_io(unsigned int write)
         if(!file->loaded&&!file->real){
             status=(unsigned int)store_attach();
             if((int)status==TSS_OK){
-                rc=TSSSIZE(&native_store,0x54534fU,file->key,52U,&n);
+                rc=TSSSIZE(&native_store,sf_store_profile(&sf_dd[file->dd]),file->key,52U,&n);
                 if(rc==TSS_DELETED)return 12U;
                 if(rc==TSS_OK){
                     if(n>TSS_LIMIT)return 12U;
@@ -343,9 +463,10 @@ static unsigned int sf_io(unsigned int write)
                         if(TSRALLOC(&storage.real,SF_REAL_OWNER+slot,
                              (n+4095U)&~4095U,TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,&file->real)!=TSR_OK)return 4U;
                         data=(unsigned char *)TSF_KAPERTURE_VA+file->real;
-                        if(TSSREAD(&native_store,0x54534fU,file->key,52U,data,n,&file->length)!=TSS_OK)return 12U;
+                        if(TSSREAD(&native_store,sf_store_profile(&sf_dd[file->dd]),file->key,52U,data,n,&file->length)!=TSS_OK)return 12U;
                     }
-                }else if(rc!=TSS_ABSENT)return 12U;
+                }else if(rc==TSS_ABSENT)file->loaded=2U;
+                else return 12U;
             }else if((int)status!=TSS_ABSENT)return 12U;
         }
         if(file->real||file->loaded==1U){
@@ -365,13 +486,13 @@ static unsigned int sf_io(unsigned int write)
             if(got&&sf_span(buffer,got,1U,TSCDATA(&channel),1U))return 12U;
             ++file->cursor;
         }
-        if(!got){
+    }
+        if(!write&&!got){
             va=cms_word(dcb+32U)&0xffffffU;
             if(!va||sf_span(va,2U,0U,iob,1U))return 12U;
             saved[0x88U/4U]=0U;saved[0x8cU/4U]=va;
             *(volatile unsigned int *)0x4f54U=1U;return 0U;
         }
-    }
     for(i=0U;i<16U;++i)iob[i]=0U;iob[12U]=0x0cU;sf_put_half(iob+14U,length-got);
     if(sf_span(iobva,16U,1U,iob,1U))return 12U;
     cms_put_word(decb,0x40000000U);cms_put_word(decb+16U,iobva);
@@ -396,7 +517,7 @@ static unsigned int sf_wait(void)
 static int sf_member(SFDD *dd,const unsigned char member[8],unsigned char ttr[3])
 {
     unsigned int track,record,cylinder,head,count,used,at,size,i;
-    unsigned int subchannel=*(volatile const unsigned int *)0x40bcU;
+    unsigned int subchannel=dd->device;
     unsigned char *block;
     if(dd->extent.organisation!=0x0200U)return -1;
     for(track=0U;track<128U;++track){
@@ -423,6 +544,9 @@ static int sf_member(SFDD *dd,const unsigned char member[8],unsigned char ttr[3]
     }
     return -1;
 }
+static int sf_volume_record(void *context,unsigned int c,unsigned int h,unsigned int r,
+                             unsigned int capacity,const unsigned char **data)
+{return channel_record_ssid(&channel,*(const unsigned int *)context,c,h,r,capacity,data);}
 static unsigned int sf_lookup(unsigned int svc)
 {
     volatile unsigned int *saved=(volatile unsigned int *)0x3000U;
@@ -432,29 +556,35 @@ static unsigned int sf_lookup(unsigned int svc)
     if(svc==24U){
         if(sf_span(r1&0x7fffffffU,8U,0U,name,1U)||sf_span(r0&0x7fffffffU,8U,1U,0,0U))return 8U;
         dd=sf_find_dd(name);if(!dd)return 8U;
-        bytes[0U]=0x30U;bytes[1U]=0x50U;bytes[2U]=0x20U;bytes[3U]=0x0bU;
+        bytes[0U]=0x30U;bytes[1U]=0x50U;bytes[2U]=dd->tape?0x80U:0x20U;bytes[3U]=0x0bU;
         bytes[4U]=bytes[5U]=0U;bytes[6U]=0x7fU;bytes[7U]=0xffU;
         return sf_span(r0&0x7fffffffU,8U,1U,bytes,1U)?8U:0U;
     }
     if(svc==27U){
+        unsigned int device=*(volatile const unsigned int *)0x40bcU;int volume;
         if(sf_span(r1&0x7fffffffU,16U,0U,cam,1U)||cms_word(cam)!=0xc1000000U)return 8U;
         if(sf_span(cms_word(cam+4U)&0x7fffffffU,44U,0U,name,1U)||
-           sf_span(cms_word(cam+8U)&0x7fffffffU,6U,0U,bytes,1U)||
-           !sf_equal(bytes,(const unsigned char *)"\xd7\xc4\xd6\xe2\xf0\xf0",6U))return 8U;
+           sf_span(cms_word(cam+8U)&0x7fffffffU,6U,0U,bytes,1U))return 8U;
+        if(normal_boot()&&media_state.volume_count){
+            for(volume=0;volume<media_state.volume_count;++volume)
+                if(sf_equal(bytes,(const unsigned char *)media_state.volumes[volume].volser,6U))break;
+            if(volume==media_state.volume_count)return 8U;
+            device=(unsigned int)media_state.volumes[volume].device;
+        }else if(!sf_equal(bytes,(const unsigned char *)"\xd7\xc4\xd6\xe2\xf0\xf0",6U))return 8U;
         n=44U;while(n&&name[n-1U]==0x40U)--n;
-        if(TSKDSCB(channel_record,&channel,name,n,&extent,bytes)!=TSK_OK)return 8U;
+        if(TSKDSCB(sf_volume_record,&device,name,n,&extent,bytes)!=TSK_OK)return 8U;
         return sf_span(cms_word(cam+12U)&0x7fffffffU,96U,1U,bytes,1U)?8U:0U;
     }
     type_d=(r1&0x80000000U)!=0U;dcba=type_d?0U-r1:r1;dcba&=0x7fffffffU;
     if(sf_span(dcba,88U,0U,dcb,1U))return 8U;
-    dd=sf_find_dd(dcb+40U);file=sf_find_file(dcba);if(!dd||!file)return 8U;
+    file=sf_find_file(dcba);dd=file?&sf_dd[file->dd]:sf_find_dd(dcb+40U);if(!dd||!file)return 8U;
     if(sf_span(r0&0x7fffffffU,type_d?8U:16U,0U,name,1U)||
        (!type_d&&(sf_half(name)!=1U||sf_half(name+2U)<16U)))return 8U;
     if(!type_d&&sf_span(r0&0x7fffffffU,16U,1U,0,0U))return 8U;
     for(i=0U;i<8U;++i){old_member[i]=file->key[44U+i];file->key[44U+i]=name[(type_d?0U:4U)+i];}
     /* A committed journal member takes precedence over its original PDS TTR. */
     rc=store_attach();
-    if(rc==TSS_OK)rc=TSSSIZE(&native_store,0x54534fU,file->key,52U,&n);
+    if(rc==TSS_OK)rc=TSSSIZE(&native_store,sf_store_profile(dd),file->key,52U,&n);
     if(rc==TSS_OK){ttr[0U]=0U;ttr[1U]=0U;ttr[2U]=1U;rc=1;}
     else if(rc==TSS_DELETED)rc=0;
     else if(rc==TSS_ABSENT)rc=sf_member(dd,file->key+44U,ttr);

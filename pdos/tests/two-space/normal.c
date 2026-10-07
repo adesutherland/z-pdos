@@ -19,5 +19,11 @@ int main(void) {
  for(va.lo=0;va.lo<0x1000000;va.lo+=4096)if(TSDLOOKUP(&u,va,&pa)!=TSD_MISSING)return 1;
  va.hi=0x01000000;va.lo=0;
  if(TSDLOOKUP(&k,va,&pa)||TSDLOOKUP(&u,va,&pa)!=TSD_MISSING)return 1;
+ va.hi=0;va.lo=0x02000000U+(TSF_SERVICE_PAGES-1U)*4096U;
+ if(TSDLOOKUP(&k,va,&pa)||pa.lo!=TSF_SERVICE_EXTRA_REAL+TSF_SERVICE_EXTRA_BYTES-4096U||
+    TSDLOOKUP(&u,va,&pa)!=TSD_MISSING)return 1;
+ va.lo=0x03000000U+(TSF_KSTACK_PAGES-1U)*4096U;
+ if(TSDLOOKUP(&k,va,&pa)||pa.lo!=TSF_KSTACK_EXT_REAL+TSF_KSTACK_EXT_BYTES-4096U||
+    TSDLOOKUP(&u,va,&pa)!=TSD_MISSING)return 1;
  free(core);puts("Normal boot: empty low U, protected high K and actual bootstrap purges pass");return 0;
 }

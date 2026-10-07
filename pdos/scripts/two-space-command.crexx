@@ -32,13 +32,20 @@ main: procedure = .int
     if rc <> 0 then return rc
     objects[i] = object
   end
+  source = "pdpclib/src/stdlib.c"; asm = work || "/stdlib.asm"; object = work || "/stdlib.obj"
+  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR -DPDP_HEAP_CHUNK_BYTES=16769024 -S -I pdpclib/src :source -o :asm"
+  if rc <> 0 then return rc
+  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+  if rc <> 0 then return rc
+  command_stdlib = object
   native = .string[]
   native[1] = objects[5]; native[2] = objects[1]; native[3] = objects[2]
   native[4] = objects[3]; native[5] = objects[4]; native[6] = objects[6]
   native[7] = base || "/support/MVSSUPA.obj"
-  common = "START STDLIB CTYPE STRING TIME ERRNO ASSERT LOCALE MATH SETJMP SIGNAL MEMMGR"
+  native[8] = command_stdlib
+  common = "START CTYPE STRING TIME ERRNO ASSERT LOCALE MATH SETJMP SIGNAL MEMMGR"
   do i = 1 to words(common)
-    native[i+7] = base || "/c/objects/" || word(common,i) || ".obj"
+    native[i+8] = base || "/c/objects/" || word(common,i) || ".obj"
   end
   module = work || "/PCOMM.rdw"; map = work || "/PCOMM.map"
   address crexx "run :linker --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@CRT0 -Map :map -o :module :native[]"

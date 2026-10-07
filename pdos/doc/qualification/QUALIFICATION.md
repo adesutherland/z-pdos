@@ -1,5 +1,8 @@
 # z/PDOS 0.1 qualification
 
+The current source-built K/U results are in [PD-003 P6](TWO-SPACE-P6-2026-10-07.md).
+This document preserves the earlier one-ASCE 0.1 result.
+
 2 October 2026. **The Classic-built OS boots and runs the unchanged released
 cREXX TSO31, TSO64 ANY and TSO64 HIGH packages.** Their actual compiler chains,
 interactive checks, diagnostics and stopped-disk readback pass. TSO24 was

@@ -1,0 +1,28 @@
+[
+  [
+    "CMS RUN 31 RXVM -l A1 IOQUAL -a INTERACT T.TXT B.BIN E.TXT M.TXT CMS CMSREC",
+    "PCOMM END 1 RC=0",
+    [
+      [
+        "PROMPT Q-06 line",
+        "Mixed café!"
+      ],
+      [
+        "PROMPT Q-06 empty line",
+        ""
+      ],
+      [
+        "PROMPT Q-06 spaces",
+        "  padded  "
+      ],
+      [
+        "PROMPT Q-06 character",
+        "é"
+      ]
+    ],
+    [
+      "SUMMARY: PASS=9 FAIL=0 SKIP=2",
+      "INPUT LENGTHS: 11 0 10 1"
+    ]
+  ]
+]

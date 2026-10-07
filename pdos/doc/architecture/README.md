@@ -11,85 +11,27 @@ support or qualification. See [profiles](../../../doc/PROFILES.md) for those
 boundaries and the [exact guest record](../qualification/QUALIFICATION.md)
 for what has run.
 
-The two-address-space successor, its K64/C31/shared-U proofs, checked guest-DAT
-IPL, bounded interruption/service gate, live storage, K-owned channel and
-terminal operations, CMS and TSO image maps, native version calls and wide
-heaps are in
-[the two-space PoC contract](TWO-SPACE-POC.md).
-The [successor ABI inventory](TWO-SPACE-ABI.md) names the unchanged CMS/TSO
-binary inputs, selected calls, low-U measurements and open compatibility gates.
-Its [architecture decisions](TWO-SPACE-POC.md#architecture-decisions-for-the-first-replacement)
-retain one shared U ASCE, place the PDOS command processor and reusable C
-3270 presentation library in U, and keep the C31 C terminal driver and
-checked service handling in K. The next terminal target includes 3270 models
-2–5 with geometry and capabilities supplied by a checked query or explicit
-configuration; the present fixed 24×80 layout is a source limitation. The
-[operator line-view decision](TWO-SPACE-POC.md#operator-line-view-and-attached-transcript)
-keeps a scrollable 3270 primary and permits an attached text monitor of the
-same line and command events, with one explicit input owner. A line-only
-primary is also planned. This is [P4 work](../BACKLOG.md#pd-003-completion-plan-6-october-2026),
-not yet a qualified successor feature.
-The [completion plan](../BACKLOG.md#pd-003-completion-plan-6-october-2026)
-orders the remaining K, native-call, C console, image and qualification work.
-Required application calls are within the same CMS or TSO personality, with
-parameters and a return code. Mainframe cREXX does not require a REXX
-`ADDRESS` operation or a CMS-to-TSO application call.
-The current released disk-boot kernel described below has not yet adopted
-that layout.
+The source-built successor has a protected K address space and one shared
+64-bit U address space. The AMODE64 nucleus saves full architectural state
+and switches ASCEs; most checked services and the terminal encoder run as
+Classic C31 in K. PCOMM and its C presentation library run in U. K owns
+placement, real frames, native image leases, file handles, terminal leases
+and interruption-driven completion. A native child may use the same CMS or
+TSO personality at another qualified address mode; caller files, cursors,
+lowcore and full context are restored on return or recoverable U fault.
 
-The successor now has a coherent but bounded memory path. K64 owns the ASCE
-switch and saves full-width context; a K-only C31 endpoint walks U's tables
-through a K alias. U allocation chooses an interval in one shared 64-bit map,
-backs it with real frames outside the core, zeroes them and changes the live
-U DAT with a single-CPU purge. It can return a low U address backed by high
-real storage. The selected conditional SVC 120 GETMAIN/FREEMAIN subset and
-an internal high-U diagnostic entry allocate, touch and release simultaneous
-64 MiB U31 and 128 MiB U64 heaps while CMS24/CMS31 RXVM images are mapped.
-The [256 MiB profile result](../qualification/TWO-SPACE-256M-HEAPS-2026-10-06.md)
-measures 909,312 U table bytes in that guest. Reversible
-fixed-origin child backing is also exercised in the guest.
+The [two-space contract](TWO-SPACE-POC.md) and [ABI inventory](TWO-SPACE-ABI.md)
+record that design. P0–P6 are accepted; [P6](../qualification/TWO-SPACE-P6-2026-10-07.md)
+records final reviewed qualification and source-default selection. Models 2–5, the line-only
+primary, optional attached monitor and explicit capture gaps have normal-image
+results. K code, stack and table storage use no low-U virtual reservation.
+The shared-U choice remains; separate personality ASCEs require the recorded
+conflict or isolation trigger.
 
-K reads checked CKD records through separate low-real disk and console
-workspaces, writes and reads the 3270, and validates and maps the pinned
-CMS24/CMS31 RXVM MODULEs. None of this places K storage in U's 24-bit
-virtual range. Both unchanged RXVM `-v` programs run in this diagnostic
-IPL. A [selected CMS31 file result](../qualification/TWO-SPACE-CMS31-IOQUAL-2026-10-06.md)
-also runs IOQUAL with LIBRARY through checked K file records and transient
-output. A [selected CMS24 IO24 result](../qualification/TWO-SPACE-CMS24-IO24-2026-10-06.md)
-uses a fresh fixed-origin overlay and profile-specific K file state, with its
-13,914,112-byte low U placement gap restored after the call. The successor
-also has [bounded per-file CMS input cursors](../qualification/TWO-SPACE-CMS-CURSORS-2026-10-06.md)
-in K real storage, so a second open input does not discard the first cursor.
-The successor still lacks persistent output, general CMS/TSO file and command
-adapters, qualified same-personality application calls, the U 3270
-presentation library and the explicitly selected replacement image. The
-shared-U choice is recorded in the architecture decision above; separate U
-ASCEs need evidence of a conflict or isolation requirement before changing
-the design.
-The [native TSO loader-core check](../qualification/TWO-SPACE-TSO-LOADER-2026-10-06.md)
-matches the existing TSO31 materialized image at two bases. The
-[fresh-IPL TSO31 map](../qualification/TWO-SPACE-TSO31-MAP-2026-10-06.md)
-now places the unchanged native image at U `0x07000000` beside CMS24 and both
-CMS31 images without consuming the 24-bit U placement gap. Unchanged
-[TSO31](../qualification/TWO-SPACE-TSO31-NATIVE-2026-10-06.md) and
-[TSO64 ANY](../qualification/TWO-SPACE-TSO64-NATIVE-2026-10-06.md) RXVM
-version calls now run through selected MVS-style storage and terminal
-services. The separate
-[TSO24 host loader checkpoint](../qualification/TWO-SPACE-TSO24-LOADER-2026-10-06.md)
-matches native AMODE24/RMODE24 relocation at two low U bases, but has not
-run the member in the guest. A
-[fresh-IPL map](../qualification/TWO-SPACE-TSO24-MAP-2026-10-06.md) now
-holds its image beside CMS24 and rejects an impossible low-only request
-with RC 4 while high-U work still succeeds. A normal load must fail if its required low
-virtual interval or real backing is unavailable. Broader TSO service
-compatibility remains open.
-The later [released beta 3 TSO24 native result](../qualification/TWO-SPACE-TSO24-BETA3-NATIVE-2026-10-06.md)
-enters the unchanged AMODE24 image, displays its EBCDIC version line and
-releases its stack, output buffer, heap and parameter page. This does not
-change the selected one-ASCE release kernel.
-The same result also verifies that an occupied fixed low interval makes the
-loader return RC 4 without publishing an image, and that release and retry
-allow the unchanged TSO24 program to run.
+The following boot and execution description records the published 0.1.1
+one-ASCE kernel. Its exact earlier results remain in the dated qualification
+records. The [successor operator guide](../user/TWO-SPACE.md) describes the
+source-built K/U route and its current selection status.
 
 ## The system at a glance
 

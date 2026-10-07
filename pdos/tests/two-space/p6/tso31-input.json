@@ -1,0 +1,32 @@
+[
+  [
+    "RXVM -v",
+    "PCOMM END 1 RC=0"
+  ],
+  [
+    "RXVM -l B3IO IOQUAL -a INTERACT B3IO/TEXT.rxas B3IO/BYTES.rxbin B3IO/EMPTY.rxas B3IO/MISSING.rxas tso",
+    "PCOMM END 2 RC=0",
+    [
+      [
+        "PROMPT Q-06 line",
+        "Mixed café!"
+      ],
+      [
+        "PROMPT Q-06 empty line",
+        ""
+      ],
+      [
+        "PROMPT Q-06 spaces",
+        "  padded  "
+      ],
+      [
+        "PROMPT Q-06 character",
+        "é"
+      ]
+    ],
+    [
+      "SUMMARY: PASS=10 FAIL=0 SKIP=1",
+      "INPUT LENGTHS: 11 0 10 1"
+    ]
+  ]
+]

@@ -40,7 +40,7 @@ int main(void)
     if (TSCBUILDREAD(&channel,0U,15U,3U,0x0eU,80U) != TSC_BAD ||
         TSCBUILDREAD(&channel,0U,0U,0U,0x0eU,80U) != TSC_BAD ||
         TSCBUILDREAD(&channel,0U,0U,3U,0x01U,80U) != TSC_BAD ||
-        TSCBUILDREAD(&channel,0U,0U,3U,0x0eU,18453U) != TSC_BAD)
+        TSCBUILDREAD(&channel,0U,0U,3U,0x0eU,TSC_MAX_RECORD+1U) != TSC_BAD)
         return 5;
     irb=TSCIRB(&channel);
     irb[8]=0x0cU; irb[9]=0U; irb[10]=0U; irb[11]=16U;

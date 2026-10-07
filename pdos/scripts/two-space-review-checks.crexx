@@ -1,0 +1,21 @@
+/* SPDX-License-Identifier: MIT; focused checks before the source freeze. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 1 then return 2
+  work = args.1
+  if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
+  address crexx "run test ! -e :work"
+  if rc <> 0 then return 2
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/review_extract.py :work"
+  if rc <> 0 then return rc
+  do i = 1 to 2
+    name = word("format observations",i); source = work || "/" || name || ".c"; binary = work || "/" || name
+    address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src :source -o :binary"
+    if rc <> 0 then return rc
+    address crexx "run :binary"
+    if rc <> 0 then return rc
+  end
+  say "Pre-qualification C89 formatting bounds and zero-minimum checks pass."
+  return 0

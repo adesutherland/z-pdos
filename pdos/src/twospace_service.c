@@ -34,6 +34,7 @@ static unsigned int console_v1_read(unsigned char *,unsigned int,unsigned int *,
 static unsigned int console_v1_cancel(unsigned int token);
 static void console_v1_begin(const TSVFRAME *frame);
 static void console_v1_failed(unsigned int,const unsigned char *,unsigned int);
+static void console_v1_operator(unsigned int,const unsigned char *,unsigned int,unsigned int);
 static void console_v1_end(unsigned int token,const unsigned char *result);
 static void call_result(unsigned int,unsigned int,unsigned int,unsigned int,unsigned int,unsigned int);
 static unsigned int console_v1_native_raw(TSGREQUEST *request,unsigned int input);
@@ -50,6 +51,7 @@ static TSVSTACK native_invocations;
 static TSSSTATE native_store;
 static TSKEXTENT store_extent;
 static unsigned int store_ready, store_fail_once;
+static unsigned int media_selected_device;
 static unsigned int storage_ready;
 static unsigned int console_ssid;
 static unsigned int console_read_phase;
@@ -108,6 +110,7 @@ typedef struct {
     unsigned int closed, profile, token;
 } CMSOUTPUT;
 static CMSOUTPUT cms_outputs[CMS_OUTPUT_SLOTS];
+static unsigned int cms_output_discard(CMSOUTPUT *out);
 #define CMS_OUTPUT_HANDLE_BASE 0x100U
 void TSFPURGE(void *unused);
 void TSKEYSET(unsigned int real_page, unsigned int key);
@@ -170,14 +173,13 @@ int TSCPOLL(unsigned int subchannel, unsigned char *irb);
 int TSCCLEAR(unsigned int subchannel, unsigned char *irb);
 int TSCWAITR(unsigned int subchannel, unsigned char *irb);
 int TSCWAITI(unsigned int subchannel, unsigned char *irb);
+int TSCNOW(unsigned int clock[2]);
 
-static int channel_record(void *context, unsigned int cylinder,
+static int channel_record_ssid(TSCSTATE *current,unsigned int subchannel,unsigned int cylinder,
                           unsigned int head, unsigned int record,
                           unsigned int capacity, const unsigned char **data)
 {
-    TSCSTATE *current=(TSCSTATE *)context;
     unsigned int count;
-    unsigned int subchannel=*(volatile const unsigned int *)0x40bcU;
     if (!subchannel || !data || !capacity || capacity > TSC_MAX_RECORD ||
         TSCBUILDREAD(current,cylinder,head,record,0x0eU,capacity) != TSC_OK ||
         TSCIO(subchannel,TSCORB(current),TSCIRB(current)) != 0 ||
@@ -186,6 +188,16 @@ static int channel_record(void *context, unsigned int cylinder,
     *data=TSCDATA(current);
     return (int)count;
 }
+static int channel_record(void *context,unsigned int c,unsigned int h,unsigned int r,
+                           unsigned int capacity,const unsigned char **data)
+{
+    unsigned int ssid=normal_boot()&&media_selected_device?media_selected_device:
+                       *(volatile const unsigned int *)0x40bcU;
+    return channel_record_ssid((TSCSTATE *)context,ssid,c,h,r,capacity,data);
+}
+static int channel_boot_record(void *context,unsigned int c,unsigned int h,unsigned int r,
+                                unsigned int capacity,const unsigned char **data)
+{return channel_record_ssid((TSCSTATE *)context,*(volatile const unsigned int *)0x40bcU,c,h,r,capacity,data);}
 
 /* The store uses only a named, preformatted extent. A physical callback
  * replaces one existing FB record and validates the actual channel status. */
@@ -201,7 +213,7 @@ static int store_record(void *unused,unsigned int index,unsigned int write,
     record=index%3U+1U;
     if(!TSKWITHIN(&store_extent,cylinder,head))return 1;
     if(!write) {
-        if(channel_record(&channel,cylinder,head,record,TSS_BLOCK,&data)
+        if(channel_boot_record(&channel,cylinder,head,record,TSS_BLOCK,&data)
             !=(int)TSS_BLOCK)return 1;
         for(i=0U;i<TSS_BLOCK;++i)block[i]=data[i];return 0;
     }
@@ -218,7 +230,7 @@ static int store_attach(void)
                                          0xe2U,0xe3U,0xd6U,0xd9U,0xc5U};
     unsigned int tracks;int rc;
     if(store_ready)return TSS_OK;
-    rc=TSKFIND(channel_record,&channel,name,sizeof name,&store_extent);
+    rc=TSKFIND(channel_boot_record,&channel,name,sizeof name,&store_extent);
     if(rc==TSK_ABSENT)return TSS_ABSENT;
     if(rc!=TSK_OK||store_extent.record_format!=0x80U||
        store_extent.block_length!=TSS_BLOCK||store_extent.logical_length!=TSS_BLOCK)
@@ -1189,7 +1201,7 @@ static const TSVFRAME *native_caller(unsigned int pc)
         (hi&0x04f10000U)!=0x04810000U || (hi&0x0000c000U) ||
         *(volatile const unsigned int *)0x3090U!=*(volatile const unsigned int *)0x4008U ||
         *(volatile const unsigned int *)0x3094U!=*(volatile const unsigned int *)0x400cU ||
-        ((frame->personality==TSV_TSO||frame->personality==TSV_PDOS) && frame->amode>=31U ?
+        ((frame->personality==TSV_TSO||frame->personality==TSV_PDOS) ?
          (mode!=24U && mode!=31U && (mode!=64U || frame->amode!=64U)) :
          mode!=frame->amode))
         return 0;
@@ -1401,6 +1413,13 @@ static unsigned int native_end(const TSGREQUEST *request)
               (void *)frame);
     if (rc==TSV_OK) {
         const TSVFRAME *parent=TSVTOP(&native_invocations);
+        if(normal_boot()){
+            unsigned int slot;
+            for(slot=0U;slot<CMS_OUTPUT_SLOTS;++slot)
+                if(cms_outputs[slot].real&&cms_outputs[slot].closed&&
+                   cms_outputs[slot].token==request->address.lo&&
+                   cms_output_discard(&cms_outputs[slot]))return 12U;
+        }
         *(volatile unsigned int *)0x4f50U=parent?parent->token:0U;
         cms_heaps[native_invocations.depth].address.hi=0U;
         cms_heaps[native_invocations.depth].address.lo=0U;
@@ -1605,16 +1624,20 @@ static unsigned int storage_service(TSGREQUEST *request)
     task=frame ? frame->runtime_owner : 1U;
     if (request->address.hi == 0U && request->address.lo == 0U) {
         if ((flags & 0x30U) == 0x30U) {
-            if (mode == 24U) return 4U;
-            storage_mode=31U;
-            minimum.hi=maximum.hi=0U;
-            minimum.lo=frame && frame->personality==TSV_PDOS ?
-                       0x10000000U : 0x02010000U;
-            maximum.lo=0x7fffffffU;
+            if(frame&&frame->amode==24U){
+                storage_mode=24U;minimum.hi=maximum.hi=0U;
+                minimum.lo=0x20000U;maximum.lo=0xffffffU;
+            }else{
+                if(mode==24U)return 4U;
+                storage_mode=31U;minimum.hi=maximum.hi=0U;
+                minimum.lo=frame&&frame->personality==TSV_PDOS?0x10000000U:0x02010000U;
+                maximum.lo=0x7fffffffU;
+            }
         } else if ((flags & 0x30U) == 0x10U) {
             storage_mode=24U;
             minimum.hi=maximum.hi=0U;
-            minimum.lo=0x20000U; maximum.lo=0x00ffffffU;
+            minimum.lo=normal_boot()&&frame&&frame->personality==TSV_PDOS?0x1c0000U:0x20000U;
+            maximum.lo=0x00ffffffU;
         } else return 8U;
         result=TSMALLOC(&storage,task,storage_mode,minimum,maximum,
                         request->length,0,&base);
@@ -1667,26 +1690,28 @@ static unsigned int storage_service(TSGREQUEST *request)
  * convention or claim an IBM high-storage ABI. */
 static unsigned int high_storage_service(TSGREQUEST *request)
 {
-    TSPADDR minimum, maximum, base;
-    unsigned int result;
-    if (!(*(volatile const unsigned int *)0x3080U & 1U)) return 8U;
-    if (request->address.hi == 0U && request->address.lo == 0U) {
-        minimum.hi=maximum.hi=1U;
-        minimum.lo=0x20000000U;
-        maximum.lo=0x7fffffffU;
-        result=TSMALLOC(&storage,1U,64U,minimum,maximum,
-                        request->length,0,&base);
-        if (result != TSM_OK) return result == TSM_NOMEM ? 4U : 8U;
-        request->address=base;
-    } else {
-        if (request->address.hi != 1U ||
-            request->address.lo < 0x20000000U ||
-            request->address.lo > 0x7fffffffU) return 8U;
-        result=TSMFREE(&storage,1U,request->address);
-        if (result != TSM_OK) return 8U;
+    const TSVFRAME *frame=TSVTOP(&native_invocations);
+    TSPADDR minimum,maximum,base;
+    unsigned int result,task=frame?frame->runtime_owner:1U,handle;
+    TSGREQUEST *reply=request;
+    if(!(*(volatile const unsigned int *)0x3080U&1U)||
+       (normal_boot()&&(!frame||frame->amode!=64U)))return 8U;
+    if(!request->address.hi&&!request->address.lo){
+        minimum.hi=maximum.hi=1U;minimum.lo=0x20000000U;maximum.lo=0x7fffffffU;
+        result=TSMALLOC(&storage,task,64U,minimum,maximum,request->length,0,&base);
+        if(result!=TSM_OK)return result==TSM_NOMEM?4U:8U;
+        if(frame){
+            handle=allocation_handle(task,base);
+            if(!handle||TSVOWN(&native_invocations,frame->token,TSV_ALLOCATION,handle)!=TSV_OK){TSMFREE(&storage,task,base);return 4U;}
+        }
+        reply->address=base;
+    }else{
+        handle=allocation_handle(task,request->address);
+        if(frame&&(!handle||TSVHAS(&native_invocations,frame->token,TSV_ALLOCATION,handle)!=TSV_OK))return 8U;
+        if(TSMFREE(&storage,task,request->address)!=TSM_OK)return 8U;
+        if(frame&&TSVFORGET(&native_invocations,frame->token,TSV_ALLOCATION,handle)!=TSV_OK)return 12U;
     }
-    *(volatile unsigned int *)0x4098U=u_tables.used;
-    return 0U;
+    *(volatile unsigned int *)0x4098U=u_tables.used;return 0U;
 }
 
 /* The selected IARV64 macro uses a stacking PC-cp to a U veneer. The veneer
@@ -1882,8 +1907,16 @@ static unsigned int store_failure_probe(const TSGREQUEST *request)
         0xe3U,0xe7U,0xe3U,0x40U,0x40U,0x40U,0x40U,0x40U,0xc1U,0xf1U};
     unsigned int real=0U,n,got,i;unsigned char *original,*changed;
     int rc,result=12;
+    const TSVFRAME *probe=TSVTOP(&native_invocations);
+    if(probe){
+        static const unsigned char name[8]={0xd8U,0xc1U,0xd7U,0xd9U,0xd6U,0xc2U,0xc5U,0x40U};
+        unsigned int i;
+        if(!normal_boot()||probe->personality!=TSV_TSO||probe->amode!=31U||probe->image_owner>=TSL_IMAGES)return 8U;
+        for(i=0U;i<8U&&native_images[probe->image_owner].name[i]==name[i];++i){}
+        if(i!=8U)return 8U;
+    }
     if(request->length||request->address.hi||request->address.lo||request->direction||
-       TSVTOP(&native_invocations)||store_attach()!=TSS_OK)return 8U;
+       store_attach()!=TSS_OK)return 8U;
     if(TSSSIZE(&native_store,31U,id,18U,&n)!=TSS_OK||!n||n>CMS_OUTPUT_BYTES)return 12U;
     if(TSRALLOC(&storage.real,0x50525746U,2U*((n+4095U)&~4095U),
                  TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,&real)!=TSR_OK)return 4U;
@@ -2219,9 +2252,12 @@ static unsigned int cms31_fst_lookup(TSGREQUEST *request)
     unsigned int cylinder, head, number, visits=0U, seen=0U;
     unsigned int i, j, name_len, type_len, at;
     int count;
-    if (!cms31_lowcore_real || request->address.hi ||
-        request->address.lo<0x1000000U ||
-        request->address.lo>=0x80000000U || request->length>1024U)
+    /* This native AMODE31 veneer uses bit 31 as resume, not an address.
+       GNU's word loads may sign-extend it into the unused register half. */
+    if (!cms31_lowcore_real ||
+        (*(volatile const unsigned int *)0x3080U&1U) ||
+        !(*(volatile const unsigned int *)0x3084U&0x80000000U) ||
+        (request->address.lo&0x7fffffffU)<0x1000000U || request->length>1024U)
         return 12U;
     count=channel_record(&channel,0U,0U,3U,80U,&record);
     if (count<24 || record[4]!=0xe5U || record[5]!=0xd6U ||
@@ -2839,13 +2875,14 @@ static unsigned int call_overlay_task[TSV_MAX_DEPTH];
 static TSPADDR call_overlay_address[TSV_MAX_DEPTH];
 
 static unsigned int call_alloc(unsigned int,unsigned int *,unsigned char **);
+#include "twospace_media.inc"
 #include "twospace_command.inc"
 #include "twospace_file.inc"
 #include "twospace_call.inc"
 #include "twospace_high.inc"
 #include "twospace_console.inc"
 
-unsigned int pdosTwoSpaceService(TSGREQUEST *request)
+static unsigned int service_request(TSGREQUEST *request)
 {
     TSGCONTEXT gate;
     const TSVFRAME *native_frame;
@@ -2907,6 +2944,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if(native_tso&&request->svc==6U)return native_tso_link();
     if(native_tso&&(request->svc==8U||request->svc==9U))return native_high_service(request->svc);
     if(native_tso&&request->svc==10U)return command_storage10(request);
+    if(native_tso&&request->svc==201U)return sf_swa();
     if(native_tso&&(request->svc==1U||request->svc==99U||request->svc==64U||request->svc==22U||
        request->svc==20U||request->svc==18U||request->svc==24U||request->svc==27U||
        request->svc==250U||request->svc==251U||request->svc==252U))
@@ -2992,6 +3030,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
         }
         return 0xfffffffbU;
     }
+    if(normal_boot())return TSA_OS_UNSUPPORTED;
     gate.u_tables = &u_tables;
     gate.real_aperture = (unsigned char *)TSF_KAPERTURE_VA;
     gate.real_bytes = TSF_REAL_BYTES;
@@ -3012,6 +3051,50 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (request->svc == 204U) return 0x20420420U;
     if (request->svc == 205U) return 0x20520520U;
     return 0x2468ace0U;
+}
+
+/* Per-service observations are separate from channel completion decisions. */
+static unsigned int real_observed_peak,low_observed_min,low_observed_initialized;
+static void service_observe(void)
+{
+    volatile unsigned int *out=(volatile unsigned int *)(TSF_KAPERTURE_VA+0x3c800U);
+    unsigned int used=0U,i,cursor=0x20000U,next,end,largest=0U,first=0U;
+    if(!storage_ready||!normal_boot())return;
+    for(i=0U;i<storage.real.count;++i)
+        if(storage.real.ranges[i].phases&TSR_RUN)used+=storage.real.ranges[i].size;
+    if(used>real_observed_peak)real_observed_peak=used;
+    while(cursor<0xf00000U){
+        next=0xf00000U;end=cursor;
+        for(i=0U;i<TSP_SLOTS;++i){
+            const TSPENTRY *e=&storage.virtuals.entry[i];
+            unsigned int last;
+            if(!e->owner||e->first.hi||e->first.lo>=0xf00000U)continue;
+            last=e->last.hi||e->last.lo>=0xefffffU?0xf00000U:e->last.lo+1U;
+            if(e->first.lo<=cursor&&last>cursor){if(last>end)end=last;}
+            else if(e->first.lo>cursor&&e->first.lo<next)next=e->first.lo;
+        }
+        if(end>cursor)cursor=end;
+        else{
+            if(next-cursor>largest){largest=next-cursor;first=cursor;}
+            cursor=next;
+        }
+    }
+    if(!low_observed_initialized||largest<low_observed_min)low_observed_min=largest;
+    low_observed_initialized=1U;
+    out[0U]=0x4d455431U;out[1U]=used;out[2U]=real_observed_peak;
+    out[3U]=TSMLOWFREE(&storage);out[4U]=first;out[5U]=largest;out[6U]=low_observed_min;
+    out[7U]=native_invocations.depth;
+}
+unsigned int pdosTwoSpaceService(TSGREQUEST *request)
+{
+    unsigned int rc=service_request(request);
+    if(normal_boot()&&request&&request->svc==202U&&
+       !*(volatile const unsigned int *)0x4f54U){
+        const TSVFRAME *f=native_caller(*(volatile const unsigned int *)0x308cU);
+        if(f&&f->personality==TSV_CMS&&f->amode==24U)
+            *(volatile unsigned int *)0x308cU+=4U;
+    }
+    service_observe();return rc;
 }
 
 static unsigned int user_rights(unsigned int frame, void *unused)

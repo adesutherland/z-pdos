@@ -16,9 +16,18 @@ own exact results.
 3. Make authorised changes directly in the owning component's `src/` and
    maintained build recipes. A new upstream input is reconciled through normal
    Git commits with attribution in UPSTREAM.md; frozen archives do not change.
-4. Build the component and run affected checks. Preserve failure controls and
-   separate host, object/link, disk-image, guest and release qualification.
-5. Close an item only after its acceptance is met. Record the commands, result
+4. Build the component and run focused implementation checks. Complete the
+   final code review against scope, architecture/ABI, error paths, ownership,
+   cleanup, shared-code reuse, build selection and acceptance coverage. Resolve
+   actionable findings before expensive qualification.
+5. Record the reviewed source freeze, exact source/input identities and bounded
+   qualification matrix. Run guest or release qualification on that candidate.
+   Preserve failure controls and distinguish host, object/link, disk-image,
+   guest and release results. If a repair changes the candidate, review and
+   check it, then freeze it again before affected requalification. Reuse
+   unchanged results with an explicit identity and dependency justification.
+6. Review the resulting evidence and documentation, then close an item only
+   after its acceptance is met. Record the commands, result
    and relevant source/target identities, and update current user/design docs.
    Keep the item ID for traceability; Git retains previous source checkpoints.
 

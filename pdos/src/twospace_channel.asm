@@ -12,6 +12,20 @@
          ENTRY TSCCLEAR
          ENTRY TSCWAITR
          ENTRY TSCWAITI
+         ENTRY TSCNOW
+TSCNOW   DS    0H
+         STM   2,3,28(13)
+         L     2,0(,1)
+         BASR  3,0
+         USING *,3
+         STCK  TSCNBUF
+         MVC   0(8,2),TSCNBUF
+         DROP  3
+         LM    2,3,28(13)
+         SR    15,15
+         BR    14
+         DS    0D
+TSCNBUF  DS    D
 TSCIO    DS    0H
          STM   2,10,28(13)
 * No armed wait state until SSCH succeeds

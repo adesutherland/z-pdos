@@ -5,7 +5,7 @@ The quickest way to explore the system is the **PDOS image ZIP** from the
 The Classic tools downloads are separate packages for building mainframe
 software on your host computer.
 
-The opt-in source-built K/U route and its current acceptance are described in
+The default source-built K/U route and its accepted scope are described in
 [the successor operator guide](TWO-SPACE.md).
 
 ## Boot the supplied image

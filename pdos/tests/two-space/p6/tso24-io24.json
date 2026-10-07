@@ -1,0 +1,32 @@
+[
+  [
+    "RXVM -v",
+    "PCOMM END 1 RC=0"
+  ],
+  [
+    "RXVM -l B3IO IO24 -a INTERACT B3IO/TEXT.rxas B3IO/BYTES.rxbin B3IO/MISSING.rxas EXACT",
+    "PCOMM END 2 RC=0",
+    [
+      [
+        "C24 INPUT 1:",
+        "Mixed café!"
+      ],
+      [
+        "C24 INPUT 2:",
+        ""
+      ],
+      [
+        "C24 INPUT 3:",
+        "  padded  "
+      ],
+      [
+        "C24 INPUT 4:",
+        "é"
+      ]
+    ],
+    [
+      "C24 SUMMARY: PASS=7 FAIL=0 SKIP=0",
+      "C24 INPUT LENGTHS: 11 0 10 1"
+    ]
+  ]
+]

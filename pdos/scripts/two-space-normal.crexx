@@ -4,11 +4,15 @@ options levelb
 import rxfnsb
 main: procedure = .int
   arg args = .string[]
-  if args.0 <> 6 & args.0 <> 9 then do
+  if args.0 <> 4 & args.0 <> 6 & args.0 <> 9 then do
     say "usage: crexx -nokeep pdos/scripts/two-space-normal.crexx --args NEW-build/pdos/output GNU_AS GNU_LD HERCULES_BIN CMS_STAGE_DIR TSO_STAGE_DIR"
     return 2
   end
-  work = args.1; gnuas = args.2; gnuld = args.3; herc = args.4; cms = args.5; tso = args.6
+  work = args.1; gnuas = args.2; gnuld = args.3; herc = args.4
+  cms = ""; tso = ""
+  if args.0 >= 6 then do
+    cms = args.5; tso = args.6
+  end
   if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
   address crexx "run test ! -e :work"
   if rc <> 0 then return 2
@@ -21,7 +25,7 @@ main: procedure = .int
   classicas = root || "/build/tools/assembler/mf-classic-as"
   linker = root || "/build/tools/linker/mf-classic-ld"
   base = work || "/base"
-  address crexx "run crexx -nokeep pdos/scripts/image.crexx --args :base :herc"
+  address crexx "run crexx -nokeep pdos/scripts/one-space-image.crexx --args :base :herc"
   if rc <> 0 then return rc
   command = work || "/command"; absolute_base = out || "/base"
   address crexx "run crexx -nokeep pdos/scripts/two-space-command.crexx --args :command :absolute_base :cc :classicas :linker"
@@ -30,6 +34,13 @@ main: procedure = .int
   address crexx "run crexx -nokeep pdos/scripts/two-space-next.crexx --args :kernel :gnuas :gnuld :cc :classicas :linker :hercules normal"
   if rc <> 0 then return rc
   core = out || "/kernel/run/image.core"; image = work || "/image"
+  if args.0 = 4 then do
+    stage = out || "/command/u-command.bin"
+    address crexx "run crexx -nokeep pdos/scripts/two-space-ipl.crexx --args :image :core :gnuas :gnuld :herc command :stage"
+    if rc <> 0 then return rc
+    say "Normal K/U image: " || out || "/image/media/pdos00.cckd"
+    return 0
+  end
   cms24 = cms || "/cms24-RXVM.bin"; cms31 = cms || "/cms31-RXVM.bin"
   cmsfile = cms || "/cms31-IOQUAL-RXBIN.bin"; cmslib = cms || "/cms31-LIBRARY-RXBIN.bin"
   cms24file = cms || "/cms24-IO24-RXBIN.bin"

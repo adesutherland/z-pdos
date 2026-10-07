@@ -254,7 +254,7 @@ def stage(archive, contract_file, out):
             profile_number = 24 if item['profile'] == 'cms24' else 31
             header = (b'PDCMSF01' + profile_number.to_bytes(4, 'big')
                       + len(framed).to_bytes(4, 'big')
-                      + len(source).to_bytes(4, 'big')
+                      + (len(framed)-2*records).to_bytes(4, 'big')
                       + records.to_bytes(4, 'big')
                       + bytes.fromhex(digest(source))
                       + fnv32(framed).to_bytes(4, 'big') + b'\0' * 4)

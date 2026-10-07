@@ -1,0 +1,4781 @@
+{
+  "status": "accepted; source default selected; publication separate",
+  "machine": {
+    "hercules": "4.9.1.0-SDL",
+    "hercules_sha256": "080616bd946278ecf08bd7715663592a9bb5bc0619632bd7f2b0c0dba6f8ff77",
+    "architecture": "ESAME",
+    "model": 2064,
+    "cpus": 1,
+    "real_mib": 256,
+    "primary": 9,
+    "optional_monitor": 10,
+    "codepage": "819/1047"
+  },
+  "native_archive_sha256": "fd11ae260bba169653126a861ecae545cee9bcfbe1fad4083c4a913241e3aedd",
+  "accepted_development_and_affected_regression": [
+    {
+      "case": "p6-cms-a1-run",
+      "pass": true,
+      "core_sha256": "05bf8ea1f2501c13f6f21ff95007bc8385dccb72367ffe103c18634d50227daa",
+      "disk_before_sha256": "d8188ba0f4cd0d47c4e260395c410f5ae4a3454779e959e854e2d64ca5d499e4",
+      "disk_after_sha256": "63091f30f6e6f84852285fa2e85016aedde12461b75a5aa05f746e621a3bea1f",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": null,
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0",
+        "PCOMM END 3 RC=0",
+        "PCOMM END 4 RC=0",
+        "PCOMM END 5 RC=0",
+        "PCOMM END 6 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          5,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          6,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          7,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-tso31-capture-qualified",
+      "pass": true,
+      "core_sha256": "05bf8ea1f2501c13f6f21ff95007bc8385dccb72367ffe103c18634d50227daa",
+      "disk_before_sha256": "0b6b58b9323b7aaa264a3eaa758a5f5e3b8bc536836e21fbb9ad8b7ca5d2893a",
+      "disk_after_sha256": "f10718a88f20d6e7a867276479a1ef8423f05c9bfea4ed5d77d2bf5607c60505",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": null,
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0",
+        "PCOMM END 3 RC=0",
+        "PCOMM END 4 RC=0",
+        "PCOMM END 5 RC=0",
+        "PCOMM END 6 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          5,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          6,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          7,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-tso64-chain-run",
+      "pass": true,
+      "core_sha256": "05bf8ea1f2501c13f6f21ff95007bc8385dccb72367ffe103c18634d50227daa",
+      "disk_before_sha256": "6b51d87c961720a8f79193d98fc16cfe5a5149675fe18ab76b49b66f4e011812",
+      "disk_after_sha256": "5b75d1cec1ec1b7cee22fd513e48535af785ae81cbaf7625fff65347cb6bc49b",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": null,
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0",
+        "PCOMM END 3 RC=0",
+        "PCOMM END 4 RC=0",
+        "PCOMM END 5 RC=0",
+        "PCOMM END 6 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          5,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          6,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          7,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-high-chain-run",
+      "pass": true,
+      "core_sha256": "05bf8ea1f2501c13f6f21ff95007bc8385dccb72367ffe103c18634d50227daa",
+      "disk_before_sha256": "481028fd167641c1261f795fee22a1c158f50ac3684c46a6b098e7d5f4e48a81",
+      "disk_after_sha256": "3e6018aa22b1bf3797bba49e77ac6507932ef3ea5a0ef3c22bfd1efad5b10aea",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": null,
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0",
+        "PCOMM END 3 RC=0",
+        "PCOMM END 4 RC=0",
+        "PCOMM END 5 RC=0",
+        "PCOMM END 6 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          5,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          6,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          7,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-cms24-auto-qualified",
+      "pass": true,
+      "core_sha256": "fcce8a20f478a524ccd875f37ed07e03005e6fc358f3ecd715a1e7f4a5bb47fd",
+      "disk_before_sha256": "8e3dd3b7fa37904828bbf1ad8d070693539ea02a68e276fffb56d528ca7a2581",
+      "disk_after_sha256": "abd5cf4a4a749d0f65e96b9c32b73e056abc2deb0fea68f06f969d446f0e94d3",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": null,
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-cms24-input-qualified",
+      "pass": true,
+      "core_sha256": "fcce8a20f478a524ccd875f37ed07e03005e6fc358f3ecd715a1e7f4a5bb47fd",
+      "disk_before_sha256": "bbaf5f13d9b7485eb2c4566cd8683a08a0151c96c9c1ca2fba6797a3614a4bed",
+      "disk_after_sha256": "3f5ee192538c1270f5806d3cb76954cf38dfb1b2c48c4d670fc72f53fc87a85e",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 9195520,
+        "observed_peak_real_bytes": 83738624,
+        "total_free_low_u_bytes": 13914112,
+        "largest_low_u_start": 1814528,
+        "largest_low_u_bytes": 13914112,
+        "minimum_observed_largest_low_u_bytes": 13840384,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-cms31-input-qualified",
+      "pass": true,
+      "core_sha256": "6fd2f0274c95ec661d556e45cafdecc69c0fc0ca985297f9ef71688c6df6a6ca",
+      "disk_before_sha256": "2edf8a9a99db7e285b18229fc43720f2b869fb140b83c5180f1ded9ee7fc8d8e",
+      "disk_after_sha256": "ce1cd4cca6c02a03f8253adc71f6f76efaf1a2f4c532b94d1304713a02216ed3",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 13434880,
+        "observed_peak_real_bytes": 158167040,
+        "total_free_low_u_bytes": 13914112,
+        "largest_low_u_start": 1814528,
+        "largest_low_u_bytes": 13914112,
+        "minimum_observed_largest_low_u_bytes": 13910016,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-tso31-input-qualified",
+      "pass": true,
+      "core_sha256": "6fd2f0274c95ec661d556e45cafdecc69c0fc0ca985297f9ef71688c6df6a6ca",
+      "disk_before_sha256": "92f6402f367834112b2dcb307f075aca0933d05c31f5a135a6092c45b4e9163d",
+      "disk_after_sha256": "07168d5658c70edd02d1c22f06e30cb5ec549e6848738be2e40917d628264d3b",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 7565312,
+        "observed_peak_real_bytes": 149184512,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 15560704,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-tso64-input-qualified",
+      "pass": true,
+      "core_sha256": "7575cee3d9d1b4cb863ad340001f80b01c8e20a7f8a4ac967217e18667d9d847",
+      "disk_before_sha256": "b56fd75e8c3be1a3f8ba0b33e56dcd8796e73d7d0cbeb1eb153ab8363ad74f6b",
+      "disk_after_sha256": "fc438105e4785916ca5b482a686fbf7bea79ffb17f0859655e45ada2116bce28",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 7237632,
+        "observed_peak_real_bytes": 216031232,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 15560704,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-high-input-qualified",
+      "pass": true,
+      "core_sha256": "897987cfa3b0f6da49021bcf964105afc05cc06c36629906084052e3edeb04b0",
+      "disk_before_sha256": "8dc9647d27b0256734f9edfcf087630bcba62126d28b25677c143424b0cb1fad",
+      "disk_after_sha256": "353fa16e8b7dc038563391a237dd5a9e0e406b1672dfa0715eb114a77310bd53",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6488064,
+        "observed_peak_real_bytes": 216035328,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 15560704,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-tso24-io24-run",
+      "pass": true,
+      "core_sha256": "7575cee3d9d1b4cb863ad340001f80b01c8e20a7f8a4ac967217e18667d9d847",
+      "disk_before_sha256": "6b46aba9474b941554cf988482655df961ed915fe7b7bae1d22563995a3d66bc",
+      "disk_after_sha256": "8aa23acc21d676abee449c1edb27705f362ad2237a61f7556600bfd2bde17415",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 7565312,
+        "observed_peak_real_bytes": 85286912,
+        "total_free_low_u_bytes": 14499840,
+        "largest_low_u_start": 1232896,
+        "largest_low_u_bytes": 14495744,
+        "minimum_observed_largest_low_u_bytes": 9150464,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-normal-calls/run",
+      "pass": true,
+      "core_sha256": "897987cfa3b0f6da49021bcf964105afc05cc06c36629906084052e3edeb04b0",
+      "disk_before_sha256": "28bc727a2277ee739fb4bbbb689d07260ea6192bfaea2a007e84c379458ba55a",
+      "disk_after_sha256": "295330c9adedcd12c48ded6497d97cd54f1af68e660a1c7a46c36de5ff251b74",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 10694656,
+        "observed_peak_real_bytes": 165896192,
+        "total_free_low_u_bytes": 13905920,
+        "largest_low_u_start": 1896448,
+        "largest_low_u_bytes": 13832192,
+        "minimum_observed_largest_low_u_bytes": 13762560,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=37",
+        "PCOMM END 2 RC=37",
+        "PCOMM END 3 RC=37",
+        "PCOMM END 4 RC=37",
+        "PCOMM END 5 RC=37",
+        "PCOMM END 6 RC=37",
+        "PCOMM END 7 RC=37",
+        "PCOMM END 8 RC=37",
+        "PCOMM END 9 RC=37",
+        "PCOMM END 10 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          5,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          7,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          6,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          9,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          8,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          11,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          10,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          13,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          12,
+          0
+        ],
+        [
+          1,
+          12,
+          1,
+          0,
+          0,
+          4294967295,
+          15,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          14,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          17,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          16,
+          0
+        ],
+        [
+          1,
+          12,
+          1,
+          0,
+          0,
+          4294967295,
+          19,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          18,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          20,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-normal-probes/run",
+      "pass": true,
+      "core_sha256": "d240233185e2cce3114a7f2a9b6ebb39dfd8340f16ae311d3b215fe17f7006b8",
+      "disk_before_sha256": "b272991d70025066971d091c80391f1ff5a5d5edeecaa030e8371078fcf51a22",
+      "disk_after_sha256": "e8dafbd23135b4dd78ae679d8c4e15c0f1cb9ddceba44b2fb8329911e072e586",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 10297344,
+        "observed_peak_real_bytes": 99459072,
+        "total_free_low_u_bytes": 13914112,
+        "largest_low_u_start": 1814528,
+        "largest_low_u_bytes": 13914112,
+        "minimum_observed_largest_low_u_bytes": 13905920,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=37",
+        "PCOMM END 2 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-normal-controls/run-corrected",
+      "pass": true,
+      "core_sha256": "d240233185e2cce3114a7f2a9b6ebb39dfd8340f16ae311d3b215fe17f7006b8",
+      "disk_before_sha256": "8115d3995acf7939a2672ef9e0e05fa32d332993f02339a3b487c2a57cb386e0",
+      "disk_after_sha256": "2f5f865f5b48794fd0426b96047ecbe92543611a52dad554a4f8512e1bf38bda",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 9207808,
+        "observed_peak_real_bytes": 31268864,
+        "total_free_low_u_bytes": 13914112,
+        "largest_low_u_start": 1814528,
+        "largest_low_u_bytes": 13914112,
+        "minimum_observed_largest_low_u_bytes": 13840384,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=-4",
+        "PCOMM END 2 OS=12 RC=unavailable",
+        "PCOMM END 3 OS=12 RC=unavailable",
+        "PCOMM END 4 RC=37"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          4294967292,
+          2,
+          0
+        ],
+        [
+          1,
+          12,
+          0,
+          0,
+          0,
+          4294967295,
+          3,
+          0
+        ],
+        [
+          1,
+          12,
+          0,
+          0,
+          0,
+          4294967295,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          6,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          5,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-failedio/run",
+      "pass": true,
+      "core_sha256": "009c9dbf941bacd7191fb2abde9188c2334847c5c025e6351296d13010ae65ff",
+      "disk_before_sha256": "bb9dca0e37542ec5bf438cf87db4403608c1b2a3c4a4788ca24af17821c05c76",
+      "disk_after_sha256": "9a89aba144cd227c9b3935651bc4473b9a328fc79b76c04b3ffe6edaf6a23104",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 14536704,
+        "observed_peak_real_bytes": 107835392,
+        "total_free_low_u_bytes": 13914112,
+        "largest_low_u_start": 1814528,
+        "largest_low_u_bytes": 13914112,
+        "minimum_observed_largest_low_u_bytes": 13905920,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=37",
+        "PCOMM END 3 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-normal-model2-owned",
+      "pass": true,
+      "core_sha256": "d240233185e2cce3114a7f2a9b6ebb39dfd8340f16ae311d3b215fe17f7006b8",
+      "disk_before_sha256": "401107e4351aa3a3d7a58561737c371186a012a57a9bfdff05d1879db2a50616",
+      "disk_after_sha256": "eacabe6daf61caabd66d79a11ffeff12e2be99a233cb66c0d6d57d9b5f26fcbc",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6586368,
+        "observed_peak_real_bytes": 231837696,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 15589376,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-normal-model3-owned/run",
+      "pass": true,
+      "core_sha256": "ab8c8e0b0f92bc77b4d86aeda0da77c551dcc5f58019e7c903d709cd23fe8c16",
+      "disk_before_sha256": "6aa6b56c065eb0644bdc06caf2765fcf2974e9963f25d0cf4a756c7b1e9b35dd",
+      "disk_after_sha256": "a1d90e5de1cc33513abe4853817c8ed696b5dfea9948f0df5c4b5768bfeb5cde",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6586368,
+        "observed_peak_real_bytes": 231837696,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 15589376,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-normal-model4-owned/run",
+      "pass": true,
+      "core_sha256": "d1e277ae8b896d62754613056b07fc83019c2d650ee1035ceef7db2b9f8eb08b",
+      "disk_before_sha256": "1f3ab20ceeea2f4ea3f60673b3b553669a8c95ce2ceb590e968ba0525320c111",
+      "disk_after_sha256": "b44e7f81f53a0bf02817791a5687e823b538ff886b70f4246d8ba6beae7c4ed1",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6586368,
+        "observed_peak_real_bytes": 231837696,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 15589376,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-normal-model5-owned/run",
+      "pass": true,
+      "core_sha256": "79a975a6e329836d8994cef1bc8aea202f8924ef2dbfb420717d7f5f79d00662",
+      "disk_before_sha256": "4b8295607757c9455b8ded258bf5348bf5aa2128e09f811b50a6851e2232d693",
+      "disk_after_sha256": "db577e344f624bbfc2f883222bbf2cb969aaac8cd492c96b24f1c23d75a17340",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6586368,
+        "observed_peak_real_bytes": 231837696,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 15589376,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-normal-line-owned/run",
+      "pass": true,
+      "core_sha256": "c8afa718679566b08cdac798c2b21f3ade6d992e46b17ad5c7142603deb3766f",
+      "disk_before_sha256": "e935617ce073e9628260d58bc8f7396953e3b5ab3acbf42009deceade5dfc341",
+      "disk_after_sha256": "53638c77797beafc68309f6ec14d9acb5b0318836702d2c94db01d0e3df4403d",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6586368,
+        "observed_peak_real_bytes": 231837696,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 15589376,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-normal-handoff/run",
+      "pass": true,
+      "core_sha256": "009c9dbf941bacd7191fb2abde9188c2334847c5c025e6351296d13010ae65ff",
+      "disk_before_sha256": "ca7b022657cb93b2647b081509a54db1a8dc8fd08059fd5719fa43872f5be099",
+      "disk_after_sha256": "541910bd1b3f4bacc6462f17da592198bb84ae3eb9745a5f7fbf27951208c7bb",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6582272,
+        "observed_peak_real_bytes": 231837696,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 15589376,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-normal-raw/run",
+      "pass": true,
+      "core_sha256": "009c9dbf941bacd7191fb2abde9188c2334847c5c025e6351296d13010ae65ff",
+      "disk_before_sha256": "5921817754853cfa310c08f2275faf055c792daaffdfa6f1e5991aefe0034828",
+      "disk_after_sha256": "a98338af72cee4516bf127ca737a70663d9e91f8773acb88057e5fdc27123c4f",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": null,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6582272,
+        "observed_peak_real_bytes": 231837696,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 15589376,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-normal-disconnect/run",
+      "pass": true,
+      "core_sha256": "009c9dbf941bacd7191fb2abde9188c2334847c5c025e6351296d13010ae65ff",
+      "disk_before_sha256": "cddcc5d00c019576b76333c68b0ecce7e22c3dd88fc8e2da30648c2bd5a9c565",
+      "disk_after_sha256": "edb92a13f77527281128613b499ad7eca5272d45d7bcc4948020a7ccc22cf26a",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "monitor_gap_explicit_and_recovery_visible": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": false,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6582272,
+        "observed_peak_real_bytes": 231837696,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 15589376,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-final-tso31/chain",
+      "pass": true,
+      "core_sha256": "55d60c84aa248501ee58076475dc67eb715f3c04728f654f4b6ed1f83eda5fac",
+      "disk_before_sha256": "fdfa5b4450f8075d91bf90952074e37c98b2b41c204a8d16eb7d3a0686be3e19",
+      "disk_after_sha256": "dd7f6887e19e1ac20a6dc5955c8e5976c116201cc33d002026c224b9d6105f3c",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 12906496,
+        "observed_peak_real_bytes": 104194048,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 13889536,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0",
+        "PCOMM END 3 RC=0",
+        "PCOMM END 4 RC=0",
+        "PCOMM END 5 RC=0",
+        "PCOMM END 6 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          5,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          6,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          7,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-final-tso64/chain",
+      "pass": true,
+      "core_sha256": "55d60c84aa248501ee58076475dc67eb715f3c04728f654f4b6ed1f83eda5fac",
+      "disk_before_sha256": "c17f5e219e835ef7d9a2403378725641c8c391e7f0c4a78b3da70e3b31ca935c",
+      "disk_after_sha256": "a8fd127bf7a9bc89a3fad01d963cacdf0c4b73fd956c0cb1adde1565b6c2dd69",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 10870784,
+        "observed_peak_real_bytes": 169332736,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 13889536,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0",
+        "PCOMM END 3 RC=0",
+        "PCOMM END 4 RC=0",
+        "PCOMM END 5 RC=0",
+        "PCOMM END 6 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          5,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          6,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          7,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-final-high/chain",
+      "pass": true,
+      "core_sha256": "55d60c84aa248501ee58076475dc67eb715f3c04728f654f4b6ed1f83eda5fac",
+      "disk_before_sha256": "de1e09ca19a00c62ff6c81e54c87dbddf446fa06ef77e8715fed07e82e65c723",
+      "disk_after_sha256": "5d71ed2bf3ffccec512ef1515b15cbf41c53cdba4f645cd901473c92a7d2e5d4",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6529024,
+        "observed_peak_real_bytes": 167862272,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 13889536,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0",
+        "PCOMM END 3 RC=0",
+        "PCOMM END 4 RC=0",
+        "PCOMM END 5 RC=0",
+        "PCOMM END 6 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          5,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          6,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          7,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-final-tso31/input",
+      "pass": true,
+      "core_sha256": "55d60c84aa248501ee58076475dc67eb715f3c04728f654f4b6ed1f83eda5fac",
+      "disk_before_sha256": "dd7f6887e19e1ac20a6dc5955c8e5976c116201cc33d002026c224b9d6105f3c",
+      "disk_after_sha256": "2dd5c0170f8244690d7d6c16e93b6ca44dcf0e642e54deb8f00051875140bd94",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 7565312,
+        "observed_peak_real_bytes": 98852864,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 13889536,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-final-tso64/input",
+      "pass": true,
+      "core_sha256": "55d60c84aa248501ee58076475dc67eb715f3c04728f654f4b6ed1f83eda5fac",
+      "disk_before_sha256": "a8fd127bf7a9bc89a3fad01d963cacdf0c4b73fd956c0cb1adde1565b6c2dd69",
+      "disk_after_sha256": "a7f427e5e72ce76f50aa17375bfe46f3081f375f99c5d943df7b1d6f94028a15",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 7237632,
+        "observed_peak_real_bytes": 165699584,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 13889536,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-final-high/input",
+      "pass": true,
+      "core_sha256": "55d60c84aa248501ee58076475dc67eb715f3c04728f654f4b6ed1f83eda5fac",
+      "disk_before_sha256": "5d71ed2bf3ffccec512ef1515b15cbf41c53cdba4f645cd901473c92a7d2e5d4",
+      "disk_after_sha256": "6f81cb330acd8ec01cd8be7333d4b60f135a020e55489b43e6528a96e6b05f95",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6488064,
+        "observed_peak_real_bytes": 165703680,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 13889536,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-final-tso24/input",
+      "pass": true,
+      "core_sha256": "55d60c84aa248501ee58076475dc67eb715f3c04728f654f4b6ed1f83eda5fac",
+      "disk_before_sha256": "c0db649ad0c7e4940d2bd84a3f05145ebb7daa0a9f2757e0e7901e7f41871e3e",
+      "disk_after_sha256": "33545a7ae09f35db7b8849d45851afe4b18039d2fa72f605c246f324842a331e",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 7565312,
+        "observed_peak_real_bytes": 34955264,
+        "total_free_low_u_bytes": 14499840,
+        "largest_low_u_start": 1228800,
+        "largest_low_u_bytes": 14499840,
+        "minimum_observed_largest_low_u_bytes": 8646656,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-final-calls-2/run",
+      "pass": true,
+      "core_sha256": "55d60c84aa248501ee58076475dc67eb715f3c04728f654f4b6ed1f83eda5fac",
+      "disk_before_sha256": "4b2b12246ee466fc3b69f2420f96747c9693a2f40e134143e18867f0d7209aeb",
+      "disk_after_sha256": "aaf625072ecc1af00caab122c423ebc3c9b4831921480aae37a6e2cf2ff66fb7",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 7966720,
+        "observed_peak_real_bytes": 163168256,
+        "total_free_low_u_bytes": 15585280,
+        "largest_low_u_start": 212992,
+        "largest_low_u_bytes": 15515648,
+        "minimum_observed_largest_low_u_bytes": 13889536,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=37",
+        "PCOMM END 2 RC=37",
+        "PCOMM END 3 RC=37",
+        "PCOMM END 4 RC=37",
+        "PCOMM END 5 RC=37",
+        "PCOMM END 6 RC=37",
+        "PCOMM END 7 RC=37",
+        "PCOMM END 8 RC=37",
+        "PCOMM END 9 RC=37",
+        "PCOMM END 10 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          5,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          7,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          6,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          9,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          8,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          11,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          10,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          13,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          12,
+          0
+        ],
+        [
+          1,
+          12,
+          1,
+          0,
+          0,
+          4294967295,
+          15,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          14,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          17,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          16,
+          0
+        ],
+        [
+          1,
+          12,
+          1,
+          0,
+          0,
+          4294967295,
+          19,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          37,
+          18,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          20,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-final-model5/run",
+      "pass": true,
+      "core_sha256": "bd35ff61cee53f8132c68f99baf79163be9db9d788a10b31d640115d9134e9f5",
+      "disk_before_sha256": "4a872e8ad9af0fee8fd56dd0639eb9b12cbda4f69ed2aea5a9dbc7b577764602",
+      "disk_after_sha256": "a813e39f6fd8f80a288405c93de7b8478cffc1d312afeb87a5ec29f6cfcd220a",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6586368,
+        "observed_peak_real_bytes": 231837696,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 13889536,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-final-line/run",
+      "pass": true,
+      "core_sha256": "4afbb86f5a307630be98b0d9633ade876970ae71226b60cddf9ae89ea5cdd558",
+      "disk_before_sha256": "78068a828753de0485f23ba3bd50d81fc329b66bfb31570eaf1f73b48391982e",
+      "disk_after_sha256": "0a9964ab4d73c8dbd031ebfccc8b0d6c350ecf5d1ab45d34f1b87aebef6e79bb",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6586368,
+        "observed_peak_real_bytes": 231837696,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 13889536,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-final-bare/run",
+      "pass": true,
+      "core_sha256": "55d60c84aa248501ee58076475dc67eb715f3c04728f654f4b6ed1f83eda5fac",
+      "disk_before_sha256": "598bd0332f536b3adc114bbdb7110258779bf8f00514217081b42503e70220ce",
+      "disk_after_sha256": "5f95e1a679c171d07741adaccdb4a0b7ba6ccf8f4f99ff26694c45d2292ba304",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6467584,
+        "observed_peak_real_bytes": 26402816,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 13889536,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 OS=28 RC=unavailable"
+      ],
+      "typed_results": [
+        [
+          1,
+          28,
+          0,
+          0,
+          0,
+          4294967295,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-final-bare/repeated",
+      "pass": true,
+      "core_sha256": "55d60c84aa248501ee58076475dc67eb715f3c04728f654f4b6ed1f83eda5fac",
+      "disk_before_sha256": "5f95e1a679c171d07741adaccdb4a0b7ba6ccf8f4f99ff26694c45d2292ba304",
+      "disk_after_sha256": "4880f042dc23ebe00a1c3a052150cc1e0163f0759cfdc196c822517b514afc9f",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6467584,
+        "observed_peak_real_bytes": 26402816,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 13889536,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 OS=28 RC=unavailable"
+      ],
+      "typed_results": [
+        [
+          1,
+          28,
+          0,
+          0,
+          0,
+          4294967295,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-final-rootfault/run",
+      "pass": true,
+      "core_sha256": "55d60c84aa248501ee58076475dc67eb715f3c04728f654f4b6ed1f83eda5fac",
+      "disk_before_sha256": "2db119d5b9e0946fb3b2fa559a7ad8ad21add615da059d81f308254e335bd321",
+      "disk_after_sha256": "9113f9914f2e7d498b141fcaf6c4e555f9b02ff2b8f328a5e001318380eaf651",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "kernel_unwinds_unhealthy_pcomm": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6369280,
+        "observed_peak_real_bytes": 9527296,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 15597568,
+        "invocation_depth": 0
+      },
+      "command_results": [],
+      "typed_results": [
+        [
+          1,
+          12,
+          1,
+          0,
+          0,
+          4294967295,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-final-media/run",
+      "pass": true,
+      "core_sha256": "ab597a6307d33cd015450f0a8195de429afd28f96d19bb8d230f55ccea2ec8d5",
+      "disk_before_sha256": "474fc490c7359e7e01919a4aa4563c016e56ee5a6e0b8eca655d2623e0114c8e",
+      "disk_after_sha256": "b0c8af044108d3f413c2121227fd8cf56091fa9bcbeed75bac4514175b14f1f8",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 25067520,
+        "observed_peak_real_bytes": 116740096,
+        "total_free_low_u_bytes": 13914112,
+        "largest_low_u_start": 1814528,
+        "largest_low_u_bytes": 13914112,
+        "minimum_observed_largest_low_u_bytes": 13799424,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0",
+        "PCOMM END 3 RC=0",
+        "PCOMM END 4 RC=0",
+        "PCOMM END 5 RC=0",
+        "PCOMM END 6 RC=0",
+        "PCOMM END 7 RC=0",
+        "PCOMM END 8 RC=0",
+        "PCOMM END 9 RC=0",
+        "PCOMM END 10 RC=0",
+        "PCOMM END 11 RC=0",
+        "PCOMM END 12 RC=0",
+        "PCOMM END 13 RC=0",
+        "PCOMM END 14 RC=0",
+        "PCOMM END 15 RC=0",
+        "PCOMM END 16 RC=0",
+        "PCOMM END 17 RC=0",
+        "PCOMM END 18 RC=0",
+        "PCOMM END 19 RC=0",
+        "PCOMM END 20 RC=0",
+        "PCOMM END 21 RC=0",
+        "PCOMM END 22 RC=0",
+        "PCOMM END 23 RC=0",
+        "PCOMM END 24 RC=0",
+        "PCOMM END 25 RC=0",
+        "PCOMM END 26 RC=0",
+        "PCOMM END 27 RC=0",
+        "PCOMM END 28 RC=0",
+        "PCOMM END 29 RC=0",
+        "PCOMM END 30 RC=0",
+        "PCOMM END 31 RC=0",
+        "PCOMM END 32 RC=0",
+        "PCOMM END 33 RC=0",
+        "PCOMM END 34 RC=0",
+        "PCOMM END 35 RC=0",
+        "PCOMM END 36 RC=0",
+        "PCOMM END 37 RC=0",
+        "PCOMM END 38 RC=0",
+        "PCOMM END 39 RC=0",
+        "PCOMM END 40 RC=0",
+        "PCOMM END 41 RC=0",
+        "PCOMM END 42 RC=0",
+        "PCOMM END 43 RC=8",
+        "PCOMM END 44 RC=0",
+        "PCOMM END 45 RC=0",
+        "PCOMM END 46 RC=0",
+        "PCOMM END 47 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          5,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          6,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          7,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          8,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          9,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          10,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          11,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          12,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          13,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          14,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          15,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          16,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          17,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          18,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          19,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          20,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          21,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          22,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          23,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          24,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          25,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          26,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          27,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          28,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          29,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          30,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          31,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          32,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          33,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          34,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          35,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          36,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          37,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          38,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          39,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          40,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          41,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          42,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          43,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          8,
+          44,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          45,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          46,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          47,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          48,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    }
+  ],
+  "limits": [
+    "Native TSO24 library-free IO24 only; full-library IOQUAL returned -1",
+    "CMS24 compiler/assembler and general CMS/TSO compatibility are not qualified",
+    "Monitor loss/raw-screen controls pass with explicit capture gaps; they do not qualify complete capture",
+    "Observed peaks/minima are service-boundary samples"
+  ],
+  "host_loader_comparison": [
+    {
+      "input": "tso24-RXVM.rdw",
+      "pass": true,
+      "native_sha256": "d9ce6e48f83e0bb4096e14e6bd285d350c8f38bc19cff8671d3d9155a96fcdd0",
+      "comparison": [
+        "native 24: 1396982 record bytes, 1096496 image bytes at 00020000 match released loader",
+        "native 24: 1396982 record bytes, 1096496 image bytes at 00220000 match released loader"
+      ]
+    },
+    {
+      "input": "tso31-RXAS.rdw",
+      "pass": true,
+      "native_sha256": "52fb1901572f36de0e7128b668965bd7f8686c0dee37b0c8de5dc613357393f1",
+      "comparison": [
+        "native 31: 1290918 record bytes, 1022072 image bytes at 20000000 match released loader",
+        "native 31: 1290918 record bytes, 1022072 image bytes at 22000000 match released loader"
+      ]
+    },
+    {
+      "input": "tso31-RXC.rdw",
+      "pass": true,
+      "native_sha256": "eba277736b4df9ca1c79170ee3b29a0299fe74c7b18568e08a8703abb720a1a0",
+      "comparison": [
+        "native 31: 5551326 record bytes, 4314528 image bytes at 20000000 match released loader",
+        "native 31: 5551326 record bytes, 4314528 image bytes at 22000000 match released loader"
+      ]
+    },
+    {
+      "input": "tso31-RXVM.rdw",
+      "pass": true,
+      "native_sha256": "77b689a3c64bad63996031654dfc353d357b9c2616da01c65a9ea3e2c09c2cc9",
+      "comparison": [
+        "native 31: 1395270 record bytes, 1094960 image bytes at 20000000 match released loader",
+        "native 31: 1395270 record bytes, 1094960 image bytes at 22000000 match released loader"
+      ]
+    },
+    {
+      "input": "tso64-any-RXAS.rdw",
+      "pass": true,
+      "native_sha256": "b05ce7e8c2b9ab06384c71e181dc35ce1514cc5ad23981ec16987f61e6f5be56",
+      "comparison": [
+        "native 64: 803226 record bytes, 743904 image bytes at 20000000 match released loader",
+        "native 64: 803226 record bytes, 743904 image bytes at 22000000 match released loader"
+      ]
+    },
+    {
+      "input": "tso64-any-RXC.rdw",
+      "pass": true,
+      "native_sha256": "a302dfcacc07132bfba7b9bb14cb0797e34007fa28f6f04a7d81f6d7bfc64fdc",
+      "comparison": [
+        "native 64: 3157162 record bytes, 2884312 image bytes at 20000000 match released loader",
+        "native 64: 3157162 record bytes, 2884312 image bytes at 22000000 match released loader"
+      ]
+    },
+    {
+      "input": "tso64-any-RXVM.rdw",
+      "pass": true,
+      "native_sha256": "dc5210b04cabf93d22942b0955ccf9bf63f7e0d4334a88e2a04e8705484339b6",
+      "comparison": [
+        "native 64: 821446 record bytes, 767728 image bytes at 20000000 match released loader",
+        "native 64: 821446 record bytes, 767728 image bytes at 22000000 match released loader"
+      ]
+    }
+  ],
+  "media_export": {
+    "format": "pdos-fixture-export-v1",
+    "disk_sha256": "d27ee21140424b75dd2a9fb99b580d19c784458fca71e06768aa28a883afd74e",
+    "manifest_sha256": "88bbdb9a36dc3fccd926d2b286a4d583f9e1855b8902d30ef16034445dea21b2",
+    "archive_sha256": "cc3853a98f2b8fec54a9b934a67aa8b0fa9bf821775947f0e47f785bafd6103d",
+    "unrelated_tracks_unchanged": true,
+    "exports": [
+      {
+        "target": "CMT.OUT",
+        "same_as": "TEXT",
+        "records": 3,
+        "records_sha256": "ae504aa288c73de2df9a7278e4094cec7d3655c9498a0ff0b14d5b6327fb9020",
+        "payload_sha256": "1fa266d4f3d48821f3685536aabd4cbcd1051510674069d87b7e1438fe43dcd9"
+      },
+      {
+        "target": "CMB.OUT",
+        "same_as": "BLANK",
+        "records": 1,
+        "records_sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
+        "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "target": "CMBIN.OUT",
+        "same_as": "BINARY",
+        "records": 1,
+        "records_sha256": "30b56fe2d92d9d76cdc44f5b34022c875da8814ed82e7bb869e0e74ff89e766f",
+        "payload_sha256": "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880"
+      },
+      {
+        "target": "TSO.OUT",
+        "same_as": "TSO",
+        "records": 2,
+        "records_sha256": "29236b0a3b7d4102fba275568f633bde07c082dbdea2f614b911bd2532ea956e",
+        "payload_sha256": "d0aa7996ab5eaa44880bae599c12b01a350caf9912ada7731c61eafe166d725f"
+      },
+      {
+        "target": "TAPOUT.DAT",
+        "same_as": "TSO",
+        "records": 2,
+        "records_sha256": "29236b0a3b7d4102fba275568f633bde07c082dbdea2f614b911bd2532ea956e",
+        "payload_sha256": "d0aa7996ab5eaa44880bae599c12b01a350caf9912ada7731c61eafe166d725f"
+      }
+    ]
+  },
+  "tape_readback": {
+    "pass": true,
+    "logical_fb_records": 2,
+    "physical_records": 1,
+    "bytes": 160,
+    "payload_sha256": "d0aa7996ab5eaa44880bae599c12b01a350caf9912ada7731c61eafe166d725f",
+    "input_unchanged": true,
+    "output_sha256": "792ae70bf500e1bcb86b2b1480a70c26e8cbbc26bc4cf6a4701b28533f0ad541"
+  },
+  "reviewed_source": {
+    "core_sha256": "df2499795c4deac44140903e242323085818e6200a142c21c8e43f8c7709c4c0",
+    "kernel_bytes": 273734,
+    "review_before_qualification": true,
+    "source_and_inputs_unchanged_through_qualification": true,
+    "focused_checks": [
+      "C89 ASan/UBSan bounded dataset-name and unsigned-long formatting",
+      "C89 ASan/UBSan zero-minimum observation retention",
+      "Exact ordered results checked on 13 existing transcripts"
+    ]
+  },
+  "reviewed_source_qualification": [
+    {
+      "case": "p6-reviewed-media/run",
+      "pass": true,
+      "core_sha256": "df2499795c4deac44140903e242323085818e6200a142c21c8e43f8c7709c4c0",
+      "disk_before_sha256": "78dcbdb1b2e1592e3b94c6fedf74c972d6bf808a6535569aa3752f52c31bb063",
+      "disk_after_sha256": "084954a26e2e0f99cf9928e09220122e36cf1cf326f8e0d7b3d4198189e7ac37",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 25067520,
+        "observed_peak_real_bytes": 116740096,
+        "total_free_low_u_bytes": 13914112,
+        "largest_low_u_start": 1814528,
+        "largest_low_u_bytes": 13914112,
+        "minimum_observed_largest_low_u_bytes": 13799424,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 RC=0",
+        "PCOMM END 2 RC=0",
+        "PCOMM END 3 RC=0",
+        "PCOMM END 4 RC=0",
+        "PCOMM END 5 RC=0",
+        "PCOMM END 6 RC=0",
+        "PCOMM END 7 RC=0",
+        "PCOMM END 8 RC=0",
+        "PCOMM END 9 RC=0",
+        "PCOMM END 10 RC=0",
+        "PCOMM END 11 RC=0",
+        "PCOMM END 12 RC=0",
+        "PCOMM END 13 RC=0",
+        "PCOMM END 14 RC=0",
+        "PCOMM END 15 RC=0",
+        "PCOMM END 16 RC=0",
+        "PCOMM END 17 RC=0",
+        "PCOMM END 18 RC=0",
+        "PCOMM END 19 RC=0",
+        "PCOMM END 20 RC=0",
+        "PCOMM END 21 RC=0",
+        "PCOMM END 22 RC=0",
+        "PCOMM END 23 RC=0",
+        "PCOMM END 24 RC=0",
+        "PCOMM END 25 RC=0",
+        "PCOMM END 26 RC=0",
+        "PCOMM END 27 RC=0",
+        "PCOMM END 28 RC=0",
+        "PCOMM END 29 RC=0",
+        "PCOMM END 30 RC=0",
+        "PCOMM END 31 RC=0",
+        "PCOMM END 32 RC=0",
+        "PCOMM END 33 RC=0",
+        "PCOMM END 34 RC=0",
+        "PCOMM END 35 RC=0",
+        "PCOMM END 36 RC=0",
+        "PCOMM END 37 RC=0",
+        "PCOMM END 38 RC=0",
+        "PCOMM END 39 RC=0",
+        "PCOMM END 40 RC=0",
+        "PCOMM END 41 RC=0",
+        "PCOMM END 42 RC=0",
+        "PCOMM END 43 RC=8",
+        "PCOMM END 44 RC=0",
+        "PCOMM END 45 RC=0",
+        "PCOMM END 46 RC=0",
+        "PCOMM END 47 RC=0"
+      ],
+      "typed_results": [
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          4,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          5,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          6,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          7,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          8,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          9,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          10,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          11,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          12,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          13,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          14,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          15,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          16,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          17,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          18,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          19,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          20,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          21,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          22,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          23,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          24,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          25,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          26,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          27,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          28,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          29,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          30,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          31,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          32,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          33,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          34,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          35,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          36,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          37,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          38,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          39,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          40,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          41,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          42,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          43,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          8,
+          44,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          45,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          46,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          47,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          48,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-reviewed-bare/run",
+      "pass": true,
+      "core_sha256": "df2499795c4deac44140903e242323085818e6200a142c21c8e43f8c7709c4c0",
+      "disk_before_sha256": "a3c4c3e3c6388ce03986c50f4df2d3ec75122b2ac81725033de68a01c566c1ac",
+      "disk_after_sha256": "3af3be08a854da7ed49603438e42726970c15726af679b635ccc0e6123a161a3",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6467584,
+        "observed_peak_real_bytes": 26402816,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 13889536,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 OS=28 RC=unavailable"
+      ],
+      "typed_results": [
+        [
+          1,
+          28,
+          0,
+          0,
+          0,
+          4294967295,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-reviewed-bare/repeated",
+      "pass": true,
+      "core_sha256": "df2499795c4deac44140903e242323085818e6200a142c21c8e43f8c7709c4c0",
+      "disk_before_sha256": "3af3be08a854da7ed49603438e42726970c15726af679b635ccc0e6123a161a3",
+      "disk_after_sha256": "2d3ae7570baeb01376268b80cec7e0f7277d59c833c7ccd95701b990c6baedbc",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "screen_geometry_observed": true,
+        "usable_3270_after_commands": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6467584,
+        "observed_peak_real_bytes": 26402816,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 13889536,
+        "invocation_depth": 0
+      },
+      "command_results": [
+        "PCOMM END 1 OS=28 RC=unavailable"
+      ],
+      "typed_results": [
+        [
+          1,
+          28,
+          0,
+          0,
+          0,
+          4294967295,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "p6-reviewed-rootfault/run",
+      "pass": true,
+      "core_sha256": "df2499795c4deac44140903e242323085818e6200a142c21c8e43f8c7709c4c0",
+      "disk_before_sha256": "0d4b7f683b1dfbb3cf128c7258017377bb60248bfe3620be6c7f7cbf31da0fa6",
+      "disk_after_sha256": "45fe868697518706afe37770a9da91e1d8d4a13525b1348d557d9dca774c7347",
+      "checks": {
+        "guest_event_sequence_completed": true,
+        "hercules_exit_zero": true,
+        "observed_real_frames_within_guest": true,
+        "final_observed_invocation_depth_zero": true,
+        "native_console_app_rc_zero": true,
+        "reported_actual_geometry": true,
+        "input_and_screen_leases_released": true,
+        "normal_ipl_and_kernel_shutdown": true,
+        "controlled_invocations_released": true,
+        "complete_text_or_explicit_gap": true,
+        "balanced_typed_invocation_results": true,
+        "kernel_unwinds_unhealthy_pcomm": true,
+        "ordered_command_results": true,
+        "expected_native_output": true,
+        "attached_line_capture_complete": true,
+        "disk_outside_store_unchanged": true,
+        "durable_transcript_readback": true
+      },
+      "capture_qualified": true,
+      "storage_observations": {
+        "magic": 1296389169,
+        "real_bytes_at_stop": 6369280,
+        "observed_peak_real_bytes": 9527296,
+        "total_free_low_u_bytes": 15597568,
+        "largest_low_u_start": 131072,
+        "largest_low_u_bytes": 15597568,
+        "minimum_observed_largest_low_u_bytes": 15597568,
+        "invocation_depth": 0
+      },
+      "command_results": [],
+      "typed_results": [
+        [
+          1,
+          12,
+          1,
+          0,
+          0,
+          4294967295,
+          1,
+          0
+        ]
+      ]
+    }
+  ],
+  "identity_only_changes": [
+    {
+      "file": "pdos/src/media_dscb.h",
+      "before_sha256": "2af7d8ddda4838d2712d9b12a4d56119daf90557bd25668f0e609fd1c41cc0c3",
+      "after_sha256": "c6a79d63c57c866e03bb3ec3eff15533bed71205d12adc941ebe8c64815a6b45",
+      "preprocessed_token_sha256": "539ccaca44545fea0ce9df1c56b82571321f3a2a9e4d4b96de5b55d47868567b",
+      "reason": "Inherited trailing whitespace normalized; preprocessed C tokens identical; no qualification rerun required"
+    }
+  ]
+}

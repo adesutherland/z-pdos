@@ -1,0 +1,30 @@
+[
+  [
+    "RXC -v",
+    "PCOMM END 1 RC=0"
+  ],
+  [
+    "RXAS -v",
+    "PCOMM END 2 RC=0"
+  ],
+  [
+    "RXVM -v",
+    "PCOMM END 3 RC=0"
+  ],
+  [
+    "RXC -l B3IO -i B3IO -o B3IO/FRESH.rxas IOQUAL",
+    "PCOMM END 4 RC=0"
+  ],
+  [
+    "RXAS -l B3IO FRESH",
+    "PCOMM END 5 RC=0"
+  ],
+  [
+    "RXVM -l B3IO B3IO/FRESH.rxbin -a auto B3IO/TEXT.rxas B3IO/BYTES.rxbin B3IO/EMPTY.rxas B3IO/MISSING.rxas tso",
+    "PCOMM END 6 RC=0",
+    [],
+    [
+      "SUMMARY: PASS=9 FAIL=0 SKIP=2"
+    ]
+  ]
+]

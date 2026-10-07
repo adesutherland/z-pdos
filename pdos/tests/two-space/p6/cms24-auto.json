@@ -1,0 +1,14 @@
+[
+  [
+    "CMS RUN 24 RXVM -v",
+    "PCOMM END 1 RC=0"
+  ],
+  [
+    "CMS RUN 24 RXVM IO24 -a AUTO QTEXT.D QBIN.D QMISS.D CMSREC",
+    "PCOMM END 2 RC=0",
+    [],
+    [
+      "C24 SUMMARY: PASS=6 FAIL=0 SKIP=1"
+    ]
+  ]
+]

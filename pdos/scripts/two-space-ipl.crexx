@@ -9,8 +9,11 @@ main: procedure = .int
   i = .int
   if args.0 <> 5 & args.0 <> 6 & args.0 <> 7 & args.0 <> 8 & args.0 <> 9 & args.0 <> 10 & args.0 <> 11 & args.0 <> 12 & args.0 <> 13 & args.0 <> 14 & args.0 <> 15 & args.0 <> 16 then return usage()
   if args.0 = 16 then if args.16 <> "image-only" then return usage()
+  bare = 0
+  if args.0 = 7 then if args.6 = "command" then bare = 1
   work = args.1; core = args.2; gnuas = args.3; gnuld = args.4; hercdir = args.5
   pcomm = ""
+  if bare = 1 then pcomm = args.7
   if args.0 >= 14 then do
     pcomm = args.14
     call require left(pcomm,1) = "/", "absolute PCOMM native stage"
@@ -33,7 +36,7 @@ main: procedure = .int
   tso64media = ""
   tso24 = ""
   tso24media = ""
-  if args.0 >= 6 then do
+  if args.0 >= 6 & bare = 0 then do
     cms24 = args.6
     call require left(cms24,1) = "/", "absolute checked CMS24 stage path"
     address crexx "run test -f :cms24"
@@ -42,7 +45,7 @@ main: procedure = .int
     address crexx "run shasum -a 256 :cms24" output hashes
     call require rc = 0 & word(hashes.1,1) = "04550b86d7bdfa3c9060d9fa154875adf3ccb677d95ba13290836ddc02a8da9e", "pinned unchanged CMS24 v2 stage"
   end
-  if args.0 >= 7 then do
+  if args.0 >= 7 & bare = 0 then do
     cms31 = args.7
     call require left(cms31,1) = "/", "absolute checked CMS31 stage path"
     address crexx "run test -f :cms31"
@@ -51,7 +54,7 @@ main: procedure = .int
     address crexx "run shasum -a 256 :cms31" output hashes
     call require rc = 0 & word(hashes.1,1) = "a08f3431407f8efec6b05f1e0580e3f12b76f9865f561dac15b5a90135223ff9", "pinned unchanged CMS31 v2 stage"
   end
-  if args.0 >= 8 then do
+  if args.0 >= 8 & bare = 0 then do
     cmsfile = args.8
     call require left(cmsfile,1) = "/", "absolute checked CMS31 file path"
     address crexx "run test -f :cmsfile"
@@ -60,7 +63,7 @@ main: procedure = .int
     address crexx "run shasum -a 256 :cmsfile" output hashes
     call require rc = 0 & word(hashes.1,1) = "9b436a1eb9f54bbc5c8b8b7caae634bd17dcfae6559d584a1a00a87565cfa5d4", "pinned CMS31 IOQUAL RXBIN stage"
   end
-  if args.0 >= 9 then do
+  if args.0 >= 9 & bare = 0 then do
     cmslibrary = args.9
     call require left(cmslibrary,1) = "/", "absolute checked CMS31 library path"
     address crexx "run test -f :cmslibrary"
@@ -69,7 +72,7 @@ main: procedure = .int
     address crexx "run shasum -a 256 :cmslibrary" output hashes
     call require rc = 0 & word(hashes.1,1) = "296893f0bfec021da5d7707e06faa5094c71c1824e3a2b1c0614e09c97df2e30", "pinned CMS31 LIBRARY RXBIN stage"
   end
-  if args.0 >= 10 then do
+  if args.0 >= 10 & bare = 0 then do
     cms24file = args.10
     call require left(cms24file,1) = "/", "absolute checked CMS24 IO24 path"
     address crexx "run test -f :cms24file"
@@ -78,7 +81,7 @@ main: procedure = .int
     address crexx "run shasum -a 256 :cms24file" output hashes
     call require rc = 0 & word(hashes.1,1) = "1c26a211d061f5b41d1b457d80f1493e9d641592c036b8ade03ded86a76b6b78", "pinned CMS24 IO24 RXBIN stage"
   end
-  if args.0 >= 11 then do
+  if args.0 >= 11 & bare = 0 then do
     tso31 = args.11
     call require left(tso31,1) = "/", "absolute checked TSO31 stage path"
     address crexx "run test -f :tso31"
@@ -87,7 +90,7 @@ main: procedure = .int
     address crexx "run shasum -a 256 :tso31" output tsohashes
     call require rc = 0 & word(tsohashes.1,1) = "9fffaba3c586c1f361c7ecb87167fb1b8acbb569c267b621187fe95305bce506", "pinned unchanged TSO31 record stage"
   end
-  if args.0 >= 12 then do
+  if args.0 >= 12 & bare = 0 then do
     tso64 = args.12
     call require left(tso64,1) = "/", "absolute checked TSO64 ANY stage path"
     address crexx "run test -f :tso64"
@@ -96,7 +99,7 @@ main: procedure = .int
     address crexx "run shasum -a 256 :tso64" output tso64hashes
     call require rc = 0 & word(tso64hashes.1,1) = "bdc2d14439f1a3c90409313a9693672c61187b78277197d4dc2b5634dc19bdd6", "pinned unchanged TSO64 ANY record stage"
   end
-  if args.0 >= 13 then do
+  if args.0 >= 13 & bare = 0 then do
     tso24 = args.13
     call require left(tso24,1) = "/", "absolute checked TSO24 stage path"
     address crexx "run test -f :tso24"
@@ -120,7 +123,7 @@ main: procedure = .int
   address crexx "run :realtest"
   call require rc = 0, "real-frame lifetime and release controls"
   base = work || "/base"
-  call runlog "crexx -nokeep pdos/scripts/image.crexx --args " || shellquote(base) || " " || shellquote(hercdir), out || "/base-build.log"
+  call runlog "crexx -nokeep pdos/scripts/one-space-image.crexx --args " || shellquote(base) || " " || shellquote(hercdir), out || "/base-build.log"
   classiccc = root || "/build/compiler/mvs/gcc/mf-classic-cc"
   classicas = root || "/build/tools/assembler/mf-classic-as"
   classicld = root || "/build/tools/linker/mf-classic-ld"
@@ -312,7 +315,7 @@ main: procedure = .int
   manifest = out || "/outputs.sha256"
   address system "shasum -a 256 " || quoted(outputs) || " > " || shellquote(manifest)
   call require rc = 0, "successor IPL output identities"
-  if args.0 = 16 then return 0
+  if args.0 = 16 | bare = 1 then return 0
   disk = media || "/pdos00.cckd"; hercules = hercdir || "/hercules"
   runout = out || "/run"
   check = ""

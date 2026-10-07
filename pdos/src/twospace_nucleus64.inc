@@ -454,7 +454,7 @@ k_table_alias_va: .quad 0x05000000
 u_table_alias_va: .quad 0x05180000
 bounce_va: .quad 0x03000080
 c_result_va: .quad 0x030000a0
-c_trampoline_va: .quad 0x02040000
+c_trampoline_va: .quad 0x02060000
 resume_va: .quad resume
 cms24_range: .long 0x20000, 0x1ba6c0
 

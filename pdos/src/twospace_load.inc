@@ -9,7 +9,8 @@ typedef struct {
     unsigned char name[8];
     unsigned int personality,mode,owner,runtime,bytes,entry;
     TSPADDR address;
-    unsigned int mapped,staged_real,overlay,overlay_task;
+    unsigned int mapped,staged_real,overlay,overlay_task,auxiliary_bytes,device;
+    TSPADDR auxiliary_address;
 } TSLIMAGE;
 static TSLIMAGE native_images[TSL_IMAGES];
 
@@ -66,7 +67,8 @@ static TSLIMAGE *load_find(unsigned int personality,unsigned int mode,const unsi
     unsigned int i,j;
     for(i=0U;i<TSL_IMAGES;++i){
         TSLIMAGE *image=&native_images[i];
-        if(!image->bytes||image->personality!=personality||image->mode!=mode)continue;
+        if(!image->bytes||image->personality!=personality||image->mode!=mode||
+           image->device!=(media_selected_device?media_selected_device:*(volatile const unsigned int *)0x40bcU))continue;
         for(j=0U;j<8U&&image->name[j]==name[j];++j){}
         if(j==8U)return image;
     }
@@ -115,7 +117,8 @@ static unsigned int load_native(unsigned int personality,unsigned int mode,
     unsigned int owner,i,entry=0U,bytes=0U,rc,span,real=0U,overlay=0U,overlay_task=0U;
     TSHINFO cms;TSTINFO tso;TSLIMAGE *record;
     TSKEXTENT extent;
-    TSPADDR minimum,maximum,address;
+    TSPADDR minimum,maximum,address,auxiliary;
+    unsigned int auxiliary_bytes=0U,guard_split=0U;
     const TSVFRAME *parent=TSVTOP(&native_invocations);
     if(!loaded||(personality!=TSV_CMS&&personality!=TSV_TSO)||
        (mode!=24U&&mode!=31U&&mode!=64U)||!load_name(name,dsn,personality,mode,&n))return 8U;
@@ -159,6 +162,7 @@ static unsigned int load_native(unsigned int personality,unsigned int mode,
             if(!overlay_task||overlay_task>=32U||
                (native_image_active[overlay_task]&&(!parent||parent->personality!=TSV_CMS||
                 parent->amode!=mode||parent->image_owner!=overlay_task))){rc=4U;goto done;}
+            if(mode==24U&&!cms.format&&native_image_active[overlay_task]){rc=4U;goto done;}
             overlay=1U;address=minimum;
         }
     }
@@ -186,14 +190,37 @@ static unsigned int load_native(unsigned int personality,unsigned int mode,
         destination=(unsigned char *)TSF_KAPERTURE_VA+real;
         for(i=0U;i<bytes;++i)destination[i]=image[i];
     }
+    /* The selected unchanged GNU CMS24 image embeds a fixed stack above
+       its guard. It is cached image backing, as in the one-space contract. */
+    if(personality==TSV_CMS&&mode==24U&&!cms.format&&!overlay){
+        TSPADDR guard;
+        guard.hi=0U;guard.lo=0xf00000U;
+        if(TSPRELS(&storage.virtuals,0x80000007U)!=TSP_OK){rc=4U;goto undo_image;}
+        guard_split=1U;
+        if(TSMRESERVE(&storage,7U,24U,guard,4096U)!=TSP_OK){rc=4U;goto undo_guard;}
+        auxiliary.hi=0U;auxiliary.lo=0xf01000U;
+        if(TSMALLOC(&storage,owner,24U,auxiliary,auxiliary,0xff000U,1,&auxiliary)!=TSM_OK){rc=4U;goto undo_guard;}
+        auxiliary_bytes=0xff000U;
+    }
     record=&native_images[owner];for(i=0U;i<8U;++i)record->name[i]=name[i];
     record->personality=personality;record->mode=mode;record->owner=owner;
     record->runtime=0x100U+owner;record->bytes=bytes;record->entry=entry;
+    record->device=media_selected_device?media_selected_device:*(volatile const unsigned int *)0x40bcU;
     record->address=address;record->mapped=!overlay;record->overlay=overlay;
-    record->overlay_task=overlay_task;
+    record->overlay_task=overlay_task;record->auxiliary_bytes=auxiliary_bytes;
+    if(auxiliary_bytes)record->auxiliary_address=auxiliary;
     record->staged_real=overlay?image_real:0U;
     if(overlay)image_real=0U;
-    *loaded=record;rc=0U;
+    *loaded=record;rc=0U;goto done;
+undo_guard:
+    if(guard_split){
+        TSPADDR guard;guard.hi=0U;guard.lo=0xf00000U;
+        /* Remove the shorter guard when installed, then restore the range. */
+        TSPRELS(&storage.virtuals,0x80000007U);
+        if(TSMRESERVE(&storage,7U,24U,guard,0x100000U)!=TSP_OK)rc=16U;
+    }
+undo_image:
+    if(TSMFREE(&storage,owner,address)!=TSM_OK)rc=16U;
 done:
     if(image_real&&TSRRELEASE(&storage.real,TSL_IMAGE_OWNER,image_real)!=TSR_OK)rc=16U;
     if(stage_real&&TSRRELEASE(&storage.real,personality==TSV_CMS?CMS_STAGE_OWNER:TSL_STAGE_OWNER,
@@ -257,7 +284,18 @@ static unsigned int load_refresh(TSLIMAGE *record)
             storage.allocations[i].address.lo==record->address.lo)
                 target=(unsigned char *)TSF_KAPERTURE_VA+storage.allocations[i].real;
         if(!target)rc=12U;
-        else for(i=0U;i<record->bytes;++i)target[i]=image[i];
+        else {
+            for(i=0U;i<record->bytes;++i)target[i]=image[i];
+            if(record->auxiliary_bytes){
+                target=0;
+                for(i=0U;i<TSM_ALLOCS;++i)if(storage.allocations[i].handle&&
+                    storage.allocations[i].task==record->owner&&
+                    storage.allocations[i].address.lo==record->auxiliary_address.lo)
+                    target=(unsigned char *)TSF_KAPERTURE_VA+storage.allocations[i].real;
+                if(!target)rc=12U;
+                else for(i=0U;i<record->auxiliary_bytes;++i)target[i]=0U;
+            }
+        }
     }
 done:
     if(real&&TSRRELEASE(&storage.real,TSL_IMAGE_OWNER,real)!=TSR_OK)rc=16U;

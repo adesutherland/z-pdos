@@ -1,0 +1,24 @@
+[
+  [
+    "D4CONAPP",
+    "PCOMM END 1 RC=0",
+    [
+      [
+        "CONSOLE INPUT 1:",
+        "QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+      ],
+      [
+        "CONSOLE INPUT 2:",
+        ""
+      ],
+      [
+        "CONSOLE INPUT 3:",
+        "  padded  "
+      ]
+    ],
+    [
+      "CONSOLE PASS:",
+      "LINE 079:"
+    ]
+  ]
+]

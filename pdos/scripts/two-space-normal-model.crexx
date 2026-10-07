@@ -1,0 +1,35 @@
+/* SPDX-License-Identifier: MIT; configured normal-image console gate. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 8 & args.0 <> 9 then return 2
+  work = args.1; prior = args.2; core = args.3; herc = args.4
+  model = args.5; primary = args.6; monitor = args.7; commands = args.8
+  if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
+  address crexx "run test ! -e :work"
+  if rc <> 0 then return 2
+  lines = .string[]
+  address crexx "pwd" output lines
+  root = strip(lines.1); input = root || "/" || work || "-config"
+  address crexx "run mkdir -p :input"
+  if rc <> 0 then return rc
+  configured = input || "/normal.core"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_core.py configure :core :configured :model :primary :monitor"
+  if rc <> 0 then return rc
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :prior :configured :herc"
+  if rc <> 0 then return rc
+  disk = root || "/" || work || "/media/pdos00.cckd"; runout = root || "/" || work || "/run"
+  hercules = herc || "/hercules"; flags = " --normal --model " || model
+  if primary = "line" then flags = flags || " --line-primary"
+  if monitor = "monitor" then flags = flags || " --monitor"
+  if args.0 = 9 then do
+    variant = args.9
+    if variant <> "raw" & variant <> "disconnect" then return 2
+    flags = flags || " --" || variant
+  end
+  address system "env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_machine.py " || quote(disk) || " " || quote(configured) || " " || quote(hercules) || " " || quote(runout) || " --commands " || quote(commands) || flags
+  return rc
+quote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'",value,"'\''") || "'"

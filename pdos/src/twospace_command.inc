@@ -89,6 +89,13 @@ static unsigned int pcomm_start(const TSGREQUEST *request)
     init=*request; init.svc=208U;
     status=terminal_service(&init);
     if (!status) status=cms31_setup_lowcore();
+    if(!status&&normal_boot()){
+        static const unsigned char fixed_name[8]={0xd9U,0xe7U,0xe5U,0xd4U,0x40U,0x40U,0x40U,0x40U};
+        TSLIMAGE *fixed_image;
+        /* Establish checked fixed-origin backing before the U shell can
+           allocate its below-line ATTACH work area. Optional absence is OK. */
+        load_native(TSV_CMS,24U,fixed_name,&fixed_image);
+    }
     if (!status) status=tso_map_service(&init,32U);
     if(!normal_boot()){
         if (!status) status=tso_map_service(&init,31U);
@@ -226,6 +233,7 @@ static unsigned int command_attach(void)
     volatile unsigned int *saved=(volatile unsigned int *)0x3000U;
     TSGREQUEST begin, end;
     unsigned char ctl[28], name[8], ptr[4], parameters[202], plist[120];
+    char operator_verb[9];
     unsigned char *args_real, *stack_real;
     unsigned int ecb, tcb, tail, count, selector, entry, args, stack;
     unsigned int i, j, field, width, status, mode=31U, returned, depth;
@@ -258,6 +266,23 @@ static unsigned int command_attach(void)
     if (command_copy(tail,2U,parameters,0)) return 8U;
     count=((unsigned int)parameters[0]<<8)|parameters[1];
     if (count>198U || command_copy(tail,count+2U,parameters,0)) return 8U;
+    if(normal_boot()&&media_known(name,parameters,count,operator_verb)){
+        unsigned int token=native_invocations.next_token;int app_rc;
+        if(!token||token==0xffffffffU)return 12U;
+        status=command_alloc(4096U,&tcb,&args_real);if(status)return status;
+        for(i=0U;i<20U;++i)args_real[i]=0U;
+        ++native_invocations.next_token;
+        console_v1_operator(token,name,8U,0U);
+        app_rc=media_operator(operator_verb,parameters);
+        call_result(0U,0U,0U,1U,(unsigned int)app_rc,token);
+        console_v1_operator(token,name,8U,1U);
+        command_ecb=ecb;command_tcb=tcb;command_os_status=0U;
+        cms_put_word(args_real+16U,(unsigned int)app_rc);
+        cms_put_word(ptr,0x40000000U|((unsigned int)app_rc&0xffffffU));
+        if(command_copy(ecb,4U,ptr,1U))return 12U;
+        saved[2U]=0U;saved[3U]=tcb;saved[30U]=saved[31U]=0U;
+        *(volatile unsigned int *)0x4f54U=0U;command_observe((unsigned int)app_rc);return 0U;
+    }
     selector=0; entry=0;
     if (name[0]==0xc3U && name[1]==0xd4U && name[2]==0xe2U &&
         name[3]==0x40U && name[4]==0x40U && name[5]==0x40U &&
@@ -411,7 +436,11 @@ static unsigned int command_finish(void)
     command_os_status=kind==2U ? 12U : 0U;
     for(i=0U;i<frame->resources;++i)
         if(frame->resource[i].kind==TSV_LOWCORE)child_lowcore=frame->resource[i].handle;
-    if (kind==2U) ++*(volatile unsigned int *)0x4f68U;
+    if (kind==2U) {
+        volatile unsigned int *trace=(volatile unsigned int *)(TSF_KAPERTURE_VA+0x3b500U);
+        for(i=0U;i<128U;++i)trace[i]=saved[i];
+        ++*(volatile unsigned int *)0x4f68U;
+    }
     end.address.hi=0; end.address.lo=frame->token;
     end.length=end.direction=0; end.svc=236U;
     if(call_overlay_task[native_invocations.depth-1U]){

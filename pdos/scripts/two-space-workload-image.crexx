@@ -1,0 +1,46 @@
+/* SPDX-License-Identifier: MIT; source-built normal native-profile media. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 9 & args.0 <> 10 then return 2
+  native = .string
+  work = args.1; prior = args.2; core = args.3; cms = args.4; inventory = args.5
+  archive = args.6; herc = args.7; writer = args.8; profile = args.9
+  if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
+  address crexx "run test ! -e :work"
+  if rc <> 0 then return 2
+  lines = .string[]
+  address crexx "pwd" output lines
+  root = strip(lines.1); input = root || "/" || work || "-inputs"; pack = input || "-pack"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src pdos/src/twospace_tso.c pdos/tests/two-space/tso_pack.c -o :pack"
+  if rc <> 0 then return rc
+  if args.0 = 10 then do
+    app = args.10
+    address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_workload_media.py :prior :cms :inventory :archive :pack :input :profile :app"
+  end
+  else address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_workload_media.py :prior :cms :inventory :archive :pack :input :profile"
+  if rc <> 0 then return rc
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :input :core :herc"
+  if rc <> 0 then return rc
+  if profile <> "cms" then do
+    source = root || "/" || work || "/media/pdos00.ckd"
+    native = root || "/" || work || "/media/native.ckd"; receipt = root || "/" || work || "/native-pds.json"
+    if profile = "tso24" then address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/native_files_media.py :archive :writer :source :native :receipt tso24"
+    else address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/native_files_media.py :archive :writer :source :native :receipt"
+    if rc <> 0 then return rc
+    compressor = herc || "/ckd2cckd"; disk = root || "/" || work || "/media/native.cckd"
+    address crexx "run :compressor -q -bz2 -cyls 100 :native :disk"
+    if rc <> 0 then return rc
+    before = root || "/" || work || "/store-before.json"
+    address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/store_check.py :native :before"
+    if rc <> 0 then return rc
+  end
+  transient = .string[]
+  transient[1] = root || "/" || work || "/media/datasets.ckd"
+  transient[2] = root || "/" || work || "/media/pdos00.ckd"
+  transient[3] = root || "/" || work || "/media/readback.ckd"
+  if profile <> "cms" then transient[4] = native
+  address crexx "run cmake -E rm :transient[]"
+  if rc <> 0 then return rc
+  return 0
