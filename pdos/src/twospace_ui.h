@@ -10,4 +10,5 @@ unsigned int TUIREAD(unsigned char *text,unsigned int capacity,unsigned int *len
 unsigned int TUIMON(unsigned char status[TSA_MONITOR_BYTES]);
 unsigned int TUIHAND(unsigned int source);
 unsigned int TUICLOSE(void);
+unsigned int TUIRESULT(unsigned char result[TSA_RESULT_BYTES]);
 #endif

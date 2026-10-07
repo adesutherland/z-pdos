@@ -37,6 +37,8 @@ static void put32(unsigned char *p, unsigned int n)
     p[0]=(unsigned char)(n>>24); p[1]=(unsigned char)(n>>16);
     p[2]=(unsigned char)(n>>8); p[3]=(unsigned char)n;
 }
+static unsigned int get32(const unsigned char *p)
+{return ((unsigned int)p[0]<<24)|((unsigned int)p[1]<<16)|((unsigned int)p[2]<<8)|p[3];}
 
 int TSFBUILD(unsigned char *core, unsigned int kpool, unsigned int upool,
              TSFRESULT *result, TSDPURGE purge, void *context)
@@ -85,7 +87,8 @@ int TSFBUILD(unsigned char *core, unsigned int kpool, unsigned int upool,
     if (TSDINIT(&k,core+kpool,kpool,TSF_KPOOL_BYTES) != TSD_OK ||
         TSDINIT(&u,core+upool,upool,TSF_UPOOL_BYTES) != TSD_OK ||
         map_all(&k,kmaps,sizeof kmaps / sizeof kmaps[0]) ||
-        map_all(&u,umaps,sizeof umaps / sizeof umaps[0])) return -1;
+        (get32(core+TSF_NORMAL_REAL)!=TSF_NORMAL_MAGIC&&
+         map_all(&u,umaps,sizeof umaps / sizeof umaps[0]))) return -1;
     /* All final real frames have one supervisor-only C31 aperture. U never
        maps this window; the service gate first proves each U translation. */
     for (i = 0U; i < TSF_REAL_BYTES / 4096U; ++i) {
@@ -116,7 +119,15 @@ int TSFBUILD(unsigned char *core, unsigned int kpool, unsigned int upool,
         va.lo=TSF_UPOOL_VA+i*4096U; pa.lo=upool+i*4096U;
         if (TSDMAPTABLE(&k,va,pa) != TSD_OK) return -1;
     }
-    if (purge) {
+    if (purge && get32(core+TSF_NORMAL_REAL)==TSF_NORMAL_MAGIC) {
+        /* No diagnostic U page exists in a normal image. Qualify live
+           invalidation against the already present private K page. */
+        va.hi=0U; va.lo=0x2000U; pa.hi=0U; pa.lo=0x2000U;
+        if (TSDLIVE(&k,purge,context) != TSD_OK ||
+            TSDUNMAP(&k,va,&old) != TSD_OK ||
+            old.hi != pa.hi || old.lo != pa.lo ||
+            TSDMAP(&k,va,pa) != TSD_OK) return -1;
+    } else if (purge) {
         va.hi=0U; va.lo=0x20000U; pa.hi=0U; pa.lo=0x5000U;
         if (TSDLIVE(&u,purge,context) != TSD_OK ||
             TSDUNMAP(&u,va,&old) != TSD_OK ||

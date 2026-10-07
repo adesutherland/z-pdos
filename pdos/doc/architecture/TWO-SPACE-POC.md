@@ -22,7 +22,7 @@ or failure isolation that the shared map cannot provide at acceptable
 complexity. Such a change would need fresh DAT, context and service-gate
 qualification; the present proof would not establish it.
 
-P0 through P4 now have accepted results in the [completion plan](../BACKLOG.md#pd-003-completion-plan-6-october-2026).
+P0 through P5 now have accepted results in the [completion plan](../BACKLOG.md#pd-003-completion-plan-6-october-2026).
 The [P1 fresh IPL](../qualification/TWO-SPACE-P1-2026-10-06.md) closes active
 invocation ownership, full architectural caller state and interruption-driven
 completion/cancellation. The [P2 service gate](../qualification/TWO-SPACE-P2-2026-10-07.md) adds native
@@ -31,8 +31,10 @@ adds checked co-resident loading, CMS/TSO calls and mode crossings, HIGH
 LOAD/DELETE, and caller file-cursor preservation across child return/fault.
 The [P4 C console gate](../qualification/TWO-SPACE-P4-2026-10-07.md) qualifies all four
 display models, U presentation, the attached and line-only 3215 paths,
-exclusive input selection and the durable transcript. The selectable normal
-image and full workload/default selection remain P5/P6.
+exclusive input selection and the durable transcript. The [P5 normal-image gate](../qualification/TWO-SPACE-P5-2026-10-07.md)
+adds source-built PLOAD-to-K boot, U PCOMM, CMS/TSO command recovery, attached
+capture and independent K emergency/shutdown. Full workload/default selection
+remains P6; the published one-ASCE image is unchanged.
 
 ## Architecture decisions for the first replacement
 

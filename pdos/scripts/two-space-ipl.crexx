@@ -7,7 +7,8 @@ import rxfnsb
 main: procedure = .int
   arg args = .string[]
   i = .int
-  if args.0 <> 5 & args.0 <> 6 & args.0 <> 7 & args.0 <> 8 & args.0 <> 9 & args.0 <> 10 & args.0 <> 11 & args.0 <> 12 & args.0 <> 13 & args.0 <> 14 & args.0 <> 15 then return usage()
+  if args.0 <> 5 & args.0 <> 6 & args.0 <> 7 & args.0 <> 8 & args.0 <> 9 & args.0 <> 10 & args.0 <> 11 & args.0 <> 12 & args.0 <> 13 & args.0 <> 14 & args.0 <> 15 & args.0 <> 16 then return usage()
+  if args.0 = 16 then if args.16 <> "image-only" then return usage()
   work = args.1; core = args.2; gnuas = args.3; gnuld = args.4; hercdir = args.5
   pcomm = ""
   if args.0 >= 14 then do
@@ -242,7 +243,7 @@ main: procedure = .int
     call require rc = 0, "U PCOMM native stage"
     call lineout ctl,"U.COMMAND SEQ u-command.bin TRK 10 1 0 PS F 18452 18452"
   end
-  if args.0 = 15 then do
+  if args.0 >= 15 & args.15 <> pcomm then do
     childstage = args.15; childmedia = media || "/pdtest.bin"
     call require left(childstage,1) = "/", "absolute native diagnostic member"
     address crexx "run cmake -E copy :childstage :childmedia"
@@ -311,6 +312,7 @@ main: procedure = .int
   manifest = out || "/outputs.sha256"
   address system "shasum -a 256 " || quoted(outputs) || " > " || shellquote(manifest)
   call require rc = 0, "successor IPL output identities"
+  if args.0 = 16 then return 0
   disk = media || "/pdos00.cckd"; hercules = hercdir || "/hercules"
   runout = out || "/run"
   check = ""

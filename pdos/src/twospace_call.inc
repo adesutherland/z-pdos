@@ -1,9 +1,6 @@
 /* SPDX-License-Identifier: MIT
  * Synchronous native CMS PROGRAM and TSO LINK adapters. This uses the same
  * K invocation, allocation and return machinery as PCOMM ATTACH. */
-static unsigned int call_overlay_task[TSV_MAX_DEPTH];
-static TSPADDR call_overlay_address[TSV_MAX_DEPTH];
-
 static void call_result(unsigned int status,unsigned int reason,unsigned int abend,
                          unsigned int valid,unsigned int app_rc,unsigned int token)
 {

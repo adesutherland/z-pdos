@@ -33,10 +33,13 @@ static unsigned int console_v1_line(const unsigned char *text,unsigned int lengt
 static unsigned int console_v1_read(unsigned char *,unsigned int,unsigned int *,unsigned int *,unsigned int);
 static unsigned int console_v1_cancel(unsigned int token);
 static void console_v1_begin(const TSVFRAME *frame);
+static void console_v1_failed(unsigned int,const unsigned char *,unsigned int);
 static void console_v1_end(unsigned int token,const unsigned char *result);
 static void call_result(unsigned int,unsigned int,unsigned int,unsigned int,unsigned int,unsigned int);
 static unsigned int console_v1_native_raw(TSGREQUEST *request,unsigned int input);
 static unsigned char call_last_result[TSA_RESULT_BYTES];
+static int normal_boot(void)
+{return *(volatile const unsigned int *)(TSF_KAPERTURE_VA+TSF_NORMAL_REAL)==TSF_NORMAL_MAGIC;}
 static int native_clean(unsigned int token, const TSVRESOURCE *resource,
                         void *context);
 static TSDSTATE u_tables;
@@ -134,15 +137,14 @@ static int attach(void)
         TSCINIT(&console_channel,(unsigned char *)TSF_KAPERTURE_VA,
                 TSF_REAL_BYTES,TSF_CONSOLE_REAL) != TSC_OK)
         return -1;
-    at.hi=0U; at.lo=0x20000U;
-    if (TSMRESERVE(&storage,1U,24U,at,0x2000U) != TSP_OK)
-        return -1;
-    at.lo=0x02000000U;
-    if (TSMRESERVE(&storage,2U,31U,at,0x1000U) != TSP_OK)
-        return -1;
-    at.hi=1U; at.lo=0x10000000U;
-    if (TSMRESERVE(&storage,3U,64U,at,0x3000U) != TSP_OK)
-        return -1;
+    if(!normal_boot()){
+        at.hi=0U; at.lo=0x20000U;
+        if (TSMRESERVE(&storage,1U,24U,at,0x2000U) != TSP_OK)return -1;
+        at.lo=0x02000000U;
+        if (TSMRESERVE(&storage,2U,31U,at,0x1000U) != TSP_OK)return -1;
+        at.hi=1U; at.lo=0x10000000U;
+        if (TSMRESERVE(&storage,3U,64U,at,0x3000U) != TSP_OK)return -1;
+    }
     at.hi=0U; at.lo=0U;
     if (TSMRESERVE(&storage,6U,24U,at,0x20000U) != TSP_OK)
         return -1;
@@ -1187,7 +1189,7 @@ static const TSVFRAME *native_caller(unsigned int pc)
         (hi&0x04f10000U)!=0x04810000U || (hi&0x0000c000U) ||
         *(volatile const unsigned int *)0x3090U!=*(volatile const unsigned int *)0x4008U ||
         *(volatile const unsigned int *)0x3094U!=*(volatile const unsigned int *)0x400cU ||
-        (frame->personality==TSV_TSO && frame->amode>=31U ?
+        ((frame->personality==TSV_TSO||frame->personality==TSV_PDOS) && frame->amode>=31U ?
          (mode!=24U && mode!=31U && (mode!=64U || frame->amode!=64U)) :
          mode!=frame->amode))
         return 0;
@@ -2833,6 +2835,10 @@ static unsigned int cms_file_audit(const TSGREQUEST *request,
     return result;
 }
 
+static unsigned int call_overlay_task[TSV_MAX_DEPTH];
+static TSPADDR call_overlay_address[TSV_MAX_DEPTH];
+
+static unsigned int call_alloc(unsigned int,unsigned int *,unsigned char **);
 #include "twospace_command.inc"
 #include "twospace_file.inc"
 #include "twospace_call.inc"
@@ -2849,6 +2855,17 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     if (!request) return 0xffffffffU;
     if (attach()) return 0xfffffffaU;
     if(request->svc==TSA_IO_SVC)return console_v1_service(request);
+    if(request->svc==199U&&normal_boot()){
+        static const unsigned char halt[]={0xd2,0x40,0xe2,0xc8,0xe4,0xe3,0xc4,0xd6,0xe6,0xd5};
+        static const unsigned char emergency[]={0xd2,0x40,0xc5,0xd4,0xc5,0xd9,0xc7,0xc5,0xd5,0xc3,0xe8,0x7a,0x40,0xd7,0xc3,0xd6,0xd4,0xd4,0x40,0xc6,0xc1,0xe4,0xd3,0xe3};
+        if((*(volatile const unsigned int *)0x3080U&0x10000U)||TSVTOP(&native_invocations)||
+           request->address.hi||request->address.lo||request->direction||request->length<1U||request->length>2U)return 8U;
+        value=console_v1_line(request->length==1U?emergency:halt,
+                              request->length==1U?sizeof emergency:sizeof halt);
+        console_v1_flush();return value;
+    }
+    if(request->svc==246U&&normal_boot()&&TSVTOP(&native_invocations)&&
+       TSVTOP(&native_invocations)->controlled==4U)return pcomm_exit();
     if((request->svc==3U||request->svc==246U)&&TSVTOP(&native_invocations)&&
        TSVTOP(&native_invocations)->controlled==3U)return native_call_finish();
     if(request->svc==255U)return native_load_probe(request);
@@ -2866,7 +2883,8 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
         if (top->personality==TSV_PDOS) {
             if (native_caller(*(volatile const unsigned int *)0x308cU)!=top ||
                 (*(volatile const unsigned int *)0x3080U&0x04f10001U)!=0x04810000U ||
-                !(*(volatile const unsigned int *)0x3084U&0x80000000U))
+                (!(*(volatile const unsigned int *)0x3084U&0x80000000U)&&
+                 request->svc!=250U&&request->svc!=251U&&request->svc!=252U))
                 return 8U;
             if (request->svc==42U) return command_dispatch_attach();
             if (request->svc==1U || request->svc==62U) return command_wait_detach(request->svc);
@@ -2877,7 +2895,7 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     }
     caller_pc=*(volatile const unsigned int *)0x308cU;
     native_frame=native_caller(caller_pc);
-    native_tso=native_frame && native_frame->personality==TSV_TSO;
+    native_tso=native_frame && (native_frame->personality==TSV_TSO||native_frame->personality==TSV_PDOS);
     /* The selected legacy storage lists are 24/31-bit register interfaces.
      * Hardware AMODE and the K invocation must confirm that interpretation;
      * direct AMODE64 requests retain full-width validation below. */

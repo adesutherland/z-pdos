@@ -1,0 +1,60 @@
+/* SPDX-License-Identifier: MIT; fresh normal-image launch/return gate. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i = .int
+  if args.0 <> 4 & args.0 <> 5 then return 2
+  work = args.1; prior = args.2; core = args.3; herc = args.4
+  fault = ""
+  if args.0 = 5 then do
+    if args.5 <> "rootfault" then return 2
+    fault = " --rootfault"
+  end
+  if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
+  address crexx "run test ! -e :work"
+  if rc <> 0 then return 2
+  lines = .string[]
+  address crexx "pwd" output lines
+  root = strip(lines.1); input = root || "/" || work || "-inputs"
+  media = input || "/media"; support = input || "/base"
+  address crexx "run mkdir -p :media :support"
+  if rc <> 0 then return rc
+  files = .string[]; source = prior || "/media"
+  address crexx "run find :source -maxdepth 1 -type f" output files
+  if rc <> 0 then return rc
+  do i = 1 to files.0
+    source = files[i]
+    if right(source,4) = ".bin" | right(source,4) = ".sys" | right(source,4) = ".exe" | right(source,7) = "ctl.txt" then do
+      address crexx "run cmake -E copy :source :media"
+      if rc <> 0 then return rc
+    end
+  end
+  source = prior || "/launch.bin"
+  address crexx "run cmake -E copy :source :input"
+  if rc <> 0 then return rc
+  source = prior || "/base/install-ipl"
+  address crexx "run cmake -E copy :source :support"
+  if rc <> 0 then return rc
+  if fault <> "" then do
+    classicas = root || "/build/tools/assembler/mf-classic-as"; linker = root || "/build/tools/linker/mf-classic-ld"
+    object = input || "/ROOTFAULT.obj"; module = input || "/ROOTFAULT.rdw"
+    address crexx "run :classicas --profile s370 --macros pdos/tests/two-space/p5/root-fault.asm :object"
+    if rc <> 0 then return rc
+    address crexx "run :linker --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@CRT0 -o :module :object"
+    if rc <> 0 then return rc
+    pack = input || "/pack-tso"; stage = media || "/u-command.bin"
+    address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src pdos/src/twospace_tso.c pdos/tests/two-space/tso_pack.c -o :pack"
+    if rc <> 0 then return rc
+    address crexx "run :pack :module :stage classic31"
+    if rc <> 0 then return rc
+  end
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :input :core :herc"
+  if rc <> 0 then return rc
+  disk = root || "/" || work || "/media/pdos00.cckd"; runout = root || "/" || work || "/run"
+  hercules = herc || "/hercules"
+  address system "env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_machine.py " || quote(disk) || " " || quote(core) || " " || quote(hercules) || " " || quote(runout) || " --normal --monitor" || fault
+  return rc
+quote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'",value,"'\''") || "'"

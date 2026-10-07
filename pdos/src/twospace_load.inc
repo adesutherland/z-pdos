@@ -220,3 +220,48 @@ static unsigned int load_callable(unsigned int personality,unsigned int mode,
         return load_native(personality,64U,name,image);
     return rc;
 }
+
+/* Refresh mutable executable state only after complete private validation.
+ * A mapped cache is never substituted for missing or damaged input. */
+static unsigned int load_refresh(TSLIMAGE *record)
+{
+    unsigned char dsn[14],*stage=0,*image=0,*target=0;
+    unsigned int n,i,real=0U,stage_real=0U,blocks=0U,length=0U,entry=0U,rc;
+    TSHINFO cms;TSTINFO tso;
+    if(!record||native_image_active[record->owner]||
+       !load_name(record->name,dsn,record->personality,record->mode,&n))return 8U;
+    if(record->personality==TSV_CMS){
+        rc=cms_stage_read(dsn,n,record->mode,&stage,&stage_real,&cms,&blocks);
+        length=blocks*18452U;
+    }else rc=load_tso_stage(dsn,n,record->mode,0U,&stage,&stage_real,&tso,&length);
+    if(rc)return rc;
+    if(TSRALLOC(&storage.real,TSL_IMAGE_OWNER,(record->bytes+4095U)&~4095U,
+                  TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,&real)!=TSR_OK){rc=4U;goto done;}
+    image=(unsigned char *)TSF_KAPERTURE_VA+real;
+    if(record->personality==TSV_CMS){
+        rc=cms.image_bytes==record->bytes&&
+           TSHIMAGE(stage,length,record->mode,record->address.lo,image,record->bytes,&entry)==TSH_OK?0U:12U;
+    }else{
+        rc=(record->mode==24U?TSTIMAGE24(stage+64U,tso.raw_bytes,record->address.lo,image,record->bytes,&tso):
+            record->mode==31U?TSTIMAGE31(stage+64U,tso.raw_bytes,record->address.lo,image,record->bytes,&tso):
+            TSTIMAGE64ANY(stage+64U,tso.raw_bytes,record->address.lo,image,record->bytes,&tso))==TST_OK?0U:12U;
+        entry=record->address.lo+tso.entry_offset;
+        if(!rc&&tso.image_bytes!=record->bytes)rc=12U;
+    }
+    if(!rc&&entry!=record->entry)rc=12U;
+    if(!rc){
+        if(record->overlay)target=(unsigned char *)TSF_KAPERTURE_VA+record->staged_real;
+        else for(i=0U;i<TSM_ALLOCS;++i)if(storage.allocations[i].handle&&
+            storage.allocations[i].task==record->owner&&
+            storage.allocations[i].address.hi==record->address.hi&&
+            storage.allocations[i].address.lo==record->address.lo)
+                target=(unsigned char *)TSF_KAPERTURE_VA+storage.allocations[i].real;
+        if(!target)rc=12U;
+        else for(i=0U;i<record->bytes;++i)target[i]=image[i];
+    }
+done:
+    if(real&&TSRRELEASE(&storage.real,TSL_IMAGE_OWNER,real)!=TSR_OK)rc=16U;
+    if(stage_real&&TSRRELEASE(&storage.real,record->personality==TSV_CMS?CMS_STAGE_OWNER:TSL_STAGE_OWNER,
+                              stage_real)!=TSR_OK)rc=16U;
+    return rc;
+}

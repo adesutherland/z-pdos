@@ -361,7 +361,10 @@ requiring a resident low-U console image. [P4 qualification](../qualification/TW
 `twospace_abi.h` freezes neutral PDOS SVC200 version 1: R0 request byte count,
 full R1 U address, R2 operation. Operations 0/1/2 query capabilities/write
 line/read line; 16/17/18 acquire/write/release screen; 32/33/34 query monitor,
-hand off line input and emit transcript. K takes ownership from its active
+hand off line input and emit transcript. P5 adds operation 35 to return the
+already frozen 32-byte command result to the active neutral PDOS parent.
+It takes a checked 32-byte version/size request and overwrites it with the
+result; OS status and RC validity remain separate. K takes ownership from its active
 invocation; a caller cannot nominate another owner. A 64-byte capability
 record contains version/size, primary device class/address, active/default/
 alternate geometry, address encoding, attributes, features, line/screen

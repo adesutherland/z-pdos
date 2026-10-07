@@ -37,6 +37,27 @@ static int echo = 1;
 static unsigned int commandNumber = 0;
 static int batchDepth = 0;
 
+#ifdef PDOS_TWO_SPACE
+static int commandRCValid;
+static unsigned int resultWord(const unsigned char *p)
+{return ((unsigned int)p[0]<<24)|((unsigned int)p[1]<<16)|((unsigned int)p[2]<<8)|p[3];}
+static void reportCommand(int *rc)
+{
+    unsigned char result[TSA_RESULT_BYTES];
+    commandRCValid=0;
+    if(TUIRESULT(result)==0U){
+        unsigned int status=resultWord(result+TSA_RESULT_OS_STATUS);
+        commandRCValid=resultWord(result+TSA_RESULT_RC_VALID)!=0U;
+        if(status||!commandRCValid){
+            printf("PCOMM END %u OS=%u RC=unavailable\n",commandNumber,status);
+            return;
+        }
+        *rc=(int)resultWord(result+TSA_RESULT_APP_RC);
+    }else commandRCValid=1;
+    printf("PCOMM END %u RC=%d\n",commandNumber,*rc);
+}
+#endif
+
 static int parseArgs(int argc, char **argv);
 static void readAutoExec(void);
 static int readPhysicalLine(FILE *fp, const char *source);
@@ -362,7 +383,11 @@ static void processInput(void)
         commandNumber++;
         printf("PCOMM BEGIN %u %s\n", commandNumber, buf);
         rc = system(buf);
+#ifdef PDOS_TWO_SPACE
+        reportCommand(&rc);
+#else
         printf("PCOMM END %u RC=%d\n", commandNumber, rc);
+#endif
         if (select_volume && rc == 0 && selected[0] != '\0')
             strcpy(drive, selected);
     }
@@ -410,8 +435,16 @@ static void processInput(void)
         commandNumber++;
         printf("PCOMM BEGIN %u %s\n", commandNumber, buf);
         rc = system(buf);
+#ifdef PDOS_TWO_SPACE
+        reportCommand(&rc);
+#else
         printf("PCOMM END %u RC=%d\n", commandNumber, rc);
-        if (showrc)
+#endif
+        if (showrc
+#ifdef PDOS_TWO_SPACE
+            && commandRCValid
+#endif
+            )
         {
             printf("rc from program is %d\n", rc);
         }

@@ -1,0 +1,23 @@
+/* SPDX-License-Identifier: MIT */
+#include <stdio.h>
+#include <stdlib.h>
+#include "twospace_fixture.h"
+#include "twospace_dat.h"
+static unsigned int purges;
+static void purge(void *p) { (void)p; ++purges; }
+int main(void) {
+ unsigned char *core=(unsigned char *)calloc(1,TSF_CORE_BYTES);
+ TSFRESULT r;TSDSTATE k,u;TSPADDR va,pa;
+ if(!core)return 2;
+ core[TSF_NORMAL_REAL]=0x54;core[TSF_NORMAL_REAL+1]=0x53;
+ core[TSF_NORMAL_REAL+2]=0x4e;core[TSF_NORMAL_REAL+3]=0x31;
+ if(TSFBUILD(core,TSF_KPOOL_REAL,TSF_UPOOL_REAL,&r,purge,0)||purges!=2)return 1;
+ if(TSDATTACH(&k,core+TSF_KPOOL_REAL,TSF_KPOOL_REAL,TSF_KPOOL_BYTES,r.kbytes,r.kasce)||
+ TSDATTACH(&u,core+TSF_UPOOL_REAL,TSF_UPOOL_REAL,TSF_UPOOL_BYTES,r.ubytes,r.uasce))return 1;
+ va.hi=0;va.lo=0x2000;
+ if(TSDLOOKUP(&k,va,&pa)||pa.hi||pa.lo!=0x2000)return 1;
+ for(va.lo=0;va.lo<0x1000000;va.lo+=4096)if(TSDLOOKUP(&u,va,&pa)!=TSD_MISSING)return 1;
+ va.hi=0x01000000;va.lo=0;
+ if(TSDLOOKUP(&k,va,&pa)||TSDLOOKUP(&u,va,&pa)!=TSD_MISSING)return 1;
+ free(core);puts("Normal boot: empty low U, protected high K and actual bootstrap purges pass");return 0;
+}

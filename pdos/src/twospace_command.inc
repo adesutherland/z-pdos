@@ -65,6 +65,8 @@ static void command_enter(unsigned int entry, unsigned int arg,
     saved[29]=ret ? ret|0x80000000U : 0U; saved[31]=entry;
     saved[32]=0x04810000U; saved[33]=0x80000000U;
     saved[34]=0; saved[35]=entry;
+    saved[36]=*(volatile const unsigned int *)0x4008U;
+    saved[37]=*(volatile const unsigned int *)0x400cU;
 }
 
 static void command_observe(unsigned int app_rc)
@@ -83,12 +85,15 @@ static unsigned int pcomm_start(const TSGREQUEST *request)
     TSVFRAME *frame;
     if (request->length || request->direction || request->address.hi ||
         request->address.lo || native_invocations.depth) return 8U;
+    if(normal_boot()&&(*(volatile const unsigned int *)0x3080U&0x10000U))return 8U;
     init=*request; init.svc=208U;
     status=terminal_service(&init);
     if (!status) status=cms31_setup_lowcore();
-    if (!status) status=tso_map_service(&init,31U);
     if (!status) status=tso_map_service(&init,32U);
-    if (!status) status=tso_map_service(&init,33U);
+    if(!normal_boot()){
+        if (!status) status=tso_map_service(&init,31U);
+        if (!status) status=tso_map_service(&init,33U);
+    }
     if (status) return status;
     begin=init; begin.length=7U;
     status=native_begin(&begin);
@@ -108,6 +113,10 @@ static unsigned int pcomm_start(const TSGREQUEST *request)
     pcomm_row=pcomm_column=0U;
     pcomm_poll_address=args+256U;
     command_enter(pcomm_entry,args,stack,0U);
+    if(normal_boot()){
+        frame->controlled=4U;++controlled_launches;
+        *(volatile unsigned int *)0x4f00U=controlled_launches;
+    }
     *(volatile unsigned int *)0x4f44U=stack;
     *(volatile unsigned int *)0x4f48U=pcomm_entry;
     return 0U;
@@ -149,16 +158,24 @@ static unsigned int pcomm_exit(void)
     TSVFRAME *frame=&native_invocations.frame[0];
     TSVCONTEXT caller=frame->caller;
     TSGREQUEST end;
-    unsigned int status;
+    unsigned int status,controlled=frame->controlled;
+    unsigned int fault=normal_boot()&&*(volatile const unsigned int *)0x309cU==2U;
     if (native_invocations.depth!=1U || frame->personality!=TSV_PDOS)
         return 12U;
     end.address.hi=0; end.address.lo=frame->token;
     end.length=end.direction=0; end.svc=236U;
+    frame->controlled=0U;
     status=native_end(&end);
     if (status) return status;
-    call_result(0U,0U,0U,1U,0U,end.address.lo);
+    call_result(fault?12U:0U,fault?1U:0U,0U,!fault,fault?0xffffffffU:0U,end.address.lo);
     console_v1_end(end.address.lo,call_last_result);
     command_restore(&caller);
+    if(controlled==4U){
+        volatile unsigned int *saved=(volatile unsigned int *)0x3000U;
+        --controlled_launches;*(volatile unsigned int *)0x4f00U=controlled_launches;
+        saved[0U]=0U;saved[1U]=fault?12U:0U;saved[30U]=0U;saved[31U]=fault?0xffffffffU:0U;
+        *(volatile unsigned int *)0x4f54U=1U;
+    }
     *(volatile unsigned int *)0x4f5cU=1U;
     *(volatile unsigned int *)0x4f60U=native_invocations.depth;
     return 0U;
@@ -211,7 +228,8 @@ static unsigned int command_attach(void)
     unsigned char ctl[28], name[8], ptr[4], parameters[202], plist[120];
     unsigned char *args_real, *stack_real;
     unsigned int ecb, tcb, tail, count, selector, entry, args, stack;
-    unsigned int i, j, field, width, status;
+    unsigned int i, j, field, width, status, mode=31U, returned, depth;
+    TSLIMAGE *image=0;
     TSVFRAME *frame;
     const TSVFRAME *parent=TSVTOP(&native_invocations);
     *(volatile unsigned int *)0x4fa0U=1U;
@@ -259,30 +277,46 @@ static unsigned int command_attach(void)
             }
             ++field;
         }
-        /* RUN 31 RXVM -v: retain the qualified one-space command subset. */
-        if (field<4U || plist[0]!=0xd9U || plist[1]!=0xe4U ||
-            plist[2]!=0xd5U || plist[3]!=0x40U ||
-            plist[8]!=0xf3U || plist[9]!=0xf1U || plist[10]!=0x40U ||
-            plist[16]!=0xd9U || plist[17]!=0xe7U ||
-            plist[18]!=0xe5U || plist[19]!=0xd4U || plist[20]!=0x40U)
-            return 4U;
-        selector=2U; entry=*(volatile unsigned int *)0x40e4U;
-        for (i=0;i<104U;++i) plist[i]=plist[i+16U];
-        for (;i<120U;++i) plist[i]=0xffU;
-    } else if (name[0]==0xd9U && name[1]==0xe7U && name[2]==0xe5U &&
-               name[3]==0xd4U && name[4]==0x40U && name[5]==0x40U &&
-               name[6]==0x40U && name[7]==0x40U) {
-        selector=5U; entry=*(volatile unsigned int *)0x4608U;
-    } else if (name[0]==0xd7U && name[1]==0xc4U && name[2]==0xe3U &&
-               name[3]==0xc5U && name[4]==0xe2U && name[5]==0xe3U &&
-               name[6]==0x40U && name[7]==0x40U) {
-        selector=8U;
-    } else return 4U;
-    status=command_refresh(selector);
-    if (status) return status;
-    entry=selector==2U ? *(volatile unsigned int *)0x40e4U :
-          selector==5U ? *(volatile unsigned int *)0x4608U : command_test_entry;
-    if (!entry) return 8U;
+        if(normal_boot()){
+            if(field<3U||plist[0]!=0xd9U||plist[1]!=0xe4U||plist[2]!=0xd5U||
+               plist[3]!=0x40U||plist[10]!=0x40U)return 8U;
+            if(plist[8]==0xf2U&&plist[9]==0xf4U)mode=24U;
+            else if(plist[8]!=0xf3U||plist[9]!=0xf1U)return 8U;
+            status=load_native(TSV_CMS,mode,plist+16U,&image);
+            if(status)return status;
+            for(i=0U;i<104U;++i)plist[i]=plist[i+16U];
+            for(;i<120U;++i)plist[i]=0xffU;
+        }else{
+            if (field<4U || plist[0]!=0xd9U || plist[1]!=0xe4U ||
+                plist[2]!=0xd5U || plist[3]!=0x40U ||
+                plist[8]!=0xf3U || plist[9]!=0xf1U || plist[10]!=0x40U ||
+                plist[16]!=0xd9U || plist[17]!=0xe7U ||
+                plist[18]!=0xe5U || plist[19]!=0xd4U || plist[20]!=0x40U)
+                return 4U;
+            selector=2U;
+            for(i=0U;i<104U;++i)plist[i]=plist[i+16U];
+            for(;i<120U;++i)plist[i]=0xffU;
+        }
+    }else if(normal_boot()){
+        status=load_callable(TSV_TSO,31U,name,&image);
+        if(status)return status;
+    }else if(name[0]==0xd9U&&name[1]==0xe7U&&name[2]==0xe5U&&
+             name[3]==0xd4U&&name[4]==0x40U&&name[5]==0x40U&&
+             name[6]==0x40U&&name[7]==0x40U)selector=5U;
+    else if(name[0]==0xd7U&&name[1]==0xc4U&&name[2]==0xe3U&&
+            name[3]==0xc5U&&name[4]==0xe2U&&name[5]==0xe3U&&
+            name[6]==0x40U&&name[7]==0x40U)selector=8U;
+    else return 4U;
+    if(image){
+        mode=image->mode;selector=256U+image->owner;
+        status=load_refresh(image);if(status)return status;
+        entry=image->entry;
+    }else{
+        status=command_refresh(selector);if(status)return status;
+        entry=selector==2U?*(volatile unsigned int *)0x40e4U:
+              selector==5U?*(volatile unsigned int *)0x4608U:command_test_entry;
+    }
+    if(!entry)return 8U;
     /* The completion TCB is U-owned parent storage and survives child cleanup. */
     status=command_alloc(4096U,&tcb,&args_real);
     if (status) return status;
@@ -292,17 +326,28 @@ static unsigned int command_attach(void)
     status=native_begin(&begin);
     if (status) goto no_child;
     frame=&native_invocations.frame[native_invocations.depth-1U];
-    status=command_alloc(3U*1024U*1024U,&stack,&stack_real);
-    if (!status) status=command_alloc(4096U,&args,&args_real);
+    depth=native_invocations.depth-1U;call_overlay_task[depth]=0U;
+    if(image&&image->overlay){
+        status=TSMOVERLAYPUSH(&storage,image->overlay_task,image->address,
+                    (unsigned char *)TSF_KAPERTURE_VA+image->staged_real,image->bytes)==TSM_OK?0U:4U;
+        if(!status){call_overlay_task[depth]=image->overlay_task;call_overlay_address[depth]=image->address;}
+    }
+    if(!status)status=image?call_alloc(mode==24U?0x10000U:0x100000U,&stack,&stack_real):
+                                   command_alloc(3U*1024U*1024U,&stack,&stack_real);
+    if(!status)status=image?call_alloc(4096U,&args,&args_real):command_alloc(4096U,&args,&args_real);
     if (status) {
+        if(call_overlay_task[depth]){
+            if(TSMOVERLAYPOP(&storage,call_overlay_task[depth],call_overlay_address[depth],0U,&returned)!=TSM_OK)return 12U;
+            call_overlay_task[depth]=0U;
+        }
         end=begin; end.length=0; end.address.lo=frame->token;
         if (native_end(&end)) return 12U;
         goto no_child;
     }
     for (i=0;i<4096U;++i) args_real[i]=0;
-    cms_put_word(stack_real+76U,stack+256U);
+    cms_put_word(stack_real+(image?204U:76U),stack+(image?384U:256U));
     args_real[0]=0x0aU; args_real[1]=3U; /* native return SVC3 */
-    if (selector==2U) {
+    if (selector==2U||(image&&image->personality==TSV_CMS)) {
         for (i=0;i<120U;++i) args_real[128U+i]=plist[i];
     } else {
         cms_put_word(args_real+128U,args+144U|0x80000000U);
@@ -311,7 +356,13 @@ static unsigned int command_attach(void)
     command_ecb=ecb; command_tcb=tcb; command_os_status=0;
     frame->controlled=2U; ++controlled_launches;
     *(volatile unsigned int *)0x4f00U=controlled_launches;
-    command_enter(entry,args+128U,stack,args);
+    command_enter(entry,args+128U,stack+(image?128U:0U),image?0xb80U:args);
+    if(image){
+        saved[32U]=0x04810000U|(mode==64U?1U:0U);
+        saved[33U]=mode==24U?0U:0x80000000U;
+        saved[29U]=mode==31U?0x80000b80U:0xb80U;
+        if(mode==64U)saved[31U]=0xfffff002U;
+    }
     ++*(volatile unsigned int *)0x4f40U;
     command_observe(0U);
     return 0U;
@@ -331,7 +382,17 @@ static unsigned int command_dispatch_attach(void)
     unsigned int status=command_attach();
     if (status) {
         command_os_status=status;
+        if(normal_boot()){
+            static const unsigned char name[]={0xc3U,0xd6U,0xd4U,0xd4U,0xc1U,0xd5U,0xc4U};
+            unsigned int token=native_invocations.next_token;
+            if(token&&token!=0xffffffffU){
+                ++native_invocations.next_token;
+                call_result(status,0U,0U,0U,0xffffffffU,token);
+                console_v1_failed(token,name,sizeof name);
+            }
+        }
         command_observe(0xffffffffU);
+        *(volatile unsigned int *)0x4f54U=0U;
     }
     return status;
 }
@@ -353,6 +414,11 @@ static unsigned int command_finish(void)
     if (kind==2U) ++*(volatile unsigned int *)0x4f68U;
     end.address.hi=0; end.address.lo=frame->token;
     end.length=end.direction=0; end.svc=236U;
+    if(call_overlay_task[native_invocations.depth-1U]){
+        unsigned int depth=native_invocations.depth-1U,returned;
+        if(TSMOVERLAYPOP(&storage,call_overlay_task[depth],call_overlay_address[depth],app_rc,&returned)!=TSM_OK)return 12U;
+        call_overlay_task[depth]=0U;
+    }
     frame->controlled=0;
     if (native_end(&end)) { frame->controlled=2U; return 12U; }
     call_result(command_os_status,kind==2U?1U:0U,0U,kind==1U,app_rc,end.address.lo);

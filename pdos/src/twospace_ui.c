@@ -70,3 +70,6 @@ unsigned int TUICLOSE(void)
     put(request+24U,word(ui_cap+60U));rc=TUIIO(32U,request,TSA_IO_SCREEN_RELEASE);
     if(!rc)ui_open=0U;return rc;
 }
+
+unsigned int TUIRESULT(unsigned char *result)
+{zero(result,32U);put(result,1U);put(result+4U,32U);return TUIIO(32U,result,TSA_IO_RESULT);}

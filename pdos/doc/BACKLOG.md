@@ -183,7 +183,7 @@ decision. Required failure controls stay bounded to the named plan cases.
 | P2 | Done | [Selected native services, input and durable output/readback](qualification/TWO-SPACE-P2-2026-10-07.md); 169-check fresh IPL, unchanged CMS/TSO31 probes, exact input, failed-write preservation and complete runtime release. |
 | P3 | Done | [Native loading/calls, mode crossings, HIGH and caller file preservation](qualification/TWO-SPACE-P3-2026-10-07.md); 187/190/189-check fresh IPL matrix, exact RC/parameters, both personalities' return/fault cursor controls and co-resident backing. |
 | P4 | Done | [C display/device models, U presentation, monitor and durable transcript](qualification/TWO-SPACE-P4-2026-10-07.md); all four model IPLs, line-only, input handoff, loss/reconnect, raw-screen gap, PCOMM and a full-width U64 request. |
-| P5 | In progress | Explicit normal successor image with independent K emergency output and shutdown. |
+| P5 | Done | [Selectable source-built normal K/U image](qualification/TWO-SPACE-P5-2026-10-07.md); stable U PCOMM, CMS/TSO commands, explicit OS failure, complete attached capture, durable output and independent K emergency/shutdown. |
 | P6 | Open | Full unchanged workload and failure matrix; qualify before selecting the default. |
 
 The later [HIGH launcher linkage check](qualification/TWO-SPACE-TSO64-HIGH-LOADER-2026-10-06.md)

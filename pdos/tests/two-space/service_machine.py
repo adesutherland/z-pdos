@@ -59,8 +59,10 @@ def load_elf(path):
     return core
 
 
-def make_core(elf, classic, dat_emit, out):
+def make_core(elf, classic, dat_emit, out, normal=False):
     core = load_elf(elf)
+    if normal:
+        struct.pack_into(">I",core,0x95020,0x54534e31)
     service = Path(classic).read_bytes()
     if not 0 < len(service) <= 64 * 4096:
         raise ValueError("Classic C service exceeds 64 reserved pages")
@@ -86,6 +88,8 @@ def make_core(elf, classic, dat_emit, out):
                    0x02000000: 0x11000, 0x110000000: 0x6000,
                    HIGH_REQUEST: 0x12000, 0x110002000: 0x13000,
                    0x110003000: 0x1f000}
+    if normal:
+        application={}
     pools = ((0x100000, 0x280000), (0x280000, 0x3e0000))
     if any(lo <= pa < hi for pa in (*kernel.values(), *application.values())
            for lo, hi in pools):

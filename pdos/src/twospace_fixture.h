@@ -27,6 +27,8 @@
 #define TSF_CHANNEL_REAL 0x3e0000U
 #define TSF_CHANNEL_BYTES 0x10000U
 #define TSF_CONSOLE_REAL 0x3f0000U
+#define TSF_NORMAL_REAL 0x95020U
+#define TSF_NORMAL_MAGIC 0x54534e31U
 #include "twospace_dat.h"
 
 typedef struct {

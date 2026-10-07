@@ -97,7 +97,7 @@ def run(a):
     cmd=[str(herc),"-t","-f",str(out/"machine.cnf"),"-o",str(out/"console.log"),"-r",str(out/"run.rc")]
     proc=subprocess.Popen(cmd,cwd=out,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
     lines=[];events=queue.Queue();thread=threading.Thread(target=drain_output,args=(proc.stdout,lines,events),daemon=True);thread.start()
-    terminal=None;client=None;monitor=None;error=None;screens=[];monitor_parts=[]
+    terminal=None;client=None;monitor=None;error=None;screens=[];monitor_parts=[];cases=[]
     log=out/"console.log"
     try:
         def listener():
@@ -115,14 +115,27 @@ def run(a):
         wanted=["0:0009 COMM: client"]+(["0:000A COMM: client"] if a.monitor else [])
         until(lambda:all(x in log.read_text(errors="replace") for x in wanted),proc,log,20)
         proc.stdin.write("ipl 01B9\n");proc.stdin.flush()
-        if a.pcomm:
+        if a.normal and not a.rootfault:
+            if client:until(lambda:"welcome to pcomm" in client.text(),proc,log)
+            else:until(lambda:"welcome to pcomm" in terminal_action(script,"Ascii()").stdout,proc,log,60)
+            cases=json.loads(Path(a.commands).read_text()) if a.commands else [["VERSION","PDIO1"],["CMS RUN 31 RXVM -v","PCOMM END 1 RC=0"],["RXVM -v","PCOMM END 2 RC=0"],["MISSING","PCOMM END 3 OS=28 RC=unavailable"],["RXVM -v","PCOMM END 4 RC=0"]]
+            for command,marker in cases:
+                if client:client.enter(command)
+                else:
+                    terminal_action(script,'String('+json.dumps(command)+')');terminal_action(script,"Enter()")
+                if client:shown=until(lambda:client.text() if marker in client.text() else None,proc,log)
+                else:shown=until(lambda:terminal_action(script,"Ascii()").stdout if marker in terminal_action(script,"Ascii()").stdout else None,proc,log)
+                screens.append(shown)
+            if client:client.enter("EXIT")
+            else:terminal_action(script,'String("EXIT")');terminal_action(script,"Enter()")
+        elif a.pcomm:
             until(lambda:"welcome to pcomm" in terminal_action(script,"Ascii()").stdout,proc,log)
             for command,marker in (("VERSION","PDIO1"),("CMS RUN 31 RXVM -v","PCOMM END 1 RC=0"),("RXVM -v","PCOMM END 2 RC=0")):
                 terminal_action(script,'String('+json.dumps(command)+')');terminal_action(script,"Enter()")
                 until(lambda:marker in terminal_action(script,"Ascii()").stdout,proc,log)
                 screens.append(terminal_action(script,"Ascii()").stdout)
             terminal_action(script,'String("EXIT")');terminal_action(script,"Enter()")
-        for marker,text in (() if a.pcomm else (("CONSOLE INPUT 1:","Q"*(148 if a.line_primary else 256)),("CONSOLE INPUT 2:",""),("CONSOLE INPUT 3:","  padded  "))):
+        for marker,text in (() if a.pcomm or a.normal else (("CONSOLE INPUT 1:","Q"*(148 if a.line_primary else 256)),("CONSOLE INPUT 2:",""),("CONSOLE INPUT 3:","  padded  "))):
             def prompt():
                 if client:return client.text() if marker in client.text() else None
                 shown=terminal_action(script,"Ascii()");return shown.stdout if shown.returncode==0 and marker in shown.stdout else None
@@ -174,23 +187,39 @@ def run(a):
             checks["reported_actual_geometry"]=transcript["rows"]==rows and transcript["columns"]==cols
             checks["input_and_screen_leases_released"]=transcript["read_owner"]==transcript["screen_owner"]==0
             texts=[e["text"] for e in transcript["events"] if e["type"]==2]
-            expected=[] if a.pcomm else ["LINE %03d: 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ -- ordered output"%i for i in range(80)]
-            checks["ordered_output_records"]=("PCOMM END 1 RC=0" in "\n".join(texts) and "PCOMM END 2 RC=0" in "\n".join(texts)) if a.pcomm else texts[:80]==expected
-            checks["unchanged_child_versions_once"]=texts.count("crexx-1.0.0-beta.3 (Bytecode Mode)")==(2 if a.pcomm else 1)
-            checks["complete_text_or_explicit_gap"]=transcript["gaps"]==(1 if a.raw or a.disconnect else 0)
-            ends=[e for e in transcript["events"] if e["type"]==3]
-            begins=[e for e in transcript["events"] if e["type"]==1]
-            checks["separate_successful_command_results"]=len(ends)==len(begins) and len(ends)>1 and all(e["result"][1]==0 and e["result"][4:6]==(1,0) for e in ends)
-            if any(bytes.fromhex(e["payload_hex"]).decode("cp037").rstrip()=="P4CAP64" for e in begins):
-                checks["native_u64_full_width_capability_buffer"]=(struct.unpack_from(">2I",raw,0x12a00)==(1,64) and struct.unpack_from(">2I",raw,0x12a10)==(rows,cols))
-            if a.monitor:
-                captured=(out/"monitor.txt").read_text()
-                checks["attached_line_capture_complete"]=all(captured.count(x)==1 for x in expected) and captured.count("crexx-1.0.0-beta.3 (Bytecode Mode)")==(2 if a.pcomm else 1)
-                if a.disconnect:
-                    checks["monitor_gap_and_reconnect_visible"]="TRANSCRIPT GAP" in captured and "AFTER GAP" in captured and "DURING GAP" not in captured and transcript["monitor"]==1
-            if not a.line_primary and screens:
-                checks["screen_geometry_observed"]=len(screens[0].splitlines())>=rows and max(map(len,screens[0].splitlines()))>=cols
-                checks["scroll_and_child_return_repaint"]=all(x in screens[-1] for x in ("z/PDOS PCOMM","PCOMM END 2 RC=0","crexx-1.0.0-beta.3")) if a.pcomm else all(x in screens[0] for x in ("Console qualification","LINE 079:","crexx-1.0.0-beta.3","CONSOLE INPUT 1:"))
+            if a.normal:
+                checks["normal_ipl_and_kernel_shutdown"]=struct.unpack_from(">Q",raw,0x2010)[0]==1 and struct.unpack_from(">2I",raw,0x2018)==((12,0xffffffff) if a.rootfault else (0,0)) and texts[-1]==("K EMERGENCY: PCOMM FAULT" if a.rootfault else "K SHUTDOWN")
+                checks["controlled_invocations_released"]=struct.unpack_from(">I",raw,0x4f00)[0]==0
+                checks["complete_text_or_explicit_gap"]=transcript["gaps"]==0
+                ends=[e for e in transcript["events"] if e["type"]==3]
+                begins=[e for e in transcript["events"] if e["type"]==1]
+                checks["balanced_typed_invocation_results"]=len(ends)==len(begins) and len(ends)>=(1 if a.rootfault else 2) and all(e["result"][0]==1 for e in ends)
+                if a.rootfault:checks["kernel_unwinds_unhealthy_pcomm"]=len(ends)==1 and tuple(ends[0]["result"][1:6])==(12,1,0,0,0xffffffff)
+                checks["ordered_command_results"]=all(any(marker in text for text in texts) for command,marker in cases)
+                if a.monitor:
+                    captured=(out/"monitor.txt").read_text()
+                    checks["attached_line_capture_complete"]=all(captured.splitlines().count(text)==texts.count(text) for text in set(texts) if text) and texts[-1] in captured
+                if not a.line_primary and screens:
+                    checks["screen_geometry_observed"]=len(screens[0].splitlines())>=rows and max(map(len,screens[0].splitlines()))>=cols
+                    checks["usable_3270_after_commands"]="z/PDOS PCOMM" in screens[-1] and cases[-1][1] in screens[-1]
+            else:
+                expected=[] if a.pcomm else ["LINE %03d: 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ -- ordered output"%i for i in range(80)]
+                checks["ordered_output_records"]=("PCOMM END 1 RC=0" in "\n".join(texts) and "PCOMM END 2 RC=0" in "\n".join(texts)) if a.pcomm else texts[:80]==expected
+                checks["unchanged_child_versions_once"]=texts.count("crexx-1.0.0-beta.3 (Bytecode Mode)")==(2 if a.pcomm else 1)
+                checks["complete_text_or_explicit_gap"]=transcript["gaps"]==(1 if a.raw or a.disconnect else 0)
+                ends=[e for e in transcript["events"] if e["type"]==3]
+                begins=[e for e in transcript["events"] if e["type"]==1]
+                checks["separate_successful_command_results"]=len(ends)==len(begins) and len(ends)>1 and all(e["result"][1]==0 and e["result"][4:6]==(1,0) for e in ends)
+                if any(bytes.fromhex(e["payload_hex"]).decode("cp037").rstrip()=="P4CAP64" for e in begins):
+                    checks["native_u64_full_width_capability_buffer"]=(struct.unpack_from(">2I",raw,0x12a00)==(1,64) and struct.unpack_from(">2I",raw,0x12a10)==(rows,cols))
+                if a.monitor:
+                    captured=(out/"monitor.txt").read_text()
+                    checks["attached_line_capture_complete"]=all(captured.count(x)==1 for x in expected) and captured.count("crexx-1.0.0-beta.3 (Bytecode Mode)")==(2 if a.pcomm else 1)
+                    if a.disconnect:
+                        checks["monitor_gap_and_reconnect_visible"]="TRANSCRIPT GAP" in captured and "AFTER GAP" in captured and "DURING GAP" not in captured and transcript["monitor"]==1
+                if not a.line_primary and screens:
+                    checks["screen_geometry_observed"]=len(screens[0].splitlines())>=rows and max(map(len,screens[0].splitlines()))>=cols
+                    checks["scroll_and_child_return_repaint"]=all(x in screens[-1] for x in ("z/PDOS PCOMM","PCOMM END 2 RC=0","crexx-1.0.0-beta.3")) if a.pcomm else all(x in screens[0] for x in ("Console qualification","LINE 079:","crexx-1.0.0-beta.3","CONSOLE INPUT 1:"))
         except (ValueError,struct.error) as exc:checks["transcript_framing"]=False;error=error or str(exc)
     else:checks["stopped_core_complete"]=False
     receipt={"profile":{"model":a.model,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error}
@@ -213,5 +242,6 @@ if __name__=="__main__":
     p=argparse.ArgumentParser()
     for name in ("disk","core","hercules","output"):p.add_argument(name)
     p.add_argument("--model",type=int,choices=(2,3,4,5),default=2)
-    for flag in ("monitor","line-primary","handoff","raw","disconnect","pcomm"):p.add_argument("--"+flag,action="store_true")
+    for flag in ("monitor","line-primary","handoff","raw","disconnect","pcomm","normal","rootfault"):p.add_argument("--"+flag,action="store_true")
+    p.add_argument("--commands")
     raise SystemExit(run(p.parse_args()))

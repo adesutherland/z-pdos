@@ -260,17 +260,27 @@ static void console_v1_begin(const TSVFRAME *frame)
     for(i=0U;i<n;++i)tc_headers[depth][i]=name[i];tc_header_lengths[depth]=n;
     TTXAPPEND(&tc_log,TSA_TRANSCRIPT_COMMAND_BEGIN,frame->token,TSA_ENCODING_1047,0U,name,n);tc_snapshot();
 }
-static void console_v1_end(unsigned int token,const unsigned char *result)
+static void console_v1_failed(unsigned int token,const unsigned char *name,unsigned int length)
+{
+    if(!tc_ready)return;
+    TTXAPPEND(&tc_log,TSA_TRANSCRIPT_COMMAND_BEGIN,token,TSA_ENCODING_1047,0U,name,length);
+    TTXAPPEND(&tc_log,TSA_TRANSCRIPT_COMMAND_END,token,0U,0U,call_last_result,TSA_RESULT_BYTES);
+    tc_snapshot();
+}
+static void console_v1_flush(void)
 {
     static const unsigned char key[]={0xd7,0xc4,0xd6,0xe2,0x4b,0xe3,0xd9,0xc1,0xd5,0xe2,0xc3,0xd9,0xc9,0xd7,0xe3};
+    if(tc_ready&&(store_attach()!=TSS_OK||TSSPUT(&native_store,0x5443U,key,sizeof key,tc_log.data,tc_log.used)!=TSS_OK))
+        tc_gap(0U,4U);
+    tc_snapshot();
+}
+static void console_v1_end(unsigned int token,const unsigned char *result)
+{
     if(!tc_ready)return;
     TTXAPPEND(&tc_log,TSA_TRANSCRIPT_COMMAND_END,token,0U,0U,result,TSA_RESULT_BYTES);
     if(tc_screen_owner==token)tc_screen_owner=0U;
     if(tc_raw_owner==token){tc_raw_owner=0U;TTCCONFIG(&tc_cap,tc_cap.device_class,tc_cap.address,tc_cap.model,tc_cap.monitor);}
-    if(!native_invocations.depth){
-        if(store_attach()!=TSS_OK||TSSPUT(&native_store,0x5443U,key,sizeof key,tc_log.data,tc_log.used)!=TSS_OK)
-            tc_gap(token,4U);
-    }
+    if(!native_invocations.depth)console_v1_flush();
     tc_render();tc_snapshot();
 }
 static unsigned int console_v1_native_raw(TSGREQUEST *request,unsigned int input)
@@ -312,6 +322,10 @@ static unsigned int console_v1_service(TSGREQUEST *request)
     if(cms_word(header)!=1U||cms_word(header+4U)!=request->length)return 20U;
     rc=console_v1_init();if(rc)return rc;
     if(op==TSA_IO_CAPABILITIES){TTCCAPS(&tc_cap,answer);return tc_span(request->address,64U,TSG_WRITE,answer,1U);}
+    if(op==TSA_IO_RESULT){
+        if(frame->personality!=TSV_PDOS||!cms_word(call_last_result))return 8U;
+        return tc_span(request->address,TSA_RESULT_BYTES,TSG_WRITE,call_last_result,1U);
+    }
     if(op==TSA_IO_MONITOR_STATUS){
         for(i=0U;i<32U;++i)answer[i]=0U;cms_put_word(answer,1U);cms_put_word(answer+4U,32U);
         cms_put_word(answer+8U,tc_cap.monitor);cms_put_word(answer+12U,tc_monitor_state);
