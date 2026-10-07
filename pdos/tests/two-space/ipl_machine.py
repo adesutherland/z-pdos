@@ -14,6 +14,7 @@ import zlib
 
 from machine import digest
 from service_machine import judge
+from store_check import inspect
 
 
 def unused_loopback_port():
@@ -111,6 +112,11 @@ def run(args):
     core = Path(args.core).resolve()
     hercules = Path(args.hercules).resolve()
     disk_before = digest(disk)
+    out.joinpath("start-receipt.json").write_text(json.dumps({
+        "disk_sha256_before_ipl":disk_before,
+        "source_core_sha256":digest(core),
+        "hercules_sha256":digest(hercules),
+        "native_files":args.native_files,"native_input":args.native_input},indent=2)+"\n")
     console_port = unused_loopback_port()
     script_port = unused_loopback_port()
     while script_port == console_port:
@@ -200,14 +206,45 @@ def run(args):
                                    fail_entered.returncode == 0)
         if not failed_start_input_sent:
             raise RuntimeError("3270 failed-start PING entry failed")
+        if args.cms_input:
+            for family,markers in (("cms31",("PROMPT Q-06 line:","PROMPT Q-06 empty line","PROMPT Q-06 spaces:","PROMPT Q-06 character:")),
+                                   ("cms24",("C24 INPUT 1:","C24 INPUT 2:","C24 INPUT 3:","C24 INPUT 4:"))):
+                for index,(marker,text) in enumerate(zip(markers,("Mixed café!","","  padded  ","é")),1):
+                    def cms_prompt():
+                        observed=terminal_action(script_port,"Ascii()")
+                        return observed.stdout if observed.returncode==0 and marker in observed.stdout else None
+                    view=await_condition(cms_prompt,600,family+" input prompt "+str(index))
+                    out.joinpath(family+"-input-"+str(index)+".screen").write_text(view)
+                    if text and terminal_action(script_port,'String('+json.dumps(text,ensure_ascii=False)+')').returncode:
+                        raise RuntimeError("CMS input text failed")
+                    if terminal_action(script_port,"Enter()").returncode:
+                        raise RuntimeError("CMS input AID failed")
+        if args.native_input:
+            for index,(marker,text) in enumerate((("PROMPT Q-06 line:","Mixed café!"),
+                    ("PROMPT Q-06 empty line",""),("PROMPT Q-06 spaces:","  padded  "),
+                    ("PROMPT Q-06 character:","é")),1):
+                def native_prompt():
+                    observed=terminal_action(script_port,"Ascii()")
+                    if observed.returncode==0 and "K OWNER READY" in observed.stdout:
+                        raise RuntimeError("native input invocation returned before prompt "+str(index))
+                    return observed.stdout if observed.returncode==0 and marker in observed.stdout else None
+                view=await_condition(native_prompt,600,"native input prompt "+str(index))
+                out.joinpath("native-input-"+str(index)+".screen").write_text(view)
+                if text and terminal_action(script_port,'String('+json.dumps(text,ensure_ascii=False)+')').returncode:
+                    raise RuntimeError("native input text submission failed")
+                if terminal_action(script_port,"Enter()").returncode:
+                    raise RuntimeError("native input AID submission failed")
         def owner_screen():
             try:
                 observed = terminal_action(script_port, "Ascii()")
+                if args.native_files and "HHC00809I Processor CP00: disabled wait state" in (out/"console.log").read_text(errors="replace"):
+                    raise RuntimeError("guest stopped before the post-file invocation prompt: "+observed.stdout.splitlines()[0])
                 return observed.stdout if observed.returncode == 0 and \
                     "K OWNER READY" in observed.stdout else None
             except subprocess.TimeoutExpired:
                 return None
-        owner_view = await_condition(owner_screen, 30, "owned-read input screen")
+        owner_view = await_condition(owner_screen, 600 if args.native_files else 30,
+                                     "owned-read input screen")
         out.joinpath("terminal.owner-screen").write_text(owner_view)
         owner_typed = terminal_action(script_port, 'String("PING")')
         owner_entered = terminal_action(script_port, "Enter()")
@@ -263,6 +300,7 @@ def run(args):
         (out / "console.log").exists() else "".join(lines)
     out.joinpath("hercules.log").write_text(log)
     result_path = out / "result.core"
+    raw=b""
     if result_path.exists() and result_path.stat().st_size == 0x10000000:
         raw = result_path.read_bytes()
         reference = core.read_bytes()
@@ -273,7 +311,7 @@ def run(args):
                            cmslibrary=bool(args.cmslibrary),
                            cms24file=bool(args.cms24file),
                            tso31=bool(args.tso31), tso64=bool(args.tso64),
-                           tso24=bool(args.tso24))
+                           tso24=bool(args.tso24),native_files=args.native_files)
             judged["checks"]["ipl_subchannel_handover"] = (
                 0x10000 <= struct.unpack_from(">I",raw,0x40bc)[0] < 0x10100)
             judged["checks"]["independent_disk_console_channel_workspaces"] = (
@@ -360,7 +398,7 @@ def run(args):
                     allocated24 == rxvm24_rc == released24 == 0 and
                     page_unmapped(raw,0x28000f,plist24) and
                     struct.unpack_from(">I",raw,0x4300)[0] ==
-                    (14 if args.cms24file else 1) and
+                    ((19 if args.cms_input else 14) if args.cms24file else 1) and
                     struct.unpack_from(">I",raw,0x4304)[0] == len(version) and
                     raw[0x4308:0x4308+len(version)] == version)
                 if args.cms24file:
@@ -369,7 +407,7 @@ def run(args):
                     allocated, io_rc, audit, released, returned, restored = \
                         struct.unpack_from(">6I",raw,0x122c0)
                     extra = struct.unpack_from(">I",raw,0x26000)[0]
-                    summary = "C24 SUMMARY: PASS=6 FAIL=0 SKIP=1".encode("cp037")
+                    summary = ("C24 SUMMARY: PASS=7 FAIL=0 SKIP=0" if args.cms_input else "C24 SUMMARY: PASS=6 FAIL=0 SKIP=1").encode("cp037")
                     last = 0x26004+(extra-1)*136
                     checks["cms24_io24_native_result"] = (
                         io_probe == push == allocated == io_rc ==
@@ -377,7 +415,7 @@ def run(args):
                         0x1bb000 <= io_plist < 0xf00000 and
                         page_unmapped(raw,0x28000f,io_plist) and
                         restored == int.from_bytes(staged24[148:152],"big") and
-                        extra == 13 and
+                        extra == (18 if args.cms_input else 13) and
                         struct.unpack_from(">I",raw,last)[0] == len(summary) and
                         raw[last+4:last+4+len(summary)] == summary)
                     expected24 = (("QTEXT   D       A1",3,21,0x98faeef8),
@@ -450,9 +488,9 @@ def run(args):
                             struct.unpack_from(">I",raw,0x254f0)[0] == 3 and
                             struct.unpack_from(">I",raw,0x4514)[0] ==
                                 0x04000000 and
-                            struct.unpack_from(">I",raw,0x20000)[0] == 21 and
-                            raw[0x20004+20*136+4:0x20004+20*136+33] ==
-                                "SUMMARY: PASS=8 FAIL=0 SKIP=3".encode("cp037"))
+                            struct.unpack_from(">I",raw,0x20000)[0] == (26 if args.cms_input else 21) and
+                            raw[0x20004+(25 if args.cms_input else 20)*136+4:0x20004+(25 if args.cms_input else 20)*136+33] ==
+                                ("SUMMARY: PASS=9 FAIL=0 SKIP=2" if args.cms_input else "SUMMARY: PASS=8 FAIL=0 SKIP=3").encode("cp037"))
                         expected_files = (
                             ("T       TXT     A1",3,21,0x98faeef8),
                             ("B       BIN     A1",1,256,0xb5884564),
@@ -507,8 +545,17 @@ def run(args):
                 tso_pages = (tso_bytes+4095)//4096
                 tso_hash = 0x811c9dc5
                 if tso_real and tso_real+tso_bytes <= len(raw):
-                    for value in raw[tso_real:tso_real+0x390]:
+                    version_image=raw[0x32000:0x32390] if args.native_files else raw[tso_real:tso_real+0x390]
+                    for value in version_image:
                         tso_hash = ((tso_hash ^ value)*0x01000193) & 0xffffffff
+                if args.native_files:
+                    allocated,released=struct.unpack_from(">2I",raw,0x12698)
+                    checks["native_file_pages_owned_and_released"]=allocated==released and allocated>=16642
+                    checks["failed_durable_write_preserves_committed_file"]=struct.unpack_from(">I",raw,0x126ac)[0]==0
+                    checks["native_version_image_capture"]=struct.unpack_from(">I",raw,0x32390)[0]==0x50325631
+                    checks["unchanged_tso31_file_invocation_return"]=struct.unpack_from(">4I",raw,0x12680)[::2]==(0,0) and struct.unpack_from(">I",raw,0x1268c)[0]==0
+                    native_length=struct.unpack_from(">I",raw,0x30104)[0]
+                    checks["unchanged_tso31_ioqual_summary"]=0<native_length<=132 and ("SUMMARY: PASS=10 FAIL=0 SKIP=1" if args.native_input else "SUMMARY: PASS=9 FAIL=0 SKIP=2") in raw[0x30110:0x30110+native_length].decode("cp037")
                 checks["tso31_checked_image_in_shared_u"] = (
                     struct.unpack_from(">I",raw,0x122dc)[0] == 0 and
                     tso_real >= 0x400000 and tso_bytes == 1094960 and
@@ -653,6 +700,57 @@ def run(args):
         judged["failure"] = failure
     checks["source_core_marker"] = core.read_bytes()[0x2000:0x2008] == b"PD2NEXT1"
     checks["disk_unchanged"] = disk_before == digest(disk)
+    before_store=out.parent / "store-before.json"
+    if before_store.exists():
+        flat=out / "stopped.ckd"
+        converted=subprocess.run([str(hercules.parent / "cckd2ckd"),"-q","-cyls","100",str(disk),str(flat)],capture_output=True,text=True,timeout=60)
+        if converted.returncode:
+            checks["stopped_store_readback"]=False
+        else:
+            after=inspect(flat)
+            before=json.loads(before_store.read_text())
+            del checks["disk_unchanged"]
+            checks["disk_outside_store_unchanged"]=after["outside_store_sha256"]==before["outside_store_sha256"]
+            checks["durable_disk_changed"]=(disk_before!=digest(disk)) if args.cmsfile or args.cms24file else True
+            checks["stopped_store_readback"]=True
+            for profile,base in ((31,0x25500),(24,0x25580)):
+                if len(raw)<base+128:
+                    checks["stopped_store_readback"]=False
+                    continue
+                if profile==31 and not args.cmsfile or profile==24 and not args.cms24file:
+                    continue
+                for slot in range(4):
+                    at=base+slot*32
+                    count,source,expected=struct.unpack_from(">3I",raw,at+20)
+                    if not count:
+                        continue
+                    key=raw[at:at+18].hex()
+                    matches=[f for f in after["files"] if f["kind"]==profile and f["key_hex"]==key and not f["erased"]]
+                    checks["stopped_store_readback"] &= len(matches)==1 and (matches[0].get("records"),matches[0].get("source_bytes"),matches[0].get("payload_fnv"))==(count,source,expected)
+            out.joinpath("store-after.json").write_text(json.dumps(after,indent=2)+"\n")
+            if args.native_files:
+                def native_records(suffix,member):
+                    key=("B3IO."+suffix).ljust(44).encode("cp037")+member.ljust(8).encode("cp037")
+                    found=[f for f in after["files"] if f["kind"]==0x54534f and f["key_hex"]==key.hex() and not f["erased"]]
+                    if len(found)!=1:
+                        return None
+                    values=[]
+                    for encoded in found[0].get("native_blocks_hex",[]):
+                        block=bytes.fromhex(encoded)
+                        if len(block)<4 or struct.unpack_from(">H",block)[0]!=len(block) or block[2:4]!=bytes(2):
+                            return None
+                        at=4
+                        while at<len(block):
+                            size=struct.unpack_from(">H",block,at)[0]
+                            if size<4 or size>len(block)-at or block[at+2:at+4]!=bytes(2):
+                                return None
+                            values.append(block[at+4:at+size]);at+=size
+                    return values
+                checks["native_text_stopped_readback"]=native_records("RXAS","TEXT")==[bytes.fromhex("d581a389a58540838186515a40adbd405f"),b"",bytes.fromhex("859584")]
+                binary=native_records("RXBIN","BYTES")
+                checks["native_binary_stopped_readback"]=binary is not None and b"".join(binary)==bytes(range(256))
+                checks["native_empty_stopped_readback"]=native_records("RXAS","EMPTY")==[]
+            flat.unlink()
     judged["pass"] = all(checks.values())
     receipt = {"profile": "ESAME, model 2064, 256 MiB, one CPU, 3390 01B9, 3270 0009",
                "disk_sha256_before_ipl": disk_before,
@@ -681,6 +779,9 @@ def main():
     p.add_argument("tso31", nargs="?", choices=("tso31",))
     p.add_argument("tso64", nargs="?", choices=("tso64",))
     p.add_argument("tso24", nargs="?", choices=("tso24",))
+    p.add_argument("--native-files", action="store_true")
+    p.add_argument("--native-input", action="store_true")
+    p.add_argument("--cms-input", action="store_true")
     try:
         return run(p.parse_args())
     except (OSError, ValueError) as exc:

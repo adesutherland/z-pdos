@@ -1,0 +1,89 @@
+/* SPDX-License-Identifier: MIT
+ * Fresh diagnostic IPL of the frozen native TSO31 IOQUAL file/input route.
+ * This reuses the checked native boot build; normal integration is P5. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i = .int
+  if args.0 <> 6 & args.0 <> 7 then do
+    say "usage: crexx -nokeep pdos/scripts/two-space-native-files.crexx --args FRESH-build/pdos/work ABSOLUTE_SOURCE_IMAGE_BUILD ABSOLUTE_CORE PINNED_BETA3_ZIP PDS_BYTE_WRITER HERCULES_BIN [input]"
+    return 2
+  end
+  if args.0 = 7 then if args.7 <> "input" & args.7 <> "all-input" then return 2
+  work = args.1; prior = args.2; core = args.3
+  archive = args.4; writer = args.5; herc = args.6
+  if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
+  address crexx "run test ! -e :work"
+  if rc <> 0 then return 2
+  lines = .string[]
+  address crexx "pwd" output lines
+  root = strip(lines.1); out = root || "/" || work
+  prepared = out || "-inputs"; media = prepared || "/media"
+  address crexx "run test ! -e :prepared"
+  if rc <> 0 then return 2
+  address crexx "run mkdir -p :media"
+  if rc <> 0 then return rc
+  source = prior || "/media"; files = .string[]
+  address crexx "run find :source -maxdepth 1 -type f" output files
+  if rc <> 0 then return rc
+  do i = 1 to files.0
+    source = files[i]
+    if right(source,4) = ".bin" | right(source,4) = ".sys" | right(source,4) = ".exe" then do
+      address crexx "run cmake -E copy :source :media"
+      if rc <> 0 then return rc
+    end
+  end
+  source_ctl = prior || "/media/ctl.txt"; ctl = media || "/ctl.txt"
+  do while lines(source_ctl) > 0
+    value = linein(source_ctl)
+    if left(value,10) = "PDOS.STORE" then do
+      call lineout ctl,"B3IO.CREXX EMPTY CYL 1 1 0 PO VB 4100 8200"
+      call lineout ctl,"B3IO.RXAS EMPTY CYL 2 1 0 PO VB 4100 8200"
+      call lineout ctl,"B3IO.RXBIN EMPTY CYL 7 1 0 PO VB 260 2640"
+    end
+    call lineout ctl,value
+  end
+  call lineout ctl
+  source = prior || "/launch.bin"
+  address crexx "run cmake -E copy :source :prepared"
+  if rc <> 0 then return rc
+  support = prepared || "/base"
+  address crexx "run mkdir -p :support"
+  if rc <> 0 then return rc
+  source = prior || "/base/install-ipl"
+  address crexx "run cmake -E copy :source :support"
+  if rc <> 0 then return rc
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :prepared :core :herc"
+  if rc <> 0 then return rc
+  base = out || "/media/pdos00.ckd"; staged = out || "/media/native-files.ckd"
+  receipt = out || "/native-files.json"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/native_files_media.py :archive :writer :base :staged :receipt"
+  if rc <> 0 then return rc
+  compressor = herc || "/ckd2cckd"; disk = out || "/media/native-files.cckd"
+  address crexx "run :compressor -q -bz2 -cyls 100 :staged :disk"
+  if rc <> 0 then return rc
+  before = out || "/store-before.json"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/store_check.py :staged :before"
+  if rc <> 0 then return rc
+  transient = .string[]
+  transient[1] = out || "/media/datasets.ckd"
+  transient[2] = base
+  transient[3] = out || "/media/readback.ckd"
+  transient[4] = staged
+  hashes = .string[]
+  address crexx "run shasum -a 256 :transient[]" output hashes
+  if rc <> 0 then return rc
+  do i = 1 to hashes.0
+    call lineout out || "/flat-intermediates.sha256",hashes[i]
+  end
+  call lineout out || "/flat-intermediates.sha256"
+  address crexx "run cmake -E rm :transient[]"
+  if rc <> 0 then return rc
+  hercules = herc || "/hercules"; runout = out || "/run"
+  if args.0 = 7 then do
+    if args.7 = "all-input" then address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/ipl_machine.py :disk :core :hercules :runout cms24 cms31 cmsfile cmslibrary cms24file tso31 tso64 tso24 --native-files --native-input --cms-input"
+    else address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/ipl_machine.py :disk :core :hercules :runout cms24 cms31 cmsfile cmslibrary cms24file tso31 tso64 tso24 --native-files --native-input"
+  end
+  else address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/ipl_machine.py :disk :core :hercules :runout cms24 cms31 cmsfile cmslibrary cms24file tso31 tso64 tso24 --native-files"
+  return rc

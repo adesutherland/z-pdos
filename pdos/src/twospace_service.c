@@ -13,10 +13,15 @@
 #include "twospace_cmscursor.h"
 #include "twospace_tso.h"
 #include "twospace_invocation.h"
+#include "twospace_store.h"
 
 static unsigned int user_rights(unsigned int frame, void *unused);
 static unsigned int cms_word(const unsigned char *p);
 static void cms_put_word(unsigned char *p, unsigned int value);
+static unsigned int native_line_input(unsigned int address,unsigned int capacity,
+                                       unsigned int *count);
+static void sf_compat(void);
+static int sf_cleanup(unsigned int handle,const TSVFRAME *frame);
 static int native_clean(unsigned int token, const TSVRESOURCE *resource,
                         void *context);
 static TSDSTATE u_tables;
@@ -24,11 +29,15 @@ static TSMSTATE storage;
 static TSCSTATE channel;
 static TSCSTATE console_channel;
 static TSVSTACK native_invocations;
+static TSSSTATE native_store;
+static TSKEXTENT store_extent;
+static unsigned int store_ready, store_fail_once;
 static unsigned int storage_ready;
 static unsigned int console_ssid;
 static unsigned int console_read_phase;
 static unsigned int console_read_count;
 static unsigned int console_read_owner;
+static unsigned int console_irb_ready;
 static unsigned int console_read_io_handle;
 static unsigned int console_next_io_handle;
 static unsigned int retired_terminal_io_token;
@@ -55,7 +64,8 @@ static unsigned int pcomm_poll_address;
 static unsigned int pcomm_display(const unsigned char *message, unsigned int length);
 static unsigned char pcomm_lines[1760];
 static unsigned int pcomm_column, pcomm_row;
-static unsigned char cms_lowcore_template[4096U];
+#define U_COMPAT_BYTES 8192U
+static unsigned char cms_lowcore_template[U_COMPAT_BYTES];
 static unsigned int cms_lowcore_template_ready;
 #define CMS_LOWCORE_SAVE_OWNER 0x434d5353U
 #define CMS31_LINES_REAL 0x20000U
@@ -141,6 +151,7 @@ int TSCSTART(unsigned int subchannel, unsigned char *orb,
              unsigned char *irb);
 int TSCPOLL(unsigned int subchannel, unsigned char *irb);
 int TSCCLEAR(unsigned int subchannel, unsigned char *irb);
+int TSCWAITR(unsigned int subchannel, unsigned char *irb);
 
 static int channel_record(void *context, unsigned int cylinder,
                           unsigned int head, unsigned int record,
@@ -156,6 +167,49 @@ static int channel_record(void *context, unsigned int cylinder,
         return -1;
     *data=TSCDATA(current);
     return (int)count;
+}
+
+/* The store uses only a named, preformatted extent. A physical callback
+ * replaces one existing FB record and validates the actual channel status. */
+static int store_record(void *unused,unsigned int index,unsigned int write,
+                         unsigned char *block)
+{
+    const unsigned char *data;unsigned int track,cylinder,head,record,i,done;
+    unsigned int subchannel=*(volatile const unsigned int *)0x40bcU;
+    (void)unused;
+    if(index>=TSS_RECORDS||!subchannel)return 1;
+    track=store_extent.start_head+index/3U;
+    cylinder=store_extent.start_cylinder+track/15U;head=track%15U;
+    record=index%3U+1U;
+    if(!TSKWITHIN(&store_extent,cylinder,head))return 1;
+    if(!write) {
+        if(channel_record(&channel,cylinder,head,record,TSS_BLOCK,&data)
+            !=(int)TSS_BLOCK)return 1;
+        for(i=0U;i<TSS_BLOCK;++i)block[i]=data[i];return 0;
+    }
+    if(TSCBUILDUPDATE(&channel,cylinder,head,record,TSS_BLOCK)!=TSC_OK)return 1;
+    for(i=0U;i<TSS_BLOCK;++i)TSCDATA(&channel)[i]=block[i];
+    if(store_fail_once){store_fail_once=0U;subchannel=0x0001ffffU;}
+    if(TSCIO(subchannel,TSCORB(&channel),TSCIRB(&channel))||
+       TSCCHECKREAD(&channel,TSS_BLOCK,&done)!=TSC_OK||done!=TSS_BLOCK)return 1;
+    return 0;
+}
+static int store_attach(void)
+{
+    static const unsigned char name[10]={0xd7U,0xc4U,0xd6U,0xe2U,0x4bU,
+                                         0xe2U,0xe3U,0xd6U,0xd9U,0xc5U};
+    unsigned int tracks;int rc;
+    if(store_ready)return TSS_OK;
+    rc=TSKFIND(channel_record,&channel,name,sizeof name,&store_extent);
+    if(rc==TSK_ABSENT)return TSS_ABSENT;
+    if(rc!=TSK_OK||store_extent.record_format!=0x80U||
+       store_extent.block_length!=TSS_BLOCK||store_extent.logical_length!=TSS_BLOCK)
+        return TSS_IO;
+    tracks=(store_extent.end_cylinder-store_extent.start_cylinder)*15U+
+            store_extent.end_head-store_extent.start_head+1U;
+    if(tracks<(TSS_RECORDS+2U)/3U)return TSS_FULL;
+    if(TSSINIT(&native_store,store_record,0)!=TSS_OK)return TSS_BAD;
+    store_ready=1U;return TSS_OK;
 }
 
 /* This is a K-only post-handover channel proof. A dataset service can use
@@ -446,13 +500,13 @@ static unsigned int cms31_setup_lowcore(void)
     unsigned char *lowcore,*pc;
     TSPADDR base, lowcore_address;
     if (cms31_lowcore_real) return 0U;
-    if (TSRALLOC(&storage.real,CMS31_LOWCORE_OWNER,4096U,
+    if (TSRALLOC(&storage.real,CMS31_LOWCORE_OWNER,U_COMPAT_BYTES,
                  TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,
                  &lowcore_real)!=TSR_OK) {
         return 4U;
     }
     lowcore=(unsigned char *)TSF_KAPERTURE_VA+lowcore_real;
-    for (i=0U; i<4096U; ++i) lowcore[i]=0U;
+    for (i=0U; i<U_COMPAT_BYTES; ++i) lowcore[i]=0U;
     /* Both compatibility pointers live in U-owned lowcore backing. PC-cp
        enters the U veneer, whose SVC transfers the checked plist to K. */
     cms_put_word(lowcore+0x10U,0x500U);  /* PSA -> U CVT */
@@ -473,6 +527,13 @@ static unsigned int cms31_setup_lowcore(void)
     if (TSDMAP(&u_tables,base,lowcore_address)!=TSD_OK) {
         TSRRELEASE(&storage.real,CMS31_LOWCORE_OWNER,lowcore_real); return 12U;
     }
+    base.lo=0x10000U;lowcore_address.lo=lowcore_real+4096U;
+    TSKEYSET(lowcore_real+4096U,0x80U);
+    if(TSDMAP(&u_tables,base,lowcore_address)!=TSD_OK) {
+        TSPADDR old;base.lo=0U;
+        if(TSDUNMAP(&u_tables,base,&old)!=TSD_OK)return 12U;
+        TSRRELEASE(&storage.real,CMS31_LOWCORE_OWNER,lowcore_real);return 12U;
+    }
     pc=(unsigned char *)TSF_KAPERTURE_VA+TSF_PC_REAL;
     for (i=0U; i<TSF_PC_BYTES; ++i) pc[i]=0U;
     cms_put_word(pc+24U,0x80000000U|TSF_PC_REAL+0x100U);
@@ -487,7 +548,7 @@ static unsigned int cms31_setup_lowcore(void)
     pc[0x100bU]=0xa0U;
     *(volatile unsigned int *)0x40f8U=lowcore_real;
     cms31_lowcore_real=lowcore_real;
-    for (i=0U; i<4096U; ++i) cms_lowcore_template[i]=lowcore[i];
+    for (i=0U; i<U_COMPAT_BYTES; ++i) cms_lowcore_template[i]=lowcore[i];
     cms_lowcore_template_ready=1U;
     return 0U;
 }
@@ -860,12 +921,13 @@ static unsigned int terminal_read_cancel(unsigned int token)
         for (i=0U; i<64U; ++i) retired_terminal_irb[i]=TSCIRB(&console_channel)[i];
         retired_terminal_irb_valid=(retired_terminal_irb[2U]&0x10U)!=0U;
     }
-    console_read_phase=console_read_count=console_read_owner=0U;
+    console_read_phase=console_read_count=console_read_owner=console_irb_ready=0U;
     console_read_io_handle=0U;
     return 0U;
 }
 
-static unsigned int terminal_read_poll(const TSGREQUEST *request)
+static unsigned int terminal_read_poll_into(const TSGREQUEST *request,
+                                             unsigned char *internal)
 {
     const TSVFRAME *frame=TSVTOP(&native_invocations);
     TSGCONTEXT gate;
@@ -875,11 +937,15 @@ static unsigned int terminal_read_poll(const TSGREQUEST *request)
     int status;
     if (request->length != TSG_MAX_COPY ||
         request->direction != TSG_WRITE) return 8U;
+    gate.u_tables=&u_tables;gate.real_aperture=(unsigned char *)TSF_KAPERTURE_VA;
+    gate.real_bytes=TSF_REAL_BYTES;gate.rights=user_rights;gate.rights_context=0;
+    if(!internal && TSGPROBE(&gate,request)!=TSG_OK)return 8U;
     if (!console_read_phase) return 0xfffffffbU;
     if ((frame ? frame->token : 0U)!=console_read_owner) return 8U;
     if (console_read_phase==4U) return 12U;
     if (console_read_phase != 3U) {
-        status=TSCPOLL(console_ssid,TSCIRB(&console_channel));
+        status=console_irb_ready ? 0 : TSCPOLL(console_ssid,TSCIRB(&console_channel));
+        console_irb_ready=0U;
         if (status < 0) {
             console_read_phase=4U;
             terminal_read_cancel(console_read_owner);
@@ -945,12 +1011,16 @@ static unsigned int terminal_read_poll(const TSGREQUEST *request)
     gate.rights=user_rights;
     gate.rights_context=0;
     output=*request;
-    status=TSGCOPY(&gate,&output,bytes,sizeof bytes);
+    if(internal){for(i=0U;i<TSG_MAX_COPY;++i)internal[i]=bytes[i];status=TSG_OK;}
+    else status=TSGCOPY(&gate,&output,bytes,sizeof bytes);
     if (status == TSG_OK && terminal_read_cancel(console_read_owner)!=0U)
         return 12U;
     return status == TSG_OK ? 0U :
            status == TSG_DENIED ? 0xfffffffcU : 0xfffffffdU;
 }
+
+static unsigned int terminal_read_poll(const TSGREQUEST *request)
+{return terminal_read_poll_into(request,0);}
 
 static unsigned int terminal_cancel_probe(const TSGREQUEST *request)
 {
@@ -1093,7 +1163,9 @@ static const TSVFRAME *native_caller(unsigned int pc)
         (hi&0x04f10000U)!=0x04810000U || (hi&0x0000c000U) ||
         *(volatile const unsigned int *)0x3090U!=*(volatile const unsigned int *)0x4008U ||
         *(volatile const unsigned int *)0x3094U!=*(volatile const unsigned int *)0x400cU ||
-        (frame->amode==64U ? (mode!=31U && mode!=64U) : mode!=frame->amode))
+        (frame->personality==TSV_TSO && frame->amode>=31U ?
+         (mode!=24U && mode!=31U && (mode!=64U || frame->amode!=64U)) :
+         mode!=frame->amode))
         return 0;
     return frame;
 }
@@ -1172,7 +1244,7 @@ static unsigned int native_begin(TSGREQUEST *request)
     }
     ++native_image_active[image_owner];
     if (cms_lowcore_template_ready) {
-        if (TSRALLOC(&storage.real,CMS_LOWCORE_SAVE_OWNER,4096U,
+        if (TSRALLOC(&storage.real,CMS_LOWCORE_SAVE_OWNER,U_COMPAT_BYTES,
                      TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,
                      &saved_real)!=TSR_OK) {
             rc=TSVEND(&native_invocations,token,native_clean,
@@ -1180,7 +1252,7 @@ static unsigned int native_begin(TSGREQUEST *request)
                         native_invocations.depth-1U]);
             return rc==TSV_OK ? 4U : 12U;
         }
-        for (i=0U; i<4096U; ++i)
+        for (i=0U; i<U_COMPAT_BYTES; ++i)
             ((unsigned char *)TSF_KAPERTURE_VA+saved_real)[i]=lowcore[i];
         if (TSVOWN(&native_invocations,token,TSV_LOWCORE,saved_real)
             !=TSV_OK) {
@@ -1191,16 +1263,18 @@ static unsigned int native_begin(TSGREQUEST *request)
                         native_invocations.depth-1U]);
             return rc==TSV_OK ? 4U : 12U;
         }
-        for (i=0U; i<4096U; ++i) lowcore[i]=cms_lowcore_template[i];
+        for (i=0U; i<U_COMPAT_BYTES; ++i) lowcore[i]=cms_lowcore_template[i];
         if (personality!=TSV_CMS || mode!=31U)
             for (i=0x14U; i<0x18U; ++i) lowcore[i]=0U;
     }
+    if(personality==TSV_TSO)sf_compat();
     cms_heaps[native_invocations.depth-1U].address.hi=0U;
     cms_heaps[native_invocations.depth-1U].address.lo=0U;
     cms_heaps[native_invocations.depth-1U].bytes=0U;
     cms_heaps[native_invocations.depth-1U].handle=0U;
     request->address.hi=0U;
     request->address.lo=token;
+    *(volatile unsigned int *)0x4f50U=token;
     return 0U;
 }
 
@@ -1224,8 +1298,8 @@ static int native_clean(unsigned int token, const TSVRESOURCE *resource,
                                cms31_lowcore_real;
         if (!cms31_lowcore_real || !cms_lowcore_template_ready ||
             resource->handle<TSF_CORE_BYTES ||
-            resource->handle>TSF_REAL_BYTES-4096U) return 1;
-        for (i=0U; i<4096U; ++i) lowcore[i]=saved[i];
+            resource->handle>TSF_REAL_BYTES-U_COMPAT_BYTES) return 1;
+        for (i=0U; i<U_COMPAT_BYTES; ++i) lowcore[i]=saved[i];
         return TSRRELEASE(&storage.real,CMS_LOWCORE_SAVE_OWNER,
                           resource->handle)==TSR_OK ? 0 : 1;
     }
@@ -1252,14 +1326,18 @@ static int native_clean(unsigned int token, const TSVRESOURCE *resource,
             out->profile=out->token=0U;
             return 0;
         }
-        return 1;
+        return sf_cleanup(resource->handle,frame);
     }
     if (resource->kind!=TSV_ALLOCATION) return 1;
     for (i=0U; i<TSM_ALLOCS; ++i)
         if (storage.allocations[i].handle==resource->handle) {
+            unsigned int pages=storage.allocations[i].bytes/4096U;
             if (storage.allocations[i].task!=frame->runtime_owner ||
                 TSMFREE(&storage,frame->runtime_owner,
                         storage.allocations[i].address)!=TSM_OK) return 1;
+            if(frame->runtime_owner==16U &&
+               *(volatile unsigned int *)(TSF_KAPERTURE_VA+0x31400U))
+                *(volatile unsigned int *)(TSF_KAPERTURE_VA+0x31408U)+=pages;
             *(volatile unsigned int *)0x4098U=u_tables.used;
             return 0;
         }
@@ -1282,6 +1360,8 @@ static unsigned int native_end(const TSGREQUEST *request)
     rc=TSVEND(&native_invocations,request->address.lo,native_clean,
               (void *)frame);
     if (rc==TSV_OK) {
+        const TSVFRAME *parent=TSVTOP(&native_invocations);
+        *(volatile unsigned int *)0x4f50U=parent?parent->token:0U;
         cms_heaps[native_invocations.depth].address.hi=0U;
         cms_heaps[native_invocations.depth].address.lo=0U;
         cms_heaps[native_invocations.depth].bytes=0U;
@@ -1472,7 +1552,7 @@ static unsigned int storage_service(TSGREQUEST *request)
 {
     const TSVFRAME *frame;
     unsigned int mask_hi, mask_lo, flags, mode, storage_mode, result, task, pc;
-    unsigned int handle;
+    unsigned int handle,pages=0U,i;
     TSPADDR minimum, maximum, base;
     mask_hi=*(volatile const unsigned int *)0x3080U;
     mask_lo=*(volatile const unsigned int *)0x3084U;
@@ -1507,6 +1587,10 @@ static unsigned int storage_service(TSGREQUEST *request)
             }
         }
         request->address=base;
+        if(frame && task==16U &&
+           *(volatile unsigned int *)(TSF_KAPERTURE_VA+0x31400U))
+            *(volatile unsigned int *)(TSF_KAPERTURE_VA+0x31404U)+=
+                (request->length+4095U)/4096U;
         if (task==18U) {
             volatile unsigned int *receipt=(volatile unsigned int *)0x4cc0U;
             unsigned int count=receipt[0U];
@@ -1523,8 +1607,14 @@ static unsigned int storage_service(TSGREQUEST *request)
     if (frame && (!handle ||
         TSVHAS(&native_invocations,frame->token,TSV_ALLOCATION,handle)
             !=TSV_OK)) return 8U;
+    for(i=0U;i<TSM_ALLOCS;++i)
+        if(storage.allocations[i].handle==handle)
+            pages=storage.allocations[i].bytes/4096U;
     result=TSMFREE(&storage,task,request->address);
     if (result != TSM_OK) return 8U;
+    if(frame && task==16U &&
+       *(volatile unsigned int *)(TSF_KAPERTURE_VA+0x31400U))
+        *(volatile unsigned int *)(TSF_KAPERTURE_VA+0x31408U)+=pages;
     if (frame && TSVFORGET(&native_invocations,frame->token,
                            TSV_ALLOCATION,handle)!=TSV_OK) return 12U;
     if (task==18U) ++*(volatile unsigned int *)0x4cc4U;
@@ -1733,10 +1823,40 @@ static unsigned int cms_output_erase(CMSOUTPUT *out)
     live=!out->closed;
     if (live && TSVHAS(&native_invocations,token,TSV_FILE,handle)
         !=TSV_OK) return 12U;
+    if(out->closed && (store_attach()!=TSS_OK ||
+       TSSERASE(&native_store,out->profile,out->id,18U)!=TSS_OK))return 12U;
     if (cms_output_discard(out)!=0U) return 12U;
     if (live && TSVFORGET(&native_invocations,token,TSV_FILE,handle)
         !=TSV_OK) return 12U;
     return 0U;
+}
+
+/* One bounded P2 control: a failed physical write cannot publish FINIS data
+ * or replace an earlier committed file. This uses the actual SSCH reject. */
+static unsigned int store_failure_probe(const TSGREQUEST *request)
+{
+    static const unsigned char id[18]={0xe3U,0x40U,0x40U,0x40U,0x40U,0x40U,0x40U,0x40U,
+        0xe3U,0xe7U,0xe3U,0x40U,0x40U,0x40U,0x40U,0x40U,0xc1U,0xf1U};
+    unsigned int real=0U,n,got,i;unsigned char *original,*changed;
+    int rc,result=12;
+    if(request->length||request->address.hi||request->address.lo||request->direction||
+       TSVTOP(&native_invocations)||store_attach()!=TSS_OK)return 8U;
+    if(TSSSIZE(&native_store,31U,id,18U,&n)!=TSS_OK||!n||n>CMS_OUTPUT_BYTES)return 12U;
+    if(TSRALLOC(&storage.real,0x50525746U,2U*((n+4095U)&~4095U),
+                 TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,&real)!=TSR_OK)return 4U;
+    original=(unsigned char *)TSF_KAPERTURE_VA+real;
+    changed=original+((n+4095U)&~4095U);
+    if(TSSREAD(&native_store,31U,id,18U,original,n,&got)!=TSS_OK||got!=n)goto done;
+    for(i=0U;i<n;++i)changed[i]=original[i];changed[64U]^=1U;
+    store_fail_once=1U;
+    rc=TSSPUT(&native_store,31U,id,18U,changed,n);
+    if(rc!=TSS_IO||store_fail_once)goto done;
+    if(TSSREAD(&native_store,31U,id,18U,changed,n,&got)!=TSS_OK||got!=n)goto done;
+    for(i=0U;i<n&&changed[i]==original[i];++i){}
+    if(i==n)result=0;
+done:
+    if(TSRRELEASE(&storage.real,0x50525746U,real)!=TSR_OK)result=12;
+    return (unsigned int)result;
 }
 
 /* The CMS file envelope is a checked sequence of variable records in a
@@ -1771,6 +1891,25 @@ static unsigned int cms_file_open(const unsigned char id[18],
     if (!input) return 4U;
     handle=TSIOWNER(&cms_inputs,input,1U);
     if (!handle) return 12U;
+    found=store_attach();
+    if(found==TSS_OK) {
+        found=TSSSIZE(&native_store,profile,id,18U,&span);
+        if(found==TSS_DELETED)return 28U;
+        if(found==TSS_OK) {
+            if(!span||span>CMS_OUTPUT_BYTES)return 12U;
+            blocks=span;
+            span=(span+4095U)&~4095U;
+            if(TSRALLOC(&storage.real,TSIOWNER(&cms_inputs,input,CMS_FILE_OWNER+16U),
+                         span,TSF_CORE_BYTES,TSF_REAL_BYTES,TSR_RUN,&real)!=TSR_OK)
+                return 4U;
+            stage=(unsigned char *)TSF_KAPERTURE_VA+real;
+            if(TSSREAD(&native_store,profile,id,18U,stage,span,&n)!=TSS_OK||
+               n!=blocks||TSIFVALIDATE(stage,n,profile,&info)!=TSIF_OK)goto corrupt;
+            goto publish_input;
+        }
+        if(found!=TSS_ABSENT)return 12U;
+    } else if(found!=TSS_ABSENT)return 12U;
+    n=0U;
     for (i=0U; i<6U; ++i) name[n++]=prefix[i];
     if (profile==24U) { name[3U]=0xf2U; name[4U]=0xf4U; }
     for (i=0U; i<8U && id[i]!=0x40U; ++i) {
@@ -1816,6 +1955,7 @@ static unsigned int cms_file_open(const unsigned char id[18],
     }
     if (TSIFVALIDATE(stage,blocks*18452U,profile,&info)!=TSIF_OK)
         goto corrupt;
+publish_input:
     if (token && TSVOWN(&native_invocations,token,TSV_FILE,handle)
         !=TSV_OK)
         return TSRRELEASE(&storage.real,
@@ -1911,7 +2051,7 @@ static unsigned int tso_map_service(const TSGREQUEST *request,
     if (is_pcomm || is_test) mode=31U;
     if (mode!=24U && mode!=31U && mode!=64U) return 8U;
     if (is_test ? command_test_loaded : is_pcomm ? pcomm_loaded : mode==24U ? tso24_loaded :
-        mode==31U ? tso31_loaded && !pcomm_loaded : tso64_loaded) return 0U;
+        mode==31U ? 0U : tso64_loaded) return 0U;
     found=TSKFIND(channel_record,&channel,name,is_test ? 12U : is_pcomm ? 9U : 10U,&extent);
     if (found==TSK_ABSENT) return 4U;
     if (found!=TSK_OK || extent.record_format!=0x80U ||
@@ -1964,7 +2104,7 @@ static unsigned int tso_map_service(const TSGREQUEST *request,
          TSTIMAGE64ANY(stage+64U,bytes,base.lo,image,
                        TST_MAX_IMAGE,&info))!=TST_OK) goto bad_image;
     maximum.lo=mode==24U ? 0x00ffffffU : base.lo+0x00ffffffU;
-    if (!is_test && !is_pcomm && mode==31U && tso31_loaded && pcomm_loaded) {
+    if (!is_test && !is_pcomm && mode==31U && tso31_loaded) {
         if (native_image_active[15U] || receipt[1U]!=info.image_bytes) {
             failure=8; goto bad_image;
         }
@@ -2144,6 +2284,14 @@ static unsigned int tso_terminal_service(TSGREQUEST *request)
     mask_hi=*(volatile const unsigned int *)0x3080U;
     mask_lo=*(volatile const unsigned int *)0x3084U;
     mode24=frame && frame->amode==24U;
+    if((request->address.lo&0xff000000U)==0x80000000U){
+        unsigned int count=0U;
+        if(mask_hi&1U)return 8U;
+        status=native_line_input(request->address.lo&0x00ffffffU,request->length,&count);
+        if(!status){*(volatile unsigned int *)0x3008U=0U;
+                    *(volatile unsigned int *)0x300cU=count;}
+        return status;
+    }
     *(volatile unsigned int *)(receipt_base+0xa0U)+=1U;
     *(volatile unsigned int *)(receipt_base+0xa4U)=request->length;
     *(volatile unsigned int *)(receipt_base+0xa8U)=request->address.hi;
@@ -2250,7 +2398,7 @@ static unsigned int cms_native_service(TSGREQUEST *request,
     TSGCONTEXT gate;
     TSGREQUEST copy;
     TSPADDR minimum, maximum, address;
-    unsigned char plist[44], message[256], fst[40];
+    unsigned char plist[56], message[256], fst[40];
     unsigned int i, n, length, result, flags, cursor, size, real;
     unsigned int records, handle;
     const TSVFRAME *frame=TSVTOP(&native_invocations);
@@ -2268,7 +2416,7 @@ static unsigned int cms_native_service(TSGREQUEST *request,
     gate.rights=user_rights;
     gate.rights_context=0;
     copy=*request;
-    copy.length=32U;
+    copy.length=8U;
     copy.direction=TSG_READ;
     if (TSGCOPY(&gate,&copy,plist,sizeof plist) != TSG_OK) return 12U;
     if (profile==24U) {
@@ -2277,6 +2425,38 @@ static unsigned int cms_native_service(TSGREQUEST *request,
         for (i=0U; i<8U && plist[i]==typlin[i]; ++i) {}
         if (i==8U) return cms24_native_service(request);
     }
+    {
+        static const unsigned char liner[8]={0xd3U,0xc9U,0xd5U,0xc5U,0xd9U,0xc4U,0x40U,0x40U};
+        static const unsigned char waitr[8]={0xe6U,0xc1U,0xc9U,0xe3U,0xd9U,0xc4U,0x40U,0x40U};
+        unsigned int input=(profile==31U);
+        for(i=0U;i<8U&&plist[i]==(input?liner:waitr)[i];++i){}
+        if(i==8U){
+            copy.length=input?56U:16U;
+            if(TSGCOPY(&gate,&copy,plist,sizeof plist)!=TSG_OK)return 12U;
+            size=input?cms_word(plist+12U):((unsigned int)plist[14U]<<8)|plist[15U];
+            real=cms_word(plist+8U);
+            if(input){
+                if(plist[36U]!=0xceU||plist[37U]!=0xc0U)return 12U;
+                for(i=48U;i<56U&&plist[i]==0xffU;++i){}
+                if(i!=56U)return 12U;
+            }else{
+                if(plist[8U]!=1U||plist[12U]!=0xe3U||plist[13U])return 12U;
+                real&=0xffffffU;
+            }
+            copy.address.lo=request->address.lo+(input?40U:14U);
+            copy.length=input?4U:2U;copy.direction=TSG_WRITE;
+            if(TSGPROBE(&gate,&copy)!=TSG_OK)return 12U;
+            result=native_line_input(real,size,&n);if(result)return 12U;
+            if(input){cms_put_word(plist+40U,n);
+                *(volatile unsigned int *)0x3000U=0U;*(volatile unsigned int *)0x3004U=n;
+                result=TSGCOPY(&gate,&copy,plist+40U,4U);
+            }else{plist[14U]=(unsigned char)(n>>8);plist[15U]=(unsigned char)n;
+                result=TSGCOPY(&gate,&copy,plist+14U,2U);}
+            return result==TSG_OK?0U:12U;
+        }
+    }
+    copy=*request;copy.length=32U;copy.direction=TSG_READ;
+    if(TSGCOPY(&gate,&copy,plist,sizeof plist)!=TSG_OK)return 12U;
     flags=*(volatile const unsigned int *)0x307cU;
     for (i=0U; i<8U && plist[i]==obtain[i]; ++i) {}
     if (i==8U && profile==31U) {
@@ -2330,6 +2510,10 @@ static unsigned int cms_native_service(TSGREQUEST *request,
     }
     for (i=0U; i<8U && plist[i]==line[i]; ++i) {}
     if (i==8U && profile==31U) {
+        copy=*request;copy.length=52U;copy.direction=TSG_READ;
+        if(TSGCOPY(&gate,&copy,plist,sizeof plist)!=TSG_OK)return 12U;
+        for(i=44U;i<52U&&plist[i]==0xffU;++i){}
+        if(i!=52U)return 12U;
         length=cms_word(plist+12U);
         if (flags || length>130U || cms_word(plist+8U)<0x1000000U ||
             cms_word(plist+8U)>=0x80000000U) return 12U;
@@ -2480,6 +2664,21 @@ static unsigned int cms_native_service(TSGREQUEST *request,
                 ((unsigned char *)TSF_KAPERTURE_VA+file->real)[66U]=0x40U;
                 file->length=67U; file->records=file->source_bytes=1U;
             }
+            if(!file->closed) {
+                unsigned char *payload=(unsigned char *)TSF_KAPERTURE_VA+file->real;
+                unsigned int padded=(file->length+TSS_BLOCK-1U)/TSS_BLOCK*TSS_BLOCK;
+                unsigned int hash=0x811c9dc5U;
+                if(padded>CMS_OUTPUT_BYTES||store_attach()!=TSS_OK)return 12U;
+                for(i=0U;i<64U;++i)payload[i]=0U;
+                payload[0]=0x50U;payload[1]=0x44U;payload[2]=0x43U;payload[3]=0x4dU;
+                payload[4]=0x53U;payload[5]=0x46U;payload[6]=0x30U;payload[7]=0x31U;
+                cms_put_word(payload+8U,profile);cms_put_word(payload+12U,file->length-64U);
+                cms_put_word(payload+16U,file->source_bytes);cms_put_word(payload+20U,file->records);
+                for(i=64U;i<file->length;++i)hash=(hash^payload[i])*0x01000193U;
+                cms_put_word(payload+56U,hash);
+                for(i=file->length;i<padded;++i)payload[i]=0U;
+                if(TSSPUT(&native_store,profile,file->id,18U,payload,padded)!=TSS_OK)return 12U;
+            }
             if (!file->closed &&
                 TSVFORGET(&native_invocations,frame->token,TSV_FILE,handle)
                     !=TSV_OK) return 12U;
@@ -2493,7 +2692,12 @@ static unsigned int cms_native_service(TSGREQUEST *request,
     for (i=0U; i<8U && plist[i]==erase[i]; ++i) {}
     if (i==8U) {
         file=cms_output_find(plist+8U,profile,frame->token);
-        return file ? cms_output_erase(file) : 28U;
+        if(file)return cms_output_erase(file);
+        result=cms_file_open(plist+8U,profile,&input);
+        if(result)return result;
+        if(store_attach()!=TSS_OK ||
+           TSSERASE(&native_store,profile,plist+8U,18U)!=TSS_OK)return 12U;
+        return cms_file_close(input);
     }
     {
         volatile unsigned char *diag=(volatile unsigned char *)(
@@ -2578,6 +2782,7 @@ static unsigned int cms_file_audit(const TSGREQUEST *request,
 }
 
 #include "twospace_command.inc"
+#include "twospace_file.inc"
 
 unsigned int pdosTwoSpaceService(TSGREQUEST *request)
 {
@@ -2592,6 +2797,9 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
         TSVTOP(&native_invocations) &&
         TSVTOP(&native_invocations)->controlled==2U)
         return command_finish();
+    if (request->svc == 253U) return sf_probe_receipt(0U);
+    if (request->svc == 249U) return store_failure_probe(request);
+    if (request->svc == 254U) return sf_probe_receipt(1U);
     if (request->svc == 246U) return native_controlled_finish();
     if (request->svc == 247U) return pcomm_start(request);
     if (pcomm_loaded && TSVTOP(&native_invocations)) {
@@ -2611,14 +2819,26 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
     caller_pc=*(volatile const unsigned int *)0x308cU;
     native_frame=native_caller(caller_pc);
     native_tso=native_frame && native_frame->personality==TSV_TSO;
+    /* The selected legacy storage lists are 24/31-bit register interfaces.
+     * Hardware AMODE and the K invocation must confirm that interpretation;
+     * direct AMODE64 requests retain full-width validation below. */
+    if(native_tso && !( *(volatile const unsigned int *)0x3080U&1U) &&
+       (request->svc==120U||request->svc==10U))request->address.hi=0U;
     diagnostic_receipt=native_frame && native_frame->amode==64U ?
                        0x4d08U : native_frame && native_frame->amode==31U ?
                        0x4708U : 0x4c08U;
+    if(native_tso&&request->svc==10U)return command_storage10(request);
+    if(native_tso&&(request->svc==1U||request->svc==99U||request->svc==64U||request->svc==22U||
+       request->svc==20U||request->svc==18U||request->svc==24U||request->svc==27U||
+       request->svc==250U||request->svc==251U||request->svc==252U))
+        return sf_service(request->svc);
     /* The descriptor stores a 32-bit length. R0 is not an argument for the
        selected AMODE31 TPUT or IARV64 PC entry. Both routes validate their
        R1 arguments independently before touching U storage. */
     if (*(volatile const unsigned int *)0x3000U != 0U &&
-        !((request->svc==93U && native_tso &&
+        !(((request->svc==120U||request->svc==10U) && native_tso &&
+           !(*(volatile const unsigned int *)0x3080U&1U)) ||
+          (request->svc==93U && native_tso &&
            !(*(volatile const unsigned int *)0x3080U&1U)) ||
           (request->svc==233U && native_frame==0 &&
            TSVTOP(&native_invocations) &&
@@ -2718,6 +2938,8 @@ unsigned int pdosTwoSpaceService(TSGREQUEST *request)
 static unsigned int user_rights(unsigned int frame, void *unused)
 {
     (void)unused;
+    if(cms31_lowcore_real && frame>=cms31_lowcore_real &&
+       frame<cms31_lowcore_real+U_COMPAT_BYTES)return TSG_READ|TSG_WRITE;
     if (TSMRIGHTS(frame,&storage)) return TSG_READ | TSG_WRITE;
     if (frame == 0x7000U || frame == 0x12000U || frame == 0x13000U)
         return TSG_READ | TSG_WRITE;

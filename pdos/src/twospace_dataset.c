@@ -24,9 +24,9 @@ int TSKWITHIN(const TSKEXTENT *e, unsigned int cylinder,
     return 1;
 }
 
-int TSKFIND(TSKREAD read_record, void *context,
+int TSKDSCB(TSKREAD read_record, void *context,
             const unsigned char *name, unsigned int name_length,
-            TSKEXTENT *extent)
+            TSKEXTENT *extent, unsigned char data[96])
 {
     const unsigned char *record;
     unsigned int cylinder, head, number, i, visits=0U;
@@ -64,6 +64,7 @@ int TSKFIND(TSKREAD read_record, void *context,
             found.record_format=record[84U];
             found.block_length=word16(record+86U);
             found.logical_length=word16(record+88U);
+            found.organisation=word16(record+82U);
             if (found.start_cylinder < 3U ||
                 found.end_cylinder >= 100U ||
                 found.start_head >= 15U || found.end_head >= 15U ||
@@ -73,6 +74,7 @@ int TSKFIND(TSKREAD read_record, void *context,
                 !found.block_length || found.block_length > 18452U)
                 return TSK_CORRUPT;
             *extent=found;
+            if(data)for(i=0U;i<96U;++i)data[i]=record[44U+i];
             return TSK_OK;
         }
         if (number == 255U) {
@@ -84,3 +86,7 @@ int TSKFIND(TSKREAD read_record, void *context,
        trustworthy negative lookup; a failed channel read may be corruption. */
     return TSK_CORRUPT;
 }
+
+int TSKFIND(TSKREAD read_record,void *context,const unsigned char *name,
+             unsigned int bytes,TSKEXTENT *extent)
+{return TSKDSCB(read_record,context,name,bytes,extent,0);}

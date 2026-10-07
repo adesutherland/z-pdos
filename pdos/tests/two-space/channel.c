@@ -51,6 +51,11 @@ int main(void)
     if (TSCCHECKREAD(&channel,80U,&got) != TSC_IO) return 7;
     irb[9]=0U; irb[11]=81U;
     if (TSCCHECKREAD(&channel,80U,&got) != TSC_IO) return 8;
+    irb[8]=0x0dU;irb[11]=80U;
+    if(TSCCHECKEND(&channel,80U)!=TSC_OK||
+       TSCCHECKREAD(&channel,80U,&got)!=TSC_IO)return 17;
+    irb[11]=79U;
+    if(TSCCHECKEND(&channel,80U)!=TSC_IO)return 18;
     memset(TSCDATA(&channel),0xd2,1773U);
     if (TSCBUILDCONSWRITE(&channel,1773U) != TSC_OK ||
         TSCBUILDCONSWRITE(&channel,2049U) != TSC_BAD ||

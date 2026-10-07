@@ -38,7 +38,7 @@ def load_elf(path):
     expected = {(0, 0), (0x1000, 0x1000), (0x2000, 0x2000), (0x4000, 0x4000),
                 (0x20000, 0x5000), (0x110000000, 0x6000),
                 (0x21000, 0x7000), (0x22000, 0x8000),
-                (KCORE, 0x9000), (0x02020000, 0xf000),
+                (KCORE, 0x9000), (0x02040000, 0xf000),
                 (0x02000000, 0x11000), (HIGH_REQUEST, 0x12000),
                 (0x110002000, 0x13000), (0x110003000, 0x1f000)}
     core = bytearray(0x400000)
@@ -62,24 +62,26 @@ def load_elf(path):
 def make_core(elf, classic, dat_emit, out):
     core = load_elf(elf)
     service = Path(classic).read_bytes()
-    if not 0 < len(service) <= 32 * 4096:
-        raise ValueError("Classic C service exceeds 32 reserved pages")
+    if not 0 < len(service) <= 64 * 4096:
+        raise ValueError("Classic C service exceeds 64 reserved pages")
     core[0xa000:0xf000] = service[:5 * 4096].ljust(5 * 4096, b"\0")
     core[0x14000:0x1f000] = service[5 * 4096:16 * 4096].ljust(11 * 4096, b"\0")
-    core[0x80000:0x90000] = service[16 * 4096:].ljust(16 * 4096, b"\0")
+    core[0x80000:0x90000] = service[16 * 4096:32 * 4096].ljust(16 * 4096, b"\0")
+    core[0xa0000:0xc0000] = service[32 * 4096:].ljust(32 * 4096, b"\0")
     # Classic PDPPRLG uses R13's 76-byte slot as the next frame pointer.
     struct.pack_into(">I", core, 0x1004c, 0x03000100)
     struct.pack_into(">I", core, 0x10060, 0x03000080)
     kernel = {0: 0, 0x1000: 0x1000, 0x2000: 0x2000,
               0x3000: 0x3000, 0x4000: 0x4000,
-              0x02020000: 0xf000, 0x03000000: 0x10000,
+              0x02040000: 0xf000, 0x03000000: 0x10000,
               0x03001000: 0x92000, 0x03002000: 0x93000,
               0x03003000: 0x94000, KCORE: 0x9000}
     kernel.update({0x02000000 + 4096 * i:
                    (0xa000 + 4096 * i if i < 5 else
                     0x14000 + (i - 5) * 4096 if i < 16 else
-                    0x80000 + (i - 16) * 4096)
-                   for i in range(32)})
+                    0x80000 + (i - 16) * 4096 if i < 32 else
+                    0xa0000 + (i - 32) * 4096)
+                   for i in range(64)})
     application = {0x20000: 0x5000, 0x21000: 0x7000,
                    0x02000000: 0x11000, 0x110000000: 0x6000,
                    HIGH_REQUEST: 0x12000, 0x110002000: 0x13000,
@@ -92,7 +94,8 @@ def make_core(elf, classic, dat_emit, out):
                              0x9000, 0xa000, 0xb000, 0xc000,
                              0xd000, 0xe000, 0xf000, 0x10000,
                              *(0x14000 + i * 4096 for i in range(11)),
-                             *(0x80000 + i * 4096 for i in range(21))}
+                             *(0x80000 + i * 4096 for i in range(21)),
+                             *(0xa0000 + i * 4096 for i in range(32))}
     if private_kernel_frames.intersection(application.values()):
         raise ValueError("U maps private K real frame")
     if any(0x3e0000 <= pa < 0x400000 for pa in application.values()):
@@ -133,7 +136,7 @@ def make_core(elf, classic, dat_emit, out):
 
 def judge(raw, log, ipl=False, cms24=False, cms31=False,
           cmsfile=False, cmslibrary=False, cms24file=False,
-          tso31=False, tso64=False, tso24=False):
+          tso31=False, tso64=False, tso24=False, native_files=False):
     if len(raw) != 0x14000 or raw[0x2000:0x2008] != b"PD2NEXT1":
         raise ValueError("missing/malformed result core")
     expected_masks = (0x0481000000000000, 0x0481000080000000) + \
@@ -374,7 +377,7 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
         (4 + 98304 +
          (2 + 5 * ((1681088 + 4095) // 4096) + 255 +
           (2 if ipl else 0) if cms24 else 0) +
-         (5 * ((4238296 + 4095) // 4096) + 3 +
+         (5 * ((4238296 + 4095) // 4096) + 4 +
           2 * (0x04000000 // 4096) if cms31 and ipl else
           5 * ((4238296 + 4095) // 4096) if cms31 else 0) +
          (4 * ((1681088 + 4095) // 4096) + 2 if cms24file else 0) +
@@ -392,6 +395,10 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
                 (0x00010000 // 4096) + 1 + 1) if ipl else 0)
           if tso64 else 0) +
          (2 * (0x00300000 // 4096) if ipl and tso64 else 0) +
+         # A second unchanged TSO31 invocation has its own parameter page,
+         # native stack/output/heap, and below-line native file work areas.
+         (2 + sum(struct.unpack_from(">2I",raw,0x12698))
+          if native_files else 0) +
          (((1096496 + 4095) // 4096) +
           (2 * (1 + (0x00100000 // 4096) + 1 +
                 (0x00400000 // 4096)) if ipl else 0)

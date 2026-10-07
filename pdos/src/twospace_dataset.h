@@ -22,11 +22,15 @@ typedef struct {
     unsigned int record_format;
     unsigned int block_length;
     unsigned int logical_length;
+    unsigned int organisation;
 } TSKEXTENT;
 
 int TSKFIND(TSKREAD read_record, void *context,
             const unsigned char *name, unsigned int name_length,
             TSKEXTENT *extent);
+int TSKDSCB(TSKREAD read_record, void *context,
+            const unsigned char *name, unsigned int name_length,
+            TSKEXTENT *extent, unsigned char data[96]);
 int TSKWITHIN(const TSKEXTENT *extent, unsigned int cylinder,
               unsigned int head);
 

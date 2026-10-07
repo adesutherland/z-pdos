@@ -10,6 +10,7 @@
          ENTRY TSCSTART
          ENTRY TSCPOLL
          ENTRY TSCCLEAR
+         ENTRY TSCWAITR
 TSCIO    DS    0H
          STM   2,10,28(13)
 * No armed wait state until SSCH succeeds
@@ -164,6 +165,14 @@ TSPRET   LM    2,3,28(13)
          BR    14
 * CSCH is asynchronous. Do not recycle this real workspace until TSCH
 * reports the clear-function completion bit in the returned SCSW.
+* Await attention or the completion of an already submitted read.
+TSCWAITR DS  0H
+         STM   2,10,28(13)
+         SR    8,8
+         SR    9,9
+         L     2,0(,1)
+         L     4,4(,1)
+         BRCL  15,TSCARM
 TSCCLEAR DS    0H
          STM   2,10,28(13)
          SR    8,8

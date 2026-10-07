@@ -58,6 +58,10 @@ int TSFBUILD(unsigned char *core, unsigned int kpool, unsigned int upool,
          TSF_SERVICE_MORE_REAL < kpool+TSF_KPOOL_BYTES) ||
         (upool < TSF_SERVICE_MORE_REAL+TSF_SERVICE_MORE_BYTES &&
          TSF_SERVICE_MORE_REAL < upool+TSF_UPOOL_BYTES) ||
+        (kpool < TSF_SERVICE_EXTRA_REAL+TSF_SERVICE_EXTRA_BYTES &&
+         TSF_SERVICE_EXTRA_REAL < kpool+TSF_KPOOL_BYTES) ||
+        (upool < TSF_SERVICE_EXTRA_REAL+TSF_SERVICE_EXTRA_BYTES &&
+         TSF_SERVICE_EXTRA_REAL < upool+TSF_UPOOL_BYTES) ||
         (kpool < TSF_PC_REAL+TSF_PC_BYTES &&
          TSF_PC_REAL < kpool+TSF_KPOOL_BYTES) ||
         (upool < TSF_PC_REAL+TSF_PC_BYTES &&
@@ -96,7 +100,8 @@ int TSFBUILD(unsigned char *core, unsigned int kpool, unsigned int upool,
         va.hi=0U; va.lo=0x02000000U+i*4096U;
         pa.hi=0U; pa.lo=i<5U ? 0xa000U+i*4096U :
                               i<16U ? TSF_SERVICE_EXT_REAL+(i-5U)*4096U :
-                              TSF_SERVICE_MORE_REAL+(i-16U)*4096U;
+                              i<32U ? TSF_SERVICE_MORE_REAL+(i-16U)*4096U :
+                              TSF_SERVICE_EXTRA_REAL+(i-32U)*4096U;
         if (TSDMAP(&k,va,pa) != TSD_OK) return -1;
     }
     /* K31 can revisit both table pools after the real bootstrap is gone.

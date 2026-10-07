@@ -8,7 +8,7 @@ main: procedure = .int
     say "Usage: crexx -nokeep pdos/scripts/two-space-next.crexx --args FRESH_BUILD_DIR GNU_AS GNU_LD CLASSIC_CC CLASSIC_AS CLASSIC_LD HERCULES"
     return 2
   end
-  if args.0 = 8 then if args.8 <> "pcomm" then return 2
+  if args.0 = 8 then if args.8 <> "pcomm" & args.8 <> "files" & args.8 <> "files-input" & args.8 <> "all-input" then return 2
   work = args.1
   gnuas = args.2; gnuld = args.3
   classiccc = args.4; classicas = args.5; classicld = args.6
@@ -32,6 +32,7 @@ main: procedure = .int
   realasm = out || "/TSR.asm"; realobj = out || "/TSR.obj"
   placeasm = out || "/TSP.asm"; placeobj = out || "/TSP.obj"
   invasm = out || "/TSV.asm"; invobj = out || "/TSV.obj"
+  storeasm = out || "/TSS.asm"; storeobj = out || "/TSS.obj"
   tlbobj = out || "/TSTLB.obj"
   entryobj = out || "/TSMENTRY.obj"
   keyobj = out || "/TSMKEY.obj"
@@ -70,6 +71,8 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_tso.c -o :tsoasm"
   if rc <> 0 then return rc
+  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_store.c -o :storeasm"
+  if rc <> 0 then return rc
   address crexx "cd :root"
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :compiled :object"
   if rc <> 0 then return rc
@@ -97,6 +100,8 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :tsoasm :tsoobj"
   if rc <> 0 then return rc
+  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :storeasm :storeobj"
+  if rc <> 0 then return rc
   address crexx "run :classicas --profile z900 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_channel.asm :chansupport"
   if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_tlb.asm :tlbobj"
@@ -105,7 +110,7 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_key.asm :keyobj"
   if rc <> 0 then return rc
-  address crexx "run :classicld --oformat binary --image-base 33554432 -e TSMENTRY -Map :map -o :binary :entryobj :object :gateobj :datobj :memobj :realobj :placeobj :invobj :chanobj :dsobj :cmsobj :cmsfileobj :cmscursorobj :tsoobj :chansupport :tlbobj :keyobj"
+  address crexx "run :classicld --oformat binary --image-base 33554432 -e TSMENTRY -Map :map -o :binary :entryobj :object :gateobj :datobj :memobj :realobj :placeobj :invobj :chanobj :dsobj :cmsobj :cmsfileobj :cmscursorobj :tsoobj :storeobj :chansupport :tlbobj :keyobj"
   if rc <> 0 then return rc
   placemap = out || "/TSP.map"; placebin = out || "/TSP.bin"
   dattest = out || "/dat-test"; placetest = out || "/placement-test"
@@ -165,16 +170,58 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :cmscursortest"
   if rc <> 0 then return rc
+  storetest = out || "/store-test"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_store.c pdos/tests/two-space/store.c -o :storetest"
+  if rc <> 0 then return rc
+  address crexx "run :storetest"
+  if rc <> 0 then return rc
   datemit = out || "/dat-emit"
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src pdos/src/twospace_dat.c pdos/src/twospace_fixture.c pdos/src/twospace_placement.c pdos/tests/two-space/dat_emit.c -o :datemit"
   if rc <> 0 then return rc
   asobject = out || "/service.o"
   elf = out || "/service.elf"
-  if args.0 = 8 then address crexx "run :gnuas -m64 -march=z900 --defsym PCOMM_LAUNCH=1 pdos/tests/two-space/service.S -o :asobject"
+  if args.0 = 8 then do
+    if args.8 = "pcomm" then address crexx "run :gnuas -m64 -march=z900 --defsym PCOMM_LAUNCH=1 pdos/tests/two-space/service.S -o :asobject"
+    else if args.8 = "all-input" then address crexx "run :gnuas -m64 -march=z900 --defsym NATIVE_FILES=1 --defsym NATIVE_INPUT=1 --defsym CMS_INPUT=1 pdos/tests/two-space/service.S -o :asobject"
+    else if args.8 = "files-input" then address crexx "run :gnuas -m64 -march=z900 --defsym NATIVE_FILES=1 --defsym NATIVE_INPUT=1 pdos/tests/two-space/service.S -o :asobject"
+    else address crexx "run :gnuas -m64 -march=z900 --defsym NATIVE_FILES=1 pdos/tests/two-space/service.S -o :asobject"
+  end
   else address crexx "run :gnuas -m64 -march=z900 pdos/tests/two-space/service.S -o :asobject"
   if rc <> 0 then return rc
   address crexx "run :gnuld -m elf64_s390 -T pdos/tests/two-space/service.ld :asobject -o :elf"
   if rc <> 0 then return rc
+  source_inputs = .string[]
+  source_inputs[1] = "pdos/src/twospace_service.c"
+  source_inputs[2] = "pdos/src/twospace_gate.c"
+  source_inputs[3] = "pdos/src/twospace_dat.c"
+  source_inputs[4] = "pdos/src/twospace_memory.c"
+  source_inputs[5] = "pdos/src/twospace_real.c"
+  source_inputs[6] = "pdos/src/twospace_placement.c"
+  source_inputs[7] = "pdos/src/twospace_invocation.c"
+  source_inputs[8] = "pdos/src/twospace_channel.c"
+  source_inputs[9] = "pdos/src/twospace_channel.asm"
+  source_inputs[10] = "pdos/src/twospace_dataset.c"
+  source_inputs[11] = "pdos/src/twospace_cms.c"
+  source_inputs[12] = "pdos/src/twospace_cmsfile.c"
+  source_inputs[13] = "pdos/src/twospace_cmscursor.c"
+  source_inputs[14] = "pdos/src/twospace_tso.c"
+  source_inputs[15] = "pdos/src/twospace_store.c"
+  source_inputs[16] = "pdos/src/twospace_store.h"
+  source_inputs[17] = "pdos/src/twospace_file.inc"
+  source_inputs[18] = "pdos/src/twospace_command.inc"
+  source_inputs[19] = "pdos/src/twospace_fixture.c"
+  source_inputs[20] = "pdos/src/twospace_fixture.h"
+  source_inputs[21] = "pdos/src/twospace_abi.h"
+  source_inputs[22] = "pdos/tests/two-space/service.S"
+  source_inputs[23] = "pdos/tests/two-space/service.ld"
+  source_inputs[24] = "pdos/scripts/two-space-next.crexx"
+  hashes = .string[]
+  address crexx "run shasum -a 256 :source_inputs[]" output hashes
+  if rc <> 0 then return rc
+  do i = 1 to hashes.0
+    call lineout out || "/inputs.sha256",hashes[i]
+  end
+  call lineout out || "/inputs.sha256"
   runout = out || "/run"
   if args.0 = 8 then address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pcomm_core.py :elf :binary :datemit :runout"
   else address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/service_machine.py :elf :binary :runout :gnuas :gnuld :classiccc :classicas :classicld :herctool :datemit"

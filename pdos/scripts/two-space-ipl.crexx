@@ -249,6 +249,10 @@ main: procedure = .int
     call require rc = 0, "native test member stage"
     call lineout ctl,"TSO31.PDTEST SEQ pdtest.bin CYL 1 1 0 PS F 18452 18452"
   end
+  storefile = media || "/store.bin"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/store_media.py :storefile"
+  call require rc = 0, "preformatted durable output store"
+  call lineout ctl,"PDOS.STORE SEQ store.bin CYL 42 1 0 PS F 18452 18452"
   call lineout ctl
   installer = out || "/base/install-ipl"
   address crexx "cd :media"
@@ -258,6 +262,8 @@ main: procedure = .int
   call runlog shellquote(hercdir || "/ckd2cckd") || " -q -bz2 -cyls 100 pdos00.ckd pdos00.cckd", media || "/ckd2cckd.log"
   call runlog shellquote(hercdir || "/cckd2ckd") || " -q -cyls 100 pdos00.cckd readback.ckd", media || "/readback.log"
   call runlog shellquote(installer) || " --compare pdos00.ckd readback.ckd pload.sys pdos.sys command.exe config.sys kcore.bin", media || "/roundtrip-check.log"
+  before = out || "/store-before.json"
+  call runlog "env PYTHONDONTWRITEBYTECODE=1 python3 " || shellquote(root || "/pdos/tests/two-space/store_check.py") || " " || shellquote(media || "/readback.ckd") || " " || shellquote(before), out || "/store-before.log"
   address crexx "cd :root"
   inputs = .string[]
   inputs[1] = "pdos/src/twospace_boot.c"

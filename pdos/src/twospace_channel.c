@@ -89,6 +89,29 @@ int TSCCHECKREAD(const TSCSTATE *s, unsigned int capacity,
     return TSC_OK;
 }
 
+int TSCBUILDUPDATE(TSCSTATE *s,unsigned int cylinder,unsigned int head,
+                   unsigned int record,unsigned int length)
+{
+    unsigned char *base;
+    if(TSCBUILDREAD(s,cylinder,head,record,0x06U,length)!=TSC_OK)
+        return TSC_BAD;
+    base=s->aperture+s->region_real;
+    /* WRITE DATA (05) follows the same seek/search/TIC chain. Only the
+     * explicitly allocated existing record is replaced. */
+    base[TSC_CCW_OFFSET+24U]=0x05U;
+    return TSC_OK;
+}
+
+int TSCCHECKEND(const TSCSTATE *s,unsigned int capacity)
+{
+    const unsigned char *irb;
+    if(!s||!s->aperture||!capacity||capacity>TSC_MAX_RECORD)return TSC_BAD;
+    irb=s->aperture+s->region_real+TSC_IRB_OFFSET;
+    if(irb[8U]!=0x0dU||irb[9U]||get16(irb+10U)!=capacity||
+       get32(irb+4U)!=s->region_real+TSC_CCW_OFFSET+32U)return TSC_IO;
+    return TSC_OK;
+}
+
 int TSCBUILDCONSWRITE(TSCSTATE *s, unsigned int length)
 {
     unsigned char *base;

@@ -31,8 +31,13 @@ int TSCINIT(TSCSTATE *state, unsigned char *aperture,
 int TSCBUILDREAD(TSCSTATE *state, unsigned int cylinder, unsigned int head,
                  unsigned int record, unsigned int command,
                  unsigned int capacity);
+/* Replace a preformatted fixed-length record without changing track layout. */
+int TSCBUILDUPDATE(TSCSTATE *state, unsigned int cylinder, unsigned int head,
+                   unsigned int record, unsigned int length);
 int TSCCHECKREAD(const TSCSTATE *state, unsigned int capacity,
                  unsigned int *transferred);
+/* CKD zero-length record: CE/DE/UE, no channel error, full residual. */
+int TSCCHECKEND(const TSCSTATE *state, unsigned int capacity);
 int TSCBUILDCONSWRITE(TSCSTATE *state, unsigned int length);
 int TSCCHECKWRITE(const TSCSTATE *state);
 int TSCBUILDCONSREAD(TSCSTATE *state, unsigned int capacity);

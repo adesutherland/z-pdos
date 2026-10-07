@@ -1,0 +1,64 @@
+/* SPDX-License-Identifier: MIT
+ * Rebuild a fresh diagnostic disk with a changed K core, reusing the checked
+ * unchanged native IPL stage and application inputs from a source image build.
+ * The owning boot sources must still match that build's recorded identities. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i = .int
+  if args.0 <> 4 then do
+    say "usage: crexx -nokeep pdos/scripts/two-space-refresh.crexx --args FRESH-build/pdos/work ABSOLUTE_SOURCE_IMAGE_BUILD ABSOLUTE_CORE ABSOLUTE_HERCULES_BIN"
+    return 2
+  end
+  work = args.1; prior = args.2; core = args.3; herc = args.4
+  if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
+  if left(prior,1) <> "/" | left(core,1) <> "/" | left(herc,1) <> "/" then return 2
+  address crexx "run test ! -e :work"
+  if rc <> 0 then return 2
+  lines = .string[]
+  address crexx "pwd" output lines
+  root = strip(lines.1); out = root || "/" || work; media = out || "/media"
+  address crexx "run mkdir -p :media"
+  if rc <> 0 then return rc
+  from = prior || "/media"
+  files = .string[]
+  address crexx "run find :from -maxdepth 1 -type f" output files
+  if rc <> 0 then return rc
+  hashes = .string[]
+  do i = 1 to files.0
+    source = files[i]
+    if right(source,4) = ".bin" | right(source,4) = ".sys" | right(source,4) = ".exe" | right(source,7) = "ctl.txt" then do
+      address crexx "run cmake -E copy :source :media"
+      if rc <> 0 then return rc
+      address crexx "run shasum -a 256 :source" output hashes
+      if rc <> 0 then return rc
+      call lineout out || "/reused-inputs.sha256", hashes.1
+    end
+  end
+  call lineout out || "/reused-inputs.sha256"
+  package = media || "/kcore.bin"; launch = prior || "/launch.bin"
+  installer = prior || "/base/install-ipl"
+  call checked "env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pack_core.py " || quote(core) || " " || quote(launch) || " " || quote(package), out || "/package.log"
+  address crexx "cd :media"
+  call checked quote(herc || "/dasdload") || " -bz2 ctl.txt datasets.cckd", out || "/dasdload.log"
+  call checked quote(herc || "/cckd2ckd") || " -q -cyls 100 datasets.cckd datasets.ckd", out || "/unpack.log"
+  call checked quote(installer) || " datasets.ckd pdos00.ckd pload.sys pdos.sys command.exe config.sys kcore.bin", out || "/install.log"
+  call checked quote(herc || "/ckd2cckd") || " -q -bz2 -cyls 100 pdos00.ckd pdos00.cckd", out || "/compress.log"
+  call checked quote(herc || "/cckd2ckd") || " -q -cyls 100 pdos00.cckd readback.ckd", out || "/readback.log"
+  call checked quote(installer) || " --compare pdos00.ckd readback.ckd pload.sys pdos.sys command.exe config.sys kcore.bin", out || "/compare.log"
+  call checked "env PYTHONDONTWRITEBYTECODE=1 python3 " || quote(root || "/pdos/tests/two-space/store_check.py") || " readback.ckd " || quote(out || "/store-before.json"), out || "/store-before.log"
+  call checked "shasum -a 256 pdos00.ckd pdos00.cckd kcore.bin", out || "/outputs.sha256"
+  say "Fresh core image rebuilt with verified unchanged native boot inputs."
+  return 0
+checked: procedure = .int
+  arg command = .string, log = .string
+  address system "( " || command || " ) > " || quote(log) || " 2>&1"
+  if rc <> 0 then do
+    say "FAILED: " || command || "; see " || log
+    exit 1
+  end
+  return 0
+quote: procedure = .string
+  arg value = .string
+  return "'" || changestr("'", value, "'\''") || "'"
