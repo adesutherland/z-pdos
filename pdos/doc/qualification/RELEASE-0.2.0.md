@@ -3,14 +3,15 @@
 7 October 2026. Version 0.2.0 selects the completed PD-003 K64/C31 kernel
 and shared-U architecture. [P6](TWO-SPACE-P6-2026-10-07.md) retains its
 pre-release source/workload qualification; this record owns the separate
-release build and operator acceptance.
+release build, DAT recycling repair and operator acceptance. All ten repaired
+acceptance gates passed before managed adoption and publication.
 
 | Gate | Status |
 | --- | --- |
 | Version and current documentation | Passed: current architecture/capability guides reconciled; 97 current/reference guides scanned, local links resolved. |
 | Code review and source freeze | Passed for DAT recycling repair and release plumbing; new exact source/input freeze precedes repaired-image guest qualification. |
-| Fresh local K/U image and host package checks | Initial candidate passed: fresh normal build, 93/93 host tests and package checks. Repaired image pending. |
-| Exact mainframe operator acceptance and managed replacement | Blocked by PD-023 DAT exhaustion in a valid mixed workload; previous accepted version retained. |
+| Fresh local K/U image and host package checks | Passed for the repaired image: integrated host, loader/dataset/compression and ZIP inventory checks; unchanged components retain 93/93 host results. |
+| Exact mainframe operator acceptance and managed replacement | Passed: ten gates, fourteen fresh phases, 143 ordered cases; reviewed working image adopted while stopped, old managed version retired and runbook committed. |
 | Four-host release matrix and downloadable K/U image | Branch matrix passed on both macOS hosts, Linux x64 and Windows x64; final tag matrix pending. |
 | Tag, publication and final asset verification | Pending. |
 
@@ -119,3 +120,123 @@ guest results do not qualify the repaired memory manager.
 The operator's runbook update is required for acceptance: new command routes,
 3270 device/model selection, the separate Telnet 3215 monitor, line-only
 configuration, output persistence, K shutdown and host/lease cleanup.
+
+## Repaired source and fresh build
+
+Reviewed repair commit `b2b718e61c8b468d53da382a7228bab650abf30f` was frozen
+with 459 source/input SHA-256 identities before qualification. The freeze
+receipt SHA-256 is
+`0b491b730633b4d998acac56b778b03abfe98eed77c489c610462d5118e9742a`.
+The fresh normal source build passes its integrated host, Classic object/link,
+loader, dataset and disk-compression controls. All 459 identities were
+reverified before handoff. The unchanged component implementations retain their
+93/93 host-test result; DAT and its dependent memory/gate/bootstrap checks
+were rerun for the repair.
+
+| Repaired local artifact | SHA-256 |
+| --- | --- |
+| K core, 4 MiB | `952d26167b07b39a5ba8675a622b460b17f2cde1bdbc8e16af8f94bcbf6eebcc` |
+| U PCOMM, version 0.2.0 | `ea2cb6542359a178908bda508ce89c1bee2ff495985a110febc6491545e7c38b` |
+| Bare compressed disk | `4c9a2813281c52f474b3850859085a6d68438f3924ee59463c8a99c8d963ae44` |
+| C31 handover native file | `8cff28f471788a3ee2ad8400bcad1033e7dbf979885b5a9038f0262f4c7f4774` |
+| KCORE package | `fd100145682c783883968f7ae5ca29c0b8c897bcfd6519b44415dbeb7690c77e` |
+| Local image ZIP | `9848fecd96d7399f45d21512b65c09214903a6f8e010ebfba02ef1501127c695` |
+
+The local ZIP passes its 13-entry internal SHA-256 inventory. The bare default
+core is model 2; the operator derives and records model-specific console
+configurations from these exact kernel bytes. Operator acceptance passed. Its bounded affected matrix begins with the exact failed mixed
+sequence, then covers bare/repeated IPL, CMS31 and TSO31/64 ANY/HIGH chains
+and input, bounded CMS24/TSO24 IO24, physical media and durable output,
+positive models 2–5, line/monitor handoff and final installed readiness.
+Unchanged application identities and exact output baselines are reused;
+no new invalid-binary test campaign is part of this repair.
+
+The repaired hosted Linux branch image passes its internal inventory and
+matches local PLOAD, CONFIG, bootstrap COMMAND, KCORE and U PCOMM exactly.
+C31 handover differs only at the same seven directory module-name bytes;
+actual loader materialization is identical: 127,336 bytes, entry `0x146d4`,
+AMODE31/RMODE24, loaded SHA-256
+`f500f68f68e04d617f376ff4ded69d4199d7e1f63f362e43a6aa07d7dfda2b00`.
+The hosted branch ZIP has SHA-256
+`110d25ae79eb7aed1954ebdb36c86938c7dc483eb30c73b4bb8e87d71444161d`.
+This host comparison does not substitute for the repaired guest acceptance.
+
+All four repaired-source jobs passed in the
+[branch build](https://github.com/adesutherland/z-pdos/actions/runs/37651991661):
+macOS arm64, macOS x86_64, Linux x64 and Windows x64. Publication was skipped
+because this is a branch build. Final version-tag assets remain a separate
+post-acceptance gate.
+
+The repaired model-5 core is
+`f88ee321abbc505452974d42d80ae9737af8393febb028936e43ad4ff2204f54`,
+independently reproduced from the frozen default core. The exact failed mixed
+sequence now passes all 17 ordered commands, including CMS24 CHECK/RUN at
+RC 0, both native parent/fault returns at RC 37, presentation/input/child
+repaint and a final healthy HIGH retry. Normal K shutdown, complete attached
+capture, released ownership/depth, durable STORE and unrelated disk records
+all pass. Independently reviewed stopped DAT observations: capacity 1,441,792
+bytes, high-water extent 196,608, 20 reusable frames (81,920 bytes), active
+114,688 bytes and total available 1,327,104 bytes. Reusable interior holes are
+counted separately from high-water tail storage. Host processes, handles and
+exact leases were verified closed. This closes the original reproduction; all remaining affected application,
+media and console acceptance gates also passed.
+
+## Operator acceptance and managed adoption
+
+Independent acceptance review verifies all ten gates in fourteen fresh
+fleet-controlled phases and 143 ordered command cases against the frozen
+repaired source and adapter. Every passing phase verifies normal shutdown,
+complete ordered primary/monitor output, released ownership/depth, durable
+transcript, stopped disk integrity and actual host-process/lease cleanup.
+The [machine-readable record](release-0.2.0.json) pins each phase's core, disks,
+receipt and independent handback hashes.
+
+| Gate | Accepted result |
+| --- | --- |
+| R1 | Exact mixed failure order, CMS24 CHECK/RUN, native return/fault, model-5 input/repaint and HIGH retry. |
+| R2 | Bare version/missing-command result, clean shutdown and repeated IPL of the same disk. |
+| R3 | Fresh CMS31 chain and input; bounded CMS24 IO24; 59-command CKD/tape workflow and exact exports. |
+| R4/R5 | Fresh TSO31/TSO64 ANY chains and input, five exact output files per profile. |
+| R7 | Native TSO24 library-free IO24 input and two exact output files. |
+| R8 | Models 2, 3 and 4 with long output, input, nested HIGH/U64 child and caller repaint; model 5 in R1/R6. |
+| R9 | Line-only primary and exclusive monitor prompt handoff, complete text and released ownership. |
+| R6 | Full HIGH chain/input plus native return/fault, model 5, mounted CMS31/CMS24 and healthy retry. |
+| R10 | Repeated installed-image IPL/readiness and normal shutdown; all five HIGH outputs preserved. |
+
+Eight freshly generated assembly/bytecode record-array comparisons match the
+accepted P6 references. Seven CMS files, five per wider TSO profile and two
+native TSO24 files pass exact byte/record readback. Six physical CKD exports,
+including an empty VB record and all 256 binary octets, match expected records.
+Host tape ingress and disk-to-tape COPY preserve the 160-byte payload and two
+file marks; read-only inputs and the CMS exchange remain unchanged.
+
+One model-2 console preparation omitted its nested HIGH dependency and failed
+before input. The physical member inventory identified the omission; corrected
+inputs passed models 2–4. Product source, frozen adapter and expected results
+were unchanged. Failed whole-phase results remain failed rather than being
+included in the fourteen accepted phases.
+
+The retained working image is model 5, one CPU/256 MiB, with unchanged beta-3
+HIGH applications and useful generated outputs. Its final IPL CCKD SHA-256 is
+`2fcd0407640c9672d903aee3a25074b77c05cd40f02f4395824621feb1ad70dc`;
+CMS exchange SHA-256 is
+`80543264ed614b8e65225d3bd1698bbb6b516bcaaaf8e8538c4a69af9636c34a`.
+These installed media are distinct from the OS-only downloadable image.
+The operator runbook now covers K/U commands, model/device selection,
+`ANSI@000A` teletype monitor, explicit line primary, storage/output location,
+DAT observations, K shutdown and independent host cleanup. Its task-only
+changes were reviewed before stopped adoption and selective Lab commit.
+
+Managed adoption is complete. The operator committed the seven reviewed
+runbook, registry and adapter paths in private Lab commit
+`061378c50021b9972a8994fe105ca956cbdd22ec`. The exact accepted disk is the
+current managed 0.2.0 version; the previous 0.1.1 version and 32 identified
+operator temporary media paths were retired with receipts. Canonical inputs
+and failed diagnostics were retained. All six guests are stopped, process
+and lease ledgers are empty, and instance file handles are closed. The final
+handback records 31 unrelated working-tree files preserved; no Lab push was
+requested. Its SHA-256 is
+`c9b0bdefe42c28a9aa10364ba51025eeda64148aa7dec62eba721175b8b21249`.
+
+Final tagged artifacts and signing remain the publication gate. No further
+product implementation change follows this accepted freeze.

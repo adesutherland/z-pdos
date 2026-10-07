@@ -671,9 +671,9 @@ be K-only and explicitly budgeted rather than consuming low U placement.
 ## PD-023: Recycle empty DAT tables
 
 - Type: defect
-- Status: In progress
+- Status: Done
 - Target: live shared-U mapping and release of native application storage
 - Observation: The 0.2.0 operator's mixed HIGH/call/model-5/CMS31 sequence exhausted the U DAT pool before a subsequent valid CMS24 CHECK. The retained image had `used == capacity == 0x160000`, no live allocation overlapping the fixed CMS24 image and ample free real storage. A cold CMS24 run passed on the same stopped disk. `TSDUNMAP` removed page mappings but never recycled their empty tables.
 - Repair: Unlink empty tables bottom-up, purge live single-CPU translation before reuse, recycle their pool frames and trim the high-water tail. Reserve a complete new path before changing any table. Keep the pool capacity, ASCE root and bootstrap/state ABI unchanged.
-- Evidence: [0.2.0 release record](qualification/RELEASE-0.2.0.md); focused C89 ASan/UBSan DAT churn, neighbour preservation, attachment, purge ordering and atomic-full controls pass, as do memory/gate/boot/capacity checks and Classic C31 compilation. Fresh repaired-image guest qualification remains pending.
+- Evidence: [0.2.0 release record](qualification/RELEASE-0.2.0.md); focused C89 ASan/UBSan DAT churn, neighbour preservation, attachment, purge ordering and atomic-full controls pass, as do memory/gate/boot/capacity checks and Classic C31 compilation. The reviewed/frozen repaired image then passed ten operator acceptance gates in fourteen fresh phases and 143 ordered cases, including the exact failed order and full HIGH/CMS24 sequence. All output/capture, DAT recycling and host/lease cleanup gates passed before managed adoption.
 - Acceptance: The reviewed/frozen repaired image passes the exact previously failing mixed workload, normal application/memory/console paths affected by map/free, durable output and clean shutdown. Record bounded table use and exact image/input identities before release or managed promotion.
