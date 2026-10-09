@@ -1,7 +1,8 @@
 # PD-025: shared K/U and channel I/O qualification
 
 9 October 2026. PD-025 is complete for the current one-CPU K/U profile.
-This is an uncommitted, locally qualified development candidate based on
+The locally qualified implementation was saved on `develop` as
+`3d6c01cb5b7af8d404c71f360c8888525fbc2512`, based on
 `a83d8236616cf5291ac1a08f0579923f036a0b90`. It is not a 0.2.1 release or
 managed-guest replacement. The [machine-readable record](IO-FOUNDATION-2026-10-09.json)
 retains source, tools, inputs, receipts and acceptance checks.
@@ -126,4 +127,5 @@ foundation. Its completion and the 0.2.1 release remain separate gates.
 
 All disposable guest/terminal children exited and candidate disk handles closed.
 The exact maintenance lease was released; shared guests remain stopped without
-leases. No managed image, commit, push or release changed.
+leases. Qualification changed no managed image or release. The source was
+subsequently committed and pushed at the user's request for preservation.

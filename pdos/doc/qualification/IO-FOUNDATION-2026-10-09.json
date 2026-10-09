@@ -1,6 +1,6 @@
 {
   "date": "2026-10-09",
-  "status": "PD-025 Done: locally qualified, uncommitted; 0.2.1 unreleased",
+  "status": "PD-025 Done: locally qualified development checkpoint; 0.2.1 unreleased",
   "base_commit": "a83d8236616cf5291ac1a08f0579923f036a0b90",
   "production_source_sha256": {
     "pdos/src/twospace_3270.c": "711832dde997616baf3ad1fdf9c84cc917524f896d901faf4c1e5682f4615281",
@@ -1196,5 +1196,6 @@
     "all_shared_guests_stopped_and_unleased": true,
     "managed_guest_changed": false
   },
-  "pass": true
+  "pass": true,
+  "implementation_commit": "3d6c01cb5b7af8d404c71f360c8888525fbc2512"
 }
