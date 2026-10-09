@@ -214,6 +214,35 @@ int TSCCHECKWRITE(const TSCSTATE *s)
         return TSC_IO;
     return TSC_OK;
 }
+
+int TSCBUILDEXT(TSCSTATE *s,unsigned int command,unsigned int real,unsigned int length,unsigned int input)
+{
+    unsigned char *base;unsigned int at=0U,n,i=0U;
+    if(!s||!s->aperture||s->quarantined||s->occupied||!length||length>131072U||input>1U||
+       real>=s->real_bytes||length>s->real_bytes-real||
+       (input&&length>65535U)||
+       (real<s->region_real+TSC_REGION_BYTES&&real+length>s->region_real))return TSC_BAD;
+    if((input&&command!=2U&&command!=6U&&command!=14U&&command!=10U)||
+       (!input&&command!=1U&&command!=5U&&command!=13U&&command!=15U&&command!=17U&&command!=9U))return TSC_BAD;
+    base=s->aperture+s->region_real;clear(base,TSC_DATA_OFFSET);
+    put32(base+4U,0x0080ff00U);put32(base+8U,s->region_real+TSC_CCW_OFFSET);
+    while(at<length){
+        n=input?length:length-at>32768U?32768U:length-at;
+        ccw(base+TSC_CCW_OFFSET+8U*i,command,0x20U|(at+n<length?0x80U:0U),n,real+at);
+        at+=n;++i;
+    }
+    return TSC_OK;
+}
+int TSCCHECKEXT(const TSCSTATE *s,unsigned int length,unsigned int input,unsigned int *got)
+{
+    const unsigned char *irb;unsigned int residual,ccws;
+    if(!s||!s->aperture||!got||!length||length>131072U||input>1U||(input&&length>65535U))return TSC_BAD;
+    irb=s->aperture+s->region_real+TSC_IRB_OFFSET;residual=get16(irb+10U);ccws=input?1U:(length+32767U)/32768U;
+    if((irb[8U]&0x7fU)!=0x0cU||irb[9U]||get32(irb+4U)!=s->region_real+TSC_CCW_OFFSET+8U*ccws||
+       residual>(input?length:length-32768U*(ccws-1U))||
+       (!input&&residual&&!(length==1U&&residual==1U&&s->aperture[s->region_real+TSC_CCW_OFFSET]==15U)))return TSC_IO;
+    *got=length-residual;return TSC_OK;
+}
 int TSCCHECKOUT(const TSCSTATE *s)
 {
     const unsigned char *irb;

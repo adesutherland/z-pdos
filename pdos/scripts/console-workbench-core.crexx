@@ -1,0 +1,20 @@
+/* SPDX-License-Identifier: MIT; normal nucleus with the reviewed K service. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>5 then return 2
+  work=args.1;service=args.2;emit=args.3;gnuas=args.4;gnuld=args.5
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  object=work||"/normal.o";elf=work||"/normal.elf"
+  address crexx "run :gnuas -m64 -march=z900 pdos/src/twospace_normal.S -o :object"
+  if rc<>0 then return rc
+  address crexx "run :gnuld -m elf64_s390 -T pdos/tests/two-space/service.ld :object -o :elf"
+  if rc<>0 then return rc
+  core=work||"/core"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_core.py :elf :service :emit :core"
+  return rc

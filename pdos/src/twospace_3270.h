@@ -14,6 +14,7 @@
 #define T27_EVENT_KEY 1U
 #define T27_EVENT_STRUCTURED 2U
 #define T27_EVENT_UNFORMATTED 3U
+#define T27_EVENT_BUFFER 4U
 typedef struct {
     unsigned int rows,columns,cells,addressing;
 } T27GEOMETRY;
@@ -33,6 +34,8 @@ typedef struct {
     unsigned int implicit_valid,default_rows,default_columns;
     unsigned int alternate_rows,alternate_columns;
     unsigned int printer_valid,default_buffer,alternate_buffer;
+    unsigned int colours_valid,highlighting;
+    unsigned char colours[16];
 } T27CAPABILITIES;
 int T27GEOM(T27GEOMETRY *,unsigned int,unsigned int,unsigned int);
 int T27ADDR(const T27GEOMETRY *,unsigned int,unsigned char[2]);
@@ -45,12 +48,27 @@ int T27PACK(unsigned int,const unsigned char *,unsigned int,
               unsigned char *,unsigned int,unsigned int *);
 int T27WRITE(const T27GEOMETRY *,const unsigned char *,unsigned int);
 int T27QUERY(unsigned char *,unsigned int,unsigned int *);
+/* Tested local3287 unformatted text: WCC start-print and explicit End Media. */
+int T27PRINT(const unsigned char *,unsigned int,unsigned char *,unsigned int,unsigned int *);
+int T27PRWRT(const unsigned char *,unsigned int);
+/* Set Reply Mode for the implicit partition; requested character attributes
+ * remain explicit native pairs in the immutable returned records. */
+int T27REPLY(unsigned int,const unsigned char *,unsigned int,unsigned char *,unsigned int,unsigned int *);
 /* Returned capability bits are device replies, not PDOS implementation bits.
  * Preserve the complete raw reply separately for feature-specific clients. */
 int T27QRPLY(const unsigned char *,unsigned int,T27CAPABILITIES *);
+/* Exact legacy DX3270 reply fingerprint. No general malformed-SF tolerance;
+ * callers retain the original record and identify the compatibility profile. */
+int T27DXQR(const unsigned char *,unsigned int,T27CAPABILITIES *);
 int T27HAS(const T27CAPABILITIES *,unsigned int);
 /* Input fields describe ranges in the original record, retaining SA/GE and
  * DBCS bytes. The caller owns that record. Validation precedes publication. */
 int T27INPUT(const T27GEOMETRY *,const unsigned char *,unsigned int,
                T27INPUTEVENT *,T27INPUTFIELD *,unsigned int);
+/* Validate/count a complete immutable record without publishing field views. */
+int T27EVENT(const T27GEOMETRY *,const unsigned char *,unsigned int,T27INPUTEVENT *);
+/* Default field reply-mode Read Buffer: extract one unprotected field,
+ * retaining embedded nulls and trimming trailing nulls only. */
+int T27BUFFER(const T27GEOMETRY *,const unsigned char *,unsigned int,unsigned int,
+                unsigned char *,unsigned int,unsigned int *,T27INPUTEVENT *);
 #endif

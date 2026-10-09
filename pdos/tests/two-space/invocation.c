@@ -64,6 +64,14 @@ int main(void)
     assert(TSVBEGIN(&stack,TSV_PDOS,31U,20U,20U,&parent_context,
                     &parent)==TSV_OK);
     assert(TSVTOP(&stack)->personality==TSV_PDOS);
+    assert(TSVOWN(&stack,parent,TSV_DEVICE_SESSION,808U)==TSV_OK);
+    assert(TSVHAS(&stack,parent,TSV_DEVICE_SESSION,808U)==TSV_OK);
+    assert(TSVOWN(&stack,parent,TSV_PANEL,909U)==TSV_OK);
+    assert(TSVHAS(&stack,parent,TSV_PANEL,909U)==TSV_OK);
+    assert(TSVHAS(&stack,parent+1U,TSV_PANEL,909U)==TSV_BUSY);
+    assert(TSVFORGET(&stack,parent,TSV_PANEL,909U)==TSV_OK);
+    assert(TSVFORGET(&stack,parent,TSV_DEVICE_SESSION,808U)==TSV_OK);
+    assert(TSVHAS(&stack,parent,TSV_DEVICE_SESSION,808U)==TSV_STALE);
     assert(TSVEND(&stack,parent,clean_owned,&trace)==TSV_OK);
     assert(TSVTOP(&stack)==0);
     assert(TSVBEGIN(&stack,TSV_CMS,31U,1U,2U,&parent_context,

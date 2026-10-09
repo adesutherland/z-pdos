@@ -25,8 +25,9 @@ main: procedure = .int
   if monitor = "monitor" then flags = flags || " --monitor"
   if args.0 = 9 then do
     variant = args.9
-    if variant <> "raw" & variant <> "disconnect" then return 2
-    flags = flags || " --" || variant
+    if variant <> "raw" & variant <> "disconnect" & variant <> "workbench" then return 2
+    if variant="workbench" then flags=flags||" --workbench-normal --colour"
+    else flags = flags || " --" || variant
   end
   address system "env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_machine.py " || quote(disk) || " " || quote(configured) || " " || quote(hercules) || " " || quote(runout) || " --commands " || quote(commands) || flags
   return rc

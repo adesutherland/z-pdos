@@ -1,0 +1,9 @@
+INPUT_OWNER source=PRIMARY consumer=PCOMM generation=7
+COMMAND_BEGIN token=0042 command="CMS RUN 31 RXVM HELLO"
+PROGRAM token=0042 name=RXVM state=ACTIVE rc=PENDING
+TEXT token=0042 source=RXVM bytes=18 encoding=UTF-8
+Hello from cREXX.
+TEXT token=0042 source=RXVM bytes=35 encoding=UTF-8
+Native CMS31 invocation on z/PDOS.
+COMMAND_END token=0042 program=RXVM os=OK rc=0
+INPUT_REQUEST source=PRIMARY consumer=PCOMM kind=LINE

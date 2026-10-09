@@ -17,6 +17,10 @@
 #include "twospace_store.h"
 #include "twospace_abi.h"
 #include "twospace_console.h"
+#include "twospace_dasd.h"
+#include "twospace_session.h"
+#include "twospace_workbench.h"
+#include "twospace_display.h"
 #include "twospace_transcript.h"
 typedef struct channel_context CHANNELCONTEXT;
 
@@ -45,6 +49,33 @@ static unsigned int console_v1_init(void);
 static unsigned int console_v1_line(const unsigned char *text,unsigned int length);
 static unsigned int console_v1_read(unsigned char *,unsigned int,unsigned int *,unsigned int *,unsigned int);
 static unsigned int console_v1_cancel(unsigned int token);
+static unsigned int console_device_service(TSGREQUEST *);
+static unsigned int console_device_close(unsigned int,unsigned int);
+static unsigned int console_device_init(void);
+static unsigned int console_device_geometry_check(TTCCAP *,unsigned int);
+static unsigned int console_device_geometry(TTCCAP *);
+static unsigned int console_device_reap(unsigned int);
+static unsigned int console_panel_service(TSGREQUEST *);
+static unsigned int console_panel_enabled(void);
+static unsigned int console_panel_render(void);
+static unsigned int console_panel_line(const unsigned char *,unsigned int);
+static void console_panel_begin(const TSVFRAME *);
+static void console_panel_end(unsigned int,const unsigned char *);
+static void console_panel_operator(unsigned int,unsigned int);
+static int console_panel_close(unsigned int,unsigned int);
+static unsigned int console_panel_key(unsigned int,const unsigned char *,unsigned int,unsigned int,unsigned int);
+static void console_panel_primary(void);
+static unsigned int console_panel_source(void);
+static void console_panel_waiting(unsigned int);
+static unsigned int console_panel_cursor(unsigned int);
+static unsigned int console_panel_take(unsigned int,unsigned char *,unsigned int,unsigned int *,unsigned int *);
+static unsigned int console_panel_hit(unsigned int);
+static void console_panel_gap(void);
+static unsigned int device_colours(void);
+static unsigned int device_highlights(void);
+static unsigned int device_buffer(void);
+static unsigned int tc_span(TSPADDR,unsigned int,unsigned int,unsigned char *,unsigned int);
+static unsigned int console_panel_set(TSGREQUEST *,const unsigned char *);
 static void console_v1_begin(const TSVFRAME *frame);
 static void console_v1_failed(unsigned int,const unsigned char *,unsigned int);
 static void console_v1_operator(unsigned int,const unsigned char *,unsigned int,unsigned int);
@@ -1376,6 +1407,8 @@ static int native_clean(unsigned int token, const TSVRESOURCE *resource,
     unsigned int i;
     (void)token;
     if (!frame || !resource) return 1;
+    if(resource->kind==TSV_PANEL)return console_panel_close(token,resource->handle);
+    if(resource->kind==TSV_DEVICE_SESSION){if(console_device_reap(token))return 1;return console_device_close(token,resource->handle)?1:0;}
     if(resource->kind==TSV_HIGH_IMAGE)return high_cleanup(resource->handle,frame);
     if (resource->kind==TSV_IMAGE) {
         if (resource->handle!=frame->token || frame->image_owner>=32U ||
@@ -2922,6 +2955,8 @@ static unsigned int call_alloc(unsigned int,unsigned int *,unsigned char **);
 #include "twospace_call.inc"
 #include "twospace_high.inc"
 #include "twospace_console.inc"
+#include "twospace_device.inc"
+#include "twospace_panel.inc"
 
 static unsigned int service_request(TSGREQUEST *request)
 {

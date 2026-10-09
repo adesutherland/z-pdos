@@ -10,8 +10,9 @@ static TTXSTATE tc_log;
 static TSCSTATE tc_monitor_channel;
 static unsigned int tc_ready,tc_ssid,tc_monitor_ssid,tc_monitor_state;
 static unsigned int tc_next_input,tc_read_owner,tc_read_ssid,tc_read_handle,tc_submitted;
+static unsigned int tc_monitor_interactive;
 static unsigned int tc_monitor_stale,tc_screen_owner,tc_raw_owner,tc_input_field;
-static unsigned int tc_monitor_gap_notice;
+static unsigned int tc_monitor_gap_notice,tc_capture_failed;
 static unsigned int tc_display_known,tc_input_end;
 static unsigned int tc_attention_pending,tc_attention_owner;
 static unsigned int tc_input_owner;
@@ -31,7 +32,7 @@ static unsigned int tc_span(TSPADDR address,unsigned int bytes,unsigned int dire
                              unsigned char *data,unsigned int copy)
 {
     TSGCONTEXT gate;TSGREQUEST request;
-    if(bytes>TSA_SCREEN_BYTES)return 8U;
+    if(bytes>TDS_TRANSFER_BYTES)return 8U;
     if(!bytes)return 0U;
     gate.u_tables=&u_tables;gate.real_aperture=(unsigned char *)TSF_KAPERTURE_VA;
     gate.real_bytes=TSF_REAL_BYTES;gate.rights=user_rights;gate.rights_context=0;
@@ -48,6 +49,7 @@ static unsigned int tc_find(unsigned int device,TSCSTATE *channel_state)
     return 0U;
 }
 static void tc_gap(unsigned int,unsigned int);
+static void tc_snapshot(void);
 static unsigned int tc_abort_output(TSCSTATE *device,unsigned int ssid)
 {
     const TIOREQUEST *r=TIOSTATE(&channel_io,device);
@@ -61,6 +63,7 @@ static void tc_attention(unsigned int ssid)
         /* Read Inquiry owns line input; it has no 3270 field/AID lease. */
         if(tc_cap.device_class!=TSA_DEVICE_3270)return;
         tc_attention_pending=1U;tc_attention_owner=tc_input_owner;
+        tc_snapshot();
     }else{tc_monitor_stale=1U;tc_gap(0U,3U);}
 }
 typedef struct {
@@ -80,6 +83,14 @@ static int tc_notice(TSCSTATE *device,unsigned int ssid,const unsigned char *irb
     TCNOTICE *n=(TCNOTICE *)argument;
     const TIOREQUEST *r=TIOSTATE(&channel_io,device);
     if(irb[8U]&0x80U){
+        /* An early line reply is already owned when Read Inquiry is prepared.
+         * Its attention is a notification, not a capture gap or completion;
+         * only the matched read status and bytes can satisfy this caller. */
+        if(!n&&r&&(r->phase==TIO_PREPARED||r->phase==TIO_ACTIVE)&&ssid==tc_monitor_ssid&&
+           ssid==tc_read_ssid&&r->owner==tc_read_owner&&r->ticket==tc_read_handle)return 0;
+        /* A completed owning read consumes this record's AT along with its
+         * bytes. Re-queuing that combined status fabricates another prompt. */
+        if(!n&&r&&r->phase==TIO_ACTIVE&&r->owner==tc_read_owner&&r->ticket==tc_read_handle&&ssid==tc_read_ssid&&(irb[8U]&0x0cU))return 0;
         if(n&&r&&r->phase==TIO_ACTIVE&&(irb[8U]&0x0cU)==0x0cU&&ssid==tc_ssid)tc_unlock_owner(n->command,n->text);
         tc_attention(ssid);
         if(n&&n->prompt&&r&&r->phase==TIO_PREPARED&&ssid==tc_ssid)return TIO_DEFER;
@@ -93,12 +104,12 @@ static unsigned int tc_write(TSCSTATE *device,unsigned int ssid,unsigned int com
     if(!device||!device->aperture||!ssid||!text||!length||length>TSC_MAX_CONSOLE||device->quarantined)return 12U;
     if(ssid==console_ssid&&console_read_phase)return 16U;
     if(ssid==tc_read_ssid&&tc_submitted)return 16U;
-    if(prompt&&ssid==tc_ssid&&tc_attention_pending)return 0U;
+    if(prompt&&ssid==tc_ssid&&tc_attention_pending)return prompt==2U?16U:0U;
     if(TSCBUILDCONSCMD(device,command,length,0U)!=TSC_OK)return 12U;
     for(i=0U;i<length;++i)TSCDATA(device)[i]=text[i];
     notice.prompt=prompt;notice.command=command;notice.text=text;context.notice=tc_notice;context.argument=&notice;
     rc=channel_run_notice(device,ssid,&context);
-    if(rc==TIO_DEFER)return 0U;
+    if(rc==TIO_DEFER)return prompt==2U?16U:0U;
     if(rc)return rc==TIO_BUSY?16U:12U;
     if(TSCCHECKOUT(device)!=TSC_OK)return 12U;
     if(ssid==tc_ssid){
@@ -144,7 +155,7 @@ static int tc_legacy_control(unsigned int svc)
 static void tc_gap(unsigned int token,unsigned int reason)
 {
     unsigned char payload[4];cms_put_word(payload,reason);
-    tc_monitor_gap_notice=1U;
+    tc_monitor_gap_notice=1U;console_panel_gap();
     if(tc_ready)TTXAPPEND(&tc_log,TSA_TRANSCRIPT_GAP,token,0U,reason,payload,4U);
 }
 static unsigned int tc_line_output(TSCSTATE *device,unsigned int ssid,
@@ -165,6 +176,8 @@ static void tc_snapshot(void)
     out[3]=tc_log.sequence_hi;out[4]=tc_log.sequence_lo;out[5]=tc_log.gaps;
     out[6]=tc_monitor_state;out[7]=tc_read_owner;out[8]=tc_screen_owner;
     out[9]=tc_cap.rows;out[10]=tc_cap.columns;out[11]=tc_cap.device_class;
+    out[12]=tc_input_owner;out[13]=tc_attention_pending;out[14]=tc_attention_owner;
+    {const TSVFRAME *f=TSVTOP(&native_invocations);out[15]=f?f->token:0U;}
 }
 static unsigned int tc_render(void)
 {
@@ -172,6 +185,11 @@ static unsigned int tc_render(void)
     TTCFIELD fields[4];
     const unsigned char *header=tc_headers[depth];unsigned int hb=tc_header_lengths[depth];
     if(tc_cap.device_class!=TSA_DEVICE_3270)return 0U;
+    /* Read the owning terminal record before further host writes. A Clear
+     * record can otherwise be displaced while returning from monitor input.
+     * Semantic output is retained and the next input boundary catches up. */
+    if(tc_attention_pending)return 0U;
+    if(console_panel_enabled())return console_panel_render();
     if(!hb){header=tc_default_header;hb=(unsigned int)sizeof tc_default_header;}
     n=tc_cap.columns-1U;
     for(i=0U;i<n;++i){
@@ -189,11 +207,12 @@ static unsigned int tc_render(void)
     if(tc_display_known){
         if(TTCDIFF(&tc_cap,fields,3U,tc_raw,tc_stream,TTC_MAX_STREAM,&bytes))return 8U;
         if(!bytes)return 0U;
-        rc=tc_output(&console_channel,tc_ssid,1U,tc_stream,bytes);
+        rc=tc_write(&console_channel,tc_ssid,1U,tc_stream,bytes,2U);
     }else{
         if(TTCENCODE(&tc_cap,fields,4U,tc_view->entry_row,1U,tc_stream,TTC_MAX_STREAM,&bytes))return 8U;
-        rc=tc_output(&console_channel,tc_ssid,13U,tc_stream,bytes);
+        rc=tc_write(&console_channel,tc_ssid,13U,tc_stream,bytes,2U);
     }
+    if(rc==16U&&tc_attention_pending)return 0U;
     if(rc){tc_display_known=0U;return rc;}
     for(i=0U;i<3U;++i){
         origin=fields[i].row*tc_cap.columns+fields[i].column;
@@ -208,11 +227,14 @@ static unsigned int console_v1_init(void)
     const unsigned char *config=(const unsigned char *)TSF_KAPERTURE_VA+TTC_CONFIG_REAL;
     unsigned char *work;unsigned int rc,type,address,model,monitor,i;
     if(tc_ready)return 0U;
-    if(!console_v1_enabled()||cms_word(config+4U)!=32U||cms_word(config+24U)||cms_word(config+28U))return 20U;
+    if(!console_v1_enabled()||cms_word(config+4U)!=32U||(cms_word(config+24U)&~TSA_CONSOLE_INTERACTIVE_MONITOR)||cms_word(config+28U))return 20U;
     if(console_read_phase)return 16U;
     type=cms_word(config+8U);address=cms_word(config+12U);
     model=cms_word(config+16U);monitor=cms_word(config+20U);
+    tc_monitor_interactive=cms_word(config+24U)&TSA_CONSOLE_INTERACTIVE_MONITOR;
+    if(tc_monitor_interactive&&!monitor)return 20U;
     if(TTCCONFIG(&tc_cap,type,address,model,monitor)!=TTC_OK)return 20U;
+    if(!tc_monitor_interactive)tc_cap.features&=~TSA_FEATURE_INPUT_HANDOFF;
     if(TSCINIT(&tc_monitor_channel,(unsigned char *)TSF_KAPERTURE_VA,TSF_REAL_BYTES,TTC_MONITOR_REAL)!=TSC_OK)return 12U;
     if(TIOBIND(&channel_io,&tc_monitor_channel)!=TIO_OK)return 12U;
     tc_ssid=tc_find(address,&console_channel);
@@ -234,8 +256,10 @@ static unsigned int console_v1_init(void)
      * selected device family, even though Hercules reports a default model. */
     rc=tc_sense(&console_channel,tc_ssid,&i);
     if(rc||i!=7U){rc=12U;goto failed;}
-    if(type==TSA_DEVICE_3270){if(TSCDATA(&console_channel)[4U]!=0x32U||TSCDATA(&console_channel)[5U]!=0x78U){rc=20U;goto failed;}}
+    if(type==TSA_DEVICE_3270){if(TSCDATA(&console_channel)[4U]!=0x32U||(TSCDATA(&console_channel)[5U]!=0x78U&&TSCDATA(&console_channel)[5U]!=0x79U)){rc=20U;goto failed;}}
     else if(TSCDATA(&console_channel)[4U]!=0x32U||TSCDATA(&console_channel)[5U]!=0x15U){rc=20U;goto failed;}
+    rc=console_device_init();if(rc)goto failed;
+    if(type==TSA_DEVICE_3270&&TTCVINIT(tc_view,&tc_cap)!=TTC_OK){rc=20U;goto failed;}
     tc_base_cap=tc_cap;tc_ready=1U;
     for(i=0U;i<native_invocations.depth;++i){
         const TSVFRAME *frame=&native_invocations.frame[i];
@@ -256,9 +280,10 @@ static unsigned int console_v1_line(const unsigned char *text,unsigned int lengt
     rc=console_v1_init();if(rc)return rc;
     if(length>256U||(length&&!text)||tc_read_owner)return 8U;
     if(tc_raw_owner||console_read_phase)return 16U;
-    if(TTXAPPEND(&tc_log,TSA_TRANSCRIPT_TEXT,token,TSA_ENCODING_1047,0U,text,length))return 24U;
+    if(TTXAPPEND(&tc_log,TSA_TRANSCRIPT_TEXT,token,TSA_ENCODING_1047,0U,text,length)&&!tc_capture_failed){tc_capture_failed=1U;tc_gap(token,4U);}
     if(tc_cap.device_class==TSA_DEVICE_LINE)
         rc=tc_line_output(&console_channel,tc_ssid,text,length);
+    else if(console_panel_enabled())rc=console_panel_line(text,length);
     else{rc=TTCVLINE(tc_view,text,length)==TTC_OK?tc_render():8U;}
     if(tc_monitor_ssid){
         unsigned int monitor_rc;
@@ -330,23 +355,37 @@ static unsigned int console_v1_read(unsigned char *text,unsigned int capacity,
     const TSVFRAME *f=TSVTOP(&native_invocations);TSCSTATE *device;
     unsigned int ssid,rc,n,input_class,read_capacity;
     rc=console_v1_init();if(rc)return rc;
-    if(!f||!text||!count||!aid||!capacity||capacity>(raw_mode?TSA_SCREEN_BYTES:256U)||tc_read_owner)return 8U;
+    if(!f||!text||!count||!aid||!capacity||capacity>(raw_mode==1U?TSA_SCREEN_BYTES:256U)||tc_read_owner)return 8U;
     if(console_read_phase)return 16U;
-    if(!raw_mode&&tc_raw_owner)return 16U;
-    if(raw_mode&&tc_raw_owner&&tc_raw_owner!=f->token)return 16U;
-    if(raw_mode&&(tc_cap.device_class!=TSA_DEVICE_3270||tc_next_input))return 20U;
-    if(tc_next_input&&(!tc_monitor_ssid||tc_monitor_stale))return 16U;
+    if(raw_mode!=1U&&tc_raw_owner)return 16U;
+    if(raw_mode==1U&&tc_raw_owner&&tc_raw_owner!=f->token)return 16U;
+    if(raw_mode==1U&&(tc_cap.device_class!=TSA_DEVICE_3270||tc_next_input))return 20U;
+restart:
+    if(raw_mode!=1U&&console_panel_enabled()){
+        rc=console_panel_take(f->token,text,capacity,count,aid);
+        if(rc!=16U){if(rc)return rc;if(*aid==0x7dU){console_panel_waiting(0U);return 0U;}
+            rc=console_panel_key(f->token,text,*count,*aid,console_panel_cursor(f->token));
+            if(raw_mode==2U&&(*aid==0xf5U||*aid==0xf6U||*aid==0x6dU)){if(rc&&rc!=20U)return rc;return 0U;}if(rc&&rc!=20U)return rc;}
+    }
+    if(raw_mode!=1U&&console_panel_enabled()){tc_next_input=console_panel_source();console_panel_waiting(1U);rc=tc_render();if(rc)return rc;}
+    if(tc_next_input&&(!tc_monitor_ssid||tc_monitor_stale||tc_monitor_state!=TSA_MONITOR_ONLINE))return 16U;
     ssid=tc_next_input?tc_monitor_ssid:tc_ssid;device=tc_next_input?&tc_monitor_channel:&console_channel;
     if(device->quarantined)return 12U;
     input_class=tc_next_input?TSA_DEVICE_LINE:tc_cap.device_class;
-    read_capacity=raw_mode?TSC_MAX_INPUT:4096U;
+    read_capacity=raw_mode==1U?TSC_MAX_INPUT:4096U;
     if(TSVOWN(&native_invocations,f->token,TSV_TERMINAL,ssid)!=TSV_OK)return 16U;
     tc_read_owner=f->token;tc_read_ssid=ssid;
+    /* Primary attention remains owned by this exact blocked caller. It can
+     * request a return without publishing a fabricated monitor completion. */
+    if(ssid==tc_monitor_ssid&&tc_cap.device_class==TSA_DEVICE_3270){
+        unsigned char unlock=0xc2U;tc_input_owner=f->token;
+        rc=tc_write(&console_channel,tc_ssid,1U,&unlock,1U,1U);if(rc)goto done;
+    }
     if(ssid==tc_ssid){rc=tc_claim_attention(f->token);if(rc)goto done;}
-    if(input_class==TSA_DEVICE_3270&&!raw_mode){
+    if(input_class==TSA_DEVICE_3270&&raw_mode!=1U){
         unsigned char prompt[5];
         /* Unlock without clearing already keyed input or resetting its MDT. */
-        prompt[0]=0xc2U;prompt[1]=0x11U;TTCADDR(&tc_cap,tc_input_field,prompt+2U);prompt[4]=0x13U;
+        prompt[0]=0xc2U;prompt[1]=0x11U;TTCADDR(&tc_cap,console_panel_enabled()?console_panel_cursor(f->token):tc_input_field,prompt+2U);prompt[4]=0x13U;
         rc=tc_write(&console_channel,tc_ssid,1U,prompt,5U,1U);if(rc){tc_display_known=0U;goto done;}
     }
     if(input_class==TSA_DEVICE_3270){
@@ -372,8 +411,23 @@ again:
         context.notice=tc_notice;context.argument=0;
         status=channel_poll(device,f->token,tc_read_handle,&context);
         if(status==TIO_OK){if(TSCCHECKIN(device,read_capacity,&n)!=TSC_OK){rc=12U;goto done;}break;}
-        if(status!=TIO_PENDING){rc=12U;goto done;}
+        if(status!=TIO_PENDING){
+            if(ssid==tc_monitor_ssid&&tc_cap.device_class==TSA_DEVICE_3270){
+                if(console_v1_cancel(f->token))return 12U;
+                tc_monitor_stale=1U;tc_monitor_state=TSA_MONITOR_OFFLINE;tc_gap(f->token,1U);console_panel_primary();
+                goto restart;
+            }
+            rc=12U;goto done;
+        }
         tc_other_status(ssid);
+        if(ssid==tc_monitor_ssid&&tc_cap.device_class==TSA_DEVICE_3270&&
+           tc_attention_pending&&tc_attention_owner==f->token){
+            if(console_v1_cancel(f->token))return 12U;
+            /* The line protocol cannot correlate a late reply with a new
+             * request. Require an actual reconnect before selecting it again. */
+            tc_monitor_stale=1U;tc_gap(f->token,6U);console_panel_primary();
+            goto restart;
+        }
         if((input_class==TSA_DEVICE_LINE?TSCWAITI(ssid,TSCIRB(device)):TSCWAITN(ssid,TSCIRB(device)))){rc=12U;goto done;}
     }
     if(TSVCOMPLETE(&native_invocations,f->token,tc_read_handle)!=TSV_OK||
@@ -382,27 +436,44 @@ again:
     tc_read_handle=tc_submitted=0U;
     if(input_class==TSA_DEVICE_LINE){
         if(n>capacity){rc=8U;goto done;}
-        for(rc=0U;rc<n;++rc)text[rc]=TSCDATA(device)[rc];*count=n;*aid=0x7dU;rc=0U;
+        for(rc=0U;rc<n;++rc)text[rc]=TSCDATA(device)[rc];*count=n;*aid=0x7dU;rc=0U;console_panel_waiting(0U);
     }else if(n==3U&&TSCDATA(device)[0U]==0x60U){
+        if(raw_mode!=1U){unsigned char unlock=0xc2U;rc=tc_output(&console_channel,tc_ssid,1U,&unlock,1U);if(rc)goto done;}
         rc=tc_wait(device,ssid);if(rc)goto done;goto again;
-    }else if(raw_mode){
+    }else if(raw_mode==1U){
         if(n>capacity){rc=8U;goto done;}
         for(rc=0U;rc<n;++rc)text[rc]=TSCDATA(device)[rc];*count=n;*aid=n?text[0U]:0U;rc=0U;
     }else{
-        unsigned char control[8];
+        unsigned char control[12];T27GEOMETRY geometry;T27INPUTEVENT event;unsigned int cursor=0xffffffffU;
+        if(T27GEOM(&geometry,tc_cap.rows,tc_cap.columns,tc_cap.encoding)||T27EVENT(&geometry,TSCDATA(device),n,&event)){rc=8U;goto done;}
+        if(event.cursor_valid)cursor=event.cursor;
         rc=TTCINPUT(&tc_cap,TSCDATA(device),n,tc_input_field,text,capacity,count,aid)==TTC_OK?0U:8U;
         if(rc)goto done;
+        if(console_panel_enabled()&&*aid==0x7dU&&n<=3U&&event.cursor_valid&&(cursor<tc_input_field||cursor>=tc_input_end)){
+            rc=console_panel_key(f->token,0,0U,console_panel_hit(cursor),cursor);
+            if(rc==20U)rc=0U;if(rc)goto done;control[0]=0xc2U;rc=tc_output(&console_channel,tc_ssid,1U,control,1U);if(rc)goto done;
+            do{rc=tc_wait(device,ssid);if(rc)goto done;}while(!(TSCIRB(device)[8U]&0x80U));goto again;
+        }
         if(*aid==0x7dU){
             /* The submitted bytes are already private. Clear only this field;
-             * leave the keyboard locked until the next owning input prompt. */
+             * position its cursor at the start and leave the keyboard locked
+             * until the next owning input prompt. */
             control[0]=0xc1U;control[1]=0x11U;TTCADDR(&tc_cap,tc_input_field,control+2U);
             control[4]=0x3cU;TTCADDR(&tc_cap,tc_input_end,control+5U);control[7]=0U;
-            rc=tc_output(&console_channel,tc_ssid,1U,control,8U);
+            control[8]=0x11U;TTCADDR(&tc_cap,tc_input_field,control+9U);control[11]=0x13U;
+            rc=tc_output(&console_channel,tc_ssid,1U,control,12U);
             if(rc)tc_display_known=0U;
+            else if(console_panel_enabled()){tc_input_owner=0U;console_panel_key(f->token,text,*count,*aid,cursor);}
         }else{
             /* Legacy line readers receive submissions, never PF text as a
              * command. A separate event service exposes the complete AID. */
-            if(*aid==0x6dU){tc_display_known=0U;rc=tc_render();}
+            if(console_panel_enabled()){
+                rc=console_panel_key(f->token,n>=6U?text:0,*count,*aid,cursor);
+                if(raw_mode==2U&&(*aid==0xf5U||*aid==0xf6U||*aid==0x6dU)){if(rc==20U)rc=0U;goto done;}
+                if(rc==20U)rc=0U;if(rc)goto done;
+                if(console_panel_source()!=tc_next_input){if(console_v1_cancel(f->token))return 12U;goto restart;}
+                control[0]=0xc2U;rc=tc_output(&console_channel,tc_ssid,1U,control,1U);
+            }else if(*aid==0x6dU){tc_display_known=0U;rc=tc_render();}
             else{control[0]=0xc2U;rc=tc_output(&console_channel,tc_ssid,1U,control,1U);}
             if(rc)goto done;
             do{rc=tc_wait(device,ssid);if(rc)goto done;}while(!(TSCIRB(device)[8U]&0x80U));
@@ -424,6 +495,7 @@ static void console_v1_begin(const TSVFRAME *frame)
          native_images[frame->image_owner].name:tc_default_header;
     n=frame->image_owner<TSL_IMAGES&&native_images[frame->image_owner].bytes?8U:sizeof tc_default_header;
     for(i=0U;i<n;++i)tc_headers[depth][i]=name[i];tc_header_lengths[depth]=n;
+    console_panel_begin(frame);
     TTXAPPEND(&tc_log,TSA_TRANSCRIPT_COMMAND_BEGIN,frame->token,TSA_ENCODING_1047,0U,name,n);tc_snapshot();
 }
 static void console_v1_failed(unsigned int token,const unsigned char *name,unsigned int length)
@@ -436,6 +508,7 @@ static void console_v1_failed(unsigned int token,const unsigned char *name,unsig
 static void console_v1_operator(unsigned int token,const unsigned char *name,unsigned int length,unsigned int end)
 {
     if(!tc_ready)return;
+    console_panel_operator(token,end);
     TTXAPPEND(&tc_log,end?TSA_TRANSCRIPT_COMMAND_END:TSA_TRANSCRIPT_COMMAND_BEGIN,
               token,end?0U:TSA_ENCODING_1047,0U,end?call_last_result:name,end?TSA_RESULT_BYTES:length);
     tc_snapshot();
@@ -450,6 +523,7 @@ static void console_v1_flush(void)
 static void console_v1_end(unsigned int token,const unsigned char *result)
 {
     if(!tc_ready)return;
+    console_panel_end(token,result);
     TTXAPPEND(&tc_log,TSA_TRANSCRIPT_COMMAND_END,token,0U,0U,result,TSA_RESULT_BYTES);
     if(tc_screen_owner==token)tc_screen_owner=0U;
     {const TSVFRAME *parent=TSVTOP(&native_invocations);
@@ -457,7 +531,9 @@ static void console_v1_end(unsigned int token,const unsigned char *result)
      if(depth<=TSV_MAX_DEPTH&&parent&&tc_suspended_screen[depth]==parent->token)
          tc_screen_owner=parent->token;
      if(depth<=TSV_MAX_DEPTH)tc_suspended_screen[depth]=0U;}
-    if(tc_raw_owner==token){tc_raw_owner=0U;tc_cap=tc_base_cap;tc_display_known=0U;}
+    if(tc_raw_owner==token){TTCCAP base=tc_base_cap;
+        if(console_device_geometry(&base)){tc_gap(token,5U);return;}
+        tc_raw_owner=0U;tc_display_known=0U;}
     if(tc_attention_pending&&tc_attention_owner==token){
         tc_attention_pending=tc_attention_owner=0U;tc_display_known=0U;
         tc_gap(token,3U);
@@ -483,12 +559,14 @@ static unsigned int console_v1_native_raw(TSGREQUEST *request,unsigned int input
     }
     cap=tc_cap;data=tc_staging;
     if(request->length>1U&&(data[1U]==0xf5U||data[1U]==0x7eU)){
+        if(tc_attention_pending)return 16U;
         cap.rows=data[1U]==0xf5U?cap.default_rows:cap.alternate_rows;
         cap.columns=data[1U]==0xf5U?cap.default_columns:cap.alternate_columns;
         cap.encoding=cap.rows*cap.columns<=4096U?TSA_ADDRESS_CODED12:TSA_ADDRESS_BINARY14;
+        if(console_device_geometry_check(&cap,0U))return 16U;
     }
     if(TTCRAW(&cap,data,request->length,&command)!=TTC_OK)return 8U;
-    if(tc_screen_owner&&tc_screen_owner!=f->token)return 16U;
+    if((tc_screen_owner&&tc_screen_owner!=f->token)||(tc_input_owner&&tc_input_owner!=f->token))return 16U;
     n=request->length-2U;
     for(i=0U;i<n;++i)tc_stream[i]=data[i+2U];
     /* EAU and write NOPs have no payload. Supply an ignored byte to the
@@ -498,7 +576,7 @@ static unsigned int console_v1_native_raw(TSGREQUEST *request,unsigned int input
     tc_display_known=0U;
     rc=tc_output(&console_channel,tc_ssid,command,tc_stream,n);
     if(rc){tc_gap(f->token,2U);return rc;}
-    tc_cap=cap;tc_raw_owner=tc_screen_owner=f->token;
+    if(console_device_geometry(&cap))return 12U;tc_raw_owner=tc_screen_owner=f->token;
     tc_display_known=0U;
     TTXAPPEND(&tc_log,TSA_TRANSCRIPT_SCREEN_CHANGE,f->token,0U,TSA_TRANSCRIPT_RAW_SCREEN,data,request->length);
     tc_gap(f->token,2U);tc_snapshot();return 0U;
@@ -508,6 +586,9 @@ static unsigned int console_v1_service(TSGREQUEST *request)
     const TSVFRAME *frame=TSVTOP(&native_invocations);
     unsigned char header[64],field_bytes[24],answer[64],text[256];TTCFIELD fields[64];
     TSPADDR pointer;unsigned int op=request->direction,rc,i,count,n=0U,aid=0U,at=0U,length;
+    if(op==TSA_IO_DASD_STATUS)return media_status(request);
+    if(op>=TSA_IO_DEVICE_OPEN&&op<=TSA_IO_DEVICE_QUERY)return console_device_service(request);
+    if(op>=TSA_IO_WORKBENCH&&op<=TSA_IO_PANEL_COMMIT)return console_panel_service(request);
     if(!frame||*(volatile const unsigned int *)0x3000U||*(volatile const unsigned int *)0x3010U)return 8U;
     if(request->length!=(op==TSA_IO_CAPABILITIES?64U:32U)&&op!=TSA_IO_SCREEN_WRITE)return 8U;
     if(request->length>32U+24U*TSA_SCREEN_FIELDS||
@@ -515,8 +596,12 @@ static unsigned int console_v1_service(TSGREQUEST *request)
        tc_span(request->address,request->length,TSG_WRITE,header,0U)||
        tc_span(request->address,op==TSA_IO_CAPABILITIES?64U:32U,TSG_READ,header,1U))return 8U;
     if(cms_word(header)!=1U||cms_word(header+4U)!=request->length)return 20U;
+    if(op==TSA_IO_LINE_WRITE||op==TSA_IO_LINE_READ||op==TSA_IO_LINE_KEY||op==TSA_IO_LINE_SET){
+        count=cms_word(header+12U);pointer.hi=cms_word(header+16U);pointer.lo=cms_word(header+20U);
+        if(count>256U||tc_span(pointer,count,op==TSA_IO_LINE_READ||op==TSA_IO_LINE_KEY?TSG_WRITE:TSG_READ,text,0U))return 8U;
+    }
     rc=console_v1_init();if(rc)return rc;
-    if(op==TSA_IO_CAPABILITIES){TTCCAPS(&tc_cap,answer);return tc_span(request->address,64U,TSG_WRITE,answer,1U);}
+    if(op==TSA_IO_CAPABILITIES){TTCCAPS(&tc_cap,answer);cms_put_word(answer+TSA_CAP_FEATURES,tc_cap.features|TSA_FEATURE_DEVICE_SESSIONS|TSA_FEATURE_KEY_EVENTS|(tc_cap.device_class==TSA_DEVICE_3270?TSA_FEATURE_WORKBENCH:0U)|(device_colours()?TSA_FEATURE_COLOUR:0U)|(device_highlights()?TSA_FEATURE_HIGHLIGHT:0U)|(tc_cap.device_class==TSA_DEVICE_3270&&device_buffer()?TSA_FEATURE_READ_BUFFER:0U));return tc_span(request->address,64U,TSG_WRITE,answer,1U);}
     if(op==TSA_IO_RESULT){
         if(frame->personality!=TSV_PDOS||!cms_word(call_last_result))return 8U;
         return tc_span(request->address,TSA_RESULT_BYTES,TSG_WRITE,call_last_result,1U);
@@ -532,11 +617,14 @@ static unsigned int console_v1_service(TSGREQUEST *request)
         if(cms_word(header+8U)>1U||cms_word(header+12U)||cms_word(header+24U)||cms_word(header+28U)||
            tc_read_owner||tc_raw_owner)return 16U;
         tc_other_status(0U);
-        if(cms_word(header+8U)&&(!tc_monitor_ssid||tc_monitor_stale))return 16U;
+        if(tc_attention_pending)return 16U;
+        if(cms_word(header+8U)&&!tc_monitor_interactive)return 20U;
+        if(cms_word(header+8U)&&(!tc_monitor_ssid||tc_monitor_stale||tc_monitor_state!=TSA_MONITOR_ONLINE))return 16U;
         tc_next_input=cms_word(header+8U);cms_put_word(header+16U,frame->token);cms_put_word(header+20U,1U);
         return tc_span(request->address,32U,TSG_WRITE,header,1U);
     }
-    if(op==TSA_IO_LINE_WRITE||op==TSA_IO_LINE_READ){
+    if(op==TSA_IO_LINE_SET)return console_panel_set(request,header);
+    if(op==TSA_IO_LINE_WRITE||op==TSA_IO_LINE_READ||op==TSA_IO_LINE_KEY){
         count=cms_word(header+12U);pointer.hi=cms_word(header+16U);pointer.lo=cms_word(header+20U);
         if(cms_word(header+8U)||count>256U||
            tc_span(pointer,count,op==TSA_IO_LINE_WRITE?TSG_READ:TSG_WRITE,text,0U))return 8U;
@@ -544,7 +632,7 @@ static unsigned int console_v1_service(TSGREQUEST *request)
             if(tc_span(pointer,count,TSG_READ,text,1U))return 8U;
             rc=console_v1_line(text,count);n=count;
         }else{
-            rc=console_v1_read(text,count,&n,&aid,0U);
+            rc=console_v1_read(text,count,&n,&aid,op==TSA_IO_LINE_KEY?2U:0U);
             if(!rc&&tc_span(pointer,n,TSG_WRITE,text,1U))return 8U;
         }
         if(rc)return rc;cms_put_word(header+24U,n);cms_put_word(header+28U,aid);
@@ -553,11 +641,11 @@ static unsigned int console_v1_service(TSGREQUEST *request)
     if(op==TSA_IO_SCREEN_ACQUIRE||op==TSA_IO_SCREEN_RELEASE){
         if(tc_cap.device_class!=TSA_DEVICE_3270)return 20U;
         if(cms_word(header+8U)||cms_word(header+12U)||cms_word(header+28U))return 8U;
-        if(op==TSA_IO_SCREEN_ACQUIRE){if(tc_screen_owner&&tc_screen_owner!=frame->token)return 16U;tc_screen_owner=frame->token;}
+        if(op==TSA_IO_SCREEN_ACQUIRE){if((tc_screen_owner&&tc_screen_owner!=frame->token)||(tc_input_owner&&tc_input_owner!=frame->token))return 16U;tc_screen_owner=frame->token;}
         else{
             if(tc_screen_owner!=frame->token)return 16U;
-            if(tc_raw_owner){tc_cap=tc_base_cap;tc_display_known=0U;}
-            tc_screen_owner=tc_raw_owner=0U;
+            if(tc_raw_owner){TTCCAP base=tc_base_cap;if(console_device_geometry(&base))return 16U;tc_display_known=0U;}
+            tc_screen_owner=tc_raw_owner=tc_input_owner=0U;
         }
         return 0U;
     }

@@ -28,6 +28,13 @@ compatibility details. The earlier 0.1.1 C32/AMODE31 one-space image remains
 available through the explicit `one-space-image.crexx` recipe and its dated
 qualification reports.
 
+The develop source also contains the [0.2.1 console checkpoint](doc/qualification/CONSOLE-STAGE3-2026-10-09.md):
+retained Workbench panels/history, owned monitor recovery, tested text modes,
+basic 3287 printing and the optional DISKMAP C application. Its 21 guest runs
+and 333 checks qualify the recorded subset. Full 3270 conformance and closure
+of every facility testable with installed providers remain open; this source
+checkpoint does not select a 0.2.1 release.
+
 - [Boot the image or build your own](doc/user/README.md)
 - [Architecture: boot, execution, memory, loading and services](doc/architecture/README.md)
 - [Development and source map](doc/development/README.md)

@@ -131,6 +131,28 @@ int T27QUERY(unsigned char *out,unsigned int capacity,unsigned int *length)
     if(!out||!length||capacity<5U)return T27_BAD;
     for(i=0U;i<5U;++i)out[i]=query[i];*length=5U;return T27_OK;
 }
+int T27PRWRT(const unsigned char *in,unsigned int bytes)
+{
+    unsigned int i;
+    if(!in||!bytes)return T27_BAD;
+    for(i=1U;i<bytes;++i)if(in[i]<0x40U&&in[i]!=0U&&in[i]!=0x0cU&&in[i]!=0x0dU&&in[i]!=0x15U&&in[i]!=0x19U)return T27_UNSUPPORTED;
+    return T27_OK;
+}
+int T27PRINT(const unsigned char *text,unsigned int bytes,unsigned char *out,unsigned int capacity,unsigned int *length)
+{
+    unsigned int i;
+    if(!text||!bytes||!out||!length||bytes>65533U||capacity<bytes+2U)return T27_BAD;
+    for(i=0U;i<bytes;++i)if(text[i]<0x40U&&text[i]!=0x0cU&&text[i]!=0x0dU&&text[i]!=0x15U)return T27_UNSUPPORTED;
+    out[0]=0xc8U;for(i=0U;i<bytes;++i)out[1U+i]=text[i];out[bytes+1U]=0x19U;*length=bytes+2U;return T27_OK;
+}
+int T27REPLY(unsigned int mode,const unsigned char *attrs,unsigned int bytes,unsigned char *out,unsigned int capacity,unsigned int *length)
+{
+    unsigned int i;
+    if(mode>2U||bytes>16U||(bytes&&!attrs)||!out||!length||capacity<5U+bytes||(mode!=2U&&bytes))return T27_BAD;
+    for(i=0U;i<bytes;++i)if(attrs[i]!=0x41U&&attrs[i]!=0x42U&&attrs[i]!=0x43U)return T27_UNSUPPORTED;
+    out[0]=0U;out[1]=(unsigned char)(5U+bytes);out[2]=9U;out[3]=0U;out[4]=(unsigned char)mode;
+    for(i=0U;i<bytes;++i)out[5U+i]=attrs[i];*length=5U+bytes;return T27_OK;
+}
 int T27HAS(const T27CAPABILITIES *cap,unsigned int code)
 {return cap&&code<256U&&(cap->replies[code/8U]&(1U<<(code%8U)))!=0U;}
 int T27QRPLY(const unsigned char *in,unsigned int bytes,T27CAPABILITIES *out)
@@ -144,6 +166,8 @@ int T27QRPLY(const unsigned char *in,unsigned int bytes,T27CAPABILITIES *out)
     cap.usable_valid=cap.rows=cap.columns=cap.addressing=cap.hardcopy=cap.page_printer=0U;
     cap.implicit_valid=cap.default_rows=cap.default_columns=cap.alternate_rows=cap.alternate_columns=0U;
     cap.printer_valid=cap.default_buffer=cap.alternate_buffer=0U;
+    cap.colours_valid=cap.highlighting=0U;
+    for(i=0U;i<16U;++i)cap.colours[i]=0U;
     while(at<bytes){
         if(T27WALK(in,bytes,&at,&f)!=T27_OK||f.id<0x8100U||f.id>0x81ffU)return T27_BAD;
         code=f.id&255U;
@@ -161,6 +185,22 @@ int T27QRPLY(const unsigned char *in,unsigned int bytes,T27CAPABILITIES *out)
                 if(T27GEOM(&g,half(f.data+8U),half(f.data+6U),n))return T27_BAD;
                 if(cap.usable_valid&&(cap.rows!=g.rows||cap.columns!=g.columns))return T27_BAD;
                 cap.rows=g.rows;cap.columns=g.columns;cap.usable_valid=1U;
+            }
+        }else if(code==0x86U){
+            if(f.length<6U||f.data[5U]>(f.length-6U)/2U)return T27_BAD;
+            for(i=0U;i<f.data[5U];++i){
+                unsigned int value=f.data[6U+2U*i],colour=f.data[7U+2U*i];
+                if(colour>=0xf0U){
+                    n=colour-0xf0U;
+                    if(!(cap.colours_valid&(1U<<n))||value==colour)cap.colours[n]=(unsigned char)value;
+                    cap.colours_valid|=1U<<n;
+                }
+            }
+        }else if(code==0x87U){
+            if(f.length<5U||f.data[4U]>(f.length-5U)/2U)return T27_BAD;
+            for(i=0U;i<f.data[4U];++i){
+                unsigned int value=f.data[5U+2U*i],action=f.data[6U+2U*i];
+                if(value==action&&(value==0xf1U||value==0xf2U||value==0xf4U))cap.highlighting|=value&15U;
             }
         }else if(code==0xa6U){
             if(f.length<6U)return T27_BAD;
@@ -190,6 +230,35 @@ int T27QRPLY(const unsigned char *in,unsigned int bytes,T27CAPABILITIES *out)
            T27GEOM(&g,cap.alternate_rows,cap.alternate_columns,mode))return T27_BAD;
     }
     *out=cap;return T27_OK;
+}
+int T27DXQR(const unsigned char *in,unsigned int bytes,T27CAPABILITIES *out)
+{
+    /* Observed DX3270 1.7.5 profile; these replies omit the SF81 prefix and
+     * use a nonstandard 18-byte usable-area body. Match the whole signature
+     * before projecting only its validated character grid/palette. */
+    static const unsigned char signature[68]={
+        0x88U,0U,8U,0x81U,0x80U,0x81U,0x84U,0x86U,0x87U,
+        0U,18U,0x80U,1U,0U,0U,0x84U,0U,0x1bU,1U,0U,0x60U,0U,0x70U,9U,12U,0x0dU,0xecU,
+        0U,21U,0x86U,0U,8U,0U,0xf4U,0xf1U,0xf1U,0xf2U,0xf2U,0xf3U,0xf3U,0xf4U,0xf4U,0xf5U,0xf5U,0xf6U,0xf6U,0xf7U,0xf7U,
+        0U,14U,0x87U,5U,0U,0U,0xf1U,0xf1U,0xf2U,0xf2U,0xf4U,0xf4U,0xf8U,0xf8U,
+        0U,6U,0x84U,0U,1U,2U};
+    unsigned char standard[67];unsigned int i;T27GEOMETRY g;
+    if(!in||!out||bytes!=sizeof signature)return T27_BAD;
+    for(i=0U;i<bytes;++i){
+        if(i==12U||(i>=14U&&i<=17U)||i==25U||i==26U)continue;
+        if(in[i]!=signature[i])return T27_BAD;
+    }
+    if(T27GEOM(&g,half(in+16U),half(in+14U),T27_BINARY14)||
+       half(in+25U)!=g.cells||in[12U]!=(g.cells>4095U?0U:1U))return T27_BAD;
+    for(i=0U;i<sizeof standard;++i)standard[i]=0U;
+    for(i=0U;i<9U;++i)standard[i]=in[i];
+    standard[10U]=21U;standard[11U]=standard[12U]=0x81U;standard[13U]=1U;
+    standard[15U]=in[14U];standard[16U]=in[15U];standard[17U]=in[16U];standard[18U]=in[17U];
+    standard[31U]=22U;standard[32U]=0x81U;
+    for(i=0U;i<19U;++i)standard[33U+i]=in[29U+i];
+    standard[53U]=15U;standard[54U]=0x81U;
+    for(i=0U;i<12U;++i)standard[55U+i]=in[50U+i];
+    return T27QRPLY(standard,sizeof standard,out);
 }
 static int short_key(unsigned int aid)
 {return aid==0x6bU||aid==0x6cU||aid==0x6dU||aid==0x6eU;}
@@ -243,4 +312,46 @@ int T27INPUT(const T27GEOMETRY *g,const unsigned char *in,unsigned int bytes,
         rc=input_pass(g,in,bytes,&e,fields,capacity);if(rc)return rc;
     }
     *event=e;return T27_OK;
+}
+int T27EVENT(const T27GEOMETRY *g,const unsigned char *in,unsigned int bytes,T27INPUTEVENT *event)
+{return input_pass(g,in,bytes,event,0,65536U);}
+static int buffer_pass(const T27GEOMETRY *g,const unsigned char *in,unsigned int bytes,unsigned int field,
+                         unsigned char *out,unsigned int capacity,unsigned int *length,T27INPUTEVENT *event)
+{
+    unsigned int at=3U,address=0U,active=0U,found=0U,n=0U,last=0U,code,pairs,i,attr;
+    T27INPUTEVENT e;
+    if(!geometry(g)||!in||bytes<3U||!field||field>=g->cells||!length||!event||T27DECD(g,in+1U,&e.cursor))return T27_BAD;
+    e.aid=in[0U];e.kind=T27_EVENT_BUFFER;e.cursor_valid=1U;e.fields=0U;
+    while(at<bytes){
+        code=in[at++];
+        if(code==0x28U){if(bytes-at<2U)return T27_BAD;at+=2U;continue;}
+        if(address==g->cells)return T27_BAD;
+        if(code==0x1dU||code==0x29U){
+            attr=0xffffffffU;
+            if(code==0x1dU){if(at==bytes)return T27_BAD;attr=in[at++]&0x3fU;}
+            else{if(at==bytes)return T27_BAD;pairs=in[at++];if(pairs>(bytes-at)/2U)return T27_BAD;
+                for(i=0U;i<pairs;++i){if(in[at]==0xc0U)attr=in[at+1U]&0x3fU;at+=2U;}
+                if(attr==0xffffffffU)return T27_BAD;
+            }
+            active=address==field-1U;
+            if(active){if(attr&0x20U||found)return T27_BAD;found=1U;}
+            if(!(attr&0x20U))++e.fields;
+            ++address;continue;
+        }
+        if(code==0x08U){if(at==bytes)return T27_BAD;code=in[at++];if(active)return T27_UNSUPPORTED;}
+        if(code&&(!character(code)||code==0x0eU||code==0x0fU))return T27_UNSUPPORTED;
+        if(active){if(n>=capacity&&code)return T27_BAD;if(out&&n<capacity)out[n]=(unsigned char)code;++n;if(code)last=n;}
+        ++address;
+    }
+    if(address!=g->cells||!found)return T27_BAD;
+    *length=last;*event=e;return T27_OK;
+}
+int T27BUFFER(const T27GEOMETRY *g,const unsigned char *in,unsigned int bytes,unsigned int field,
+                unsigned char *out,unsigned int capacity,unsigned int *length,T27INPUTEVENT *event)
+{
+    T27INPUTEVENT checked;unsigned int n;int rc;
+    if(!out||!length||!event)return T27_BAD;
+    rc=buffer_pass(g,in,bytes,field,0,capacity,&n,&checked);if(rc)return rc;
+    rc=buffer_pass(g,in,bytes,field,out,capacity,&n,&checked);if(rc)return rc;
+    *length=n;*event=checked;return T27_OK;
 }

@@ -1,0 +1,24 @@
+ z/PDOS 0.2.1  /  PCOMM                                  3270-2  24x80          
+ Session 01   Volume PDOS01   Last: #0042 OS=OK RC=0                            
+ + RXVM / COMPLETED / #0042 / OS=OK RC=0 -------------------------------------+ 
+ | Hello from cREXX.                                                          | 
+ | Native CMS31 invocation on z/PDOS.                                         | 
+ |                                                                            | 
+ |                                                                            | 
+ |                                                                            | 
+ |                                                                            | 
+ |                                                                            | 
+ |                                                                            | 
+ |                                                                            | 
+ |                                                                            | 
+ |                                                                            | 
+ |                                                                            | 
+ |                                                                            | 
+ + Output 1-2 / 2  Latest ----------------------------------------------------+ 
+ SHELL / PCOMM   Last: CMS RUN 31 RXVM HELLO   OS=OK RC=0                       
+ COMMAND / Enter submits   PF2 expands editor                                   
+ >  HELP CMS                                                                    
+                                                                                
+ Ready   Focus: SHELL   Input: PRIMARY / PCOMM   Output: latest                 
+ Enter Run  PF1 Help  PF2 Edit  PF7 Up  PF8 Down                                
+ PF9 Latest  PF10 Output  PF11 Shell  PF12 Input source                         

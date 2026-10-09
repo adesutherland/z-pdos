@@ -1,0 +1,48 @@
+/* SPDX-License-Identifier: MIT; fresh native I/O regression on Workbench. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>10 then return 2
+  work=args.1;prior=args.2;core=args.3;command=args.4;herc=args.5;model=args.6;commands=args.7;archive=args.8;writer=args.9;profile=args.10
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  if profile<>"tso31" & profile<>"high" then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  locations=.string[]
+  address crexx "pwd" output locations
+  root=strip(locations.1);input=root||"/"||work||"-inputs";media=input||"/media";support=input||"/base"
+  address crexx "run test ! -e :input"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :media :support"
+  if rc<>0 then return rc
+  source=prior||"/media"
+  address crexx "run cmake -E copy_directory :source :media"
+  if rc<>0 then return rc
+  target=media||"/u-command.bin"
+  address crexx "run cmake -E copy :command :target"
+  if rc<>0 then return rc
+  source=prior||"/launch.bin"
+  address crexx "run cmake -E copy :source :input"
+  if rc<>0 then return rc
+  source=prior||"/base/install-ipl"
+  address crexx "run cmake -E copy :source :support"
+  if rc<>0 then return rc
+  configured=input||"/normal.core"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_core.py configure :core :configured :model 3270 monitor"
+  if rc<>0 then return rc
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :input :configured :herc"
+  if rc<>0 then return rc
+  source=root||"/"||work||"/media/pdos00.ckd";native=root||"/"||work||"/media/native.ckd";receipt=root||"/"||work||"/native-pds.json"
+  if profile="tso31" then address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/native_files_media.py :archive :writer :source :native :receipt tso31"
+  else address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/native_files_media.py :archive :writer :source :native :receipt"
+  if rc<>0 then return rc
+  disk=root||"/"||work||"/media/native.cckd";compressor=herc||"/ckd2cckd"
+  address crexx "run :compressor -q -bz2 -cyls 100 :native :disk"
+  if rc<>0 then return rc
+  before=root||"/"||work||"/store-before.json"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/store_check.py :native :before"
+  if rc<>0 then return rc
+  runout=root||"/"||work||"/run";hercules=herc||"/hercules"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_machine.py :disk :configured :hercules :runout --normal --monitor --colour --model :model --workbench-normal --commands :commands"
+  return rc

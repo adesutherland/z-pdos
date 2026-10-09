@@ -1,0 +1,27 @@
+ z/PDOS 0.2.1  /  PCOMM                                                                                      3270-5  27x132         
+ Session 01   Volume PDOS01   Last: #0042 OS=OK RC=0                                                                                
+ PROGRAM / RXVM   COMPLETED   #0042   OS=OK RC=0                                         SHELL / PCOMM                              
+ Hello from cREXX.                                                                       #0039  VERSION                             
+ Native CMS31 invocation on z/PDOS.                                                             OS=OK  RC=0                         
+                                                                                         #0040  DEVICES                             
+                                                                                                OS=OK  RC=0                         
+                                                                                         #0041  CMS CHECK 31 RXVM                   
+                                                                                                OS=OK  RC=0                         
+                                                                                         #0042  CMS RUN 31 RXVM HELLO               
+                                                                                                OS=OK  RC=0                         
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                                                                    
+                                                                                         Next command stays in the dock.            
+                                                                                         Input: PRIMARY / PCOMM                     
+ Output 1-2 / 2   Latest                                                                                                            
+ COMMAND / PCOMM   Enter submits   PF2 expands editor                                                                               
+ >  HELP CMS                                                                                                                        
+                                                                                                                                    
+ Ready   Focus: SHELL   Input: PRIMARY / PCOMM   Output: latest                                                                     
+ Enter Run  PF1 Help  PF2 Edit  PF7 Up  PF8 Down  PF9 Latest  PF10 Output  PF11 Shell  PF12 Input source                            

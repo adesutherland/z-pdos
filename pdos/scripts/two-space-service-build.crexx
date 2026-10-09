@@ -1,0 +1,95 @@
+/* SPDX-License-Identifier: MIT; rebuild the service after an service/invocation repair.
+ * Reuse separately compiled modules only when their recorded source hashes match.
+ * This builds a core; it never starts a guest. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  i=.int;j=.int
+  source=.string; expected=.string; row=.string; name=.string
+  if args.0<>5 then return 2
+  work=args.1; prior=args.2; cc=args.3; classicas=args.4; ld=args.5
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  identities=prior||"/inputs.sha256"; inputs=.string[]; hashes=.string[]
+  rebuilt="twospace_3270.c twospace_3270.h twospace_console.h twospace_history.c twospace_history.h twospace_surface.c twospace_workbench.c twospace_workbench.h twospace_dasd.c twospace_dasd.h"
+  do while lines(identities)>0
+    row=linein(identities);source=word(row,2);expected=word(row,1)
+    changed=.int; changed=0
+    do i=1 to words(rebuilt)
+      if source="pdos/src/"||word(rebuilt,i) then changed=1
+    end
+    if changed=0 & source<>"pdos/src/twospace_service.c" & source<>"pdos/src/twospace_invocation.c" & source<>"pdos/src/twospace_session.c" & source<>"pdos/src/twospace_session.h" & source<>"pdos/src/twospace_abi.h" & right(source,6)<>".crexx" & right(source,4)<>".inc" then do
+      hashes=.string[]
+      address crexx "run shasum -a 256 :source" output hashes
+      if rc<>0 then return rc
+      if word(hashes.1,1)<>expected then do
+        say "Reusable source changed: "||source||" expected "||expected||" observed "||hashes.1
+        return 3
+      end
+    end
+    inputs[inputs.0+1]=source
+  end
+  inputs[inputs.0+1]="pdos/src/twospace_dasd.c"
+  inputs[inputs.0+1]="pdos/src/twospace_dasd.h"
+  asm=work||"/TWOSVC.asm"; object=work||"/TWOSVC.obj"
+  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR -S -I pdos/src -I pdpclib/src pdos/src/twospace_service.c -o :asm"
+  if rc<>0 then return rc
+  address crexx "run :classicas --profile s370 --literal-limit 8192 --symbol-limit 8192 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+  if rc<>0 then return rc
+  invasm=work||"/TSV.asm";invobj=work||"/TSV.obj";invtest=work||"/invocation-test"
+  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src pdos/src/twospace_invocation.c -o :invasm"
+  if rc<>0 then return rc
+  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :invasm :invobj"
+  if rc<>0 then return rc
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_invocation.c pdos/tests/two-space/invocation.c -o :invtest"
+  if rc<>0 then return rc
+  address crexx "run :invtest"
+  if rc<>0 then return rc
+  sessionasm=work||"/TDS.asm";sessionobj=work||"/TDS.obj"
+  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src pdos/src/twospace_session.c -o :sessionasm"
+  if rc<>0 then return rc
+  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :sessionasm :sessionobj"
+  if rc<>0 then return rc
+  consoleobjects=.string[]
+  modules="3270 history surface workbench dasd"; names="T27 TPH TWF TWB TDA"
+  do i=1 to words(modules)
+    source="pdos/src/twospace_"||word(modules,i)||".c";name=word(names,i);casm=work||"/"||name||".asm";cobj=work||"/"||name||".obj"
+    address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src :source -o :casm"
+    if rc<>0 then return rc
+    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :casm :cobj"
+    if rc<>0 then return rc
+    consoleobjects[i]=cobj
+  end
+  objects=.string[]; objects[1]=prior||"/TSMENTRY.obj";objects[2]=object
+  common="TSG TSD TSM TSR TSP TSV TSC TIO TSK TSH TSIF TSI TST TSS TTC T27 TDS TPH TWF TWD TWB TDA TTX TSCH TSTLB TSMKEY"
+  do i=1 to words(common)
+    name=word(common,i);source=prior||"/"||name||".obj"
+    if name="TSV" then source=invobj
+    if name="TDS" then source=sessionobj
+    do j=1 to words(names)
+      if name=word(names,j) then source=consoleobjects[j]
+    end
+    objects[i+2]=source
+  end
+  binary=work||"/TWOSVC.bin"; map=work||"/TWOSVC.map"
+  address crexx "run :ld --oformat binary --image-base 33554432 -e TSMENTRY -Map :map -o :binary :objects[]"
+  if rc<>0 then return rc
+  address crexx "run shasum -a 256 :inputs[]" output hashes
+  if rc<>0 then return rc
+  do i=1 to hashes.0
+    call lineout work||"/inputs.sha256",hashes[i]
+  end
+  call lineout work||"/inputs.sha256"
+  address crexx "run shasum -a 256 :objects[]" output hashes
+  if rc<>0 then return rc
+  do i=1 to hashes.0
+    call lineout work||"/objects.sha256",hashes[i]
+  end
+  call lineout work||"/objects.sha256"
+  elf=prior||"/service.elf"; emit=prior||"/dat-emit"; out=work||"/run"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pcomm_core.py :elf :binary :emit :out"
+  return rc

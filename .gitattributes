@@ -1,0 +1,3 @@
+# Exact-cell design boards preserve their full 80/132-column row padding.
+pdos/doc/architecture/console-designs/*-80.txt whitespace=-blank-at-eol
+pdos/doc/architecture/console-designs/*-132.txt whitespace=-blank-at-eol

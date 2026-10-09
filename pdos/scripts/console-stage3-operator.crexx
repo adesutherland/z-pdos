@@ -1,0 +1,50 @@
+/* SPDX-License-Identifier: MIT; normal PCOMM disk with the real DISKMAP app. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  i=.int
+  if args.0<>9 then return 2
+  work=args.1;prior=args.2;core=args.3;command=args.4;app=args.5;packer=args.6;herc=args.7;model=args.8;cases=args.9
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  locations=.string[]
+  address crexx "pwd" output locations
+  root=strip(locations.1);input=root||"/"||work||"-inputs";media=input||"/media";support=input||"/base"
+  address crexx "run test ! -e :input"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :media :support"
+  if rc<>0 then return rc
+  source=prior||"/media"
+  address crexx "run cmake -E copy_directory :source :media"
+  if rc<>0 then return rc
+  target=media||"/u-command.bin"
+  address crexx "run cmake -E copy :command :target"
+  if rc<>0 then return rc
+  target=media||"/diskmap.bin"
+  address crexx "run :packer :app :target classic31"
+  if rc<>0 then return rc
+  before=media||"/ctl.txt";ctl=media||"/new-ctl.txt"
+  do while lines(before)>0
+    row=linein(before)
+    if word(row,1)="PDOS.STORE" then call lineout ctl,"TSO31.DISKMAP SEQ diskmap.bin CYL 1 1 0 PS F 18452 18452"
+    call lineout ctl,row
+  end
+  call lineout ctl
+  address crexx "run cmake -E rename :ctl :before"
+  if rc<>0 then return rc
+  source=prior||"/launch.bin"
+  address crexx "run cmake -E copy :source :input"
+  if rc<>0 then return rc
+  source=prior||"/base/install-ipl"
+  address crexx "run cmake -E copy :source :support"
+  if rc<>0 then return rc
+  configured=input||"/normal.core"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_core.py configure :core :configured :model 3270 monitor"
+  if rc<>0 then return rc
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :input :configured :herc"
+  if rc<>0 then return rc
+  disk=root||"/"||work||"/media/pdos00.cckd";runout=root||"/"||work||"/run";hercules=herc||"/hercules"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_machine.py :disk :configured :hercules :runout --normal --monitor --colour --model :model --workbench-normal --commands :cases"
+  return rc

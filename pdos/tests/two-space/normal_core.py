@@ -7,12 +7,14 @@ import sys
 from service_machine import make_core
 if sys.argv[1]=="configure":
     import struct
-    source,output,model,primary,monitor=sys.argv[2:]
+    source,output,model,primary,monitor=sys.argv[2:7]
+    interactive=len(sys.argv)==8 and sys.argv[7]=="interactive-monitor"
+    if len(sys.argv) not in (7,8) or len(sys.argv)==8 and not interactive or interactive and monitor!="monitor":raise ValueError("interactive monitor configuration")
     raw=bytearray(Path(source).read_bytes())
     if len(raw)!=0x400000 or struct.unpack_from(">I",raw,0x95020)[0]!=0x54534e31 or model not in ("2","3","4","5") or primary not in ("3270","line") or monitor not in ("monitor","none"):
         raise ValueError("explicit normal console configuration")
     if Path(output).exists():raise ValueError("fresh core path required")
-    struct.pack_into(">8I",raw,0x95000,0x434f4e31,32,2 if primary=="line" else 1,9,0 if primary=="line" else int(model),10 if monitor=="monitor" else 0,0,0)
+    struct.pack_into(">8I",raw,0x95000,0x434f4e31,32,2 if primary=="line" else 1,9,0 if primary=="line" else int(model),10 if monitor=="monitor" else 0,int(interactive),0)
     Path(output).write_bytes(raw)
     print(json.dumps({"configured_core_sha256":hashlib.sha256(raw).hexdigest(),"model":model,"primary":primary,"monitor":monitor}))
     sys.exit(0)

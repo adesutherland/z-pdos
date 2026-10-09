@@ -1,0 +1,30 @@
+/* SPDX-License-Identifier: MIT; final bounded console compatibility checks.
+ * Requires the caller's PDOS maintenance qualification reservation. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>8 then return 2
+  work=args.1;prior=args.2;displaycore=args.3;normalcore=args.4;command=args.5;app=args.6;herc=args.7
+  packer=args.8
+  locations=.string[]
+  address crexx "pwd" output locations
+  root=strip(locations.1)
+  /* Geometry checks use the generic C client, independent of PCOMM. */
+  out=work||"-mono"
+  say "Workbench final: monochrome"
+  address crexx "run crexx -nokeep pdos/scripts/two-space-console-ipl.crexx --args :out :prior :displaycore :app :packer :herc 2 3270 monitor workbench-mono"
+  if rc<>0 then return rc
+  out=work||"-oversize"
+  say "Workbench final: negotiated 132x50"
+  address crexx "run crexx -nokeep pdos/scripts/two-space-console-ipl.crexx --args :out :prior :displaycore :app :packer :herc 5 3270 monitor workbench-oversize"
+  if rc<>0 then return rc
+  cases=root||"/pdos/tests/two-space/p6/workbench-normal.json"
+  out=work||"-line"
+  say "Workbench final: plain line primary"
+  address crexx "run crexx -nokeep pdos/scripts/console-workbench-normal.crexx --args :out :prior :normalcore :command :herc 2 line :cases"
+  if rc<>0 then return rc
+  out=work||"-basic"
+  say "Workbench final: basic 3270 without Query"
+  address crexx "run crexx -nokeep pdos/scripts/console-workbench-normal.crexx --args :out :prior :normalcore :command :herc 2 3270 :cases basic"
+  return rc

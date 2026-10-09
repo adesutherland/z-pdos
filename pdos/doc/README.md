@@ -13,6 +13,12 @@ and an application's service call.
   normal-image workload, media, console and lifecycle results.
 - [0.2.0 release record](qualification/RELEASE-0.2.0.md): candidate review,
   build, operator acceptance and publication status.
+- [3270 family coverage contract](architecture/CONSOLE-STANDARD.md) and
+  [Workbench ABI](architecture/CONSOLE-WORKBENCH-ABI.md): shared sessions,
+  retained presentation, input ownership and capability boundaries.
+- [Console stage 3 checkpoint](qualification/CONSOLE-STAGE3-2026-10-09.md):
+  21 passing guest runs/333 checks for the bounded console/text/printer/DASD
+  increment; full provider/conformance closure and the 0.2.1 release remain open.
 - [Source-to-image dependencies](architecture/DEPENDENCIES.md): selected inputs,
   Classic/GNU links and disk construction.
 - [Development guide](development/README.md): source map and change contracts.

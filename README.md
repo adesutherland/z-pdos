@@ -21,6 +21,11 @@ handling together.
 · [Understand the architecture](pdos/doc/architecture/README.md)
 · [Documentation](doc/README.md)
 
+The develop branch includes a [0.2.1 console development checkpoint](pdos/doc/qualification/CONSOLE-STAGE3-2026-10-09.md):
+Workbench panels/history, tested monitor recovery, basic printer output and a
+DASD allocation graph. Its bounded qualification is separate from complete
+3270 conformance, the remaining provider/coverage audit and a 0.2.1 release.
+
 ## What works today
 
 Version 0.2.0 introduces **a protected kernel address space (K) and one shared

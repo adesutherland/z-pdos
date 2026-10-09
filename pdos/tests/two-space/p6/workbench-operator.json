@@ -1,0 +1,27 @@
+[
+  [
+    "VERSION",
+    "PDIO1"
+  ],
+  [
+    "DIR",
+    "PCOMM END 1 RC=0",
+    [],
+    [
+      "PDOS.STORE",
+      "U.COMMAND"
+    ]
+  ],
+  [
+    "LAVM65O -v",
+    "PCOMM END 2 RC=0"
+  ],
+  [
+    "MISSING",
+    "PCOMM END 3 OS=28 RC=unavailable"
+  ],
+  [
+    "LAVM65O -v",
+    "PCOMM END 4 RC=0"
+  ]
+]

@@ -44,8 +44,30 @@ A normal guest needs ESAME, one CPU, 256 MiB real storage, that disk at 01B9,
 a primary device matching the selected configuration at 0009 and, when
 selected, `000A 3215 noprompt`. Connect the terminals before IPL 01B9. K
 starts U PCOMM; an ordinary EXIT returns to K, commits the transcript and
-prints K SHUTDOWN before disabled wait. The monitor remains output-only
-unless a U application explicitly hands off its next line prompt.
+prints K SHUTDOWN before disabled wait. The monitor defaults to output capture. Interactive input requires both
+configuration mask `0x00000001` at console word 24 and an explicit handoff
+by a U application.
+
+The 0.2.1 Workbench development console separates program output and shell
+history. Enter clears the submitted command and immediately returns the cursor
+to the start of the input field. Its keys are PF1 Help, PF2 Edit, PF5/PF6 command
+recall, PF7/PF8 page, PF9 Latest and PF10 Output/Shell. PF10 toggles the focused
+pane and its highlighted heading; on colour terminals this is the yellow bar.
+PF11 and PF12 have no Workbench action. A panel selected with cursor plus Enter
+stays selected when chosen again. Plain teletype operation uses ordered text.
+Explicit `CONSOLE INPUT PRIMARY|MONITOR` commands still select shell input;
+monitor handoff requires the configured interactive reply path. A capture-only
+monitor refuses selection. While interactive monitor input is pending, Clear
+on the primary cancels the exact monitor request and restores primary input.
+The monitor needs an actual reconnect before it can be selected again.
+
+The opt-in `DISKMAP` C application shows actual mounted DASD allocation: a
+capacity bar, cylinder map, reserved/allocated/free track counts and the largest
+unallocated run. Enter refreshes, N selects the next registered volume and Q
+returns to PCOMM. It uses the read-only K storage service and also prints a
+readable teletype view. The current parser supports the maintained 100-cylinder
+3390 layout and direct extents; these are allocated tracks, not file contents
+or compressed host disk sizes.
 
 For a human operator, select the primary 3270 device as
 `0009@HOST:PORT` with a terminal model matching the image configuration.
@@ -53,8 +75,8 @@ The separate text console is a Telnet connection to the same host and port:
 set its negotiated terminal type to `ANSI@000A` to select the 3215 monitor.
 For a line-only primary, use `ANSI@0009` and a core configured with `line`;
 changing the Hercules device alone does not change the kernel's selection.
-The monitor is normally output-only. Its input is used only for an application
-prompt that explicitly requests the monitor handoff.
+The monitor defaults to output capture. Its input is used only when the
+configuration permits it and an application explicitly requests handoff.
 
 The accepted normal command route includes:
 

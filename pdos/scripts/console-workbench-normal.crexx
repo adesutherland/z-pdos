@@ -1,0 +1,44 @@
+/* SPDX-License-Identifier: MIT; normal PCOMM candidate with a reviewed U stage. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>8 & args.0<>9 then return 2
+  work=args.1;prior=args.2;core=args.3;command=args.4;herc=args.5;model=args.6;primary=args.7;commands=args.8
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  if primary<>"3270" & primary<>"line" then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  lines=.string[]
+  address crexx "pwd" output lines
+  root=strip(lines.1);input=root||"/"||work||"-inputs";media=input||"/media";support=input||"/base"
+  address crexx "run test ! -e :input"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :media :support"
+  if rc<>0 then return rc
+  source=prior||"/media"
+  address crexx "run cmake -E copy_directory :source :media"
+  if rc<>0 then return rc
+  target=media||"/u-command.bin"
+  address crexx "run cmake -E copy :command :target"
+  if rc<>0 then return rc
+  source=prior||"/launch.bin"
+  address crexx "run cmake -E copy :source :input"
+  if rc<>0 then return rc
+  source=prior||"/base/install-ipl"
+  address crexx "run cmake -E copy :source :support"
+  if rc<>0 then return rc
+  configured=input||"/normal.core"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_core.py configure :core :configured :model :primary monitor"
+  if rc<>0 then return rc
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :input :configured :herc"
+  if rc<>0 then return rc
+  disk=root||"/"||work||"/media/pdos00.cckd";runout=root||"/"||work||"/run";hercules=herc||"/hercules"
+  flags=.string[]
+  if args.0=9 then do
+    if args.9<>"basic" & args.9<>"editor" then return 2
+    flags[1]="--"||args.9
+  end
+  if primary="line" then address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_machine.py :disk :configured :hercules :runout --normal --monitor --line-primary --workbench-normal --commands :commands :flags[]"
+  else address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_machine.py :disk :configured :hercules :runout --normal --monitor --colour --model :model --workbench-normal --commands :commands :flags[]"
+  return rc

@@ -9,6 +9,13 @@ display and printer facilities, graphics, programmed symbols, DBCS, negotiated
 geometry and hardware partitions. A missing emulator feature is a device
 capability result; it is not a reason to omit its standard interface from PDOS.
 
+The 9 October stage 3 delivery decision implements what we can test with the
+available providers. The remaining facilities stay in PD-024's backlog rather
+than acquiring an untested implementation. Each implementation slice gets
+focused checks; the final candidate gets a complete code review, source/input
+freeze and integrated QA. The full-family table below remains the roadmap,
+with implemented and qualified subsets recorded separately.
+
 ## Sources and interpretation
 
 The primary data-stream source is IBM *3270 Information Display System Data
@@ -101,9 +108,10 @@ original mask. Timer/watchdog expiry is an error, never a completion condition.
 The [console foundation review](../qualification/CONSOLE-FOUNDATION-2026-10-09.md)
 records retained-stream and input observations. The subsequent
 [PD-025 acceptance](../qualification/IO-FOUNDATION-2026-10-09.md) completes
-the shared I/O and normal-IPL performance checkpoint. Attention belongs to the lease that
-unlocked its input field, rather than the application active when status is
-consumed. Line Read Inquiry remains separate from that field/AID policy.
+the shared I/O and normal-IPL performance checkpoint. Attention belongs to the confirmed editable-field lease or the exact owning
+read, rather than the application active when status is consumed. A completed
+full retained presentation establishes that field owner even when its WCC
+preserves keyboard state; deltas preserve the existing owner. Line Read Inquiry remains separate from that field/AID policy.
 
 The pre-versioned asynchronous console diagnostic controls use the legacy
 console profile. The v1 profile rejects their start, poll, clear, cancellation
@@ -125,8 +133,27 @@ metadata. The raw console validator consumes the common order/framing layer;
 native channel selection now includes the remaining basic command opcodes.
 Structured object and printer data stay opaque in this layer.
 
-This checkpoint is protocol implementation, not complete driver conformance.
-The normal fixed console, checked device-session API, automatic query policy,
-printer endpoints, retained rendering and panel integration still need their
-own implementation and frozen guest acceptance. The backlog owns delivery;
-this document owns the accepted interface and coverage requirements.
+The first checkpoint above describes the initial protocol foundation. The
+[Workbench result](../qualification/CONSOLE-WORKBENCH-2026-10-09.md) and
+[stage 3 result](../qualification/CONSOLE-STAGE3-2026-10-09.md) subsequently
+qualify bounded sessions, retained presentation, monitor recovery, text and
+basic printer facilities. They do not establish complete driver conformance.
+
+## Current qualification boundaries
+
+The source development checkpoint contains the tested stage 3 subset. It does
+not claim that every facility possible with the installed providers is finished.
+Deferred means unfinished or unqualified until the provider/coverage audit
+establishes a more specific limit; it does not mean that an emulator is known
+to lack the feature.
+
+| Area | Qualified subset | Remaining boundary |
+| --- | --- | --- |
+| Sessions and Workbench | Models 2–5, negotiated 132×50, colour/monochrome, protected deltas, panels/history, draft/cursor and owned recovery | Bounded single-CPU profile; full command/order/AID/selection conformance audit remains open |
+| Text replies and DBCS | Field, extended-field and character reply modes; two IBM930 characters rendered and preserved as raw bytes | Wider codepage, input, editing, field-boundary and conversion matrix remains open |
+| Printers | One local 3287 endpoint; unformatted native text and exact actual print-command capture | Formatted orders are deliberately rejected; pagination, job-end, formatted 3287, SCS/IPDS and additional routes remain unqualified |
+| Advanced device facilities | Common structured-field framing and retained raw replies | Full partitions/16-bit partition execution, graphics/images, programmed symbols, format storage and routing need individual implementation/provider/qualification entries |
+| Publication | Reviewed development source and bounded qualification reports | No 0.2.1 release selection, managed adoption or marketing publication is established by this checkpoint |
+
+The backlog owns delivery and the open provider/coverage closure audit; this
+document owns the accepted interface and coverage requirements.

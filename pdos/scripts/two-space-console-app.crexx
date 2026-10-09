@@ -9,7 +9,9 @@ main: procedure = .int
   work = args.1; library = args.2; cc = args.3; classicas = args.4; linker = args.5
   mode = "0"
   if args.0 = 6 then do
-    if args.6 = "handoff" then mode = "1"
+    if args.6 = "workbench-transfer" then mode = "6"
+    else if args.6 = "workbench" then mode = "4"
+    else if args.6 = "handoff" then mode = "1"
     else if args.6 = "raw" then mode = "2"
     else if args.6 = "disconnect" then mode = "3"
     else return 2
@@ -21,6 +23,7 @@ main: procedure = .int
   if rc <> 0 then return rc
   sources = .string[]; objects = .string[]
   sources[1] = "pdos/tests/two-space/p4/console-app.c"
+  if mode = "4" | mode = "6" then sources[1] = "pdos/tests/two-space/p4/workbench-app.c"
   sources[2] = "pdos/src/twospace_ui.c"
   sources[3] = "pdos/src/twospace_console.c"
   sources[4] = "pdos/src/twospace_3270.c"

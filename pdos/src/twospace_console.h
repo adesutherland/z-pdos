@@ -15,6 +15,7 @@
 #define TTC_INPUT 0U
 #define TTC_CONFIG_REAL 0x95000U
 #define TTC_MONITOR_REAL 0x60000U
+#define TTC_PRINTER_REAL 0x70000U
 #define TTC_CONFIG_MAGIC 0x434f4e31U
 typedef struct {
     unsigned int device_class,address,model,rows,columns,encoding,generation;

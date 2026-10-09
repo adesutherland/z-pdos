@@ -1,0 +1,48 @@
+/* SPDX-License-Identifier: MIT; portable session and external-buffer checks. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>1 then return 2
+  work=args.1
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  binary=work||"/session"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_3270.c pdos/src/twospace_session.c pdos/tests/two-space/session.c -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary"
+  if rc<>0 then return rc
+  binary=work||"/query-compat"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_3270.c pdos/tests/two-space/query_compat.c -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary"
+  if rc<>0 then return rc
+  binary=work||"/external"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_channel.c pdos/tests/two-space/channel_external.c -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary"
+  if rc<>0 then return rc
+  binary=work||"/buffer"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_3270.c pdos/tests/two-space/buffer.c -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary"
+  if rc<>0 then return rc
+  binary=work||"/history"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_history.c pdos/tests/two-space/history.c -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary"
+  if rc<>0 then return rc
+  binary=work||"/surface"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_3270.c pdos/src/twospace_surface.c pdos/tests/two-space/surface.c -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary"
+  if rc<>0 then return rc
+  binary=work||"/workbench"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_3270.c pdos/src/twospace_history.c pdos/src/twospace_surface.c pdos/src/twospace_display.c pdos/src/twospace_workbench.c pdos/tests/two-space/workbench.c -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary"
+  if rc<>0 then return rc
+  return 0

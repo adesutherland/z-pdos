@@ -1,0 +1,11 @@
+[
+  ["VERSION", "PDIO1"],
+  ["DISKMAP", "PCOMM END 1 RC=0", [
+    ["Enter refresh / N next volume / Q return", "", "primary", 1],
+    ["Enter refresh / N next volume / Q return", "N", "primary", 2],
+    ["Enter refresh / N next volume / Q return", "Q", "primary", 3]
+  ], ["DASD STORAGE / PDOS00", "Allocated", "Largest unallocated run"]],
+  ["RXV64 -v", "PCOMM END 2 RC=0"],
+  ["CONSOLE INPUT MONITOR", "PDOS00:\\>", [], ["PCOMM: input selection unavailable (20)"], "prompt"],
+  ["RXV64 -v", "PCOMM END 3 RC=0"]
+]

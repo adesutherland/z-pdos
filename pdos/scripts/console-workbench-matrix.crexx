@@ -1,0 +1,23 @@
+/* SPDX-License-Identifier: MIT; bounded post-review geometry/colour matrix.
+ * Caller holds the disposable PDOS qualification maintenance reservation. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  i=.int
+  if args.0<>6 then return 2
+  work=args.1;prior=args.2;core=args.3;app=args.4;packer=args.5;herc=args.6
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  models=.string[];modes=.string[];labels=.string[]
+  models[1]="3";modes[1]="workbench";labels[1]="model3"
+  models[2]="4";modes[2]="workbench";labels[2]="model4"
+  models[3]="5";modes[3]="workbench";labels[3]="model5"
+  models[4]="2";modes[4]="workbench-mono";labels[4]="mono2"
+  models[5]="5";modes[5]="workbench-oversize";labels[5]="oversize"
+  do i=1 to models.0
+    out=work||"-"||labels[i];model=models[i];mode=modes[i]
+    say "Workbench qualification "||labels[i]
+    address crexx "run crexx -nokeep pdos/scripts/two-space-console-ipl.crexx --args :out :prior :core :app :packer :herc :model 3270 monitor :mode"
+    if rc<>0 then return rc
+  end
+  return 0

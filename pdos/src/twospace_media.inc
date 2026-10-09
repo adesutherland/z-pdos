@@ -266,6 +266,41 @@ static int media_init(void)
     media_state.curdev=media_state.volumes[0].device=(int)boot;
     media_state.volumes[0].address=media_getdevn((int)boot);media_state.volume_count=1;return 0;
 }
+static unsigned int media_status(TSGREQUEST *request)
+{
+    unsigned char header[64],raw[140],map[TDA_TRACKS];TDAMAP state;TSPADDR pointer;
+    unsigned int volume,capacity,c,h,r,i,pertrack;int got;
+    const TSVFRAME *f=TSVTOP(&native_invocations);
+    if(!f||*(volatile const unsigned int *)0x3000U||*(volatile const unsigned int *)0x3010U||
+       request->length!=64U||tc_span(request->address,64U,TSG_READ,header,1U)||
+       tc_span(request->address,64U,TSG_WRITE,header,0U))return 8U;
+    if(cms_word(header)!=1U||cms_word(header+4U)!=64U)return 20U;
+    volume=cms_word(header+8U);capacity=cms_word(header+12U);
+    pointer.hi=cms_word(header+56U);pointer.lo=cms_word(header+60U);
+    if((capacity&&capacity<TDA_TRACKS)||capacity>TDA_TRACKS||
+       (capacity&&tc_span(pointer,capacity,TSG_WRITE,map,0U)))return 8U;
+    if(media_init())return 12U;
+    if(volume>=(unsigned int)media_state.volume_count)return 20U;
+    got=media_rdblock(media_state.volumes[volume].device,1,0,1,raw,140,0x0e);
+    if(got!=140)return 12U;
+    if(TDAINIT(&state,map,sizeof map,raw,140U)||!raw[74U])return 20U;
+    pertrack=raw[74U];
+    for(c=1U;c<=2U;++c)for(h=0U;h<15U;++h)for(r=c==1U&&h==0U?3U:1U;r<=pertrack;++r){
+        got=media_rdblock(media_state.volumes[volume].device,(int)c,(int)h,(int)r,raw,140,0x0e);
+        if(got!=140)return 12U;
+        if(!raw[44U]){for(i=0U;i<140U;++i)if(raw[i])return 8U;continue;}
+        if(TDAADD(&state,raw,140U))return 20U;
+    }
+    if(TDASTAT(&state))return 12U;
+    cms_put_word(header+8U,(unsigned int)media_state.volume_count);
+    cms_put_word(header+12U,(unsigned int)media_state.volumes[volume].address);
+    cms_put_word(header+16U,100U);cms_put_word(header+20U,15U);cms_put_word(header+24U,state.tracks);
+    cms_put_word(header+28U,state.reserved);cms_put_word(header+32U,state.allocated);cms_put_word(header+36U,state.free);
+    cms_put_word(header+40U,state.largest);cms_put_word(header+44U,state.datasets);
+    for(i=0U;i<8U;++i)header[48U+i]=i<6U?(unsigned char)media_state.volumes[volume].volser[i]:0x40U;
+    if(capacity&&tc_span(pointer,capacity,TSG_WRITE,map,1U))return 8U;
+    return tc_span(request->address,64U,TSG_WRITE,header,1U);
+}
 static int media_directory(void)
 {
     DSCB1 d;unsigned int c,h,r,year,day,month,days;int n;char format;

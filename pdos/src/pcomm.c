@@ -39,22 +39,25 @@ static int batchDepth = 0;
 
 #ifdef PDOS_TWO_SPACE
 static int commandRCValid;
+static char recalled[16][199];
+static unsigned int recallCount,recallNext,recallPosition;
 static unsigned int resultWord(const unsigned char *p)
 {return ((unsigned int)p[0]<<24)|((unsigned int)p[1]<<16)|((unsigned int)p[2]<<8)|p[3];}
 static void reportCommand(int *rc)
 {
     unsigned char result[TSA_RESULT_BYTES];
+    TUICTRL(1U);
     commandRCValid=0;
     if(TUIRESULT(result)==0U){
         unsigned int status=resultWord(result+TSA_RESULT_OS_STATUS);
         commandRCValid=resultWord(result+TSA_RESULT_RC_VALID)!=0U;
         if(status||!commandRCValid){
             printf("PCOMM END %u OS=%u RC=unavailable\n",commandNumber,status);
-            return;
+            fflush(stdout);TUICTRL(0U);return;
         }
         *rc=(int)resultWord(result+TSA_RESULT_APP_RC);
     }else commandRCValid=1;
-    printf("PCOMM END %u RC=%d\n",commandNumber,*rc);
+    printf("PCOMM END %u RC=%d\n",commandNumber,*rc);fflush(stdout);TUICTRL(0U);
 }
 #endif
 
@@ -81,7 +84,7 @@ int main(int argc, char **argv)
 {
     if (!parseArgs(argc, argv)) return 2;
 #ifdef PDOS_TWO_SPACE
-    if (TUIOPEN((const unsigned char *)"z/PDOS PCOMM",12U)) return 2;
+    if (TUIOPEN((const unsigned char *)"z/PDOS PCOMM",12U)||TUISHELL()) return 2;
 #endif
     if (singleCommand)
     {
@@ -178,32 +181,71 @@ static int readPhysicalLine(FILE *fp, const char *source)
 
 /* The 3270 field is shorter than a PCOMM command. A trailing & joins the
    next entered fragment without adding or removing whitespace. */
+static void inputNotice(const char *message)
+{
+#ifdef PDOS_TWO_SPACE
+    TUICTRL(2U);
+#endif
+    printf("%s\n",message);fflush(stdout);
+#ifdef PDOS_TWO_SPACE
+    TUICTRL(0U);
+#endif
+}
 static int readConsoleCommand(void)
 {
+#ifdef PDOS_TWO_SPACE
+    char part[257];
+    unsigned int bytes,aid,index;
+#else
     char part[sizeof buf];
+#endif
     size_t used = 0;
     size_t count;
     int more;
+#ifndef PDOS_TWO_SPACE
     int c;
+#endif
 
     buf[0] = '\0';
+#ifdef PDOS_TWO_SPACE
+    if(TUIJOIN(0U,0U))return 0;
+#endif
     for (;;)
     {
+#ifdef PDOS_TWO_SPACE
+        if(TUIKEY((unsigned char *)part,256U,&bytes,&aid))return 0;
+        if(aid==0x6dU){used=0U;buf[0]='\0';if(TUIJOIN(0U,0U))return 0;continue;}
+        if(aid==0xf5U||aid==0xf6U){
+            if(recallCount){
+                used=0U;buf[0]='\0';if(TUIJOIN(0U,0U))return 0;
+                if(aid==0xf5U){if(recallPosition<recallCount)recallPosition++;}
+                else if(recallPosition)recallPosition--;
+                if(!recallPosition){part[0]='\0';bytes=0U;}
+                else{index=(recallNext+16U-recallPosition)%16U;strcpy(part,recalled[index]);bytes=(unsigned int)strlen(part);}
+                if(TUISET((unsigned char *)part,bytes,bytes))return 0;
+            }
+            continue;
+        }
+        if(aid!=0x7dU)continue;
+        part[bytes]='\0';count=bytes;
+        if(strlen(part)!=count){inputNotice("PCOMM: binary command input refused");buf[0]='\0';return 1;}
+#else
         if (fgets(part, sizeof part, stdin) == NULL) return 0;
         count = strlen(part);
         if (count == 0 || part[count - 1] != '\n')
         {
             while ((c = fgetc(stdin)) != EOF && c != '\n') ;
-            printf("PCOMM: console fragment too long; command not run\n");
+            inputNotice("PCOMM: console fragment too long; command not run");
             buf[0] = '\0';
             return 1;
         }
         count--;
+#endif
         more = count != 0 && part[count - 1] == '&';
         if (more) count--;
         if (used + count > sizeof buf - 2)
         {
-            printf("PCOMM: command exceeds 198 characters; not run\n");
+            inputNotice("PCOMM: command exceeds 198 characters; not run");
             buf[0] = '\0';
             return 1;
         }
@@ -211,12 +253,22 @@ static int readConsoleCommand(void)
         used += count;
         if (!more)
         {
+#ifdef PDOS_TWO_SPACE
+            if(TUIJOIN(0U,0U))return 0;
+            if(used){buf[used]='\0';strcpy(recalled[recallNext],buf);recallNext=(recallNext+1U)%16U;if(recallCount<16U)recallCount++;}recallPosition=0U;
+#endif
             buf[used++] = '\n';
             buf[used] = '\0';
             return 1;
         }
+#ifdef PDOS_TWO_SPACE
+        if(TUIJOIN(1U,(unsigned int)used))return 0;TUICTRL(2U);
+#endif
         printf("MORE> ");
         fflush(stdout);
+#ifdef PDOS_TWO_SPACE
+        TUICTRL(0U);
+#endif
     }
 }
 
@@ -247,13 +299,19 @@ static void readAutoExec(void)
 static void processInput(void)
 {
     char *p;
-    int rc;
+    int rc = 0;
     char fnm[FILENAME_MAX];
     FILE *fp;    
 
     if (echo)
     {
+#ifdef PDOS_TWO_SPACE
+        TUICTRL(1U);
+#endif
         printf("%s", buf);
+#ifdef PDOS_TWO_SPACE
+        fflush(stdout);TUICTRL(0U);
+#endif
     }
     len = strlen(buf);
     if ((len > 0) && (buf[len - 1] == '\n'))
@@ -261,6 +319,10 @@ static void processInput(void)
         len--;
         buf[len] = '\0';
     }
+#ifdef PDOS_TWO_SPACE
+    if(!len)return;
+    if(len&&TUIJOB((const unsigned char *)buf,(unsigned int)len)){printf("PCOMM: console command state unavailable\n");return;}
+#endif
     p = strchr(buf, ' ');
     if (p != NULL)
     {
@@ -358,6 +420,15 @@ static void processInput(void)
         printf("z/PDOS %s; PDIO1; PCOMM operator interface 1\n", ZPDOS_VERSION);
         printf("Exact image build: see the host image receipt.\n");
     }
+#ifdef PDOS_TWO_SPACE
+    else if (ins_strcmp(buf, "console") == 0)
+    {
+        if(ins_strcmp(p,"input primary")==0)rc=(int)TUIHAND(0U);
+        else if(ins_strcmp(p,"input monitor")==0)rc=(int)TUIHAND(1U);
+        else {printf("CONSOLE INPUT PRIMARY|MONITOR\n");rc=8;}
+        if(rc)printf("PCOMM: input selection unavailable (%d)\n",rc);
+    }
+#endif
     else if (ins_strcmp(buf, "devices") == 0 ||
              ins_strcmp(buf, "volumes") == 0 ||
              ins_strcmp(buf, "mount") == 0 ||
@@ -381,7 +452,13 @@ static void processInput(void)
         }
         if (*p != '\0') p[-1] = ' ';
         commandNumber++;
+#ifdef PDOS_TWO_SPACE
+        TUIEXT();TUICTRL(1U);
+#endif
         printf("PCOMM BEGIN %u %s\n", commandNumber, buf);
+#ifdef PDOS_TWO_SPACE
+        fflush(stdout);TUICTRL(0U);
+#endif
         rc = system(buf);
 #ifdef PDOS_TWO_SPACE
         reportCommand(&rc);
@@ -433,7 +510,13 @@ static void processInput(void)
         }
         /* printf("pcomm is calling %s\n", buf); */
         commandNumber++;
+#ifdef PDOS_TWO_SPACE
+        TUIEXT();TUICTRL(1U);
+#endif
         printf("PCOMM BEGIN %u %s\n", commandNumber, buf);
+#ifdef PDOS_TWO_SPACE
+        fflush(stdout);TUICTRL(0U);
+#endif
         rc = system(buf);
 #ifdef PDOS_TWO_SPACE
         reportCommand(&rc);
@@ -446,16 +529,32 @@ static void processInput(void)
 #endif
             )
         {
+#ifdef PDOS_TWO_SPACE
+            TUICTRL(1U);
+#endif
             printf("rc from program is %d\n", rc);
+#ifdef PDOS_TWO_SPACE
+            fflush(stdout);TUICTRL(0U);
+#endif
         }
     }
+#ifdef PDOS_TWO_SPACE
+    TUIEND(0U,1U,(unsigned int)rc);
+    TUIVOL((const unsigned char *)drive,6U);
+#endif
     return;
 }
 
 static void putPrompt(void)
 {
+#ifdef PDOS_TWO_SPACE
+    TUICTRL(1U);
+#endif
     printf("\n%s:\\%s%s", drive, cwd, prompt);
     fflush(stdout);
+#ifdef PDOS_TWO_SPACE
+    TUICTRL(0U);
+#endif
     return;
 }
 

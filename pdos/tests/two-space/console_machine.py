@@ -20,10 +20,38 @@ _1047=[int(word,16) for row in _TABLE if not row.startswith("#") for word in row
 if len(_1047)!=256:raise ValueError("checked IBM1047 decoding table")
 def text1047(raw):return "".join(chr(_1047[b]) for b in raw)
 
+def received_records(trace):
+    """Decode observed Telnet EORs, including records coalesced in one recv."""
+    wire=bytearray()
+    for row in trace.splitlines():
+        match=re.match(r"^< 0x[0-9a-f]+ +([0-9a-f]+)$",row)
+        if match:wire.extend(bytes.fromhex(match[1]))
+    state="data";record=bytearray();records=[]
+    for byte in wire:
+        if state=="data":
+            if byte==255:state="iac"
+            else:record.append(byte)
+        elif state=="iac":
+            if byte==255:record.append(byte);state="data"
+            elif byte==239:records.append(bytes(record));record.clear();state="data"
+            elif byte in (251,252,253,254):state="option"
+            elif byte==250:state="sub"
+            else:state="data"
+        elif state=="option":state="data"
+        elif state=="sub":
+            if byte==255:state="sub_iac"
+        elif state=="sub_iac":state="data" if byte==240 else "sub"
+    return records
+
 def ordered_results(texts,cases):
     expected=[case[1] for case in cases if case[1].startswith("PCOMM END ")]
     observed=[text for text in texts if re.match(r"^PCOMM END [0-9]+ ",text)]
     return observed==expected
+
+def submitted_cursor_resets(records):
+    """The field-clear write itself positions the locked cursor at its start."""
+    clears=[r for r in records if len(r) in (9,13) and r[:3]==b"\xf1\xc1\x11" and r[5]==0x3c and r[8]==0]
+    return bool(clears) and all(len(r)==13 and r[9:]==b"\x11"+r[3:5]+b"\x13" for r in clears)
 
 class LineClient:
     def __init__(self,port,device):
@@ -119,12 +147,14 @@ def run(a):
         target=out/"output.aws";target.write_bytes(struct.pack("<HHBB",0,0,0x40,0)*2)
         cfg+=f"0561 3420 {target}\n"
     if a.monitor:cfg+="000A 3215 noprompt\n"
+    if a.stage3 in ("family","dbcs"):cfg+="000B 3287\n"
     (out/"machine.cnf").write_text(cfg);(out/"run.rc").write_text("sysclear\n")
     cmd=[str(herc),"-t","-f",str(out/"machine.cnf"),"-o",str(out/"console.log"),"-r",str(out/"run.rc")]
     proc=subprocess.Popen(cmd,cwd=out,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
     lines=[];events=queue.Queue();thread=threading.Thread(target=drain_output,args=(proc.stdout,lines,events),daemon=True);thread.start()
     terminal=None;client=None;monitor=None;error=None;screens=[];monitor_parts=[];cases=[]
     idle_wait_observed=False
+    stage3_resources={"monitor":None,"printer":None};stage3_checks={}
     log=out/"console.log"
     try:
         def listener():
@@ -134,13 +164,18 @@ def run(a):
         until(listener,proc,log,10)
         if a.line_primary:client=LineClient(port,9)
         else:
-            terminal=subprocess.Popen(["s3270","-model","3278-"+str(a.model),"-codepage","cp1047","-scriptport",str(script),
+            terminal=subprocess.Popen(["s3270","-model",("3279-" if a.colour else "3278-")+str(a.model),*( ["-oversize",a.oversize] if a.oversize else []),*( ["-clear","extendedDataStream"] if a.basic else []),"-codepage","cp930" if a.stage3=="dbcs" else "cp1047","-scriptport",str(script),
                                        "-trace","-tracefile",str(out/"3270.trace"),"-tracefilesize","16M"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             until(lambda:terminal_action(script,"Query(ConnectionState)").returncode==0,proc,log,10)
             until(lambda:terminal_action(script,f"Connect(127.0.0.1:{port})").returncode==0,proc,log,20)
             terminal_action(script,"Set(aidWait,false)")
         if a.monitor:monitor=LineClient(port,10)
+        stage3_resources["monitor"]=monitor
+        if a.stage3 in ("family","dbcs"):
+            from stage3_actor import printer_start
+            stage3_resources["printer"]=printer_start(out,port)
         wanted=["0:0009 COMM: client"]+(["0:000A COMM: client"] if a.monitor else [])
+        if a.stage3 in ("family","dbcs"):wanted.append("0:000B COMM: client")
         until(lambda:all(x in log.read_text(errors="replace") for x in wanted),proc,log,20)
         proc.stdin.write("ipl 01B9\n");proc.stdin.flush()
         if a.early_input:
@@ -153,7 +188,66 @@ def run(a):
             if client:client.enter("Q"*148)
             elif terminal_action(script,'String('+json.dumps("Q"*256)+')').returncode or terminal_action(script,"Enter()").returncode:
                 raise RuntimeError("early AID submission")
-        if a.normal and not a.rootfault:
+        if a.stage3:
+            from stage3_actor import act
+            stage3_checks=act(a,out,proc,log,script,client,stage3_resources,port,screens,monitor_parts)
+        elif a.workbench:
+            if client or not monitor:raise ValueError("Workbench actor needs a screen and monitor")
+            until(lambda:"WBPANEL READY" in monitor.text(),proc,log,60)
+            screen=terminal_action(script,"Ascii()").stdout;screens.append(screen)
+            (out/"panels.screen").write_text(screen)
+            (out/"panels.buffer").write_text(terminal_action(script,"ReadBuffer(Ascii)").stdout)
+            if not all(x in screen for x in ("Panel one","Panel two","Owned C text","Separate panel")):raise ValueError("C panels missing from physical screen")
+            terminal_action(script,"PF(1)")
+            help_screen=until(lambda:(shown if "WORKBENCH HELP" in (shown:=terminal_action(script,"Ascii()").stdout) else None),proc,log)
+            if "Panel one" in help_screen or "Panel two" in help_screen or "PF1 closes help" not in help_screen:raise ValueError("application panels obscure Help")
+            terminal_action(script,"PF(1)")
+            until(lambda:"Panel one" in terminal_action(script,"Ascii()").stdout,proc,log)
+            rows,cols=map(int,terminal_action(script,"Query(ScreenCurSize)").stdout.split())
+            entry=(rows-1-(2 if cols<120 else 1)-(260+cols-1)//cols)*cols+4
+            for row,col,focus in ((2,1,"OUTPUT"),(2 if cols>=100 else entry//cols-4,cols-43 if cols>=100 else 1,"SHELL")):
+                for repeat in range(2):
+                    until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log)
+                    terminal_action(script,f"MoveCursor({row},{col})");terminal_action(script,"Enter()")
+                    until(lambda:"Focus: "+focus in terminal_action(script,"Ascii()").stdout,proc,log)
+                    until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log)
+            terminal_action(script,"PF(2)")
+            until(lambda:terminal_action(script,"Query(Cursor)").stdout.strip()==f"{entry//cols} {entry%cols}",proc,log)
+            terminal_action(script,"Enter()")
+            until(lambda:"WBHISTORY READY" in terminal_action(script,"Ascii()").stdout,proc,log)
+            (out/"latest.screen").write_text(terminal_action(script,"Ascii()").stdout)
+            terminal_action(script,'String("draft kept")')
+            before_cursor=terminal_action(script,"Query(Cursor)").stdout
+            terminal_action(script,"PF(10)")
+            until(lambda:"Focus: OUTPUT" in terminal_action(script,"Ascii()").stdout,proc,log)
+            terminal_action(script,"PF(10)")
+            until(lambda:"Focus: SHELL" in terminal_action(script,"Ascii()").stdout,proc,log)
+            for key in (11,12):
+                terminal_action(script,f"PF({key})")
+                until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log)
+                unchanged=terminal_action(script,"Ascii()").stdout
+                if "Focus: SHELL" not in unchanged or "Input: PRIMARY/" not in unchanged or "draft kept" not in unchanged:
+                    raise ValueError("unassigned PF key changed focus, input source or draft")
+            terminal_action(script,"PF(10)")
+            until(lambda:"Focus: OUTPUT" in terminal_action(script,"Ascii()").stdout,proc,log)
+            terminal_action(script,"PF(7)")
+            def history_screen():
+                shown=terminal_action(script,"Ascii()").stdout
+                return shown if "Output: History" in shown and "WB LINE" in shown else None
+            history=until(history_screen,proc,log);(out/"history.screen").write_text(history)
+            after_cursor=terminal_action(script,"Query(Cursor)").stdout
+            if before_cursor!=after_cursor:raise ValueError("protected update moved the physical cursor")
+            if "draft kept" not in history:raise ValueError("scroll erased typed draft")
+            terminal_action(script,"PF(1)")
+            until(lambda:"WORKBENCH HELP" in terminal_action(script,"Ascii()").stdout,proc,log)
+            terminal_action(script,"PF(1)");terminal_action(script,"PF(9)")
+            until(lambda:"Output: Latest" in terminal_action(script,"Ascii()").stdout,proc,log)
+            terminal_action(script,"Enter()")
+            until(lambda:"WBINPUT SOURCE" in terminal_action(script,"Ascii()").stdout,proc,log)
+            until(lambda:"Input: MONITOR/" in terminal_action(script,"Ascii()").stdout,proc,log)
+            monitor.enter("MONITOR-LINE")
+            until(lambda:"WORKBENCH CLIENT PASS" in monitor.text(),proc,log)
+        elif a.normal and not a.rootfault:
             if client:until(lambda:"welcome to pcomm" in client.text(),proc,log)
             else:until(lambda:"welcome to pcomm" in terminal_action(script,"Ascii()").stdout,proc,log,60)
             cases=json.loads(Path(a.commands).read_text()) if a.commands else [["VERSION","PDIO1"],["CMS RUN 31 RXVM -v","PCOMM END 1 RC=0"],["RXVM -v","PCOMM END 2 RC=0"],["MISSING","PCOMM END 3 OS=28 RC=unavailable"],["RXVM -v","PCOMM END 4 RC=0"]]
@@ -166,13 +260,16 @@ def run(a):
                 prompt_before=prompt_capture.text().splitlines().count(marker) if prompt_case else 0
                 if client:client.enter(command)
                 else:
+                    until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
                     terminal_action(script,'String('+json.dumps(command)+')');terminal_action(script,"Enter()")
                 for response in responses:
                     prompt,text=response[:2]
                     source=response[2] if len(response)>2 else "primary"
                     def input_ready():
                         shown=client.text() if client else terminal_action(script,"Ascii()").stdout
-                        if prompt in shown:return True
+                        if prompt in shown:
+                            if len(response)>3 and isinstance(response[3],int) and prompt_capture.text().count(prompt)<response[3]:return False
+                            return True
                         prefix=re.match(r"PCOMM END [0-9]+",marker)
                         if prefix and prefix[0] in shown:raise RuntimeError("application ended before input: "+prefix[0])
                         return False
@@ -187,20 +284,58 @@ def run(a):
                         if not monitor:raise ValueError("monitor input source unavailable")
                         monitor.enter(text)
                     elif client:client.enter(text)
-                    else:terminal_action(script,'String('+json.dumps(text)+')');terminal_action(script,"Enter()")
+                    else:
+                        until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
+                        terminal_action(script,'String('+json.dumps(text)+')');terminal_action(script,"Enter()")
                 def completed():
                     shown=client.text() if client else terminal_action(script,"Ascii()").stdout
                     if prompt_case and prompt_capture.text().splitlines().count(marker)<=prompt_before:return None
-                    if marker in shown:return shown
+                    if marker in shown or (a.workbench_normal and monitor and marker in monitor.text()):return shown
                     prefix=re.match(r"PCOMM END [0-9]+",marker)
                     if prefix:
-                        actual=re.search(re.escape(prefix[0])+r" (?:RC|OS)=[^\n]*",shown)
+                        actual=re.search(re.escape(prefix[0])+r" (?:RC|OS)=[^\n]*",monitor.text() if a.workbench_normal and monitor else shown)
                         if actual:raise RuntimeError("command result: "+actual[0]+"; expected "+marker)
                     return None
                 shown=until(completed,proc,log)
                 screens.append(shown)
+                if a.editor and command=="VERSION" and not client:
+                    until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
+                    rows,cols=map(int,terminal_action(script,"Query(ScreenCurSize)").stdout.split())
+                    entry=(rows-1-(2 if cols<120 else 1)-(260+cols-1)//cols)*cols+4
+                    terminal_action(script,"PF(5)")
+                    def recalled():
+                        shown=terminal_action(script,"Ascii()").stdout.splitlines()
+                        return shown[entry//cols][entry%cols:entry%cols+7]=="VERSION"
+                    until(recalled,proc,log);terminal_action(script,"PF(6)")
+                    until(lambda:terminal_action(script,"Ascii()").stdout.splitlines()[entry//cols][entry%cols:entry%cols+7].strip()=="",proc,log)
+                    def version_count():return monitor.text().count("; PDIO1;") if monitor else 0
+                    previous=version_count();terminal_action(script,"PF(5)");until(recalled,proc,log)
+                    terminal_action(script,"Enter()")
+                    until(lambda:version_count()==previous+1,proc,log)
+                    for cancel in ("recall","clear"):
+                        until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log)
+                        terminal_action(script,'String("ECHO hidden-&")');terminal_action(script,"Enter()")
+                        until(lambda:"CONTINUE COMMAND" in terminal_action(script,"Ascii()").stdout,proc,log)
+                        previous=version_count()
+                        terminal_action(script,"PF(5)" if cancel=="recall" else "Clear()")
+                        if cancel=="recall":until(recalled,proc,log)
+                        else:
+                            until(lambda:"CONTINUE COMMAND" not in terminal_action(script,"Ascii()").stdout and terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log)
+                            terminal_action(script,'String("VERSION")')
+                        terminal_action(script,"Enter()");until(lambda:version_count()==previous+1,proc,log)
+                    if "hidden-VERSION" in monitor.text():raise ValueError("recall retained a hidden continuation prefix")
+                    until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log)
+                    terminal_action(script,'String('+json.dumps("X"*199)+')')
+                    terminal_action(script,"Enter()")
+                    until(lambda:monitor and "command exceeds 198 characters; not run" in monitor.text(),proc,log)
+                    until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log)
+                    editor_screen=terminal_action(script,"Ascii()").stdout
+                    if "command exceeds" not in editor_screen:raise ValueError("shell refusal is not visible")
+                    (out/"editor.screen").write_text(editor_screen)
             if client:client.enter("EXIT")
-            else:terminal_action(script,'String("EXIT")');terminal_action(script,"Enter()")
+            else:
+                until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
+                terminal_action(script,'String("EXIT")');terminal_action(script,"Enter()")
         elif a.pcomm:
             until(lambda:"welcome to pcomm" in terminal_action(script,"Ascii()").stdout,proc,log)
             for command,marker in (("VERSION","PDIO1"),("CMS RUN 31 RXVM -v","PCOMM END 1 RC=0"),("RXVM -v","PCOMM END 2 RC=0")):
@@ -208,7 +343,7 @@ def run(a):
                 until(lambda:marker in terminal_action(script,"Ascii()").stdout,proc,log)
                 screens.append(terminal_action(script,"Ascii()").stdout)
             terminal_action(script,'String("EXIT")');terminal_action(script,"Enter()")
-        for marker,text in (() if a.pcomm or a.normal else (("CONSOLE INPUT 1:","Q"*(148 if a.line_primary else 256)),("CONSOLE INPUT 2:",""),("CONSOLE INPUT 3:","  padded  "))):
+        for marker,text in (() if a.pcomm or a.normal or a.workbench or a.stage3 else (("CONSOLE INPUT 1:","Q"*(148 if a.line_primary else 256)),("CONSOLE INPUT 2:",""),("CONSOLE INPUT 3:","  padded  "))):
             def prompt():
                 if client:return client.text() if marker in client.text() else None
                 shown=terminal_action(script,"Ascii()");return shown.stdout if shown.returncode==0 and marker in shown.stdout else None
@@ -248,7 +383,7 @@ def run(a):
         while "disabled wait state" not in log.read_text(errors="replace"):
             if proc.poll() is not None or time.monotonic()>end:raise TimeoutError("console completion event")
             time.sleep(.05)
-    except (OSError,RuntimeError,TimeoutError,ValueError) as exc:error=str(exc)
+    except (OSError,RuntimeError,TimeoutError,ValueError,subprocess.TimeoutExpired) as exc:error=str(exc)
     finally:
         if error and a.normal and not a.rootfault and proc.poll() is None:
             try:
@@ -257,32 +392,73 @@ def run(a):
                 until(lambda:"disabled wait state" in log.read_text(errors="replace"),proc,log,30)
             except (OSError,RuntimeError,TimeoutError,subprocess.TimeoutExpired):pass
         if proc.poll() is None:
-            proc.stdin.write(f'stopall\npsw\ngpr\ncr\nsavecore "{out/"result.core"}" 0 fffffff\nquit\n');proc.stdin.flush()
+            try:
+                proc.stdin.write(f'stopall\npsw\ngpr\ncr\nsavecore "{out/"result.core"}" 0 fffffff\nquit\n');proc.stdin.flush()
+            except OSError as exc:error=error or str(exc)
             try:proc.wait(timeout=30)
             except subprocess.TimeoutExpired:proc.terminate();proc.wait(timeout=10)
         if terminal:
             try:terminal_action(script,"Quit()")
             except (OSError,subprocess.TimeoutExpired):pass
-            terminal.wait(timeout=10)
+            try:terminal.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                terminal.terminate()
+                try:terminal.wait(timeout=5)
+                except subprocess.TimeoutExpired:terminal.kill();terminal.wait(timeout=5)
         if client:(out/"primary.txt").write_text(client.text());client.close()
+        if a.stage3:monitor=stage3_resources["monitor"]
         if monitor:monitor_parts.append(monitor.text());monitor.close()
+        printer=stage3_resources["printer"]
+        if printer:
+            try:printer.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                printer.terminate()
+                try:printer.wait(timeout=5)
+                except subprocess.TimeoutExpired:printer.kill();printer.wait(timeout=5)
         if monitor_parts:(out/"monitor.txt").write_text("".join(monitor_parts))
+        thread.join(timeout=2)
     checks={"guest_event_sequence_completed":error is None,"hercules_exit_zero":proc.returncode==0}
-    raw=(out/"result.core").read_bytes();transcript=None;metrics=None;service_cost=None
+    raw=(out/"result.core").read_bytes() if (out/"result.core").exists() else b"";transcript=None;metrics=None;service_cost=None
     if len(raw)==0x10000000:
         observed=struct.unpack_from(">8I",raw,0x3c800)
         if observed[0]==0x4d455431:
             metrics=dict(zip(("magic","real_bytes_at_stop","observed_peak_real_bytes","total_free_low_u_bytes","largest_low_u_start","largest_low_u_bytes","minimum_observed_largest_low_u_bytes","invocation_depth"),observed))
             checks["observed_real_frames_within_guest"]=observed[1]<=observed[2]<=0x10000000
             checks["final_observed_invocation_depth_zero"]=observed[7]==0
-        checks["native_console_app_rc_zero"]=(struct.unpack_from(">2I",raw,0x4f5c)==(1,0) if a.pcomm or a.normal else struct.unpack_from(">2I",raw,0x12880)==(0,0))
+        checks["native_console_app_rc_zero"]=(struct.unpack_from(">2I",raw,0x4f5c)==(1,0) if a.pcomm or a.normal else error is None and struct.unpack_from(">2I",raw,0x12880)==(0,0))
         try:
             transcript=parse_transcript(raw);(out/"transcript.json").write_text(json.dumps(transcript,indent=2)+"\n")
             rows,cols=({2:(24,80),3:(32,80),4:(43,80),5:(27,132)}[a.model] if not a.line_primary else (0,0))
+            if a.oversize:cols,rows=map(int,a.oversize.lower().split("x"))
             checks["reported_actual_geometry"]=transcript["rows"]==rows and transcript["columns"]==cols
             checks["input_and_screen_leases_released"]=transcript["read_owner"]==transcript["screen_owner"]==0
             texts=[e["text"] for e in transcript["events"] if e["type"]==2]
-            if a.normal:
+            if a.workbench or a.workbench_normal and not client:
+                checks["submitted_field_clear_resets_locked_cursor"]=submitted_cursor_resets(received_records((out/"3270.trace").read_text()))
+            if a.stage3:
+                checks.update(stage3_checks)
+                checks["stage3_client_rc_zero"]=checks["native_console_app_rc_zero"]
+            elif a.workbench:
+                checks["independent_C_panel_and_session_client"]="WORKBENCH CLIENT PASS" in texts and checks["native_console_app_rc_zero"]
+                checks["physical_panels_scroll_cursor_draft_and_source"]=error is None
+                checks["semantic_output_not_repainted"]=all(texts.count("WB LINE %03d / retained output for scrollback"%i)==1 for i in range(200))
+                checks["UI_pixels_not_semantic_text"]=not any("Owned C text" in text or "WORKBENCH HELP" in text for text in texts)
+                checks["monitor_has_ordered_plain_text"]=all((out/"monitor.txt").read_text().count("WB LINE %03d / retained output for scrollback"%i)==1 for i in range(200))
+                checks["no_unmarked_capture_gap"]=transcript["gaps"]==(2 if a.transfer else 0)
+                if a.transfer:
+                    records=received_records((out/"3270.trace").read_text())
+                    exact=b"\xf1"+b"\x40"*16384 in records
+                    partial=b"\xf1"+b"\x40"*32768 in records
+                    checks["fragmented_16384_bytes_received_exactly"]=exact
+                    checks["provider_partial_131072_write_rejected_and_recovered"]=partial and "WBTRANSFER PASS 16384 / 131072 rejected" in texts
+                w=struct.unpack_from(">22I",raw,0x3ae00)
+                physical=(out/"panels.buffer").read_text() if (out/"panels.buffer").exists() else ""
+                chroma=bool(set(re.findall(r"42=([0-9a-f]+)",physical))&set(("f1","f2","f3","f4","f5","f6")))
+                checks["colour_follows_query"]=chroma==a.colour
+                checks["monochrome_sections_keep_intensity"]=a.colour or "SF(c0=f8)" in physical
+                checks["bounded_full_redraws"]=w[18]<=(4 if a.transfer else 2) and w[17]>200
+                checks["device_sessions_and_panels_reaped"]=transcript["read_owner"]==0
+            elif a.normal:
                 checks["normal_ipl_and_kernel_shutdown"]=struct.unpack_from(">Q",raw,0x2010)[0]==1 and struct.unpack_from(">2I",raw,0x2018)==((12,0xffffffff) if a.rootfault else (0,0)) and texts[-1]==("K EMERGENCY: PCOMM FAULT" if a.rootfault else "K SHUTDOWN")
                 checks["controlled_invocations_released"]=struct.unpack_from(">I",raw,0x4f00)[0]==0
                 checks["complete_text_or_explicit_gap"]=transcript["gaps"]==(1 if a.raw or a.disconnect else 0)
@@ -290,6 +466,7 @@ def run(a):
                 begins=[e for e in transcript["events"] if e["type"]==1]
                 checks["balanced_typed_invocation_results"]=len(ends)==len(begins) and len(ends)>=(1 if a.rootfault else 2) and all(e["result"][0]==1 for e in ends)
                 if a.rootfault:checks["kernel_unwinds_unhealthy_pcomm"]=len(ends)==1 and tuple(ends[0]["result"][1:6])==(12,1,0,0,0xffffffff)
+                if a.editor:checks["recall_and_whole_fragment_refusal"]=(out/"editor.screen").exists()
                 checks["ordered_command_results"]=ordered_results(texts,cases) and all(any(marker in text for text in texts) for case in cases for marker in [case[1]])
                 checks["expected_native_output"]=all(text in "\n".join(texts) for case in cases if len(case)>3 for text in case[3])
                 if a.monitor:
@@ -301,7 +478,9 @@ def run(a):
                         del checks["attached_line_capture_complete"]
                 if not a.line_primary and screens:
                     checks["screen_geometry_observed"]=len(screens[0].splitlines())>=rows and max(map(len,screens[0].splitlines()))>=cols
-                    checks["usable_3270_after_commands"]="z/PDOS PCOMM" in screens[-1] and cases[-1][1] in screens[-1]
+                    if a.workbench_normal:
+                        checks["program_panel_excludes_shell_control_text"]=all(x not in screens[-1] for x in ("PCOMM BEGIN ","PCOMM END ","PDOS00:\\>"))
+                    checks["usable_3270_after_commands"]="z/PDOS PCOMM" in screens[-1] and ("COMMAND / PCOMM" in screens[-1] if a.workbench_normal else cases[-1][1] in screens[-1])
             else:
                 expected=[] if a.pcomm else ["LINE %03d: 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ -- ordered output"%i for i in range(80)]
                 if not a.pcomm:checks["idle_input_uses_enabled_wait"]=idle_wait_observed
@@ -335,7 +514,7 @@ def run(a):
                     checks["scroll_and_child_return_repaint"]=all(x in screens[-1] for x in ("z/PDOS PCOMM","PCOMM END 2 RC=0","crexx-1.0.0-beta.3")) if a.pcomm else all(x in screens[0] for x in ("Console qualification","LINE 079:","crexx-1.0.0-beta.3","CONSOLE INPUT 1:"))
         except (ValueError,struct.error) as exc:checks["transcript_framing"]=False;error=error or str(exc)
     else:checks["stopped_core_complete"]=False
-    receipt={"profile":{"model":a.model,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
+    receipt={"profile":{"model":a.model,"colour":a.colour,"basic":a.basic,"editor":a.editor,"oversize":a.oversize,"workbench":a.workbench,"transfer":a.transfer,"workbench_normal":a.workbench_normal,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw,"stage3":a.stage3},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
     if service_cost is not None:receipt["service_cost"]=service_cost
     if a.normal and transcript is not None and any(e.get("text","").startswith("PD25 ") for e in transcript["events"]):
         from io_benchmark_check import observations
@@ -351,6 +530,9 @@ def run(a):
         flat=out/"stopped.ckd"
         subprocess.run([str(herc.parent/"cckd2ckd"),"-q","-cyls","100",str(disk),str(flat)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         stored=inspect(flat);initial=json.loads(before_store.read_text())
+        if a.stage3=="graph":
+            from stage3_actor import stopped_graph
+            checks["graph_totals_match_independent_stopped_vtoc"]=stopped_graph(flat,out)
         checks["disk_outside_store_unchanged"]=stored["outside_store_sha256"]==initial["outside_store_sha256"]
         logs=[f for f in stored["files"] if f["kind"]==0x5443 and not f["erased"]]
         checks["durable_transcript_readback"]=len(logs)==1 and logs[0]["sha256"]==transcript["sha256"]
@@ -365,8 +547,10 @@ if __name__=="__main__":
     p=argparse.ArgumentParser()
     for name in ("disk","core","hercules","output"):p.add_argument(name)
     p.add_argument("--model",type=int,choices=(2,3,4,5),default=2)
+    p.add_argument("--colour",action="store_true");p.add_argument("--workbench",action="store_true");p.add_argument("--oversize");p.add_argument("--workbench-normal",action="store_true");p.add_argument("--basic",action="store_true");p.add_argument("--transfer",action="store_true");p.add_argument("--editor",action="store_true")
     for flag in ("monitor","line-primary","handoff","raw","disconnect","pcomm","normal","rootfault","early-input"):p.add_argument("--"+flag,action="store_true")
     p.add_argument("--commands")
+    p.add_argument("--stage3",choices=("graph","family","dbcs","recovery","policy"))
     for name in ("cms-exchange","fixture-exchange","tape-input"):p.add_argument("--"+name)
     p.add_argument("--tape-output",action="store_true")
     raise SystemExit(run(p.parse_args()))

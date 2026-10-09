@@ -53,6 +53,9 @@ int TSCCHECKV(const TSCSTATE *,unsigned int,unsigned int,unsigned int,unsigned i
 int TSCBUILDCONSWRITE(TSCSTATE *state, unsigned int length);
 int TSCBUILDCONSCMD(TSCSTATE *state,unsigned int command,unsigned int length,
                      unsigned int input);
+/* K-owned contiguous low-real data; output data chaining is one operation. */
+int TSCBUILDEXT(TSCSTATE *,unsigned int,unsigned int,unsigned int,unsigned int);
+int TSCCHECKEXT(const TSCSTATE *,unsigned int,unsigned int,unsigned int *);
 int TSCCHECKWRITE(const TSCSTATE *state);
 /* A completed output can carry a simultaneous attention. The caller must
  * record that attention before consuming the completion. */
