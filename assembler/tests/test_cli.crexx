@@ -40,6 +40,23 @@ main: procedure = .int
   call run_case cli, "--literal-limit -1", 2, stdout_path, stderr_path, "negative literal capacity"
   call run_case cli, "--literal-limit 65537", 2, stdout_path, stderr_path, "excessive literal capacity"
   call run_case cli, "--literal-limit 9999999999999999999999", 2, stdout_path, stderr_path, "overflowing literal capacity"
+  call run_case cli, "--symbol-limit", 2, stdout_path, stderr_path, "missing symbol capacity"
+  call run_case cli, "--symbol-limit 0", 2, stdout_path, stderr_path, "zero symbol capacity"
+  call run_case cli, "--symbol-limit 65537", 2, stdout_path, stderr_path, "excessive symbol capacity"
+  call run_case cli, "--symbol-limit 9999999999999999999999", 2, stdout_path, stderr_path, "overflowing symbol capacity"
+  symbols_source=work||"/symbols.asm";symbols_deck=work||"/symbols.obj"
+  call erase symbols_source
+  call lineout symbols_source,"S CSECT"
+  call lineout symbols_source," DC F'1'"
+  do symbol_index=1 to 5000
+    call lineout symbols_source,"N"||right(symbol_index,6,"0")||" EQU 1"
+  end
+  call lineout symbols_source," END S"
+  call lineout symbols_source
+  call erase symbols_deck
+  call run_case cli, shellquote(symbols_source)||" "||shellquote(symbols_deck),1,stdout_path,stderr_path,"default symbol capacity enforced"
+  call absent symbols_deck
+  call run_case cli,"--symbol-limit 8192 "||shellquote(symbols_source)||" "||shellquote(symbols_deck),0,stdout_path,stderr_path,"explicit symbol capacity"
   limits_source = work || "/limits.asm"; limits_deck = work || "/limits.obj"
   call writefile limits_source, "S CSECT" || '0a'x || " USING S,12" || '0a'x || " L 1,=F'1'" || '0a'x || " L 2,=F'2'" || '0a'x || " END S" || '0a'x
   call erase limits_deck

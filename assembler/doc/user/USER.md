@@ -182,7 +182,8 @@ where available and a project-owned status category, including malformed source,
 unsupported feature, range, duplicate, undefined, capacity, changed replay,
 object representation and I/O failure.
 
-The desktop configuration has 64 sections, 4096 symbols, 65536 fixups, 256
+The desktop configuration has 64 sections, 4096 symbols by default (select
+`--symbol-limit 1..65536` for a larger supplied table), 65536 fixups, 256
 literal identities across all pools by default (`--literal-limit 0..65536`
 selects an explicit count; zero disables literals), 256 statement bytes and expression depth
 32, with a 32 MiB allocation-payload budget.
