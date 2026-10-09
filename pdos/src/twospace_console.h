@@ -7,7 +7,7 @@
 #define TTC_OK 0
 #define TTC_BAD -1
 #define TTC_UNSUPPORTED -2
-#define TTC_MAX_CELLS 3564U
+#define TTC_MAX_CELLS 16384U
 #define TTC_MAX_STREAM TSA_SCREEN_BYTES
 #define TTC_BASIC_ATTRIBUTES 1U
 #define TTC_PROTECTED 0x30U
@@ -19,6 +19,7 @@
 typedef struct {
     unsigned int device_class,address,model,rows,columns,encoding,generation;
     unsigned int monitor,features;
+    unsigned int default_rows,default_columns,alternate_rows,alternate_columns;
 } TTCCAP;
 typedef struct {
     unsigned int row,column,attributes,length;
@@ -32,11 +33,16 @@ typedef struct {
 int TTCCONFIG(TTCCAP *cap,unsigned int device_class,unsigned int address,
                unsigned int model,unsigned int monitor);
 int TTCCAPS(const TTCCAP *cap,unsigned char output[TSA_CAP_BYTES]);
+int TTCGEOM(TTCCAP *,unsigned int,unsigned int,unsigned int,unsigned int);
 int TTCADDR(const TTCCAP *cap,unsigned int address,unsigned char output[2]);
 int TTCDECODE(const TTCCAP *cap,const unsigned char input[2],unsigned int *address);
 int TTCENCODE(const TTCCAP *cap,const TTCFIELD *fields,unsigned int count,
                unsigned int cursor_row,unsigned int cursor_column,
                unsigned char *output,unsigned int capacity,unsigned int *length);
+/* Protected-region changes only: no cursor, field topology or input MDT
+ * alteration. Confirmed cells are caller owned and committed after I/O. */
+int TTCDIFF(const TTCCAP *,const TTCFIELD *,unsigned int,const unsigned char *,
+               unsigned char *,unsigned int,unsigned int *);
 int TTCRAW(const TTCCAP *cap,const unsigned char *input,unsigned int length,
             unsigned int *command);
 int TTCINPUT(const TTCCAP *cap,const unsigned char *input,unsigned int bytes,

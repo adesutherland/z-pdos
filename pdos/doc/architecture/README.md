@@ -120,6 +120,10 @@ not console success alone, establishes the output.
 
 ## Console and text
 
+The [3270 family driver contract](CONSOLE-STANDARD.md) records the accepted
+0.2.1 development scope and distinguishes its implementation checkpoints from
+the qualified 0.2.0 behavior below.
+
 A C31 K driver owns channel devices and encodes checked 3270 data streams.
 The reusable C presentation library runs in U and provides PCOMM's header,
 footer, scrollable output and editable prompt. Configured models 2–5, a
@@ -146,3 +150,6 @@ The [K/U contract](TWO-SPACE-POC.md) contains decisions and dated development
 checkpoints. Dated 0.1/0.1.1 reports retain the previous one-ASCE layout; their
 4096 MiB machine and eager tables are not the 0.2 memory contract.
 The [backlog](../BACKLOG.md) owns remaining compatibility and qualification work.
+The [shared I/O foundation](IO-FOUNDATION.md) describes the locally qualified
+PD-025 operation lifetime, common U transfers and record grouping used by the
+0.2.1 development candidate.

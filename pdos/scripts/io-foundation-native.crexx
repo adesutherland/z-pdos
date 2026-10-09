@@ -1,0 +1,42 @@
+/* SPDX-License-Identifier: MIT; normal native-profile I/O regression.
+ * Fresh checked media, explicit stopped PDS installation, then console actor. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 9 then return 2
+  work=args.1; prior=args.2; core=args.3; herc=args.4; model=args.5
+  commands=args.6; archive=args.7; writer=args.8; profile=args.9
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  if model<>"2" & model<>"3" & model<>"4" & model<>"5" then return 2
+  if profile<>"tso31" & profile<>"tso24" then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  locations=.string[]
+  address crexx "pwd" output locations
+  root=strip(locations.1); config=root||"/"||work||"-config"
+  address crexx "run mkdir -p :config"
+  if rc<>0 then return rc
+  configured=config||"/normal.core"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_core.py configure :core :configured :model 3270 monitor"
+  if rc<>0 then return rc
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :prior :configured :herc"
+  if rc<>0 then return rc
+  source=root||"/"||work||"/media/pdos00.ckd"; native=root||"/"||work||"/media/native.ckd"
+  receipt=root||"/"||work||"/native-pds.json"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/native_files_media.py :archive :writer :source :native :receipt :profile"
+  if rc<>0 then return rc
+  disk=root||"/"||work||"/media/native.cckd"; compressor=herc||"/ckd2cckd"
+  address crexx "run :compressor -q -bz2 -cyls 100 :native :disk"
+  if rc<>0 then return rc
+  before=root||"/"||work||"/store-before.json"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/store_check.py :native :before"
+  if rc<>0 then return rc
+  transient=.string[]
+  transient[1]=native; transient[2]=source; transient[3]=root||"/"||work||"/media/datasets.ckd"
+  transient[4]=root||"/"||work||"/media/readback.ckd"
+  address crexx "run cmake -E rm :transient[]"
+  if rc<>0 then return rc
+  runout=root||"/"||work||"/run"; hercules=herc||"/hercules"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_machine.py :disk :configured :hercules :runout --commands :commands --normal --model :model --monitor"
+  return rc

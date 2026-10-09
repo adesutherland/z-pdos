@@ -27,6 +27,7 @@ typedef struct {
 typedef struct {
     unsigned int limit;
     unsigned int count;
+    unsigned int generation;
     TSRRANGE ranges[TSR_MAX];
 } TSRPLAN;
 

@@ -7,6 +7,7 @@
 #include "twospace_fixture.h"
 #include "twospace_memory.h"
 #include "twospace_channel.h"
+#include "twospace_io.h"
 #include "twospace_dataset.h"
 #include "twospace_cms.h"
 #include "twospace_cmsfile.h"
@@ -17,8 +18,20 @@
 #include "twospace_abi.h"
 #include "twospace_console.h"
 #include "twospace_transcript.h"
+typedef struct channel_context CHANNELCONTEXT;
 
 static unsigned int user_rights(unsigned int frame, void *unused);
+static int channel_run(TSCSTATE *,unsigned int);
+static unsigned int channel_owner(void);
+static int channel_cancel(TSCSTATE *,unsigned int,unsigned int);
+static int channel_release(TSCSTATE *,unsigned int,unsigned int);
+static int channel_take(TSCSTATE *,unsigned int,unsigned int,unsigned int *);
+static int channel_submit(TSCSTATE *,unsigned int,unsigned int,CHANNELCONTEXT *);
+static int channel_poll(TSCSTATE *,unsigned int,unsigned int,CHANNELCONTEXT *);
+static int channel_quiesce(TSCSTATE *,unsigned int,unsigned int);
+static int channel_vector(unsigned int,unsigned int,unsigned int,unsigned int,unsigned int,const unsigned char **);
+static int channel_missing(unsigned int);
+static unsigned int channel_benchmark(const TSGREQUEST *);
 static unsigned int cms_word(const unsigned char *p);
 static void cms_put_word(unsigned char *p, unsigned int value);
 static unsigned int native_cms_call(const TSGREQUEST *request,unsigned int profile);
@@ -46,6 +59,12 @@ static int native_clean(unsigned int token, const TSVRESOURCE *resource,
 static TSDSTATE u_tables;
 static TSMSTATE storage;
 static TSCSTATE channel;
+static TIOPOOL channel_io;
+static unsigned int channel_bench_real;
+static unsigned int observation_scans;
+static struct {
+    unsigned int real,valid,ssid,cylinder,head,first,records,bytes,requests,hits,batches;
+} channel_ahead;
 static TSCSTATE console_channel;
 static TSVSTACK native_invocations;
 static TSSSTATE native_store;
@@ -59,6 +78,7 @@ static unsigned int console_read_count;
 static unsigned int console_read_owner;
 static unsigned int console_irb_ready;
 static unsigned int console_read_io_handle;
+static unsigned int console_channel_ticket;
 static unsigned int console_next_io_handle;
 static unsigned int retired_terminal_io_token;
 static unsigned int retired_terminal_io_handle;
@@ -117,8 +137,19 @@ void TSKEYSET(unsigned int real_page, unsigned int key);
 
 static void purge(void *unused)
 {
+    unsigned int count;
     (void)unused;
-    ++*(volatile unsigned int *)0x40acU;
+    count=++*(volatile unsigned int *)0x40acU;
+    /* Bounded diagnostic provenance for the first small map/free operations.
+     * No U interface, clock or normal-image policy depends on these records. */
+    if(!normal_boot()&&count<=8U){
+        volatile unsigned int *row=(volatile unsigned int *)(0x2720U+(count-1U)*24U);
+        row[0U]=count;row[1U]=*(volatile unsigned int *)0x30a0U;
+        row[2U]=*(volatile unsigned int *)0x308cU;
+        row[3U]=*(volatile unsigned int *)0x3004U;
+        row[4U]=*(volatile unsigned int *)0x307cU;
+        row[5U]=*(volatile unsigned int *)0x300cU;
+    }
     TSFPURGE(0);
 }
 static void set_key(unsigned int real_page, unsigned int key, void *unused)
@@ -128,6 +159,7 @@ static int attach(void)
 {
     TSPADDR at;
     if (storage_ready) return 0;
+    TIOINIT(&channel_io);
     if (TSDATTACH(&u_tables,(unsigned char *)TSF_UPOOL_VA,TSF_UPOOL_REAL,
                   TSF_UPOOL_BYTES,
                   *(volatile const unsigned int *)0x4098U,
@@ -140,6 +172,7 @@ static int attach(void)
         TSCINIT(&console_channel,(unsigned char *)TSF_KAPERTURE_VA,
                 TSF_REAL_BYTES,TSF_CONSOLE_REAL) != TSC_OK)
         return -1;
+    if(TIOBIND(&channel_io,&channel)!=TIO_OK||TIOBIND(&channel_io,&console_channel)!=TIO_OK)return -1;
     if(!normal_boot()){
         at.hi=0U; at.lo=0x20000U;
         if (TSMRESERVE(&storage,1U,24U,at,0x2000U) != TSP_OK)return -1;
@@ -182,7 +215,7 @@ static int channel_record_ssid(TSCSTATE *current,unsigned int subchannel,unsigne
     unsigned int count;
     if (!subchannel || !data || !capacity || capacity > TSC_MAX_RECORD ||
         TSCBUILDREAD(current,cylinder,head,record,0x0eU,capacity) != TSC_OK ||
-        TSCIO(subchannel,TSCORB(current),TSCIRB(current)) != 0 ||
+        channel_run(current,subchannel) != 0 ||
         TSCCHECKREAD(current,capacity,&count) != TSC_OK)
         return -1;
     *data=TSCDATA(current);
@@ -220,7 +253,7 @@ static int store_record(void *unused,unsigned int index,unsigned int write,
     if(TSCBUILDUPDATE(&channel,cylinder,head,record,TSS_BLOCK)!=TSC_OK)return 1;
     for(i=0U;i<TSS_BLOCK;++i)TSCDATA(&channel)[i]=block[i];
     if(store_fail_once){store_fail_once=0U;subchannel=0x0001ffffU;}
-    if(TSCIO(subchannel,TSCORB(&channel),TSCIRB(&channel))||
+    if(channel_run(&channel,subchannel)||
        TSCCHECKREAD(&channel,TSS_BLOCK,&done)!=TSC_OK||done!=TSS_BLOCK)return 1;
     return 0;
 }
@@ -253,7 +286,7 @@ static unsigned int volume_service(const TSGREQUEST *request)
     subchannel=*(volatile const unsigned int *)0x40bcU;
     if (!subchannel) return 0xfffffffbU;
     if (TSCBUILDREAD(&channel,0U,0U,3U,0x0eU,80U) != TSC_OK ||
-        TSCIO(subchannel,TSCORB(&channel),TSCIRB(&channel)) != 0 ||
+        channel_run(&channel,subchannel) != 0 ||
         TSCCHECKREAD(&channel,80U,&count) != TSC_OK || count < 24U)
         return 12U;
     label=TSCDATA(&channel);
@@ -861,6 +894,8 @@ static unsigned int terminal_service(const TSGREQUEST *request)
     if(console_v1_enabled())return console_v1_init();
     if (request->length>4U || request->address.hi || request->address.lo ||
         request->direction) return 8U;
+    if(console_channel.quarantined)return 12U;
+    if(console_read_phase)return 16U;
     label=request->length==4U ? fault_message : request->length==3U ? owner_message :
           request->length==2U ? fail_message :
           request->length ? retry_message : message;
@@ -878,6 +913,7 @@ static unsigned int terminal_service(const TSGREQUEST *request)
     }
     if (!ssid) return 0xfffffffbU;
     *(volatile unsigned int *)0x40c0U=ssid;
+    if (TSCBUILDCONSWRITE(&console_channel,1773U) != TSC_OK) return 20U;
     screen=TSCDATA(&console_channel);
     for (i=0U; i<1773U; ++i) screen[i]=0x40U;
     screen[0]=0xc3U; screen[1]=0x11U; screen[2]=0x5dU;
@@ -886,10 +922,9 @@ static unsigned int terminal_service(const TSGREQUEST *request)
     screen[1766]=0x1dU; screen[1767]=0U; screen[1768]=0x13U;
     screen[1769]=0x3cU; screen[1770]=0x5dU; screen[1771]=0x7fU;
     screen[1772]=0U;
-    if (TSCBUILDCONSWRITE(&console_channel,1773U) != TSC_OK) return 20U;
     if (!console_ssid &&
         TSCENABL(ssid,TSCSCHIB(&console_channel)) != 0) return 23U;
-    io_result=TSCIO(ssid,TSCORB(&console_channel),TSCIRB(&console_channel));
+    io_result=channel_run(&console_channel,ssid);
     *(volatile unsigned int *)0x40c4U=(unsigned int)io_result;
     if (io_result != 0) return 21U;
     if (TSCCHECKWRITE(&console_channel) != TSC_OK) return 22U;
@@ -904,6 +939,7 @@ static unsigned int terminal_read_start(const TSGREQUEST *request)
         request->direction) return 8U;
     if (!console_ssid) return 0xfffffffbU;
     if (console_read_phase) return 4U;
+    if(console_channel.quarantined)return 12U;
     if (frame && TSVOWN(&native_invocations,frame->token,TSV_TERMINAL,
                         console_ssid)!=TSV_OK) return 4U;
     /* A 3270 READ MODIFIED issued before an AID returns NoAID with no
@@ -938,7 +974,7 @@ static unsigned int terminal_read_cancel(unsigned int token)
      * Quiesce that subchannel before another owner may submit a read. */
     if (console_read_phase==1U || console_read_phase==2U ||
         console_read_phase==4U) {
-        if (TSCCLEAR(console_ssid,TSCIRB(&console_channel))!=0 ||
+        if (channel_quiesce(&console_channel,console_ssid,token)!=0 ||
             terminal_io_complete(token)!=0U) {
             console_read_phase=4U; /* quarantine real workspace */
             return 12U;
@@ -946,6 +982,7 @@ static unsigned int terminal_read_cancel(unsigned int token)
     }
     if (token && TSVFORGET(&native_invocations,token,TSV_TERMINAL,
                            console_ssid)!=TSV_OK) return 12U;
+    if(console_read_phase==3U&&channel_release(&console_channel,token,console_channel_ticket))return 12U;
     if (token && retired_handle) {
         retired_terminal_io_token=token;
         retired_terminal_io_handle=retired_handle;
@@ -974,7 +1011,7 @@ static unsigned int terminal_read_poll_into(const TSGREQUEST *request,
     if (!console_read_phase) return 0xfffffffbU;
     if ((frame ? frame->token : 0U)!=console_read_owner) return 8U;
     if (console_read_phase==4U) return 12U;
-    if (console_read_phase != 3U) {
+    if (console_read_phase == 1U) {
         status=console_irb_ready ? 0 : TSCPOLL(console_ssid,TSCIRB(&console_channel));
         console_irb_ready=0U;
         if (status < 0) {
@@ -990,26 +1027,27 @@ static unsigned int terminal_read_poll_into(const TSGREQUEST *request,
             terminal_read_cancel(console_read_owner);
             return 12U;
         }
-        if (frame) {
-            if (console_next_io_handle==0xffffffffU) return 4U;
-            ++console_next_io_handle;
-            if (TSVOWN(&native_invocations,frame->token,TSV_IO,
-                       console_next_io_handle)!=TSV_OK) return 4U;
-            console_read_io_handle=console_next_io_handle;
-            cms_put_word(TSCORB(&console_channel),console_read_io_handle);
-        }
-        console_read_phase=2U;
         status=terminal_start_fail_once ? 0x0001ffffU : console_ssid;
         terminal_start_fail_once=0U;
-        if (TSCSTART(status,TSCORB(&console_channel),
-                     TSCIRB(&console_channel)) != 0) {
+        if(channel_take(&console_channel,(unsigned int)status,console_read_owner,&console_channel_ticket))return 4U;
+        console_next_io_handle=console_channel_ticket;
+        if (frame) {
+            if (TSVOWN(&native_invocations,frame->token,TSV_IO,
+                       console_channel_ticket)!=TSV_OK){channel_release(&console_channel,console_read_owner,console_channel_ticket);return 4U;}
+            console_read_io_handle=console_channel_ticket;
+        }
+        console_read_phase=2U;
+        if (channel_submit(&console_channel,console_read_owner,console_channel_ticket,0) != 0) {
             terminal_read_cancel(console_read_owner);
             return 12U;
         }
         return 1U;
     }
     if (console_read_phase == 2U) {
-        if (TSCCHECKCONSREAD(&console_channel,252U,&count) != TSC_OK) {
+        status=channel_poll(&console_channel,console_read_owner,console_channel_ticket,0);
+        if(status==TIO_PENDING)return 1U;
+        if(status!=TIO_OK){terminal_read_cancel(console_read_owner);return 12U;}
+        if (TSCCHECKIN(&console_channel,252U,&count) != TSC_OK) {
             /* Initial status can precede the actual READ MODIFIED data. */
             if (TSCIRB(&console_channel)[8U] == 0U &&
                 TSCIRB(&console_channel)[9U] == 0U) return 1U;
@@ -1018,6 +1056,7 @@ static unsigned int terminal_read_poll_into(const TSGREQUEST *request,
         }
         if (terminal_io_complete(console_read_owner)!=0U) return 12U;
         if (count == 3U && TSCDATA(&console_channel)[0] == 0x60U) {
+            if(channel_release(&console_channel,console_read_owner,console_channel_ticket))return 12U;
             console_read_phase=1U;
             return 1U;
         }
@@ -1136,7 +1175,7 @@ static unsigned int terminal_clear_probe(const TSGREQUEST *request)
     if (request->length || request->address.hi || request->address.lo ||
         request->direction || !console_ssid || console_read_phase)
         return 8U;
-    return TSCCLEAR(console_ssid,TSCIRB(&console_channel))==0 ? 0U : 12U;
+    return channel_quiesce(&console_channel,console_ssid,channel_owner())==0 ? 0U : 12U;
 }
 
 /* Diagnostic native-entry gate. The real launcher will call this from K
@@ -1220,12 +1259,6 @@ static unsigned int native_begin(TSGREQUEST *request)
      * service personality, AMODE, owner or placement. */
     if (request->address.hi || request->address.lo || request->direction)
         return 8U;
-    if(!cms_lowcore_template_ready&&cms31_setup_lowcore())return 4U;
-    lowcore=(unsigned char *)TSF_KAPERTURE_VA+cms31_lowcore_real;
-    if(console_v1_enabled()){
-        unsigned int console_status=console_v1_init();
-        if(console_status)return console_status;
-    }
     switch (request->length) {
     case 1U:
         personality=TSV_CMS; mode=24U; image_owner=5U; runtime_owner=1U;
@@ -1261,6 +1294,14 @@ static unsigned int native_begin(TSGREQUEST *request)
     }
     if (!native_loaded(personality,mode,image_owner) ||
         !native_image_bytes(personality,mode,image_owner)) return 8U;
+    /* A rejected selector must not allocate/map compatibility state or touch
+     * the console. Validate the image before beginning any setup. */
+    if(!cms_lowcore_template_ready&&cms31_setup_lowcore())return 4U;
+    lowcore=(unsigned char *)TSF_KAPERTURE_VA+cms31_lowcore_real;
+    if(console_v1_enabled()){
+        unsigned int console_status=console_v1_init();
+        if(console_status)return console_status;
+    }
     for (i=0U; i<16U; ++i) {
         caller.gpr[i].hi=saved[2U*i];
         caller.gpr[i].lo=saved[2U*i+1U];
@@ -2334,6 +2375,7 @@ static unsigned int cms_line_screen(const unsigned char *message,
     if (pcomm_loaded) return pcomm_display(message,length);
     if (!console_ssid || console_read_phase || !message || length>130U)
         return 12U;
+    if(TSCBUILDCONSWRITE(&console_channel,1773U)!=TSC_OK)return 12U;
     screen=TSCDATA(&console_channel);
     for (i=0U; i<1773U; ++i) screen[i]=0x40U;
     screen[0]=0xc3U; screen[1]=0x11U; screen[2]=0x5dU;
@@ -2342,9 +2384,7 @@ static unsigned int cms_line_screen(const unsigned char *message,
     screen[1766]=0x1dU; screen[1767]=0U; screen[1768]=0x13U;
     screen[1769]=0x3cU; screen[1770]=0x5dU; screen[1771]=0x7fU;
     screen[1772]=0U;
-    if (TSCBUILDCONSWRITE(&console_channel,1773U)!=TSC_OK ||
-        TSCIO(console_ssid,TSCORB(&console_channel),
-              TSCIRB(&console_channel))!=0 ||
+    if (channel_run(&console_channel,console_ssid)!=0 ||
         TSCCHECKWRITE(&console_channel)!=TSC_OK) return 12U;
     return 0U;
 }
@@ -2875,6 +2915,7 @@ static unsigned int call_overlay_task[TSV_MAX_DEPTH];
 static TSPADDR call_overlay_address[TSV_MAX_DEPTH];
 
 static unsigned int call_alloc(unsigned int,unsigned int *,unsigned char **);
+#include "twospace_io.inc"
 #include "twospace_media.inc"
 #include "twospace_command.inc"
 #include "twospace_file.inc"
@@ -2892,6 +2933,8 @@ static unsigned int service_request(TSGREQUEST *request)
     if (!request) return 0xffffffffU;
     if (attach()) return 0xfffffffaU;
     if(request->svc==TSA_IO_SVC)return console_v1_service(request);
+    if(request->svc==198U)return channel_benchmark(request);
+    if(console_v1_enabled()&&tc_legacy_control(request->svc))return 20U;
     if(request->svc==199U&&normal_boot()){
         static const unsigned char halt[]={0xd2,0x40,0xe2,0xc8,0xe4,0xe3,0xc4,0xd6,0xe6,0xd5};
         static const unsigned char emergency[]={0xd2,0x40,0xc5,0xd4,0xc5,0xd9,0xc7,0xc5,0xd5,0xc3,0xe8,0x7a,0x40,0xd7,0xc3,0xd6,0xd4,0xd4,0x40,0xc6,0xc1,0xe4,0xd3,0xe3};
@@ -3055,11 +3098,16 @@ static unsigned int service_request(TSGREQUEST *request)
 
 /* Per-service observations are separate from channel completion decisions. */
 static unsigned int real_observed_peak,low_observed_min,low_observed_initialized;
+static unsigned int observed_real_generation,observed_virtual_generation;
 static void service_observe(void)
 {
     volatile unsigned int *out=(volatile unsigned int *)(TSF_KAPERTURE_VA+0x3c800U);
     unsigned int used=0U,i,cursor=0x20000U,next,end,largest=0U,first=0U;
     if(!storage_ready||!normal_boot())return;
+    out[7U]=native_invocations.depth;
+    if(low_observed_initialized&&storage.real.generation!=0xffffffffU&&storage.virtuals.generation!=0xffffffffU&&
+       observed_real_generation==storage.real.generation&&observed_virtual_generation==storage.virtuals.generation)return;
+    observed_real_generation=storage.real.generation;observed_virtual_generation=storage.virtuals.generation;++observation_scans;
     for(i=0U;i<storage.real.count;++i)
         if(storage.real.ranges[i].phases&TSR_RUN)used+=storage.real.ranges[i].size;
     if(used>real_observed_peak)real_observed_peak=used;

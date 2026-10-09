@@ -8,6 +8,7 @@ int TSRINIT(TSRPLAN *p, unsigned int real_bytes)
     if (!p || !aligned(real_bytes) || real_bytes < TSR_PAGE) return TSR_BAD;
     p->limit = real_bytes;
     p->count = 0U;
+    p->generation=1U;
     return TSR_OK;
 }
 
@@ -29,6 +30,7 @@ int TSRRESERVE(TSRPLAN *p, unsigned int owner, unsigned int start,
     p->ranges[p->count].size = size;
     p->ranges[p->count].phases = phases;
     ++p->count;
+    if(p->generation!=0xffffffffU)++p->generation;
     return TSR_OK;
 }
 
@@ -70,6 +72,7 @@ int TSRRELEASE(TSRPLAN *p, unsigned int owner, unsigned int start)
         if (p->ranges[i].owner == owner && p->ranges[i].start == start) {
             --p->count;
             p->ranges[i] = p->ranges[p->count];
+            if(p->generation!=0xffffffffU)++p->generation;
             return TSR_OK;
         }
     }

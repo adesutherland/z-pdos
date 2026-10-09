@@ -7,7 +7,7 @@
 
 static unsigned int rights(unsigned int frame, void *unused)
 {
-    (void)unused;
+    if(unused)++*(unsigned int *)unused;
     if (frame == 0x7000U || frame == 0x12000U || frame == 0x13000U)
         return TSG_READ | TSG_WRITE;
     if (frame == 0x5000U || frame == 0x6000U || frame == 0x11000U ||
@@ -97,6 +97,39 @@ static int test(unsigned char *real)
     address.hi=1U; address.lo=0x10001000U;
     if (TSDLOOKUP(&tables,address,&address) != TSD_BAD) return 16;
     memcpy(real+TSF_UPOOL_REAL,root_entry,sizeof root_entry);
+    {
+        unsigned char *bulk=(unsigned char *)malloc(8193U);
+        unsigned int checks=0U;
+        if(!bulk)return 21;
+        gate.rights_context=&checks;
+        request.address.hi=1U;request.address.lo=0x10001000U;
+        request.length=8192U;request.direction=TSG_READ;
+        for(i=0U;i<8192U;++i)real[0x12000U+i]=(unsigned char)(i*17U+3U);
+        if(TSGCOPY(&gate,&request,bulk,8193U)!=TSG_BAD||
+           TSGSCOPY(&gate,&request,bulk,8193U)!=TSG_OK||checks!=4U){free(bulk);return 22;}
+        for(i=0U;i<8192U;++i)if(bulk[i]!=(unsigned char)(i*17U+3U)){free(bulk);return 23;}
+        memset(bulk,0xc7U,8193U);request.length=8193U;request.direction=TSG_WRITE;
+        real[0x12000U]=0x5aU;real[0x13000U]=0x5bU;
+        if(TSGSCOPY(&gate,&request,bulk,8193U)!=TSG_DENIED||
+           real[0x12000U]!=0x5aU||real[0x13000U]!=0x5bU){free(bulk);return 24;}
+        request.length=TSG_MAX_SPAN+1U;
+        if(TSGSPROB(&gate,&request)!=TSG_BAD){free(bulk);return 25;}
+        {
+            TSPADDR va,ra;
+            va.hi=0U;va.lo=0xfffff000U;ra.hi=0U;ra.lo=0x12000U;
+            if(TSDMAP(&tables,va,ra)!=TSD_OK){free(bulk);return 26;}
+            va.hi=1U;va.lo=0U;ra.lo=0x1f000U;
+            if(TSDMAP(&tables,va,ra)!=TSD_OK){free(bulk);return 27;}
+            for(i=0U;i<16U;++i){real[0x12ff0U+i]=(unsigned char)i;real[0x1f000U+i]=(unsigned char)(i+16U);}
+            request.address.hi=0U;request.address.lo=0xfffffff0U;
+            request.length=32U;request.direction=TSG_READ;checks=0U;
+            if(TSGSCOPY(&gate,&request,bulk,8193U)!=TSG_OK||checks!=4U){free(bulk);return 28;}
+            for(i=0U;i<32U;++i)if(bulk[i]!=(unsigned char)i){free(bulk);return 29;}
+            request.direction=TSG_WRITE;real[0x12ff0U]=0x5aU;
+            if(TSGSCOPY(&gate,&request,bulk,8193U)!=TSG_DENIED||real[0x12ff0U]!=0x5aU){free(bulk);return 30;}
+        }
+        gate.rights_context=0;free(bulk);
+    }
     if (TSFBUILD(real,0xa000U,TSF_UPOOL_REAL,&built,0,0) == 0) return 13;
     return 0;
 }

@@ -13,6 +13,7 @@ import re
 import struct
 import subprocess
 import sys
+import time
 
 from machine import digest, qword
 
@@ -22,6 +23,65 @@ HIGH_REQUEST = 0x110001000
 REPLY = 0x2468ACE0
 # DAT, key, problem state and AMODE bits; condition code is not a mode.
 MODE_MASK = 0x048f0001fc000000
+
+
+def collect_log(path, captured):
+    """Keep both channels: NoUI shutdown messages can bypass hardcopy."""
+    path = Path(path)
+    path.with_name(path.stem + "-pipe.log").write_text(captured)
+    hardcopy = path.read_text(errors="replace") if path.exists() else ""
+    return captured + "\n" + hardcopy
+
+
+def run_captured(cmd, out, logfile, rcfile, timeout=195):
+    """Quit only after the command script and final state reach the logger.
+
+    Keep stdin open and capture the process stream directly to a file. The
+    deadline is failure detection; observed events permit successful shutdown.
+    """
+    rcfile = Path(rcfile)
+    controlled = rcfile.with_name(rcfile.stem + "-controlled.rc")
+    commands = rcfile.read_text().splitlines()
+    if not commands or commands[-1].strip().lower() != "quit":
+        raise ValueError("controlled capture requires one final quit")
+    controlled.write_text("\n".join(commands[:-1]) + "\n")
+    args = list(cmd)
+    args[args.index("-r")+1] = str(controlled)
+    stream = Path(logfile).with_name(Path(logfile).stem + "-process.log")
+    deadline = time.monotonic() + timeout
+    with stream.open("w") as sink:
+        proc = subprocess.Popen(args, cwd=out, stdin=subprocess.PIPE,
+                                stdout=sink, stderr=subprocess.STDOUT, text=True)
+        try:
+            while proc.poll() is None:
+                log = Path(logfile).read_text(errors="replace") if Path(logfile).exists() else ""
+                ended = any("HHC02264I" in line and str(controlled) in line
+                            and "processing ended" in line for line in log.splitlines())
+                observed = ("HHC02278I Processor CP00 PSW:" in log and
+                            "HHC02313I State:" in log)
+                if ended and observed:
+                    proc.stdin.write("quit\n")
+                    proc.stdin.flush()
+                    proc.wait(timeout=max(1, deadline-time.monotonic()))
+                    break
+                if time.monotonic() >= deadline:
+                    raise subprocess.TimeoutExpired(args, timeout)
+                # Light host log monitoring; this interval never establishes
+                # guest readiness, completion or a successful result.
+                time.sleep(0.05)
+        except BaseException:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=5)
+            raise
+        finally:
+            proc.stdin.close()
+    return subprocess.CompletedProcess(args, proc.returncode,
+                                        stream.read_text(errors="replace"), "")
 
 
 def load_elf(path):
@@ -162,6 +222,10 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
               "no_fatal_interrupt": qword(raw, 0x2188) == 0,
               "external_entry_returned": qword(raw, 0x2190) >= 1,
               "io_entry_returned": qword(raw, 0x2198) >= 1,
+              "external_wake_returns_to_k_with_io_disabled":
+                    struct.unpack_from(">I",raw,0x21b0)[0] == 1,
+              "io_wake_returns_to_k_with_io_disabled":
+                    struct.unpack_from(">I",raw,0x21b4)[0] == 1,
               "kcore_above_region_third_range": qword(raw, 0x2020) == KCORE,
               "k_can_read_own_dat_pool": qword(raw, 0x2028) == 0x10400f,
               "k_can_read_u_dat_pool": qword(raw, 0x2030) == 0x28400f,
@@ -410,6 +474,16 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
                 (0x00400000 // 4096)) if ipl else 0)
           if tso24 else 0)) and
         0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x160000)
+    if not ipl:
+        # A rejected selector formerly created two compatibility mappings.
+        # In this diskless image there is no valid image to initialize; the
+        # first four mutations must be the two deliberate map/free pairs,
+        # followed directly by the wide-heap workload.
+        provenance = [struct.unpack_from(">6I",raw,0x2720+i*24) for i in range(8)]
+        checks["rejected_native_selector_does_not_map_compatibility"] = (
+            [row[1] for row in provenance] == [120]*8 and
+            [row[3] for row in provenance[:4]] == [4096]*4 and
+            [row[3] for row in provenance[4:]] == [0x04000000]*4)
     errors = [x for x in log.splitlines() if re.search(r"HHC\d{5}E\b", x)]
     checks["no_hercules_error"] = not errors
     return {"pass": all(checks.values()), "checks": checks,
@@ -442,7 +516,11 @@ def run(args):
                  "twospace_cmscursor.c", "twospace_cmscursor.h",
                  "twospace_tso.c", "twospace_tso.h",
                  "twospace_invocation.c", "twospace_invocation.h",
-                 "twospace_command.inc", "twospace_abi.h"):
+                 "twospace_command.inc", "twospace_abi.h",
+                 "twospace_3270.c", "twospace_3270.h",
+                 "twospace_console.c", "twospace_console.h", "twospace_console.inc",
+                 "twospace_entry64.inc", "twospace_nucleus64.inc",
+                 "twospace_transcript.c", "twospace_transcript.h"):
         manifest["source_sha256"]["pdos/src/" + name] = digest(src.parent.parent / "src" / name)
     for name in ("dat.c", "dat_emit.c", "placement.c", "gate.c", "memory.c",
                  "channel.c", "dataset.c", "cms.c", "cmsfile.c",
@@ -463,13 +541,12 @@ def run(args):
     cmd = [str(Path(args.hercules).resolve()), "-t", "-f", str(out / "machine.cnf"),
            "-o", str(out / "console.log"), "-r", str(out / "run.rc")]
     try:
-        proc = subprocess.run(cmd, cwd=out, capture_output=True, text=True, timeout=195)
+        proc = run_captured(cmd, out, out / "console.log", out / "run.rc")
         log = proc.stdout + proc.stderr
     except subprocess.TimeoutExpired as exc:
         log = (exc.stdout or b"").decode(errors="replace") + (exc.stderr or b"").decode(errors="replace")
         proc = None
-    if (out / "console.log").exists():
-        log = (out / "console.log").read_text(errors="replace")
+    log = collect_log(out / "console.log", log)
     out.joinpath("hercules.log").write_text(log)
     manifest["hercules_argv"] = cmd
     manifest["host_exit_code"] = proc.returncode if proc else None
@@ -482,6 +559,42 @@ def run(args):
     result["checks"]["guest_completion_event"] = (
         "HHC00809I Processor CP00: disabled wait state" in log)
     result["pass"] &= result["checks"]["guest_completion_event"]
+    # Deliberately remove only the K external-return I/O masking instruction.
+    # This must fail the mask oracle while still reaching ordinary completion;
+    # neither elapsed time nor an induced stall is the negative result.
+    mask_fault = bytearray(out.joinpath("image.core").read_bytes())
+    pattern = b"\x94\xfd\x10\x80"  # NI saved PSW byte 0x80(R1), FD
+    positions = [at for at in range(0x9000, 0xa000 - 3)
+                 if mask_fault[at:at+4] == pattern]
+    if len(positions) != 2:
+        raise ValueError("expected distinct external and I/O return-mask instructions")
+    mask_fault[positions[0]+1] = 0xff
+    mask_core = out / "external-mask-fault.core"
+    mask_core.write_bytes(mask_fault)
+    mask_rc = out / "external-mask-fault.rc"
+    mask_result = out / "external-mask-fault-result.core"
+    mask_console = out / "external-mask-fault-console.log"
+    mask_rc.write_text(
+        f"sysclear\narchlvl esame\nloadcore \"{mask_core}\"\n"
+        f"runtest 180\nstopall\npsw\n"
+        f"savecore \"{mask_result}\" 0 13fff\nquit\n")
+    mask_proc = run_captured(
+        [str(Path(args.hercules).resolve()), "-t", "-f", str(out / "machine.cnf"),
+         "-o", str(mask_console), "-r", str(mask_rc)], out, mask_console, mask_rc)
+    mask_log = collect_log(mask_console, mask_proc.stdout + mask_proc.stderr)
+    mask_raw = mask_result.read_bytes() if mask_result.exists() else b""
+    mask_checks = judge(mask_raw, mask_log)["checks"] if len(mask_raw) == 0x14000 else {}
+    mask_key = "external_wake_returns_to_k_with_io_disabled"
+    mask_ok = (mask_proc.returncode == 0 and mask_checks.get(mask_key) is False
+               and all(value for key, value in mask_checks.items() if key != mask_key)
+               and "HHC00809I Processor CP00: disabled wait state" in mask_log)
+    result["checks"]["external_mask_fault_control_rejected"] = mask_ok
+    result["pass"] &= mask_ok
+    manifest["external_mask_fault"] = {
+        "control": "replace external-return NI mask FD with FF; normal completion required",
+        "core_sha256": digest(mask_core), "instruction_real": hex(positions[0]),
+        "host_exit_code": mask_proc.returncode,
+        "failed_checks": [key for key, value in mask_checks.items() if not value]}
     # A separate synthetic machine-check entry exercises the bounded
     # fail-stop route; it is deliberately not reported as a hardware MCHK.
     negative = bytearray(out.joinpath("image.core").read_bytes())
@@ -496,16 +609,14 @@ def run(args):
                     str(out / "machine.cnf"), "-o", str(out / "machine-check-console.log"), "-r",
                     str(out / "machine-check.rc")]
     try:
-        negative_proc = subprocess.run(negative_cmd, cwd=out,
-                                       capture_output=True, text=True,
-                                       timeout=195)
+        negative_proc = run_captured(negative_cmd, out, out / "machine-check-console.log",
+                                    out / "machine-check.rc")
         negative_log = negative_proc.stdout + negative_proc.stderr
     except subprocess.TimeoutExpired as exc:
         negative_proc = None
         negative_log = (exc.stdout or b"").decode(errors="replace") + \
                        (exc.stderr or b"").decode(errors="replace")
-    if (out / "machine-check-console.log").exists():
-        negative_log = (out / "machine-check-console.log").read_text(errors="replace")
+    negative_log = collect_log(out / "machine-check-console.log", negative_log)
     out.joinpath("machine-check.log").write_text(negative_log)
     negative_path = out / "machine-check-result.core"
     negative_raw = negative_path.read_bytes() if negative_path.exists() else b""
@@ -537,15 +648,14 @@ def run(args):
                  str(out / "machine.cnf"), "-o", str(out / "unexpected-fault-console.log"), "-r",
                  str(out / "unexpected-fault.rc")]
     try:
-        fault_proc = subprocess.run(fault_cmd, cwd=out, capture_output=True,
-                                    text=True, timeout=195)
+        fault_proc = run_captured(fault_cmd, out, out / "unexpected-fault-console.log",
+                                 out / "unexpected-fault.rc")
         fault_log = fault_proc.stdout + fault_proc.stderr
     except subprocess.TimeoutExpired as exc:
         fault_proc = None
         fault_log = (exc.stdout or b"").decode(errors="replace") + \
                     (exc.stderr or b"").decode(errors="replace")
-    if (out / "unexpected-fault-console.log").exists():
-        fault_log = (out / "unexpected-fault-console.log").read_text(errors="replace")
+    fault_log = collect_log(out / "unexpected-fault-console.log", fault_log)
     out.joinpath("unexpected-fault.log").write_text(fault_log)
     fault_path = out / "unexpected-fault-result.core"
     fault_raw = fault_path.read_bytes() if fault_path.exists() else b""

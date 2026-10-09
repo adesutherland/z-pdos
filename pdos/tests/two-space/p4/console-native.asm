@@ -1,6 +1,6 @@
 * SPDX-License-Identifier: MIT; selected native LINK and TPUT/TGET forms.
          CSECT
-         ENTRY P4LINK,P4WIDE,P4LOW,P4PUT,P4GET
+         ENTRY P4LINK,P4WIDE,P4LOW,P4PUT,P4GET,P4READ
 P4LINK   STM   14,12,12(13)
          BASR  12,0
          USING *,12
@@ -46,7 +46,7 @@ P4LOWBAD SR    15,15
          LM    14,12,12(13)
          BR    14
          DS    0F
-P4LOWSIZE DC   F'4096'
+P4LOWSIZE DC   F'16384'
          DROP  12
 P4PUT    STM   14,12,12(13)
          BASR  12,0
@@ -71,4 +71,19 @@ P4GET    STM   14,12,12(13)
          LM    14,12,12(13)
          BR    14
 P4INFLAG DC   X'83000000'
+         DROP  12
+* Raw TGET returns the actual byte count as well as its status.
+P4READ   STM   14,12,12(13)
+         BASR  12,0
+         USING *,12
+         L     8,8(1)
+         L     0,0(1)
+         L     1,4(1)
+         O     1,P4READFL
+         SVC   93
+         ST    1,0(8)
+         ST    15,16(13)
+         LM    14,12,12(13)
+         BR    14
+P4READFL DC   X'83000000'
          END   P4LINK

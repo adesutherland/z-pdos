@@ -1,0 +1,53 @@
+/* SPDX-License-Identifier: MIT; focused protocol checks and native links. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i = .int; imagebase = .string
+  source = .string; asm = .string; object = .string
+  binary = .string; map = .string
+  if args.0 <> 1 & args.0 <> 4 then return 2
+  work = args.1
+  if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
+  address crexx "run test ! -e :work"
+  if rc <> 0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc <> 0 then return rc
+  family = "pdos/src/twospace_3270.c"; console = "pdos/src/twospace_console.c"
+  do i = 1 to 3
+    name = word("console_family console channel",i)
+    test = "pdos/tests/two-space/" || name || ".c"; binary = work || "/" || name
+    if i = 3 then do
+      source = "pdos/src/twospace_channel.c"
+      address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src :source :test -o :binary"
+    end
+    else address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src :family :console :test -o :binary"
+    if rc <> 0 then return rc
+    address crexx "run :binary"
+    if rc <> 0 then return rc
+  end
+  if args.0 = 4 then do
+    cc = args.2; classicas = args.3; classicld = args.4
+    objects = .string[]
+    do i = 1 to 3
+      source = "pdos/src/twospace_" || word("3270 console channel",i) || ".c"
+      asm = work || "/part" || i || ".asm"; object = work || "/part" || i || ".obj"
+      address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src :source -o :asm"
+      if rc <> 0 then return rc
+      address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+      if rc <> 0 then return rc
+      objects[i] = object
+    end
+    /* The channel C object depends on native privileged linkage; the codec
+     * pair is independently linked at two bases without library services. */
+    codecs = .string[]; codecs[1] = objects[1]; codecs[2] = objects[2]
+    do i = 1 to 2
+      if i = 1 then imagebase = "33554432"
+      else imagebase = "67108864"
+      binary = work || "/codec" || i || ".bin"; map = work || "/codec" || i || ".map"
+      address crexx "run :classicld --oformat binary --image-base :imagebase -e T27GEOM -Map :map -o :binary :codecs[]"
+      if rc <> 0 then return rc
+    end
+  end
+  say "Focused 3270 family checks passed; native links are not guest qualification."
+  return 0

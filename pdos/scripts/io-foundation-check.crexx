@@ -1,0 +1,29 @@
+/* SPDX-License-Identifier: MIT; focused shared-I/O and bulk transfer checks. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i = .int; source = .string; binary = .string
+  if args.0 <> 1 then return 2
+  work = args.1
+  if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
+  address crexx "run test ! -e :work"
+  if rc <> 0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc <> 0 then return rc
+  do i = 1 to 5
+    name = word("io channel_vector gate real placement",i)
+    source = "pdos/tests/two-space/" || name || ".c"; binary = work || "/" || name
+    if i = 1 then address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_channel.c pdos/src/twospace_io.c :source -o :binary"
+    else if i = 2 then address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_channel.c :source -o :binary"
+    else if i = 3 then address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_gate.c pdos/src/twospace_dat.c pdos/src/twospace_placement.c pdos/src/twospace_fixture.c :source -o :binary"
+    else do
+      component = "pdos/src/twospace_" || name || ".c"
+      address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src :component :source -o :binary"
+    end
+    if rc <> 0 then return rc
+    address crexx "run :binary"
+    if rc <> 0 then return rc
+  end
+  say "Shared I/O, fixed-record batching, whole-span copies and storage generations pass."
+  return 0

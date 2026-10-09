@@ -362,7 +362,14 @@ kinterrupt:
     je machine_failstop
     j return_app
 count_external:
-    ni 0x82(%r1), 0xfd       /* event resumes an enabled K wait */
+    tm 0x81(%r1), 0x01
+    jnz external_context_ready /* preserve an interrupted U PSW exactly */
+    ni 0x81(%r1), 0xfd       /* PSW bit14: clear WAIT in the second byte */
+    /* Match the I/O wake path: service C polls with I/O disabled, and
+     * LPSWE enables I/O and WAIT atomically. An external wake must not open
+     * an acceptance window between the final status check and WAIT. */
+    ni 0x80(%r1), 0xfd
+external_context_ready:
     lghi %r3, 0x2710
     llgh %r2, 0x86
     st %r2, 0(%r3)
@@ -378,8 +385,11 @@ external_event_ready:
     stg %r2, 0(%r1)
     j return_app
 count_io:
-    ni 0x82(%r1), 0xfd
+    tm 0x81(%r1), 0x01
+    jnz io_context_ready
+    ni 0x81(%r1), 0xfd
     ni 0x80(%r1), 0xfd       /* C consumes status before rearming I/O */
+io_context_ready:
     lghi %r3, 0x2700
     l %r2, 0xb8
     st %r2, 0(%r3)

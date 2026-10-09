@@ -13,7 +13,7 @@ main: procedure = .int
   mode = ""
   if args.0 = 10 then do
     mode = args.10
-    if mode <> "handoff" & mode <> "raw" & mode <> "disconnect" then return 2
+    if mode <> "handoff" & mode <> "raw" & mode <> "disconnect" & mode <> "early" then return 2
   end
   if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
   address crexx "run test ! -e :work"
@@ -77,7 +77,8 @@ main: procedure = .int
   address crexx "run cmake -E rm :transient[]"
   if rc <> 0 then return rc
   disk = out || "/media/pdos00.cckd"; runout = out || "/run"; hercules = herc || "/hercules"
-  if mode <> "" then flags = flags || " --" || mode
+  if mode = "early" then flags = flags || " --early-input"
+  else if mode <> "" then flags = flags || " --" || mode
   address system "env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_machine.py " || quote(disk) || " " || quote(configured_core) || " " || quote(hercules) || " " || quote(runout) || " --model " || model || flags
   return rc
 quote: procedure = .string

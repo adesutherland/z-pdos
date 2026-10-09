@@ -68,6 +68,11 @@ int main(void)
     irb[8]=0x0cU; irb[9]=0U; irb[10]=0U; irb[11]=0U;
     irb[4]=0U; irb[5]=0x3eU; irb[6]=0x02U; irb[7]=0x08U;
     if (TSCCHECKWRITE(&channel) != TSC_OK) return 10;
+    irb[8]=0x8cU;
+    if(TSCCHECKOUT(&channel)!=TSC_OK||TSCCHECKWRITE(&channel)!=TSC_IO)return 21;
+    irb[8]=0x8eU;
+    if(TSCCHECKOUT(&channel)!=TSC_IO)return 22;
+    irb[8]=0x0cU;
     irb[11]=1U;
     if (TSCCHECKWRITE(&channel) != TSC_IO) return 11;
     if (TSCBUILDCONSREAD(&channel,252U) != TSC_OK ||
@@ -79,6 +84,12 @@ int main(void)
     irb[4]=0U; irb[5]=0x3eU; irb[6]=0x02U; irb[7]=0x08U;
     if (TSCCHECKCONSREAD(&channel,252U,&got) != TSC_OK || got != 8U)
         return 13;
+    irb[8]=0x8cU;
+    if(TSCCHECKIN(&channel,252U,&got)!=TSC_OK||got!=8U||
+       TSCCHECKCONSREAD(&channel,252U,&got)!=TSC_IO)return 23;
+    irb[8]=0x8eU;
+    if(TSCCHECKIN(&channel,252U,&got)!=TSC_IO)return 24;
+    irb[8]=0x0cU;
     irb[9]=1U;
     if (TSCCHECKCONSREAD(&channel,252U,&got) != TSC_IO) return 14;
     if (TSCINIT(&console,real,0x4000000U,0x3f0000U) != TSC_OK ||
@@ -97,6 +108,12 @@ int main(void)
         TSCDATA(&console)[0] != 0xc1U ||
         word(TSCORB(&console)+8U) != 0x3f0200U ||
         word(TSCORB(&channel)+8U) != 0x3e0200U) return 16;
+    channel.quarantined=1U;
+    if(TSCBUILDCONSREAD(&channel,252U)!=TSC_BAD||
+       TSCBUILDCONSCMD(&channel,6U,TSC_MAX_INPUT,1U)!=TSC_BAD)return 25;
+    channel.quarantined=0U;
+    if(TSCBUILDCONSCMD(&channel,6U,TSC_MAX_INPUT,1U)!=TSC_OK||
+       base[0x202U]!=0x40U||base[0x203U]!=0U)return 26;
     free(real);
     return 0;
 }

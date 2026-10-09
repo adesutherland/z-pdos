@@ -1,0 +1,4 @@
+[
+  ["VERSION", "PDIO1"],
+  ["PD25IO", "PCOMM END 1 RC=0", [], ["PD25 A", "PD25 B", "PD25 C"]]
+]

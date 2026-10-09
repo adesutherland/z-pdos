@@ -50,22 +50,14 @@ static int sf_equal(const unsigned char *p,const unsigned char *q,unsigned int n
 static unsigned int sf_span(unsigned int address,unsigned int n,unsigned int write,
                              unsigned char *bytes,unsigned int perform)
 {
-    TSGCONTEXT gate;TSGREQUEST r;unsigned int at,take;
+    TSGCONTEXT gate;TSGREQUEST r;
     const TSVFRAME *frame=TSVTOP(&native_invocations);
     unsigned int limit=frame&&frame->amode==24U?0x1000000U:0x80000000U;
     if(!address||address>=limit||!n||n>limit-address)return 8U;
     gate.u_tables=&u_tables;gate.real_aperture=(unsigned char *)TSF_KAPERTURE_VA;
     gate.real_bytes=TSF_REAL_BYTES;gate.rights=user_rights;gate.rights_context=0;
-    r.address.hi=0U;r.direction=write?TSG_WRITE:TSG_READ;r.svc=0U;
-    for(at=0U;at<n;at+=take){take=n-at;if(take>TSG_MAX_COPY)take=TSG_MAX_COPY;
-        r.address.lo=address+at;r.length=take;
-        if(TSGPROBE(&gate,&r)!=TSG_OK)return 8U;}
-    if(!perform)return 0U;
-    if(!bytes)return 8U;
-    for(at=0U;at<n;at+=take){take=n-at;if(take>TSG_MAX_COPY)take=TSG_MAX_COPY;
-        r.address.lo=address+at;r.length=take;
-        if(TSGCOPY(&gate,&r,bytes+at,take)!=TSG_OK)return 8U;}
-    return 0U;
+    r.address.hi=0U;r.address.lo=address;r.length=n;r.direction=write?TSG_WRITE:TSG_READ;r.svc=0U;
+    return (perform?TSGSCOPY(&gate,&r,bytes,n):TSGSPROB(&gate,&r))==TSG_OK?0U:8U;
 }
 static SFDD *sf_find_dd(const unsigned char name[8])
 {
@@ -401,14 +393,25 @@ static int sf_record(SFFILE *file,unsigned int capacity,unsigned int *got)
     SFDD *dd=&sf_dd[file->dd];unsigned int subchannel=dd->device;
     unsigned int attempt;
     for(attempt=0U;attempt<2U;++attempt){
+        const unsigned char *ahead;
         if(++file->record>255U){file->record=1U;if(++file->head==15U){file->head=0U;++file->cylinder;}}
         if(!TSKWITHIN(&dd->extent,file->cylinder,file->head))return 1;
+        if(dd->extent.organisation!=0x0200U&&dd->extent.block_length==capacity&&
+           (file->cylinder<dd->extent.end_cylinder||file->head<dd->extent.end_head)&&
+           channel_vector(subchannel,file->cylinder,file->head,file->record,capacity,&ahead)==(int)capacity){
+            unsigned int i;
+            /* Existing consumers borrow the primary K data buffer. Copy only
+             * the requested record after the complete batch was validated. */
+            if(TIOREADY(&channel_io,&channel)!=TIO_OK)return -1;
+            for(i=0U;i<capacity;++i)TSCDATA(&channel)[i]=ahead[i];*got=capacity;return 0;
+        }
         if(TSCBUILDREAD(&channel,file->cylinder,file->head,file->record,
                         dd->extent.organisation==0x0200U?0x06U:0x0eU,capacity)!=TSC_OK)return -1;
-        if(TSCIO(subchannel,TSCORB(&channel),TSCIRB(&channel))==0){
+        if(channel_run(&channel,subchannel)==0){
             if(TSCCHECKREAD(&channel,capacity,got)==TSC_OK)return *got?0:1;
             if(TSCCHECKEND(&channel,capacity)==TSC_OK){*got=0U;return 1;}
         }
+        if(!channel_missing(subchannel))return -1;
         /* A missing next CKD record ends this track. The extent still bounds
          * the following read. No elapsed-time success or fabricated record. */
         file->record=0U;if(++file->head==15U){file->head=0U;++file->cylinder;}
@@ -526,8 +529,10 @@ static int sf_member(SFDD *dd,const unsigned char member[8],unsigned char ttr[3]
         if(!TSKWITHIN(&dd->extent,cylinder,head))return -1;
         for(record=1U;record<100U;++record){
             if(TSCBUILDREAD(&channel,cylinder,head,record,0x06U,256U)!=TSC_OK)return -1;
-            if(TSCIO(subchannel,TSCORB(&channel),TSCIRB(&channel))||
-               TSCCHECKREAD(&channel,256U,&count)!=TSC_OK)break;
+            if(channel_run(&channel,subchannel)||TSCCHECKREAD(&channel,256U,&count)!=TSC_OK){
+                if(!channel_missing(subchannel))return -1;
+                break;
+            }
             if(count!=256U)return -1;block=TSCDATA(&channel);used=sf_half(block);
             if(used<2U||used>256U)return -1;
             for(at=2U;at<used;at+=size){
@@ -658,9 +663,9 @@ static unsigned int native_line_input(unsigned int address,unsigned int capacity
     for(;;){
         rc=terminal_read_poll_into(&request,raw);
         if(rc!=1U)break;
-        if(TSCWAITR(console_ssid,TSCIRB(&console_channel))!=0){
+        if((console_read_phase==1U?TSCWAITI(console_ssid,TSCIRB(&console_channel)):TSCWAITN(console_ssid,TSCIRB(&console_channel)))!=0){
             terminal_read_cancel(console_read_owner);return 12U;}
-        console_irb_ready=1U;
+        console_irb_ready=0U;
     }
     if(rc)return rc;n=cms_word(raw);
     if(n==3U&&raw[4U]==0x7dU)n=0U;

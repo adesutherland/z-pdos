@@ -34,6 +34,7 @@ void TSPINIT(TSPMAP *map)
     unsigned int i;
     if (!map) return;
     map->used = 0U;
+    map->generation=1U;
     for (i = 0; i < TSP_SLOTS; ++i) map->entry[i].owner = 0U;
 }
 
@@ -55,6 +56,7 @@ int TSPRESV(TSPMAP *map, unsigned int owner, unsigned int mode,
         if (!e->owner) {
             e->first = first; e->last = last; e->owner = owner;
             ++map->used;
+            if(map->generation!=0xffffffffU)++map->generation;
             return TSP_OK;
         }
     }
@@ -72,6 +74,7 @@ int TSPRELS(TSPMAP *map, unsigned int owner)
             found = 1U;
         }
     }
+    if(found&&map->generation!=0xffffffffU)++map->generation;
     return found ? TSP_OK : TSP_ABSENT;
 }
 

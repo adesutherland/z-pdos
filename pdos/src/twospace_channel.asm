@@ -5,13 +5,16 @@
 * STCK only bounds a failed operation; the TSCH status event decides success.
          CSECT
          ENTRY TSCIO
+         ENTRY TSCOUT
          ENTRY TSCDEV
          ENTRY TSCENABL
          ENTRY TSCSTART
+         ENTRY TSCPOST
          ENTRY TSCPOLL
          ENTRY TSCCLEAR
          ENTRY TSCWAITR
          ENTRY TSCWAITI
+         ENTRY TSCWAITN
          ENTRY TSCNOW
 TSCNOW   DS    0H
          STM   2,3,28(13)
@@ -35,12 +38,16 @@ TSCIO    DS    0H
          L     4,8(,1)
          LR    1,2
          TSCH  0(4)
-         SSCH  0(3)
+TSCSSCH  SSCH  0(3)
          BRCL  7,TSCREJ
          SR    9,9
 TSCARM   LA    5,128(4)
+         LA    7,3
+         CR    9,7
+         BRCL  8,TSCSTAMP
          STCK  0(5)
          BRCL  7,TSCFAIL
+TSCSTAMP DS    0H
 * Save clock-comparator and CR0 policy; only this synchronous K operation
 * arms the watchdog. All scratch is before the separate CCW region.
 * STCKC 224(R4)
@@ -70,7 +77,7 @@ TSCNOPRM DS    0H
 * Enable I/O and external interruption
          OI    160(4),X'03'
 * Enabled WAIT; interruption entry clears it
-         OI    162(4),X'02'
+         OI    161(4),X'02'
          XC    168(4,4),168(4)
          BASR  10,0
          USING *,10
@@ -85,6 +92,9 @@ TSCWAIT  LA    7,2
 * Prompt wait only notifies C of an interruption. C owns the status routing
 * and still requires the exact channel completion before reporting success.
          BRCL  8,TSCOK
+         LA    7,3
+         CR    9,7
+         BRCL  8,TSCNWAKE
          LR    1,2
          TSCH  0(4)
          BRCL  8,TSCDONE
@@ -105,6 +115,15 @@ TSCNOST  STCK  8(5)
 * Wake only on an actual interruption event
 TSCIDLE  DS    0H
          DC    X'B2B240A0'
+TSCNWAKE STCK  8(5)
+         BRCL  7,TSCFAIL
+         L     7,8(5)
+         L     6,0(5)
+         SR    7,6
+         LA    10,64
+         CR    7,10
+         BRCL  10,TSCFAIL
+         BRCL  15,TSCOK
 TSCFAIL  SR    15,15
          BCTR  15,0
          BCTR  15,0
@@ -130,6 +149,16 @@ TSCRET   LTR   8,8
 TSCREST  LM    2,10,28(13)
          BR    14
          LTORG
+* Checked output must route a pending attention rather than discard it.
+* Unlike the legacy synchronous helper, this entry performs no initial TSCH.
+TSCOUT   DS    0H
+         STM   2,10,28(13)
+         SR    8,8
+         L     2,0(,1)
+         L     3,4(,1)
+         L     4,8(,1)
+         LR    1,2
+         BRCL  15,TSCSSCH
 TSCDEV   DS    0H
          STM   2,3,28(13)
          L     2,0(,1)
@@ -175,6 +204,25 @@ TSCSTART DS    0H
 TSSOK    SR    15,15
 TSSRET   LM    2,4,28(13)
          BR    14
+* Submit an owned console read without acknowledging pending status.
+TSCPOST  DS    0H
+         STM   2,4,28(13)
+         L     2,0(,1)
+         L     3,4(,1)
+         LR    1,2
+         SSCH  0(3)
+         BRCL  8,TSPSTOK
+         BRCL  4,TSPSTPN
+         SR    15,15
+         BCTR  15,0
+         BRCL  15,TSPSTRT
+TSPSTPN  SR    15,15
+         BCTR  15,0
+         BCTR  15,0
+         BRCL  15,TSPSTRT
+TSPSTOK  SR    15,15
+TSPSTRT  LM    2,4,28(13)
+         BR    14
 TSCPOLL  DS    0H
          STM   2,3,28(13)
          L     2,0(,1)
@@ -208,6 +256,15 @@ TSCWAITI DS    0H
          STM   2,10,28(13)
          SR    8,8
          LA    9,2
+         L     2,0(,1)
+         L     4,4(,1)
+         BRCL  15,TSCARM
+* Shared C operation engine stamped IRB+128 before accepted submission.
+* Preserve that deadline across unrelated wakeups; leave TSCH to C.
+TSCWAITN DS    0H
+         STM   2,10,28(13)
+         SR    8,8
+         LA    9,3
          L     2,0(,1)
          L     4,4(,1)
          BRCL  15,TSCARM

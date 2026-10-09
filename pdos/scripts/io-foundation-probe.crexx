@@ -1,0 +1,53 @@
+/* SPDX-License-Identifier: MIT; checked native negative controls on fresh K. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args = .string[]
+  i=.int; row=.string
+  if args.0<>8 then return 2
+  work=args.1; prior=args.2; core=args.3; probe=args.4; pack=args.5; runtime=args.6; herc=args.7; commands=args.8
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  locations=.string[]
+  address crexx "pwd" output locations
+  root=strip(locations.1); input=root||"/"||work||"-inputs"; media=input||"/media"; support=input||"/base"
+  address crexx "run test ! -e :input"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :media :support"
+  if rc<>0 then return rc
+  paths=.string[]; source=prior||"/media"
+  address crexx "run find :source -maxdepth 1 -type f" output paths
+  if rc<>0 then return rc
+  do i=1 to paths.0
+    source=paths[i]
+    if right(source,4)=".bin" | right(source,4)=".sys" | right(source,4)=".exe" then do
+      address crexx "run cmake -E copy :source :media"
+      if rc<>0 then return rc
+    end
+  end
+  stage=media||"/qaprobe.bin"
+  address crexx "run :pack :probe :stage classic31"
+  if rc<>0 then return rc
+  stage=media||"/qavm.bin"
+  address crexx "run :pack :runtime :stage"
+  if rc<>0 then return rc
+  before=prior||"/media/ctl.txt"; ctl=media||"/ctl.txt"
+  do while lines(before)>0
+    row=linein(before)
+    if word(row,1)="TSO31.QAPROBE" | word(row,1)="TSO31.RXVM" then iterate
+    if word(row,1)="PDOS.STORE" then do
+      call lineout ctl,"TSO31.QAPROBE SEQ qaprobe.bin TRK 1 1 0 PS F 18452 18452"
+      call lineout ctl,"TSO31.RXVM SEQ qavm.bin CYL 3 1 0 PS F 18452 18452"
+    end
+    call lineout ctl,row
+  end
+  call lineout ctl
+  source=prior||"/launch.bin"
+  address crexx "run cmake -E copy :source :input"
+  if rc<>0 then return rc
+  source=prior||"/base/install-ipl"
+  address crexx "run cmake -E copy :source :support"
+  if rc<>0 then return rc
+  address crexx "run crexx -nokeep pdos/scripts/two-space-normal-model.crexx --args :work :input :core :herc 2 3270 monitor :commands"
+  return rc

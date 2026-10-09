@@ -127,7 +127,7 @@ static int media_rdblock(int device,int c,int h,int r,void *buffer,int capacity,
     unsigned int got;
     if(device<=0||capacity<1||TSCBUILDREAD(&channel,(unsigned int)c,(unsigned int)h,
         (unsigned int)r,(unsigned int)command,(unsigned int)capacity)!=TSC_OK||
-        TSCIO((unsigned int)device,TSCORB(&channel),TSCIRB(&channel)))return -1;
+        channel_run(&channel,(unsigned int)device))return -1;
     if(TSCCHECKEND(&channel,(unsigned int)capacity)==TSC_OK)return 0;
     if(TSCCHECKREAD(&channel,(unsigned int)capacity,&got)!=TSC_OK)return -1;
     media_copy(buffer,TSCDATA(&channel),got);return (int)got;
@@ -138,7 +138,7 @@ static int media_wrblock(int device,int c,int h,int r,const void *buffer,int byt
     if(device<=0||bytes<1||TSCBUILDBLOCK(&channel,(unsigned int)c,(unsigned int)h,
         (unsigned int)r,(unsigned int)command,(unsigned int)bytes)!=TSC_OK)return -1;
     media_copy(TSCDATA(&channel),buffer,(unsigned int)bytes);
-    if(TSCIO((unsigned int)device,TSCORB(&channel),TSCIRB(&channel))||
+    if(channel_run(&channel,(unsigned int)device)||
        TSCCHECKREAD(&channel,(unsigned int)bytes,&got)!=TSC_OK||got!=(unsigned int)bytes)return -1;
     return bytes;
 }
@@ -147,7 +147,7 @@ static int media_tape(int device,unsigned int command,void *buffer,unsigned int 
     unsigned int got;
     if(device<=0||TSCBUILDTAPE(&channel,command,bytes)!=TSC_OK)return -1;
     if(command==1U)media_copy(TSCDATA(&channel),buffer,bytes);
-    if(TSCIO((unsigned int)device,TSCORB(&channel),TSCIRB(&channel))||
+    if(channel_run(&channel,(unsigned int)device)||
        TSCCHECKTAPE(&channel,command,bytes,&got)!=TSC_OK)return -1;
     if(command==2U&&got)media_copy(buffer,TSCDATA(&channel),got);return (int)got;
 }

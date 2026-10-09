@@ -75,6 +75,9 @@ normal_magic: .long 0x54534e31
     stg %r4, 0x138
     j external_entry             /* exercise entry with a planted old PSW */
 after_synthetic_external:
+    epsw %r2,%r3
+    lghi %r1,0x21b0
+    st %r2,0(%r1)              /* deterministic K return-mask control */
     larl %r3, synthetic_io_psw
     lg %r4, 0(%r3)
     stg %r4, 0x170
@@ -82,6 +85,9 @@ after_synthetic_external:
     stg %r4, 0x178
     j io_entry                   /* hardware I/O needs a later device test */
 after_synthetic_io:
+    epsw %r2,%r3
+    lghi %r1,0x21b4
+    st %r2,0(%r1)
     larl %r1, pc_control_words
     lctlg %c3, %c3, 0(%r1)
     lctlg %c5, %c5, 8(%r1)
@@ -235,7 +241,7 @@ pc_control_words:
 .quad 0x000000000010000f, 0x0000000008091008
 .ifndef TSN_NORMAL
 synthetic_external_psw:
-.quad 0x0000000180000000, after_synthetic_external
+.quad 0x0202000180000000, after_synthetic_external
 synthetic_io_psw:
-.quad 0x0000000180000000, after_synthetic_io
+.quad 0x0202000180000000, after_synthetic_io
 .endif

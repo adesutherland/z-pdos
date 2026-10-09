@@ -26,6 +26,7 @@ typedef struct {
 typedef struct {
     TSPENTRY entry[TSP_SLOTS];
     unsigned int used;
+    unsigned int generation;
 } TSPMAP;
 
 void TSPINIT(TSPMAP *map);

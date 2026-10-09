@@ -9,6 +9,7 @@
 #include "twospace_dat.h"
 
 #define TSG_MAX_COPY 256U
+#define TSG_MAX_SPAN 33554432U
 #define TSG_READ 1U
 #define TSG_WRITE 2U
 #define TSG_OK 0
@@ -38,5 +39,9 @@ int TSGCOPY(const TSGCONTEXT *gate, const TSGREQUEST *request,
 /* Check an entire U transfer without touching its destination or a K buffer.
  * The single CPU keeps the U map stable until the subsequent copy. */
 int TSGPROBE(const TSGCONTEXT *gate, const TSGREQUEST *request);
+/* Whole-span preflight/copy for bulk services. The existing 256-byte ABI
+ * remains unchanged. No mapping or rights changes may occur between passes. */
+int TSGSPROB(const TSGCONTEXT *,const TSGREQUEST *);
+int TSGSCOPY(const TSGCONTEXT *,const TSGREQUEST *,unsigned char *,unsigned int);
 
 #endif

@@ -34,11 +34,13 @@ main: procedure = .int
   invasm = out || "/TSV.asm"; invobj = out || "/TSV.obj"
   storeasm = out || "/TSS.asm"; storeobj = out || "/TSS.obj"
   consoleasm = out || "/TTC.asm"; consoleobj = out || "/TTC.obj"
+  familyasm = out || "/T27.asm"; familyobj = out || "/T27.obj"
   transcriptasm = out || "/TTX.asm"; transcriptobj = out || "/TTX.obj"
   tlbobj = out || "/TSTLB.obj"
   entryobj = out || "/TSMENTRY.obj"
   keyobj = out || "/TSMKEY.obj"
   chanasm = out || "/TSC.asm"; chanobj = out || "/TSC.obj"
+  ioasm = out || "/TIO.asm"; ioobj = out || "/TIO.obj"
   chansupport = out || "/TSCH.obj"
   dsasm = out || "/TSK.asm"; dsobj = out || "/TSK.obj"
   cmsasm = out || "/TSH.asm"; cmsobj = out || "/TSH.obj"
@@ -63,6 +65,8 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_channel.c -o :chanasm"
   if rc <> 0 then return rc
+  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_io.c -o :ioasm"
+  if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_dataset.c -o :dsasm"
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_cms.c -o :cmsasm"
@@ -77,10 +81,12 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_console.c -o :consoleasm"
   if rc <> 0 then return rc
+  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_3270.c -o :familyasm"
+  if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_transcript.c -o :transcriptasm"
   if rc <> 0 then return rc
   address crexx "cd :root"
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :compiled :object"
+  address crexx "run :classicas --profile s370 --literal-limit 8192 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :compiled :object"
   if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :gateasm :gateobj"
   if rc <> 0 then return rc
@@ -96,6 +102,8 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :chanasm :chanobj"
   if rc <> 0 then return rc
+  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :ioasm :ioobj"
+  if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :dsasm :dsobj"
   if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :cmsasm :cmsobj"
@@ -110,6 +118,8 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :consoleasm :consoleobj"
   if rc <> 0 then return rc
+  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :familyasm :familyobj"
+  if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :transcriptasm :transcriptobj"
   if rc <> 0 then return rc
   address crexx "run :classicas --profile z900 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_channel.asm :chansupport"
@@ -120,7 +130,7 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_key.asm :keyobj"
   if rc <> 0 then return rc
-  address crexx "run :classicld --oformat binary --image-base 33554432 -e TSMENTRY -Map :map -o :binary :entryobj :object :gateobj :datobj :memobj :realobj :placeobj :invobj :chanobj :dsobj :cmsobj :cmsfileobj :cmscursorobj :tsoobj :storeobj :consoleobj :transcriptobj :chansupport :tlbobj :keyobj"
+  address crexx "run :classicld --oformat binary --image-base 33554432 -e TSMENTRY -Map :map -o :binary :entryobj :object :gateobj :datobj :memobj :realobj :placeobj :invobj :chanobj :ioobj :dsobj :cmsobj :cmsfileobj :cmscursorobj :tsoobj :storeobj :consoleobj :familyobj :transcriptobj :chansupport :tlbobj :keyobj"
   if rc <> 0 then return rc
   placemap = out || "/TSP.map"; placebin = out || "/TSP.bin"
   dattest = out || "/dat-test"; placetest = out || "/placement-test"
@@ -258,6 +268,11 @@ main: procedure = .int
   source_inputs[43] = "pdos/src/media_commands.inc"
   source_inputs[44] = "pdos/src/media_dscb.h"
   source_inputs[45] = "pdos/src/twospace_channel.h"
+  source_inputs[46] = "pdos/src/twospace_3270.c"
+  source_inputs[47] = "pdos/src/twospace_3270.h"
+  source_inputs[48] = "pdos/src/twospace_io.c"
+  source_inputs[49] = "pdos/src/twospace_io.h"
+  source_inputs[50] = "pdos/src/twospace_io.inc"
   hashes = .string[]
   address crexx "run shasum -a 256 :source_inputs[]" output hashes
   if rc <> 0 then return rc

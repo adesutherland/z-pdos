@@ -2,6 +2,7 @@
  * IBM 3270 basic SF/SBA/IC/RA coding; see TWO-SPACE-ABI.md's primary sources.
  * Screen dimensions are validated configuration, never an assumed 24x80. */
 #include "twospace_console.h"
+#include "twospace_3270.h"
 static const unsigned char coded[64]={
  0x40,0xc1,0xc2,0xc3,0xc4,0xc5,0xc6,0xc7,0xc8,0xc9,0x4a,0x4b,0x4c,0x4d,0x4e,0x4f,
  0x50,0xd1,0xd2,0xd3,0xd4,0xd5,0xd6,0xd7,0xd8,0xd9,0x5a,0x5b,0x5c,0x5d,0x5e,0x5f,
@@ -10,8 +11,12 @@ static const unsigned char coded[64]={
 static void put(unsigned char *p,unsigned int n)
 {p[0]=(unsigned char)(n>>24);p[1]=(unsigned char)(n>>16);p[2]=(unsigned char)(n>>8);p[3]=(unsigned char)n;}
 static int valid(const TTCCAP *c)
-{return c&&c->device_class==TSA_DEVICE_3270&&c->rows&&c->columns&&
-        c->rows*c->columns<=TTC_MAX_CELLS&&c->encoding==TSA_ADDRESS_CODED12;}
+{
+    T27GEOMETRY g;
+    return c&&c->device_class==TSA_DEVICE_3270&&
+           (c->encoding==TSA_ADDRESS_CODED12||c->encoding==TSA_ADDRESS_BINARY14)&&
+           T27GEOM(&g,c->rows,c->columns,c->encoding)==T27_OK;
+}
 int TTCCONFIG(TTCCAP *c,unsigned int type,unsigned int address,
                unsigned int model,unsigned int monitor)
 {
@@ -26,6 +31,9 @@ int TTCCONFIG(TTCCAP *c,unsigned int type,unsigned int address,
     c->device_class=type;c->address=address;c->model=model;c->rows=rows;c->columns=columns;
     c->encoding=type==TSA_DEVICE_3270?TSA_ADDRESS_CODED12:0U;c->generation=1U;
     c->monitor=monitor;
+    c->default_rows=type==TSA_DEVICE_3270?24U:0U;
+    c->default_columns=type==TSA_DEVICE_3270?80U:0U;
+    c->alternate_rows=rows;c->alternate_columns=columns;
     c->features=TSA_FEATURE_LINE_INPUT|TSA_FEATURE_LINE_OUTPUT|TSA_FEATURE_TRANSCRIPT;
     if(type==TSA_DEVICE_3270)c->features|=TSA_FEATURE_SCREEN;
     if(monitor)c->features|=TSA_FEATURE_MONITOR|TSA_FEATURE_INPUT_HANDOFF;
@@ -40,8 +48,8 @@ int TTCCAPS(const TTCCAP *c,unsigned char *out)
     put(out+TSA_CAP_DEVICE_CLASS,c->device_class);put(out+TSA_CAP_DEVICE_ADDRESS,c->address);
     put(out+TSA_CAP_ROWS,c->rows);put(out+TSA_CAP_COLUMNS,c->columns);
     if(c->device_class==TSA_DEVICE_3270){
-        put(out+TSA_CAP_DEFAULT_ROWS,24U);put(out+TSA_CAP_DEFAULT_COLUMNS,80U);
-        put(out+TSA_CAP_ALTERNATE_ROWS,c->rows);put(out+TSA_CAP_ALTERNATE_COLUMNS,c->columns);
+        put(out+TSA_CAP_DEFAULT_ROWS,c->default_rows);put(out+TSA_CAP_DEFAULT_COLUMNS,c->default_columns);
+        put(out+TSA_CAP_ALTERNATE_ROWS,c->alternate_rows);put(out+TSA_CAP_ALTERNATE_COLUMNS,c->alternate_columns);
         put(out+TSA_CAP_ATTRIBUTES,TTC_BASIC_ATTRIBUTES);
     }
     put(out+TSA_CAP_ADDRESS_FORMAT,c->encoding);put(out+TSA_CAP_FEATURES,c->features);
@@ -49,24 +57,61 @@ int TTCCAPS(const TTCCAP *c,unsigned char *out)
     put(out+TSA_CAP_SCREEN_LIMIT,valid(c)?TTC_MAX_STREAM:0U);
     put(out+TSA_CAP_GENERATION,c->generation);return TTC_OK;
 }
+int TTCGEOM(TTCCAP *c,unsigned int dr,unsigned int dc,unsigned int ar,unsigned int ac)
+{
+    T27GEOMETRY g;TTCCAP next;
+    if(!c||c->device_class!=TSA_DEVICE_3270||c->generation==0xffffffffU||
+       T27GEOM(&g,dr,dc,T27_BINARY14)||T27GEOM(&g,ar,ac,T27_BINARY14))return TTC_BAD;
+    next=*c;next.default_rows=dr;next.default_columns=dc;
+    next.alternate_rows=next.rows=ar;next.alternate_columns=next.columns=ac;
+    next.encoding=g.cells<=4096U?TSA_ADDRESS_CODED12:TSA_ADDRESS_BINARY14;
+    if(c->default_rows!=dr||c->default_columns!=dc||c->alternate_rows!=ar||c->alternate_columns!=ac)
+        ++next.generation;
+    *c=next;return TTC_OK;
+}
 int TTCADDR(const TTCCAP *c,unsigned int address,unsigned char *out)
 {
-    if(!valid(c)||!out||address>=c->rows*c->columns)return TTC_BAD;
-    out[0]=coded[address>>6];out[1]=coded[address&63U];return TTC_OK;
+    T27GEOMETRY g;
+    if(!valid(c)||T27GEOM(&g,c->rows,c->columns,c->encoding))return TTC_BAD;
+    return T27ADDR(&g,address,out);
 }
 int TTCDECODE(const TTCCAP *c,const unsigned char *input,unsigned int *address)
 {
-    unsigned int a,b,i;
-    if(!valid(c)||!input||!address)return TTC_BAD;
-    a=b=64U;
-    if(!(input[0]&0xc0U)){
-        *address=((unsigned int)(input[0]&0x3fU)<<8)|input[1];
-    }else{
-        for(i=0U;i<64U;++i){if(coded[i]==input[0])a=i;if(coded[i]==input[1])b=i;}
-        if(a==64U||b==64U)return TTC_BAD;
-        *address=a*64U+b;
+    T27GEOMETRY g;
+    if(!valid(c)||T27GEOM(&g,c->rows,c->columns,c->encoding))return TTC_BAD;
+    return T27DECD(&g,input,address);
+}
+int TTCDIFF(const TTCCAP *c,const TTCFIELD *fields,unsigned int count,
+               const unsigned char *old,unsigned char *out,unsigned int capacity,unsigned int *length)
+{
+    unsigned int i,j,start,end,gap,at=1U,full,origin,run;
+    if(!old||!length||!fields||!count||count>TSA_SCREEN_FIELDS)return TTC_BAD;
+    for(i=0U;i<count;++i)if(fields[i].attributes==TTC_INPUT)return TTC_BAD;
+    /* This also checks all text, positions, field topology and bounds before
+     * any delta is emitted. Its valid full write is the capacity fallback. */
+    if(TTCENCODE(c,fields,count,0U,0U,out,capacity,&full))return TTC_BAD;
+    for(i=0U;i<count;++i){
+        origin=fields[i].row*c->columns+fields[i].column;j=0U;
+        while(j<fields[i].length){
+            if(fields[i].text[j]==old[origin+j]){++j;continue;}
+            start=j;end=++j;
+            while(j<fields[i].length){
+                if(fields[i].text[j]!=old[origin+j]){end=++j;continue;}
+                gap=j;
+                while(j<fields[i].length&&fields[i].text[j]==old[origin+j]&&j-gap<3U)++j;
+                if(j==fields[i].length||j-gap==3U)break;
+                end=++j;
+            }
+            run=end-start;
+            if(run>capacity||capacity-run<3U||at>capacity-run-3U){
+                if(TTCENCODE(c,fields,count,0U,0U,out,capacity,&full))return TTC_BAD;
+                out[0]=0x40U;*length=full-4U;return TTC_OK;
+            }
+            out[at++]=0x11U;TTCADDR(c,origin+start,out+at);at+=2U;
+            for(gap=start;gap<end;++gap)out[at++]=fields[i].text[gap];
+        }
     }
-    return *address<c->rows*c->columns?TTC_OK:TTC_BAD;
+    out[0]=0x40U;*length=at==1U?0U:at;return TTC_OK;
 }
 int TTCENCODE(const TTCCAP *c,const TTCFIELD *fields,unsigned int count,
                unsigned int cr,unsigned int cc,unsigned char *out,
@@ -91,7 +136,7 @@ int TTCENCODE(const TTCCAP *c,const TTCFIELD *fields,unsigned int count,
                (positions[j]>=address&&positions[j]<ends[i])||
                (address<ends[j]&&other<ends[i]))return TTC_BAD;
         }
-        if(needed>TTC_MAX_STREAM-5U-f->length)return TTC_BAD;
+        if(f->length>TTC_MAX_STREAM-5U||needed>TTC_MAX_STREAM-5U-f->length)return TTC_BAD;
         needed+=5U+f->length;
     }
     if(needed>capacity)return TTC_BAD;
@@ -106,36 +151,32 @@ int TTCENCODE(const TTCCAP *c,const TTCFIELD *fields,unsigned int count,
 }
 int TTCRAW(const TTCCAP *c,const unsigned char *raw,unsigned int length,unsigned int *command)
 {
-    unsigned int at=3U,address=0U,n,target;
-    if(!valid(c)||!raw||!command||length<3U||length>TTC_MAX_STREAM||raw[0]!=0x27U)return TTC_BAD;
-    if(raw[1]==0xf1U)*command=1U;
-    else if(raw[1]==0xf5U)*command=5U;
-    else if(raw[1]==0x7eU)*command=13U;
-    else return TTC_UNSUPPORTED;
-    while(at<length){
-        n=raw[at++];
-        if(n==0x11U){
-            if(length-at<2U||TTCDECODE(c,raw+at,&address)!=TTC_OK)return TTC_BAD;at+=2U;
-        }else if(n==0x1dU){
-            if(at==length)return TTC_BAD;++at;address=(address+1U)%(c->rows*c->columns);
-        }else if(n==0x13U){
-            /* IC consumes no buffer position. */
-        }else if(n==0x3cU){
-            if(length-at<3U||TTCDECODE(c,raw+at,&target)!=TTC_OK||raw[at+2U]<0x40U)return TTC_BAD;
-            at+=3U;address=target;
-        }else{
-            if(n<0x40U&&n!=0U)return TTC_UNSUPPORTED;
-            address=(address+1U)%(c->rows*c->columns);
-        }
+    T27GEOMETRY g;T27FIELD field;
+    unsigned int at=2U,next,input;
+    int rc;
+    if(!valid(c)||!raw||!command||length<2U||length>TTC_MAX_STREAM||raw[0]!=0x27U)return TTC_BAD;
+    rc=T27CMAP(raw[1U],&next,&input);if(rc)return rc;
+    if(input)return TTC_UNSUPPORTED;
+    if(next==15U){if(length!=2U)return TTC_BAD;}
+    else if(next==17U){
+        if(length==2U)return TTC_BAD;
+        while(at<length)if(T27WALK(raw,length,&at,&field)!=T27_OK)return TTC_BAD;
+    }else if(length>2U){
+        if(T27GEOM(&g,c->rows,c->columns,c->encoding))return TTC_BAD;
+        rc=T27WRITE(&g,raw+3U,length-3U);if(rc)return rc;
     }
-    return TTC_OK;
+    *command=next;return TTC_OK;
 }
 int TTCINPUT(const TTCCAP *c,const unsigned char *in,unsigned int bytes,
               unsigned int field,unsigned char *out,unsigned int capacity,
               unsigned int *length,unsigned int *aid)
 {
     unsigned int cursor,address,n,i;
-    if(!valid(c)||!in||bytes<3U||!out||!length||!aid||
+    if(!valid(c)||!in||!out||!length||!aid)return TTC_BAD;
+    if(bytes==1U&&(in[0U]==0x6bU||in[0U]==0x6cU||in[0U]==0x6dU||in[0U]==0x6eU)){
+        *aid=in[0U];*length=0U;return TTC_OK;
+    }
+    if(bytes<3U||
        TTCDECODE(c,in+1U,&cursor)!=TTC_OK)return TTC_BAD;
     *aid=in[0U];
     if(bytes==3U){*length=0U;return TTC_OK;}

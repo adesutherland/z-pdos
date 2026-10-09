@@ -39,6 +39,8 @@ int TSCINIT(TSCSTATE *s, unsigned char *aperture,
     s->aperture=aperture;
     s->real_bytes=real_bytes;
     s->region_real=region_real;
+    s->quarantined=0U;
+    s->occupied=0U;
     return TSC_OK;
 }
 
@@ -48,14 +50,14 @@ int TSCBUILDREAD(TSCSTATE *s, unsigned int cylinder, unsigned int head,
 {
     unsigned char *base, *orb, *seek, *search, *chain;
     unsigned int real;
-    if (!s || !s->aperture || cylinder >= 100U || head >= 15U ||
+    if (!s || !s->aperture || s->quarantined || s->occupied || cylinder >= 100U || head >= 15U ||
         !record || record > 255U ||
         (command != 0x06U && command != 0x0eU && command != 0x1eU) ||
         !capacity || capacity > TSC_MAX_RECORD)
         return TSC_BAD;
     real=s->region_real;
     base=s->aperture+real;
-    clear(base,TSC_REGION_BYTES);
+    clear(base,TSC_DATA_OFFSET+capacity);
     orb=base+TSC_ORB_OFFSET;
     seek=base+TSC_SEEK_OFFSET;
     search=base+TSC_SEARCH_OFFSET;
@@ -82,7 +84,7 @@ int TSCCHECKREAD(const TSCSTATE *s, unsigned int capacity,
         !capacity || capacity > TSC_MAX_RECORD) return TSC_BAD;
     irb=s->aperture+s->region_real+TSC_IRB_OFFSET;
     residual=get16(irb+10U);
-    if (irb[8U] != 0x0cU || irb[9U] != 0U || residual > capacity ||
+    if ((irb[8U]&0x7fU) != 0x0cU || irb[9U] != 0U || residual > capacity ||
         get32(irb+4U) != s->region_real+TSC_CCW_OFFSET+32U)
         return TSC_IO;
     *transferred=capacity-residual;
@@ -118,9 +120,9 @@ int TSCBUILDBLOCK(TSCSTATE *s,unsigned int cylinder,unsigned int head,
 int TSCBUILDTAPE(TSCSTATE *s,unsigned int command,unsigned int bytes)
 {
     unsigned char *base;
-    if(!s||!s->aperture||!bytes||bytes>TSC_MAX_RECORD||
+    if(!s||!s->aperture||s->quarantined||s->occupied||!bytes||bytes>TSC_MAX_RECORD||
        (command!=1U&&command!=2U&&command!=7U&&command!=0x1fU))return TSC_BAD;
-    base=s->aperture+s->region_real;clear(base,TSC_REGION_BYTES);
+    base=s->aperture+s->region_real;clear(base,TSC_DATA_OFFSET+bytes);
     put32(base+4U,0x0080ff00U);put32(base+8U,s->region_real+TSC_CCW_OFFSET);
     ccw(base+TSC_CCW_OFFSET,command,0x20U,bytes,s->region_real+TSC_DATA_OFFSET);
     return TSC_OK;
@@ -132,8 +134,8 @@ int TSCCHECKTAPE(const TSCSTATE *s,unsigned int command,unsigned int bytes,
     if(!s||!s->aperture||!got||!bytes||bytes>TSC_MAX_RECORD)return TSC_BAD;
     irb=s->aperture+s->region_real+TSC_IRB_OFFSET;residual=get16(irb+10U);
     if(irb[9U]||get32(irb+4U)!=s->region_real+TSC_CCW_OFFSET+8U||residual>bytes)return TSC_IO;
-    if(command==2U&&irb[8U]==0x0dU&&residual==bytes){*got=0U;return TSC_OK;}
-    if(irb[8U]!=0x0cU)return TSC_IO;
+    if(command==2U&&(irb[8U]&0x7fU)==0x0dU&&residual==bytes){*got=0U;return TSC_OK;}
+    if((irb[8U]&0x7fU)!=0x0cU)return TSC_IO;
     *got=command==1U||command==2U?bytes-residual:0U;
     return command!=1U||*got==bytes?TSC_OK:TSC_IO;
 }
@@ -143,8 +145,40 @@ int TSCCHECKEND(const TSCSTATE *s,unsigned int capacity)
     const unsigned char *irb;
     if(!s||!s->aperture||!capacity||capacity>TSC_MAX_RECORD)return TSC_BAD;
     irb=s->aperture+s->region_real+TSC_IRB_OFFSET;
-    if(irb[8U]!=0x0dU||irb[9U]||get16(irb+10U)!=capacity||
+    if((irb[8U]&0x7fU)!=0x0dU||irb[9U]||get16(irb+10U)!=capacity||
        get32(irb+4U)!=s->region_real+TSC_CCW_OFFSET+32U)return TSC_IO;
+    return TSC_OK;
+}
+int TSCBUILDV(TSCSTATE *s,unsigned int cylinder,unsigned int head,unsigned int record,unsigned int bytes,unsigned int records)
+{
+    unsigned char *base,*chain;unsigned int i,at=8U,stride;
+    if(!s||!s->aperture||s->quarantined||s->occupied||cylinder>=100U||head>=15U||!record||record>255U||
+       !records||records>TSC_MAX_VECTOR||records>256U-record||!bytes||bytes>TSC_MAX_RECORD)return TSC_BAD;
+    stride=bytes+8U;if(stride>TSC_MAX_DATA/records)return TSC_BAD;
+    base=s->aperture+s->region_real;clear(base,TSC_DATA_OFFSET+records*stride);chain=base+TSC_CCW_OFFSET;
+    put32(base+4U,0x0080ff00U);put32(base+8U,s->region_real+TSC_CCW_OFFSET);
+    put16(base+TSC_SEEK_OFFSET+2U,cylinder);put16(base+TSC_SEEK_OFFSET+4U,head);
+    ccw(chain,7U,0x40U,6U,s->region_real+TSC_SEEK_OFFSET);
+    for(i=0U;i<records;++i){
+        unsigned int search=TSC_SEARCH_OFFSET+5U*i;
+        /* Read CKD advances to the next count area after Search ID. Select
+         * the predecessor (including record zero), not the target record. */
+        put16(base+search,cylinder);put16(base+search+2U,head);base[search+4U]=(unsigned char)(record+i-1U);
+        ccw(chain+at,0x31U,0x40U,5U,s->region_real+search);
+        ccw(chain+at+8U,8U,0U,0U,s->region_real+TSC_CCW_OFFSET+at);
+        ccw(chain+at+16U,0x1eU,i+1U==records?0x20U:0x60U,stride,s->region_real+TSC_DATA_OFFSET+i*stride);
+        at+=24U;
+    }
+    return TSC_OK;
+}
+int TSCCHECKV(const TSCSTATE *s,unsigned int cylinder,unsigned int head,unsigned int record,unsigned int bytes,unsigned int records)
+{
+    const unsigned char *irb,*data;unsigned int i,stride=bytes+8U;
+    if(!s||!s->aperture||!records||records>TSC_MAX_VECTOR||!bytes||bytes>TSC_MAX_RECORD||stride>TSC_MAX_DATA/records)return TSC_BAD;
+    irb=TSCIRB(s);data=TSCDATA(s);
+    if((irb[8U]&0x7fU)!=12U||irb[9U]||get16(irb+10U)||get32(irb+4U)!=s->region_real+TSC_CCW_OFFSET+8U+24U*records)return TSC_IO;
+    for(i=0U;i<records;++i){const unsigned char *p=data+i*stride;
+        if(get16(p)!=cylinder||get16(p+2U)!=head||p[4U]!=record+i||p[5U]||get16(p+6U)!=bytes)return TSC_IO;}
     return TSC_OK;
 }
 
@@ -155,10 +189,11 @@ int TSCBUILDCONSCMD(TSCSTATE *s,unsigned int command,unsigned int length,
                      unsigned int input)
 {
     unsigned char *base;
-    if (!s || !s->aperture || !length || length > TSC_MAX_CONSOLE)
+    if (!s || !s->aperture || s->quarantined || s->occupied || !length || length > TSC_MAX_CONSOLE)
         return TSC_BAD;
-    if(command!=1U&&command!=5U&&command!=13U&&command!=9U&&
-       command!=10U&&command!=0xe4U&&command!=4U&&command!=6U)return TSC_BAD;
+    if(command!=1U&&command!=2U&&command!=5U&&command!=13U&&command!=14U&&
+       command!=15U&&command!=17U&&command!=9U&&command!=10U&&
+       command!=0xe4U&&command!=4U&&command!=6U)return TSC_BAD;
     base=s->aperture+s->region_real;
     /* Preserve the caller's K-owned 3270 stream in the following data page. */
     clear(base,TSC_DATA_OFFSET+(input?length:0U));
@@ -179,11 +214,21 @@ int TSCCHECKWRITE(const TSCSTATE *s)
         return TSC_IO;
     return TSC_OK;
 }
+int TSCCHECKOUT(const TSCSTATE *s)
+{
+    const unsigned char *irb;
+    if(!s||!s->aperture)return TSC_BAD;
+    irb=s->aperture+s->region_real+TSC_IRB_OFFSET;
+    if((irb[8U]&0x7fU)!=0x0cU||irb[9U]||
+       (get16(irb+10U)&&!(s->aperture[s->region_real+TSC_CCW_OFFSET]==15U&&get16(irb+10U)==1U))||
+       get32(irb+4U)!=s->region_real+TSC_CCW_OFFSET+8U)return TSC_IO;
+    return TSC_OK;
+}
 
 int TSCBUILDCONSREAD(TSCSTATE *s, unsigned int capacity)
 {
     unsigned char *base;
-    if (!s || !s->aperture || !capacity || capacity > TSC_MAX_INPUT)
+    if (!s || !s->aperture || s->quarantined || s->occupied || !capacity || capacity > TSC_MAX_INPUT)
         return TSC_BAD;
     base=s->aperture+s->region_real;
     clear(base,TSC_DATA_OFFSET+capacity);
@@ -194,8 +239,8 @@ int TSCBUILDCONSREAD(TSCSTATE *s, unsigned int capacity)
     return TSC_OK;
 }
 
-int TSCCHECKCONSREAD(const TSCSTATE *s, unsigned int capacity,
-                     unsigned int *transferred)
+static int check_input(const TSCSTATE *s,unsigned int capacity,
+                          unsigned int *transferred,unsigned int attention)
 {
     const unsigned char *irb;
     unsigned int residual;
@@ -203,12 +248,16 @@ int TSCCHECKCONSREAD(const TSCSTATE *s, unsigned int capacity,
         capacity > TSC_MAX_INPUT) return TSC_BAD;
     irb=s->aperture+s->region_real+TSC_IRB_OFFSET;
     residual=get16(irb+10U);
-    if (irb[8U] != 0x0cU || irb[9U] != 0U || residual > capacity ||
+    if ((irb[8U]&attention) != 0x0cU || irb[9U] != 0U || residual > capacity ||
         get32(irb+4U) != s->region_real+TSC_CCW_OFFSET+8U)
         return TSC_IO;
     *transferred=capacity-residual;
     return TSC_OK;
 }
+int TSCCHECKCONSREAD(const TSCSTATE *s,unsigned int capacity,unsigned int *transferred)
+{return check_input(s,capacity,transferred,0xffU);}
+int TSCCHECKIN(const TSCSTATE *s,unsigned int capacity,unsigned int *transferred)
+{return check_input(s,capacity,transferred,0x7fU);}
 
 unsigned char *TSCDATA(const TSCSTATE *s)
 { return s && s->aperture ? s->aperture+s->region_real+TSC_DATA_OFFSET : 0; }

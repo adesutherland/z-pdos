@@ -582,7 +582,9 @@ static unsigned int pcomm_display(const unsigned char *message, unsigned int len
     }
     /* Every native output record terminates a line, including the prompt. */
     pcomm_column=0; ++pcomm_row;
-    { unsigned char *screen=TSCDATA(&console_channel);
+    { unsigned char *screen;
+      if(TSCBUILDCONSWRITE(&console_channel,1773U)!=TSC_OK)return 12U;
+      screen=TSCDATA(&console_channel);
       for (i=0;i<1773U;++i) screen[i]=0x40U;
       screen[0]=0xc3U; screen[1]=0x11U; screen[2]=0x5dU;
       screen[3]=0x7fU; screen[4]=0x1dU; screen[5]=0xf0U;
@@ -590,8 +592,7 @@ static unsigned int pcomm_display(const unsigned char *message, unsigned int len
       screen[1766]=0x1dU; screen[1767]=0; screen[1768]=0x13U;
       screen[1769]=0x3cU; screen[1770]=0x5dU; screen[1771]=0x7fU;
       screen[1772]=0;
-      if (TSCBUILDCONSWRITE(&console_channel,1773U)!=TSC_OK ||
-          TSCIO(console_ssid,TSCORB(&console_channel),TSCIRB(&console_channel)) ||
+      if (channel_run(&console_channel,console_ssid) ||
           TSCCHECKWRITE(&console_channel)!=TSC_OK) return 12U;
     }
     return 0U;

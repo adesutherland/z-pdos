@@ -21,7 +21,11 @@ def prepare(a):
     for record in [payload,b"",b""]:
         raw+=struct.pack("<HHBB",len(record),previous,0xa0 if record else 0x40,0)+record;previous=len(record)
     (out/"input.aws").write_bytes(raw)
-    lock["outputs"].append(dict(target="TAPOUT.DAT",same_as="TSO",recfm="FB",lrecl=80,blksize=80,encoding="ibm1047"))
+    tape_output=dict(target="TAPOUT.DAT",same_as="TSO",recfm="FB",lrecl=80,blksize=80,encoding="ibm1047")
+    existing=[row for row in lock["outputs"] if row["target"]=="TAPOUT.DAT"]
+    if existing:
+        if existing!=[tape_output]:raise ValueError("conflicting tape output expectation")
+    else:lock["outputs"].append(tape_output)
     (out/"lock.json").write_text(json.dumps(lock,indent=2)+"\n")
     cases=[["VERSION","PDIO1"]];number=0
     def command(text,expected=(),rc=0):

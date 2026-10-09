@@ -3,11 +3,13 @@
 #include <string.h>
 #include "twospace_ui.h"
 #include "twospace_console.h"
+#include "twospace_3270.h"
 extern int P4LINK(void);
 extern int P4WIDE(void);
 extern void *P4LOW(void);
 extern unsigned int P4PUT(unsigned int,void *);
 extern unsigned int P4GET(unsigned int,void *);
+extern unsigned int P4READ(unsigned int,void *,unsigned int *);
 #ifndef P4_TEST_MODE
 #define P4_TEST_MODE 0
 #endif
@@ -52,6 +54,25 @@ int main(int argc,char **argv)
         raw[j++]=0x11U;TTCADDR(&cap,(cap.rows-4U)*cap.columns,raw+j);j+=2U;
         raw[j++]=0x1dU;raw[j++]=0U;raw[j++]=0x13U;
         if(P4PUT(j,raw)||P4GET(4096U,raw))return 51;
+        /* One-character modified fields make a record larger than 4096 bytes
+         * on model 5. Enter supplies attention; time never decides readiness. */
+        raw[0]=0x27U;raw[1]=0x7eU;raw[2]=0xc3U;raw[3]=0x11U;
+        TTCADDR(&cap,cap.rows*cap.columns-1U,raw+4U);
+        raw[6]=0x1dU;raw[7]=0xf0U;
+        memcpy(raw+8U,"NATIVE RAW RECORD",17U);j=25U;
+        raw[j++]=0x11U;TTCADDR(&cap,cap.columns,raw+j);j+=2U;
+        bytes=(cap.rows-6U)*cap.columns/2U;
+        for(i=0U;i<bytes;++i){raw[j++]=0x1dU;raw[j++]=0x01U;raw[j++]=(unsigned char)'Q';}
+        raw[j++]=0x1dU;raw[j++]=0xf0U;
+        raw[j++]=0x11U;TTCADDR(&cap,cap.columns+1U,raw+j);j+=2U;raw[j++]=0x13U;
+        if(P4PUT(j,raw)||P4READ(TSA_SCREEN_BYTES,raw,&n)||n!=3U+4U*bytes||raw[0]!=0x7dU)return 61;
+        {
+            unsigned int address;T27GEOMETRY geometry;
+            if(T27GEOM(&geometry,cap.rows,cap.columns,T27_CODED12))return 62;
+            for(i=0U;i<bytes;++i)
+                if(raw[3U+4U*i]!=0x11U||raw[6U+4U*i]!=(unsigned char)'Q'||
+                   T27DECD(&geometry,raw+4U+4U*i,&address)||address!=cap.columns+1U+2U*i)return 62;
+        }
     }
     if(P4_TEST_MODE==3){
         if(TUILINE((const unsigned char *)"DISCONNECT MONITOR",18U)||TUIREAD(input,256U,&n))return 58;
@@ -65,6 +86,12 @@ int main(int argc,char **argv)
     if(P4_TEST_MODE==2&&TUICLOSE())return 53;
     bytes=(unsigned int)strlen((char *)line);
     if(P4_TEST_MODE==2){if(TUIOPEN((const unsigned char *)"Console qualification",21U))return 54;}
+    if(P4_TEST_MODE==2){
+        sprintf((char *)line,"RAW RECORD PASS: BYTES=%u",n);
+        if(TUILINE(line,(unsigned int)strlen((char *)line)))return 63;
+        sprintf((char *)line,"CONSOLE PASS: ROWS=%u COLS=%u GAPS=%u",word(caps+16U),word(caps+20U),word(status+16U));
+        bytes=(unsigned int)strlen((char *)line);
+    }
     if(TUILINE(line,bytes)||TUICLOSE())return 55;
     return 0;
 }

@@ -124,6 +124,7 @@ def run(a):
     proc=subprocess.Popen(cmd,cwd=out,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
     lines=[];events=queue.Queue();thread=threading.Thread(target=drain_output,args=(proc.stdout,lines,events),daemon=True);thread.start()
     terminal=None;client=None;monitor=None;error=None;screens=[];monitor_parts=[];cases=[]
+    idle_wait_observed=False
     log=out/"console.log"
     try:
         def listener():
@@ -133,7 +134,8 @@ def run(a):
         until(listener,proc,log,10)
         if a.line_primary:client=LineClient(port,9)
         else:
-            terminal=subprocess.Popen(["s3270","-model","3278-"+str(a.model),"-codepage","cp1047","-scriptport",str(script)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            terminal=subprocess.Popen(["s3270","-model","3278-"+str(a.model),"-codepage","cp1047","-scriptport",str(script),
+                                       "-trace","-tracefile",str(out/"3270.trace"),"-tracefilesize","16M"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             until(lambda:terminal_action(script,"Query(ConnectionState)").returncode==0,proc,log,10)
             until(lambda:terminal_action(script,f"Connect(127.0.0.1:{port})").returncode==0,proc,log,20)
             terminal_action(script,"Set(aidWait,false)")
@@ -141,6 +143,16 @@ def run(a):
         wanted=["0:0009 COMM: client"]+(["0:000A COMM: client"] if a.monitor else [])
         until(lambda:all(x in log.read_text(errors="replace") for x in wanted),proc,log,20)
         proc.stdin.write("ipl 01B9\n");proc.stdin.flush()
+        if a.early_input:
+            if a.normal or a.pcomm:raise ValueError("early input requires native console fixture")
+            def early_field():
+                shown=client.text() if client else terminal_action(script,"Ascii()").stdout
+                if "CONSOLE INPUT 1:" in shown:raise RuntimeError("missed early-input phase")
+                return re.search(r"LINE [0-9]{3}:",shown)
+            until(early_field,proc,log)
+            if client:client.enter("Q"*148)
+            elif terminal_action(script,'String('+json.dumps("Q"*256)+')').returncode or terminal_action(script,"Enter()").returncode:
+                raise RuntimeError("early AID submission")
         if a.normal and not a.rootfault:
             if client:until(lambda:"welcome to pcomm" in client.text(),proc,log)
             else:until(lambda:"welcome to pcomm" in terminal_action(script,"Ascii()").stdout,proc,log,60)
@@ -201,6 +213,15 @@ def run(a):
                 if client:return client.text() if marker in client.text() else None
                 shown=terminal_action(script,"Ascii()");return shown.stdout if shown.returncode==0 and marker in shown.stdout else None
             screen=until(prompt,proc,log);screens.append(screen)
+            if marker==("CONSOLE INPUT 2:" if a.early_input else "CONSOLE INPUT 1:"):
+                probe_start=log.stat().st_size
+                def waiting():
+                    current=log.read_text(errors="replace")[probe_start:]
+                    if "HHC02313I State: Enabled Wait" in current:return True
+                    proc.stdin.write("psw\n");proc.stdin.flush();return False
+                until(waiting,proc,log,10)
+                idle_wait_observed=True
+            if a.early_input and marker=="CONSOLE INPUT 1:":continue
             if client:client.enter(text)
             else:
                 if text and terminal_action(script,'String('+json.dumps(text)+')').returncode:raise RuntimeError("3270 text entry")
@@ -212,6 +233,8 @@ def run(a):
         if a.raw and not a.normal:
             until(lambda:"NATIVE FULL SCREEN" in terminal_action(script,"Ascii()").stdout,proc,log)
             terminal_action(script,'String("RAW")');terminal_action(script,"Enter()")
+            until(lambda:"NATIVE RAW RECORD" in terminal_action(script,"Ascii()").stdout,proc,log)
+            terminal_action(script,"Enter()")
         if a.disconnect and not a.normal:
             if not monitor or client:raise ValueError("disconnect proof requires 3270 plus monitor")
             until(lambda:"DISCONNECT MONITOR" in terminal_action(script,"Ascii()").stdout,proc,log)
@@ -245,7 +268,7 @@ def run(a):
         if monitor:monitor_parts.append(monitor.text());monitor.close()
         if monitor_parts:(out/"monitor.txt").write_text("".join(monitor_parts))
     checks={"guest_event_sequence_completed":error is None,"hercules_exit_zero":proc.returncode==0}
-    raw=(out/"result.core").read_bytes();transcript=None;metrics=None
+    raw=(out/"result.core").read_bytes();transcript=None;metrics=None;service_cost=None
     if len(raw)==0x10000000:
         observed=struct.unpack_from(">8I",raw,0x3c800)
         if observed[0]==0x4d455431:
@@ -281,14 +304,27 @@ def run(a):
                     checks["usable_3270_after_commands"]="z/PDOS PCOMM" in screens[-1] and cases[-1][1] in screens[-1]
             else:
                 expected=[] if a.pcomm else ["LINE %03d: 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ -- ordered output"%i for i in range(80)]
+                if not a.pcomm:checks["idle_input_uses_enabled_wait"]=idle_wait_observed
+                if a.early_input:checks["early_input_survives_output_and_nested_returns"]=checks["native_console_app_rc_zero"]
                 checks["ordered_output_records"]=("PCOMM END 1 RC=0" in "\n".join(texts) and "PCOMM END 2 RC=0" in "\n".join(texts)) if a.pcomm else texts[:80]==expected
                 checks["unchanged_child_versions_once"]=texts.count("crexx-1.0.0-beta.3 (Bytecode Mode)")==(2 if a.pcomm else 1)
-                checks["complete_text_or_explicit_gap"]=transcript["gaps"]==(1 if a.raw or a.disconnect else 0)
+                checks["complete_text_or_explicit_gap"]=transcript["gaps"]==(2 if a.raw else 1 if a.disconnect else 0)
+                if a.raw:
+                    checks["native_raw_record_all_fields"]=texts.count("RAW RECORD PASS: BYTES=%d"%(3+4*((rows-6)*cols//2)))==1
                 ends=[e for e in transcript["events"] if e["type"]==3]
                 begins=[e for e in transcript["events"] if e["type"]==1]
                 checks["separate_successful_command_results"]=len(ends)==len(begins) and len(ends)>1 and all(e["result"][1]==0 and e["result"][4:6]==(1,0) for e in ends)
                 if any(bytes.fromhex(e["payload_hex"]).decode("cp037").rstrip()=="P4CAP64" for e in begins):
                     checks["native_u64_full_width_capability_buffer"]=(struct.unpack_from(">2I",raw,0x12a00)==(1,64) and struct.unpack_from(">2I",raw,0x12a10)==(rows,cols))
+                    start,end,calls=struct.unpack_from(">2QI",raw,0x12a40)
+                    checks["native_u64_repeated_service_returns"]=calls==1000
+                    checks["legacy_async_controls_cannot_borrow_v1_workspace"]=struct.unpack_from(">I",raw,0x12a54)[0]==2
+                    checks["native_u64_service_clock_observation"]=calls==1000 and end>start
+                    if calls and end>start:
+                        service_cost={"operation":"SVC 200 capability, U64 buffer above 4 GiB",
+                                      "calls":calls,"elapsed_microseconds":(end-start)/4096,
+                                      "mean_microseconds":(end-start)/4096/calls,
+                                      "platform":"single-CPU Hercules emulation"}
                 if a.monitor:
                     captured=(out/"monitor.txt").read_text()
                     checks["attached_line_capture_complete"]=all(captured.count(x)==1 for x in expected) and captured.count("crexx-1.0.0-beta.3 (Bytecode Mode)")==(2 if a.pcomm else 1)
@@ -300,6 +336,15 @@ def run(a):
         except (ValueError,struct.error) as exc:checks["transcript_framing"]=False;error=error or str(exc)
     else:checks["stopped_core_complete"]=False
     receipt={"profile":{"model":a.model,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
+    if service_cost is not None:receipt["service_cost"]=service_cost
+    if a.normal and transcript is not None and any(e.get("text","").startswith("PD25 ") for e in transcript["events"]):
+        from io_benchmark_check import observations
+        try:
+            extra,cost=observations([e["text"] for e in transcript["events"] if e["type"]==2])
+            checks.update(extra);receipt["io_foundation_cost"]=cost
+        except ValueError as exc:checks["pd025_native_report"]=False;receipt["error"]=str(exc)
+        receipt["pass"]=all(checks.values())
+    if (out/"3270.trace").exists():receipt["terminal_trace_sha256"]=digest(out/"3270.trace")
     if attachments:receipt["attachments"]=[dict(row,stopped_sha256=digest(Path(row["path"]))) for row in attachments]
     before_store=disk.parent.parent/"store-before.json"
     if transcript is not None and before_store.exists():
@@ -320,7 +365,7 @@ if __name__=="__main__":
     p=argparse.ArgumentParser()
     for name in ("disk","core","hercules","output"):p.add_argument(name)
     p.add_argument("--model",type=int,choices=(2,3,4,5),default=2)
-    for flag in ("monitor","line-primary","handoff","raw","disconnect","pcomm","normal","rootfault"):p.add_argument("--"+flag,action="store_true")
+    for flag in ("monitor","line-primary","handoff","raw","disconnect","pcomm","normal","rootfault","early-input"):p.add_argument("--"+flag,action="store_true")
     p.add_argument("--commands")
     for name in ("cms-exchange","fixture-exchange","tape-input"):p.add_argument("--"+name)
     p.add_argument("--tape-output",action="store_true")

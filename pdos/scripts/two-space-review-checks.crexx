@@ -10,12 +10,14 @@ main: procedure = .int
   if rc <> 0 then return 2
   address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/review_extract.py :work"
   if rc <> 0 then return rc
-  do i = 1 to 2
-    name = word("format observations",i); source = work || "/" || name || ".c"; binary = work || "/" || name
-    address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src :source -o :binary"
+  do i = 1 to 4
+    name = word("format observations console_output console_render",i); source = work || "/" || name || ".c"; binary = work || "/" || name
+    if i = 3 then address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -Wno-unused-function -fsanitize=address,undefined -I pdos/src pdos/src/twospace_channel.c pdos/src/twospace_io.c :source -o :binary"
+    else if i = 4 then address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_console.c pdos/src/twospace_3270.c :source -o :binary"
+    else address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src :source -o :binary"
     if rc <> 0 then return rc
     address crexx "run :binary"
     if rc <> 0 then return rc
   end
-  say "Pre-qualification C89 formatting bounds and zero-minimum checks pass."
+  say "Pre-qualification C89 bounds, observations and deterministic output/attention controls pass."
   return 0

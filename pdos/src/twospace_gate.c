@@ -17,14 +17,14 @@ static int resolve(const TSGCONTEXT *gate, TSPADDR address,
     return TSG_OK;
 }
 
-int TSGPROBE(const TSGCONTEXT *gate, const TSGREQUEST *request)
+static int probe(const TSGCONTEXT *gate,const TSGREQUEST *request,unsigned int limit)
 {
     TSPADDR at, last;
     unsigned int remaining, chunk, offset, real;
     int status;
     if (!gate || !request || !gate->u_tables ||
         !gate->real_aperture || !gate->rights ||
-        !request->length || request->length > TSG_MAX_COPY ||
+        !request->length || request->length > limit ||
         (request->direction != TSG_READ &&
          request->direction != TSG_WRITE)) return TSG_BAD;
     last.lo = request->address.lo + request->length - 1U;
@@ -48,14 +48,14 @@ int TSGPROBE(const TSGCONTEXT *gate, const TSGREQUEST *request)
     return TSG_OK;
 }
 
-int TSGCOPY(const TSGCONTEXT *gate, const TSGREQUEST *request,
-            unsigned char *buffer, unsigned int capacity)
+static int copy(const TSGCONTEXT *gate,const TSGREQUEST *request,
+                   unsigned char *buffer,unsigned int capacity,unsigned int limit)
 {
     TSPADDR at;
     unsigned int remaining, chunk, offset, real, i;
     int status;
     if (!buffer || !request || request->length > capacity) return TSG_BAD;
-    status=TSGPROBE(gate,request);
+    status=probe(gate,request,limit);
     if (status != TSG_OK) return status;
     at = request->address;
     remaining = request->length;
@@ -79,3 +79,13 @@ int TSGCOPY(const TSGCONTEXT *gate, const TSGREQUEST *request,
     }
     return TSG_OK;
 }
+int TSGPROBE(const TSGCONTEXT *gate,const TSGREQUEST *request)
+{return probe(gate,request,TSG_MAX_COPY);}
+int TSGCOPY(const TSGCONTEXT *gate,const TSGREQUEST *request,
+              unsigned char *buffer,unsigned int capacity)
+{return copy(gate,request,buffer,capacity,TSG_MAX_COPY);}
+int TSGSPROB(const TSGCONTEXT *gate,const TSGREQUEST *request)
+{return probe(gate,request,TSG_MAX_SPAN);}
+int TSGSCOPY(const TSGCONTEXT *gate,const TSGREQUEST *request,
+               unsigned char *buffer,unsigned int capacity)
+{return copy(gate,request,buffer,capacity,TSG_MAX_SPAN);}
