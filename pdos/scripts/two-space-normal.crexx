@@ -32,8 +32,12 @@ main: procedure = .int
   address crexx "run crexx -nokeep pdos/scripts/two-space-command.crexx --args :command :absolute_base :cc :classicas :linker"
   if rc <> 0 then return rc
   kernel = work || "/kernel"; hercules = herc || "/hercules"
-  address crexx "run crexx -nokeep pdos/scripts/two-space-next.crexx --args :kernel :gnuas :gnuld :cc :classicas :linker :hercules normal"
-  if rc <> 0 then return rc
+  say "Building K with " || cc || "; GNU tools " || gnuas || " / " || gnuld
+  address crexx "run crexx -verbose3 -nokeep pdos/scripts/two-space-next.crexx --args :kernel :gnuas :gnuld :cc :classicas :linker :hercules normal"
+  if rc <> 0 then do
+    say "Kernel recipe failed with status " || rc
+    return rc
+  end
   core = out || "/kernel/run/image.core"; image = work || "/image"
   if args.0 = 4 then do
     stage = out || "/command/u-command.bin"
