@@ -23,6 +23,17 @@ Open items require separate implementation authority.
 - Evidence: On Apple Silicon macOS, 3 October 2026, the SDK file selection assembled 4331 statements, 25 sections, 971 symbols and 55 fixups with the source-built Classic Assembler. Its object linked with four TSO24/31/64 entry variants and source-built C decks to XMIT transports. The independent TSO fixture checks PUTLINE, GETLINE and EXTRACT service bytes. The local host suite passed 93/93 with `-j 4`. Earlier z/PDOS guest scope remains in doc/qualification/CHECKPOINT.md and ../pdos/doc/qualification/QUALIFICATION.md.
 - Acceptance: Run each named compile, assemble, link and guest path with exact service/profile inputs.
 
+- Command-client prerequisite (10 October 2026): The approved existing-environment
+  query/invoke fixture starts with ELF/newlib in the owning Mainframe ELF SDK.
+  Independent operator/source review found no maintained whole-library Classic
+  CMS31 client recipe. The TSO31 SDK service object is consumed beneath newlib;
+  it does not establish a whole Classic C/PDPCLIB TSO31 client. Before claiming
+  either Classic matrix cell, define its native entry/caller ABI, named service
+  profile and complete compile/assemble/link recipe, then qualify file/storage
+  preservation, native output and actual command RC on the real guest. CMS24,
+  freestanding Classic C and PDOS runtime evidence cannot replace these gates.
+  The inherited CMS system() return-zero placeholder is not command support.
+
 ## PCL-003: Retained ports and file-level notices
 
 - Type: qualification

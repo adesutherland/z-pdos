@@ -54,6 +54,14 @@ passed the recorded 0.1 source-to-image and guest route.
 - Evidence: IBM *z/Architecture Principles of Operation* SA22-7832-14 defines EPSW as RRE opcode B98D; the encoder vector expects `B98D006F`. On 3 October 2026 the full local suite passed 93/93. `pdpclib_source_macros` checks independently expected FUNHEAD and TSO terminal bytes and assembles the full maintained `pdos-zarch` source. Its source SHA-256 is `8327b212648224f25dc0d0268b8d32fffb69ca36cce5cd304c08f75852f3c3d0` and its 20-section/908-symbol/50-fixup object is `9a7a69a5501edd1dbba0b60dd371c16636ce577d2cb1a41f59fade04f8f3fb58`. The TSO31 recipe reaches `SHOWCB` at prepared line 1993. Both TSO64 entries assemble with the source-built assembler, and their SDK object checks pass; the AMODE64/RMODE ANY entry SHA-256 is `5a12f242e19b1f9a89ee0203e7f3e3d8f9f8a27253c4658954dd46e8114a603f`. An isolated host XMIT link resolved the entry's six externals against deliberately nonfunctional fixture exports, proving linker shape only.
 - Acceptance: Supply independently authored service definitions from selected primary interface editions, assemble the complete SDK native entries and service support from maintained source, compare independently expected object properties, link the SDK consumer, and repeat affected guest checks.
 
+- Command-call boundary (10 October 2026): The selected assembler rejects the
+  BASSM mnemonic needed by the new TSO31 command-service entry. The SDK emits
+  independently specified RR instruction bytes X'0CEF' for BASSM 14,15 and
+  checks those bytes in the native deck. This is explicit source assembly and
+  object evidence, not new assembler mnemonic coverage. Add BASSM through the
+  normal original encoder with independent architecture vectors and register/
+  machine rejection controls before replacing that temporary literal form.
+
 ## AS-006: Explicit desktop symbol capacity for the PD-024 kernel
 
 - Type: improvement
