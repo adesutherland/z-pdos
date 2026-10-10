@@ -5,6 +5,12 @@ main: procedure = .int
   arg args = .string[]
   if args.0 < 2 | args.0 > 4 then return 2
   work = args.1; herc = args.2
+  /* Source receipts use ripgrep; fail before compiling any payload. */
+  address crexx "run rg --version"
+  if rc <> 0 then do
+    say "The source image recipe requires ripgrep (rg) for input identities."
+    return rc
+  end
   if args.0 = 3 then do
     route = args.3
     if route = "legacy" | route = "sanitize" then do

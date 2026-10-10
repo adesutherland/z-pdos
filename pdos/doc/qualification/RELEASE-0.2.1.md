@@ -81,6 +81,15 @@ version. Host-built disk containers and locally guest-tested payloads have
 separate identities. The exact tag workflow and post-publication comparison
 are recorded after they complete, rather than predicted in this source record.
 
+The initial tag build and diagnostic branch build failed on Linux because
+the source-receipt recipe uses ripgrep and the runner did not install it.
+The command payload completed; its identity scan returned 127 before K build.
+Both macOS jobs and Windows passed on the diagnostic branch, including macOS
+signing/notarization. CI now installs ripgrep, and the image entry point checks
+it before compilation. This repairs host orchestration only; the accepted
+guest payloads and guest evidence remain unchanged. The failed tag has no
+published release; final publication selects the repaired source.
+
 ## Limits and next version
 
 This release does not close the entire 3270 family or all available-provider

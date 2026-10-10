@@ -98,7 +98,7 @@ path. Staging and packaging require new output directories under
 and signing status. A local dirty package is development evidence.
 
 For the operating-system image, use the [OS build recipe](../pdos/doc/user/README.md#build-a-fresh-disk-from-source).
-It additionally requires Clang, Python 3, `shasum`, GNU s390 assembler/linker
+It additionally requires Clang, Python 3, ripgrep (`rg`), `shasum`, GNU s390 assembler/linker
 and Hercules disk utilities. Pass absolute GNU tool paths to `image.crexx`,
 or use `ZPDOS_GNU_AS`/`ZPDOS_GNU_LD`; Linux CI uses the distribution
 `binutils-s390x-linux-gnu` package. The four

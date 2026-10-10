@@ -48,7 +48,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install --yes build-essential cmake ninja-build clang perl bison flex hercules binutils-s390x-linux-gnu
+          sudo apt-get install --yes build-essential cmake ninja-build clang perl bison flex ripgrep hercules binutils-s390x-linux-gnu
       - name: Prepare native Windows build environment
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
