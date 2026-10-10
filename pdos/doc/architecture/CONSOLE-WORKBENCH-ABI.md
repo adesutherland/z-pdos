@@ -144,7 +144,7 @@ remain backlog facilities.
 ## Read-only DASD allocation and DISKMAP
 
 Operation36 uses a 64-byte version1 request. Input word8 is the mounted-volume
-index, word12 is map capacity (0 or1500), and words56/60 are its full U pointer.
+index, word12 is map capacity, and words56/60 are its full U pointer.
 The complete writable header and optional map are checked before disk I/O.
 On success, word8 becomes the mounted-volume count and word12 its device
 address. Cylinders/heads/tracks are at16/20/24, reserved/allocated/free tracks
@@ -152,7 +152,8 @@ at28/32/36, largest unallocated track run at40, dataset count at44 and the
 six IBM1047 volume characters at48. Map bits1/2 mean reserved/allocated;
 reserved extents are counted once in the totals.
 
-This implementation admits the maintained 100-cylinder 3390 layout and its
+The published 0.2.1 implementation admits the maintained 100-cylinder 3390
+layout, with map capacity 0 or 1500, and its
 two-cylinder VTOC, with up to three direct dataset extents. It reads the
 declared DSCB count per track; failed reads fail the snapshot. Other layouts
 and extent chains return unsupported. These are allocation counts rather
@@ -162,6 +163,30 @@ The optional U31 `DISKMAP` application consumes this API and the existing
 panel/layout API. It presents a capacity bar, cylinder map and actual totals,
 with Enter refresh, N next registered volume and Q return. Its plain line view
 uses the same figures and labels. No periodic polling or timers drive it.
+
+The local 0.2.2 source extends the read-only snapshot to declared 3–65535
+cylinders, 15 heads and the same VTOC/direct-extent subset. Version 1 capacity
+0 retains the full allocation-summary behavior; a positive capacity must be
+at least the declared track count and no greater than 983025. Only the actual
+track cells are written, preserving any trailing capacity. The complete U
+capacity is checked before disk I/O, in chunks of at most 128 KiB; the map
+cannot overlap the writable request header. Full-address overflow, bad late
+chunks, insufficient capacity and malformed metadata fail without publishing
+a header or map. K owns a temporary real-frame allocation and releases it on
+every normal success/error return.
+
+Version 2 is a geometry-only query. It requires capacity 0, returns the
+mounted-volume count, address, cylinders/heads/tracks and volume serial in the
+same fields, and clears words 28–44; allocation statistics are absent in this
+version. It reads only format 4 and allocates no map. Unknown versions return
+unsupported. The 0.2.2 DISKMAP source queries this size, allocates its U map,
+then obtains one version-1 snapshot. Large maps use at most three labelled
+rows of cylinder groups, including a partial final group; the original
+100-cylinder view keeps one cylinder per cell. Maps and panels have explicit
+error cleanup. These host/compile/link checks are recorded in
+[the second storage slice](../qualification/STORAGE-SLICE2-2026-10-10.md);
+larger physical media and guest behavior remain unqualified. A format-4
+declaration is not proof of physical device capacity or writer admission.
 
 ## C panel requests
 

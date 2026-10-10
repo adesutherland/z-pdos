@@ -1,5 +1,9 @@
 # How z/PDOS 0.2 works
 
+The initial 0.2.2 storage work is described in [Disk geometry, extents and larger files](STORAGE-EXTENTS.md).
+It separates the first geometry foundation from streaming, durable-store
+format/migration and production guest qualification.
+
 z/PDOS boots from a source-built 3390 disk and runs selected native CMS and
 TSO applications. Version 0.2 uses two translations on one z/Architecture
 CPU: a protected supervisor address space **K**, and one shared application

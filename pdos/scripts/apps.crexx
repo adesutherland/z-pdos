@@ -55,6 +55,7 @@ main: procedure = .int
   end
   allsources[allsources.0+1]="pdos/scripts/apps.crexx"
   allsources[allsources.0+1]="pdos/src/twospace_recordio.h"
+  allsources[allsources.0+1]="pdos/src/twospace_dasd.h"
   allsources[allsources.0+1]="pdos/src/apps/edit_core.h"
   allsources[allsources.0+1]="pdos/src/apps/utilities.h"
   allsources[allsources.0+1]="pdos/src/twospace_ui.h"

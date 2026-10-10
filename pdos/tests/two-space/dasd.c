@@ -20,6 +20,7 @@ int main(void)
     assert(!TDAADD(&s,f1,sizeof f1)&&!TDASTAT(&s)&&s.allocated==30U);
     memcpy(before,map,sizeof map);f1[59]=2U;f1[115]=0x81U;half(f1+117,100U);
     assert(TDAADD(&s,f1,sizeof f1)&&!memcmp(map,before,sizeof map));
-    f4[63]=99U;assert(TDAINIT(&s,map,sizeof map,f4,sizeof f4)&&!memcmp(map,before,sizeof map));
+    half(f4+62,101U);assert(TDAINIT(&s,map,sizeof map,f4,sizeof f4)&&!memcmp(map,before,sizeof map));
+    half(f4+62,2U);assert(TDAINIT(&s,map,sizeof map,f4,sizeof f4)&&!memcmp(map,before,sizeof map));
     return 0;
 }

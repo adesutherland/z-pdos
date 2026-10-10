@@ -758,11 +758,15 @@ be K-only and explicitly budgeted rather than consuming low U placement.
 ## PD-030: Larger configurable disks and extent-aware stored files
 
 - Type: architecture / capacity / performance
-- Status: Open
+- Status: In progress
 - Target: Default media geometry, PDOS.STORE directory/banks, native record transfers
 - Observation: The default disk has 100 cylinders; the durable store has eight fixed 2 MiB slots and duplicated banks. Operation 37 currently supports first-track PS FB/VB and separate empty destinations. Increasing memory or editor capacity does not remove these disk limits.
 - Direction: Design configurable media geometry and an extent-aware store with larger files, allocation/reuse and migration/recovery rules. Extend record I/O across tracks/extents through the common owned completion engine, preserving record boundaries and checked physical bounds. Consider contiguous transfer batches and measured channel/start counts; do not change persistent layout by multiplying constants.
 - Acceptance: Review version/migration and crash semantics, exact stopped-disk readback and preservation controls; measure fragmented and contiguous transfers and qualify all supported paths. Implementation requires its own selected storage-layout slice.
+- Authorization (10 October): Publish 0.2.1, then begin 0.2.2 with disk layout and larger files as the initial focus. [The selected storage design](architecture/STORAGE-EXTENTS.md) keeps native datasets/extents, bounded streaming and an explicit versioned-store migration contract.
+- Initial slice: Supplied-storage geometry/range helpers and allocation-map unions no longer assume 100 cylinders. Focused C89 ASan/UBSan controls cover 1024/65535-cylinder declarations, cross-cylinder extents and rejection without partial mutation. The K status caller retains an explicit 100-cylinder admission gate while its 1500-cell buffer and clients remain fixed. Host/Classic C object checks do not qualify larger production disks or file transfers. Dynamic K/U status, media admission, streaming, STORE v2, migration/recovery and measured I/O remain outstanding; the full combined guest QA is at the end.
+- Evidence: [Initial geometry slice](qualification/STORAGE-SLICE1-2026-10-10.md) records the reviewed caller guard, host controls and successful Classic compile/assemble/link with explicit unchanged kernel objects. The default guest disk remains 100 cylinders until the coordinated producer/admission/client slice is qualified.
+- Second local slice: K owns a dynamically sized read-only map and preflights all U chunks before I/O/publication, rejects header overlap and copies only actual cells. Version 1 retains complete summaries; version 2 queries geometry without a map allocation or repeated VTOC scan. DISKMAP owns its U map, aggregates larger declared volumes into bounded labelled rows and closes panels on errors. [The focused checks and native K/U links](qualification/STORAGE-SLICE2-2026-10-10.md) pass; physical capacity admission, producers, writers, streaming and persistent STORE changes remain outstanding. No new guest run or larger-disk support claim follows from these checks.
 
 ## PD-031: DX3270 code-page selection and emulator compatibility follow-up
 
