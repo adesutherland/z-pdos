@@ -13,6 +13,8 @@ main: procedure = .int
   address crexx "pwd" output paths
   root=strip(paths.1);input=root||"/"||work||"-inputs";out=root||"/"||work
   packer=apps||"/pack-tso"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/bundle-header.py"
+  if rc<>0 then return rc
   address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/scripts/bundle-media.py prepare :prior :apps :archive :packer :input"
   if rc<>0 then return rc
   address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :input :core :herc"
@@ -31,6 +33,9 @@ main: procedure = .int
   if rc<>0 then return rc
   receipt=out||"/container-compare.json"
   address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/scripts/bundle-media.py verify :target :roundtrip :receipt"
+  if rc<>0 then return rc
+  controls=out||"/header-controls"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/bundle-header.py :target :controls"
   if rc<>0 then return rc
   destination=out||"/media/pdos00.ckd"
   address crexx "run cmake -E copy :target :destination"
@@ -55,6 +60,7 @@ main: procedure = .int
   inputfiles[9]="pdos/scripts/ibm1047.table"
   inputfiles[10]="pdos/tests/two-space/pack_core.py"
   inputfiles[11]="pdos/tests/two-space/machine_profile.py"
+  inputfiles[12]="pdos/tests/bundle-header.py"
   hashes=.string[]
   address crexx "run shasum -a 256 :inputfiles[]" output hashes
   if rc<>0 then return rc

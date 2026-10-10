@@ -90,6 +90,17 @@ it before compilation. This repairs host orchestration only; the accepted
 guest payloads and guest evidence remain unchanged. The failed tag has no
 published release; final publication selects the repaired source.
 
+The repaired Linux producer then reaches full bundle compression/readback.
+Its legacy Hercules 3.13 header has zero reserved bytes where SDL stores the
+twelve-digit host serial. The new oracle incorrectly required decimal digits
+even when those legacy bytes were unchanged. It now accepts exactly zero or
+decimal serial fields; every other header byte, home/count/key/data record and
+EOT still compares exactly. [The legacy header definition](https://sources.debian.org/src/hercules/3.13-8/hstructs.h)
+records that reserved area. Independent controls accept legacy/SDL variants,
+reject changes at all 500 other header offsets and malformed serials, and
+prove a changed guest record fails without publishing a success receipt.
+This is host-container compatibility, with no guest payload change.
+
 ## Limits and next version
 
 This release does not close the entire 3270 family or all available-provider

@@ -187,13 +187,25 @@ def install(source, output, inputs):
     output.write_bytes(disk)
     (inputs/"installed.json").write_text(json.dumps({"input_sha256":digest(before),"output_sha256":digest(disk),"package_sha256":PACKAGE_SHA},indent=2)+"\n")
 
+def same_container_header(before, after):
+    """Only the documented serial field may change between known formats.
+
+    Hercules 3.13 reserves these bytes and writes zeros; SDL uses twelve
+    decimal digits. All other container-header bytes must remain identical.
+    """
+    if len(before)!=512 or len(after)!=512:
+        return False
+    def serial(value):
+        return value==bytes(12) or value.isdigit()
+    return (before[:20]==after[:20] and before[32:]==after[32:] and
+            serial(before[20:32]) and serial(after[20:32]))
+
 def verify(source, output, receipt):
     m=media_module();before=m.read_disk(source);after=m.read_disk(output)
-    # Hercules regenerates the twelve decimal host container serial digits.
+    # SDL regenerates twelve decimal host serial digits; 3.13 uses zeros.
     # Decompression may also regenerate unused bytes after a track's EOT.
     # Compare home addresses, count/key/data records and EOT byte for byte.
-    if (before[:20]!=after[:20] or before[32:512]!=after[32:512] or
-        not before[20:32].isdigit() or not after[20:32].isdigit()):
+    if not same_container_header(before[:512],after[:512]):
         raise ValueError("compressed readback changed disk payload/header")
     padding=[]
     for track in range(1500):
