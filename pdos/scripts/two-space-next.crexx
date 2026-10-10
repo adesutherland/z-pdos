@@ -322,6 +322,8 @@ main: procedure = .int
   source_inputs[67] = "pdos/tests/two-space/machine_profile.py"
   source_inputs[68] = "pdos/tests/two-space/service_machine.py"
   source_inputs[69] = "pdos/tests/two-space/normal_core.py"
+  source_inputs[70] = "pdos/src/twospace_environment.inc"
+  source_inputs[71] = "pdos/src/twospace_command_router.h"
   hashes = .string[]
   address crexx "run shasum -a 256 :source_inputs[]" output hashes
   if rc <> 0 then return rc

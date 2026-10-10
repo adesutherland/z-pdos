@@ -124,6 +124,44 @@ def until(test,proc,log,limit=180):
         time.sleep(.05)
     raise TimeoutError("console event watchdog")
 
+def recover_shutdown(proc,log,client,script):
+    if "disabled wait state" not in log.read_text(errors="replace"):
+        if client:
+            until(lambda:re.search(r"(?:^|\r?\n)[^\r\n]*:\\>\s*$",client.text()),proc,log,10)
+            client.enter("EXIT")
+        else:
+            def keyboard_ready():
+                result=terminal_action(script,"Query(KeyboardLock)")
+                return result.returncode==0 and result.stdout.strip()=="false"
+            until(keyboard_ready,proc,log,10)
+            if terminal_action(script,'String("EXIT")').returncode:
+                raise RuntimeError("recovery EXIT text entry rejected")
+            if terminal_action(script,"Enter()").returncode:
+                raise RuntimeError("recovery EXIT attention rejected")
+    until(lambda:"disabled wait state" in log.read_text(errors="replace"),proc,log,30)
+
+def stop_for_capture(proc,log,limit=10):
+    """Require fresh CP00 run-state status; PSW wait wording masks it."""
+    end=time.monotonic()+limit
+    proc.stdin.write("stopall\n");proc.stdin.flush()
+    while time.monotonic()<end:
+        begin=log.stat().st_size
+        proc.stdin.write("ipending\n");proc.stdin.flush()
+        state=None
+        while time.monotonic()<end and state is None:
+            if proc.poll() is not None:raise RuntimeError("Hercules exited before CPU stop acknowledgement")
+            fresh=log.read_bytes()[begin:].decode(errors="replace")
+            echo=False
+            for line in fresh.splitlines(keepends=True):
+                if not line.endswith("\n"):break
+                if re.search(r"HHC01603I ipending\s*$",line):echo=True
+                elif echo:
+                    match=re.search(r"HHC00866I Processor CP00: state\s+(.*)",line)
+                    if match:state=match.group(1).strip();break
+            if state is None:time.sleep(.05)
+        if state=="STOPPED":return
+    raise TimeoutError("fresh CPU stopped acknowledgement watchdog")
+
 def parse_transcript(raw):
     magic,real,length,hi,lo,gaps,monitor,read_owner,screen_owner,rows,cols,kind=struct.unpack_from(">12I",raw,0x3aa00)
     if magic!=0x434f4e31 or real<CORE or length>0x200000:raise ValueError("K transcript receipt")
@@ -411,14 +449,18 @@ def run(a):
     finally:
         if error and a.normal and not a.rootfault and proc.poll() is None:
             try:
-                if client:client.enter("EXIT")
-                else:terminal_action(script,'String("EXIT")');terminal_action(script,"Enter()")
-                until(lambda:"disabled wait state" in log.read_text(errors="replace"),proc,log,30)
-            except (OSError,RuntimeError,TimeoutError,subprocess.TimeoutExpired):pass
+                recover_shutdown(proc,log,client,script)
+            except (OSError,RuntimeError,TimeoutError,subprocess.TimeoutExpired) as exc:
+                error=(error or "console recovery failed")+"; recovery: "+str(exc)
         if proc.poll() is None:
             try:
-                proc.stdin.write(f'stopall\npsw\ngpr\ncr\nsavecore "{out/"result.core"}" 0 {REAL-1:x}\nquit\n');proc.stdin.flush()
-            except OSError as exc:error=error or str(exc)
+                stop_for_capture(proc,log)
+                proc.stdin.write(f'gpr\ncr\nsavecore "{out/"result.core"}" 0 {REAL-1:x}\n');proc.stdin.flush()
+            except (OSError,RuntimeError,TimeoutError) as exc:
+                error=(error or "console capture failed")+"; capture: "+str(exc)
+            finally:
+                try:proc.stdin.write("quit\n");proc.stdin.flush()
+                except OSError as exc:error=error or str(exc)
             try:proc.wait(timeout=30)
             except subprocess.TimeoutExpired:proc.terminate();proc.wait(timeout=10)
         if terminal:

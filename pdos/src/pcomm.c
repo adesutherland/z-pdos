@@ -18,6 +18,7 @@
 #include "zpdos-version.h"
 #ifdef PDOS_TWO_SPACE
 #include "twospace_ui.h"
+#include "twospace_command_router.h"
 #endif
 
 static char buf[200];
@@ -58,6 +59,15 @@ static void reportCommand(int *rc)
         *rc=(int)resultWord(result+TSA_RESULT_APP_RC);
     }else commandRCValid=1;
     printf("PCOMM END %u RC=%d\n",commandNumber,*rc);fflush(stdout);TUICTRL(0U);
+}
+static unsigned int pcommHost(unsigned int op,unsigned char *text,unsigned int count)
+{
+    int rc;
+    if(op!=TCM_MEDIA)return TCMIO(op,text,count);
+    ++commandNumber;TUIEXT();TUICTRL(1U);
+    printf("PCOMM BEGIN %u %s\n",commandNumber,buf);fflush(stdout);TUICTRL(0U);
+    rc=(int)TCMIO(op,text,count);reportCommand(&rc);
+    return (unsigned int)rc;
 }
 #endif
 
@@ -322,6 +332,15 @@ static void processInput(void)
 #ifdef PDOS_TWO_SPACE
     if(!len)return;
     if(len&&TUIJOB((const unsigned char *)buf,(unsigned int)len)){printf("PCOMM: console command state unavailable\n");return;}
+    {
+        unsigned int status=TCMDISP(TCM_PDOS,(const unsigned char *)buf,
+                                    (unsigned int)len,pcommHost,&rc);
+        if(status!=TCM_UNHANDLED){
+            if(status)printf("PCOMM: command service unavailable (%u)\n",status);
+            TUIEND(status,!status,(unsigned int)rc);
+            return;
+        }
+    }
 #endif
     p = strchr(buf, ' ');
     if (p != NULL)

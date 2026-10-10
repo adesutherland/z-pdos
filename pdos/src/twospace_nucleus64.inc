@@ -461,7 +461,7 @@ recovery_pc: .quad app_fault_resume
 synthetic_machine_va: .quad synthetic_machine_dispatch
 .endif
 k_table_alias_va: .quad 0x05000000
-u_table_alias_va: .quad 0x05180000
+u_table_alias_va: .quad 0x05300000
 bounce_va: .quad 0x03000080
 c_result_va: .quad 0x030000a0
 c_trampoline_va: .quad 0x02800000

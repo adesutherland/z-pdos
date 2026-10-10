@@ -21,6 +21,9 @@ and an application's service call.
   increment; full provider/conformance closure and the 0.2.1 release remain open.
 - [Source-to-image dependencies](architecture/DEPENDENCIES.md): selected inputs,
   Classic/GNU links and disk construction.
+- [Application command environments](architecture/COMMAND-ENVIRONMENTS.md)
+  and [review/freeze record](qualification/COMMAND-ENVIRONMENTS-2026-10-10.md):
+  shared U/C dispatch and the bounded CMS31/TSO31/PDOS client increment.
 - [Development guide](development/README.md): source map and change contracts.
 - [Build contract](development/BUILD-CONTRACT.md): recorded acceptance stages.
 - [0.1 guest qualification](qualification/QUALIFICATION.md): exact historical

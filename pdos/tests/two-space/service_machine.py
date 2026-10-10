@@ -217,8 +217,8 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
               "io_wake_returns_to_k_with_io_disabled":
                     struct.unpack_from(">I",raw,0x21b4)[0] == 1,
               "kcore_above_region_third_range": qword(raw, 0x2020) == KCORE,
-              "k_can_read_own_dat_pool": qword(raw, 0x2028) == 0x10400f,
-              "k_can_read_u_dat_pool": qword(raw, 0x2030) == 0x28400f,
+              "k_can_read_own_dat_pool": qword(raw, 0x2028) == ((KPOOL+0x4000)|0xf),
+              "k_can_read_u_dat_pool": qword(raw, 0x2030) == ((UPOOL+0x4000)|0xf),
               "expected_isolation_fault": raw[0x8e:0x90] == b"\0\x11",
               "fault_in_problem_amode64": qword(raw, 0x150) & MODE_MASK ==
                     0x0481000180000000,

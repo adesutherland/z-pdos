@@ -35,3 +35,8 @@ The earlier report's differently recorded outer archive identity is historical;
 we verified the selected upstream members against the 4bed44... archive.
 No private disk, native object/listing, correspondence or application package
 was imported. Future source changes are ordinary src/ edits and Git commits.
+
+The October 2026 stateless U command router and K native command-environment
+adapter are original MIT-licensed project work. Native layout facts are cited
+in [the architecture guide](doc/architecture/COMMAND-ENVIRONMENTS.md); no CMS,
+TSO or Rexx implementation source was imported.

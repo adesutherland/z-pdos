@@ -22,6 +22,7 @@
 #include "twospace_workbench.h"
 #include "twospace_display.h"
 #include "twospace_transcript.h"
+#include "twospace_command_router.h"
 typedef struct channel_context CHANNELCONTEXT;
 
 static unsigned int user_rights(unsigned int frame, void *unused);
@@ -39,6 +40,8 @@ static unsigned int channel_benchmark(const TSGREQUEST *);
 static unsigned int cms_word(const unsigned char *p);
 static void cms_put_word(unsigned char *p, unsigned int value);
 static unsigned int native_cms_call(const TSGREQUEST *request,unsigned int profile);
+static unsigned int env_cms(const TSGREQUEST *request);
+static void env_run_result(unsigned int,unsigned int);
 static unsigned int native_line_input(unsigned int address,unsigned int capacity,
                                        unsigned int *count);
 static void sf_compat(void);
@@ -128,6 +131,7 @@ static unsigned int cms31_lowcore_real;
 static unsigned int pcomm_loaded;
 static unsigned int command_test_loaded, command_test_bytes, command_test_entry;
 static unsigned int pcomm_bytes, pcomm_entry;
+static unsigned int env_entry[5];
 static unsigned int command_ecb, command_tcb;
 static unsigned int command_os_status;
 static unsigned int pcomm_input_address, pcomm_input_capacity;
@@ -2252,7 +2256,14 @@ static unsigned int tso_map_service(const TSGREQUEST *request,
          mode==31U ? TSTIMAGE31(stage+64U,bytes,base.lo,image,
                                 TST_MAX_IMAGE,&info) :
          TSTIMAGE64ANY(stage+64U,bytes,base.lo,image,
-                       TST_MAX_IMAGE,&info))!=TST_OK) goto bad_image;
+                         TST_MAX_IMAGE,&info))!=TST_OK) goto bad_image;
+    if(is_pcomm&&info.entry_offset<=info.image_bytes&&info.image_bytes-info.entry_offset>=TCM_DESC_BYTES){
+        const unsigned char *descriptor=image+info.entry_offset;
+        if(cms_word(descriptor+TCM_DESC_SIGNATURE)==0x54434d31U){
+            for(i=0U;i<TCM_DESC_COUNT;++i){unsigned int target=cms_word(descriptor+TCM_DESC_ENTRIES+4U*i);
+                if((target&1U)||target<base.lo||target-base.lo>=info.image_bytes)goto bad_image;}
+        }
+    }
     maximum.lo=mode==24U ? 0x00ffffffU : base.lo+0x00ffffffU;
     if (!is_test && !is_pcomm && mode==31U && tso31_loaded) {
         if (native_image_active[15U] || receipt[1U]!=info.image_bytes) {
@@ -2301,6 +2312,8 @@ static unsigned int tso_map_service(const TSGREQUEST *request,
     } else if (is_pcomm) {
         pcomm_loaded=1U; pcomm_bytes=info.image_bytes;
         pcomm_entry=base.lo+info.entry_offset;
+        if(info.image_bytes-info.entry_offset>=TCM_DESC_BYTES&&cms_word(destination+info.entry_offset+TCM_DESC_SIGNATURE)==0x54434d31U)
+            for(i=0U;i<TCM_DESC_COUNT;++i)env_entry[i]=cms_word(destination+info.entry_offset+TCM_DESC_ENTRIES+4U*i);
     } else if (mode==24U) tso24_loaded=1U;
     else if (mode==31U) tso31_loaded=1U;
     else tso64_loaded=1U;
@@ -2588,6 +2601,11 @@ static unsigned int cms_native_service(TSGREQUEST *request,
     copy.length=8U;
     copy.direction=TSG_READ;
     if (TSGCOPY(&gate,&copy,plist,sizeof plist) != TSG_OK) return 12U;
+    if(profile==31U&&
+       (*(volatile const unsigned int *)0x307cU==0x0200b000U||
+        (plist[0U]==0xe2U&&plist[1U]==0xe4U&&plist[2U]==0xc2U&&plist[3U]==0xc3U&&
+         plist[4U]==0xd6U&&plist[5U]==0xd4U&&plist[6U]==0x40U&&plist[7U]==0x40U)))
+        return env_cms(request);
     if (profile==24U) {
         static const unsigned char typlin[8] =
             {0xe3U,0xe8U,0xd7U,0xd3U,0xc9U,0xd5U,0x40U,0x40U};
@@ -2705,6 +2723,9 @@ static unsigned int cms_native_service(TSGREQUEST *request,
     for (i=0U; i<8U && plist[i]==state[i]; ++i) {}
     if (i==8U) {
         if (!cms31_lowcore_real) return 12U;
+        /* CMS mode A defaults to A1; STATE returns the resolved filemode.
+         * Native ELF clients preserve A-space in their initial FSCB. */
+        if(plist[24U]==0xc1U&&plist[25U]==0x40U)plist[25U]=0xf1U;
         copy.address.lo=request->address.lo+28U;
         copy.length=4U; copy.direction=TSG_WRITE;
         if (TSGPROBE(&gate,&copy)!=TSG_OK) return 12U;
@@ -2959,6 +2980,7 @@ static unsigned int call_alloc(unsigned int,unsigned int *,unsigned char **);
 #include "twospace_console.inc"
 #include "twospace_device.inc"
 #include "twospace_panel.inc"
+#include "twospace_environment.inc"
 
 static unsigned int service_request(TSGREQUEST *request)
 {
@@ -2969,6 +2991,9 @@ static unsigned int service_request(TSGREQUEST *request)
     int result;
     if (!request) return 0xffffffffU;
     if (attach()) return 0xfffffffaU;
+    if(request->svc==TCM_SVC)return env_service(request);
+    if(request->svc==246U&&TSVTOP(&native_invocations)&&env_current()&&env_current()->active)
+        return env_finish(1U);
     if(request->svc==TSA_IO_SVC)return console_v1_service(request);
     if(request->svc==198U)return channel_benchmark(request);
     if(console_v1_enabled()&&tc_legacy_control(request->svc))return 20U;
@@ -3022,7 +3047,10 @@ static unsigned int service_request(TSGREQUEST *request)
                        0x4d08U : native_frame && native_frame->amode==31U ?
                        0x4708U : 0x4c08U;
     if(native_tso&&request->svc==6U)return native_tso_link();
-    if(native_tso&&(request->svc==8U||request->svc==9U))return native_high_service(request->svc);
+    if(native_tso&&(request->svc==8U||request->svc==9U)){
+        unsigned int handled=0U,status=env_module(request->svc,&handled);
+        return handled?status:native_high_service(request->svc);
+    }
     if(native_tso&&request->svc==10U)return command_storage10(request);
     if(native_tso&&request->svc==201U)return sf_swa();
     if(native_tso&&(request->svc==1U||request->svc==99U||request->svc==64U||request->svc==22U||

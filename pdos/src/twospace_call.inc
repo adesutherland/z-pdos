@@ -67,7 +67,7 @@ static unsigned int call_launch(TSLIMAGE *image,const unsigned char *parameters,
     rc=native_begin(&begin);if(rc)return rc;
     f=&native_invocations.frame[native_invocations.depth-1U];depth=native_invocations.depth-1U;
     caller=f->caller;
-    if(cms_inline)f->caller.psw_address.lo+=4U;
+    if(cms_inline==1U)f->caller.psw_address.lo+=4U;
     call_overlay_task[depth]=0U;
     if(image->overlay){
         if(!parent_task||TSMOVERLAYPUSH(&storage,parent_task,image->address,
@@ -84,7 +84,10 @@ static unsigned int call_launch(TSLIMAGE *image,const unsigned char *parameters,
     rc=call_alloc(image->mode==24U?0x10000U:0x100000U,&stack,&stack_real);if(rc)goto failed;
     for(i=0U;i<256U;++i)stack_real[i]=0U;
     cms_put_word(stack_real+204U,stack+384U);
-    if(image->personality==TSV_TSO){
+    if(image->personality==TSV_TSO&&cms_inline==2U){
+        cms_put_word(arg_real,arg+64U|0x80000000U);
+        for(i=0U;i<bytes;++i)arg_real[64U+i]=parameters[i];
+    }else if(image->personality==TSV_TSO){
         /* Selected native PARAM list: fenced addresses to fullword values.
          * Copying both levels permits the recorded 31/64 -> 24 controls. */
         unsigned int count=bytes/8U;
@@ -151,6 +154,7 @@ static unsigned int native_call_finish(void)
     command_restore(&caller);saved[0U]=0U;saved[1U]=status;saved[30U]=0U;saved[31U]=app_rc;
     call_result(status,kind==2U?1U:0U,0U,kind==1U,app_rc,token);
     console_v1_end(token,call_last_result);
+    env_run_result(status,app_rc);
     if(!native_invocations.depth)
         *(volatile unsigned int *)0x4f9cU=*(volatile const unsigned int *)0x40acU;
     *(volatile unsigned int *)0x4f54U=1U;

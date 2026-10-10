@@ -4,9 +4,16 @@
          CSECT
          ENTRY @@CRT0,@@EXITA,TSUTPUT,TSUTGET
          EXTRN @@START
+         EXTRN TCMENTRY,TCMINIT,TCMSUB,TCMTSO,TCMPDOS
 @@CRT0   DS    0H
          BASR  12,0
          USING @@CRT0+2,12
+         B     PCSTART
+* Relocated, versioned resident interface; K validates every entry in the image.
+         DC    X'54434D31'
+         DS    0F
+         DC    V(TCMENTRY),V(TCMINIT),V(TCMSUB),V(TCMTSO),V(TCMPDOS)
+PCSTART  DS    0H
          L     2,0(,1)
          LA    3,TSUNAME
          LA    4,TSUBATCH

@@ -18,7 +18,8 @@ main: procedure = .int
   sources[2] = "pdos/src/twospace_pcomm.c"; flags[2] = "-DTSU_NATIVE_FILES"
   sources[3] = "pdos/src/pcomm.c"; flags[3] = "-DPDOS_TWO_SPACE"
   sources[4] = "pdos/src/twospace_ui.c"; flags[4] = ""
-  do i = 1 to 4
+  sources[5] = "pdos/src/twospace_command_router.c"; flags[5] = ""
+  do i = 1 to 5
     source = sources[i]; flag = flags[i]; asm = work || "/part" || i || ".asm"; object = work || "/part" || i || ".obj"
     address system quote(cc) || " -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR " || flag || " -S -I pdpclib/src -I pdos/src " || quote(source) || " -o " || quote(asm)
     if rc <> 0 then return rc
@@ -26,8 +27,9 @@ main: procedure = .int
     if rc <> 0 then return rc
     objects[i] = object
   end
-  sources[5] = "pdos/src/twospace_pcomm.asm"; sources[6] = "pdos/src/twospace_ui.asm"
-  do i = 5 to 6
+  sources[6] = "pdos/src/twospace_pcomm.asm"; sources[7] = "pdos/src/twospace_ui.asm"
+  sources[8] = "pdos/src/twospace_command_router.asm"
+  do i = 6 to 8
     source = sources[i]; object = work || "/part" || i || ".obj"
     address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :source :object"
     if rc <> 0 then return rc
@@ -40,13 +42,14 @@ main: procedure = .int
   if rc <> 0 then return rc
   command_stdlib = object
   native = .string[]
-  native[1] = objects[5]; native[2] = objects[1]; native[3] = objects[2]
-  native[4] = objects[3]; native[5] = objects[4]; native[6] = objects[6]
-  native[7] = base || "/support/MVSSUPA.obj"
-  native[8] = command_stdlib
+  native[1] = objects[6]; native[2] = objects[1]; native[3] = objects[2]
+  native[4] = objects[3]; native[5] = objects[4]; native[6] = objects[7]
+  native[7] = objects[5]; native[8] = objects[8]
+  native[9] = base || "/support/MVSSUPA.obj"
+  native[10] = command_stdlib
   common = "START CTYPE STRING TIME ERRNO ASSERT LOCALE MATH SETJMP SIGNAL MEMMGR"
   do i = 1 to words(common)
-    native[i+8] = base || "/c/objects/" || word(common,i) || ".obj"
+    native[i+10] = base || "/c/objects/" || word(common,i) || ".obj"
   end
   module = work || "/PCOMM.rdw"; map = work || "/PCOMM.map"
   address crexx "run :linker --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@CRT0 -Map :map -o :module :native[]"
@@ -60,6 +63,7 @@ main: procedure = .int
   inputs[inputs.0+1] = "pdpclib/src/stdlib.c"
   inputs[inputs.0+1] = "pdos/scripts/two-space-command.crexx"
   inputs[inputs.0+1] = "pdos/src/twospace_ui.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_command_router.h"
   inputs[inputs.0+1] = "pdos/src/twospace_abi.h"
   inputs[inputs.0+1] = "pdos/src/twospace_tso.h"
   inputs[inputs.0+1] = "pdos/src/twospace_tso.c"
