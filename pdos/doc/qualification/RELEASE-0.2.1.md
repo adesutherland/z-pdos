@@ -117,3 +117,30 @@ The initial 0.2.2 focus is PD-030: configurable disk geometry, larger files,
 extent allocation/reuse, migration and crash recovery, followed by measured
 contiguous/fragmented I/O. Continue through the shared owned completion engine.
 Managed-fleet adoption and marketing publication remain separate from release.
+
+## Published result
+
+Published on **10 October 2026 at 13:28 BST**, from annotated tag `v0.2.1`
+at `e60f6d90bf32934bcc03943a36e4148592a833fb`. All four host builds and
+the publisher passed in [run 38051443469](https://github.com/adesutherland/z-pdos/actions/runs/38051443469).
+The earlier failed tag targets remain in the commit history and as local
+annotated audit tags; no release was published from either failed candidate.
+The published tag is now fixed.
+
+The [publication receipt](release-0.2.1.json) records independent download,
+source and payload verification. The image ZIP SHA256 is
+`5128303ea492430ef0a2668a7d9042d8a3b895460c9c722076ef233cef247fc0`;
+its 28 payload files pass the internal inventory. Every published asset digest
+matches the combined SHA256SUMS. The source archive's 1842 regular/symlink
+entries match the exact tag. Both macOS notarization records report Accepted.
+Windows remains explicitly unsigned; managed PDOS remains the stopped 0.2.0
+instance and was not replaced by this publication.
+
+The hosted image's KCORE package, PCOMM, PLOAD, bootstrap command, configuration,
+all C applications and canonical RXC/RXAS/RXVM payloads compare byte for byte
+with the qualified local versioned image. LIBRARY, RXCEXITS and IOQUAL members
+also compare exactly. PDOS.SYS differs only in seven module-name bytes carrying
+the host path prefix; the actual maintained loader materializes both to the
+same 139976-byte AMODE31/RMODE24 handover at base `0x200000`, entry `0x146d4`,
+loaded SHA256 `cd6b0936d39fde7d00f9ad97d01976c693f353db33313e9180275d7755ce7802`.
+Container identities remain separate from payload/execution identities.
