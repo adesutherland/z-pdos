@@ -104,61 +104,61 @@ main: procedure = .int
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_dasd.c -o :dasdasm"
   if rc <> 0 then return rc
   address crexx "cd :root"
-  address crexx "run :classicas --profile s370 --literal-limit 8192 --symbol-limit 8192 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :compiled :object"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :compiled :object"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :gateasm :gateobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :gateasm :gateobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :datasm :datobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :datasm :datobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :memasm :memobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :memasm :memobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :realasm :realobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :realasm :realobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :placeasm :placeobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :placeasm :placeobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :invasm :invobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :invasm :invobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :chanasm :chanobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :chanasm :chanobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :ioasm :ioobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :ioasm :ioobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :dsasm :dsobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :dsasm :dsobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :cmsasm :cmsobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :cmsasm :cmsobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :cmsfileasm :cmsfileobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :cmsfileasm :cmsfileobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :cmscursorasm :cmscursorobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :cmscursorasm :cmscursorobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :tsoasm :tsoobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :tsoasm :tsoobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :storeasm :storeobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :storeasm :storeobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :consoleasm :consoleobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :consoleasm :consoleobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :familyasm :familyobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :familyasm :familyobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :sessionasm :sessionobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :sessionasm :sessionobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :historyasm :historyobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :historyasm :historyobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :surfaceasm :surfaceobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :surfaceasm :surfaceobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :displayasm :displayobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :displayasm :displayobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :workbenchasm :workbenchobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :workbenchasm :workbenchobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :dasdasm :dasdobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :dasdasm :dasdobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :transcriptasm :transcriptobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :transcriptasm :transcriptobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile z900 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_channel.asm :chansupport"
+  address crexx "run :classicas --profile z900 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_channel.asm :chansupport"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_tlb.asm :tlbobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_tlb.asm :tlbobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_entry.asm :entryobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_entry.asm :entryobj"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_key.asm :keyobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_key.asm :keyobj"
   if rc <> 0 then return rc
   address crexx "run :classicld --oformat binary --image-base 33554432 -e TSMENTRY -Map :map -o :binary :entryobj :object :gateobj :datobj :memobj :realobj :placeobj :invobj :chanobj :ioobj :dsobj :cmsobj :cmsfileobj :cmscursorobj :tsoobj :storeobj :consoleobj :familyobj :sessionobj :historyobj :surfaceobj :displayobj :workbenchobj :dasdobj :transcriptobj :chansupport :tlbobj :keyobj"
   if rc <> 0 then return rc
@@ -317,6 +317,11 @@ main: procedure = .int
   source_inputs[62] = "pdos/src/twospace_workbench.h"
   source_inputs[63] = "pdos/src/twospace_dasd.c"
   source_inputs[64] = "pdos/src/twospace_dasd.h"
+  source_inputs[65] = "pdos/src/twospace_recordio.h"
+  source_inputs[66] = "pdos/src/twospace_recordio.inc"
+  source_inputs[67] = "pdos/tests/two-space/machine_profile.py"
+  source_inputs[68] = "pdos/tests/two-space/service_machine.py"
+  source_inputs[69] = "pdos/tests/two-space/normal_core.py"
   hashes = .string[]
   address crexx "run shasum -a 256 :source_inputs[]" output hashes
   if rc <> 0 then return rc

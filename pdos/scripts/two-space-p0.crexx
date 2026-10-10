@@ -25,7 +25,7 @@ main: procedure = .int
     name = word(source_names,i)
     source = "pdos/tests/two-space/p0/" || name || ".asm"
     object = work || "/" || name || ".obj"
-    address crexx "run :classicas --profile z900 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :source :object"
+    address crexx "run :classicas --profile z900 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :source :object"
     if rc <> 0 then return rc
   end
   do variant = 1 to 4

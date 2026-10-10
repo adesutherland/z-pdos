@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from machine_profile import CORE, REAL
 import struct
 import subprocess
 
@@ -16,7 +17,7 @@ def main():
     p.add_argument("--interactive-monitor",action="store_true")
     a=p.parse_args();out=Path(a.output);out.mkdir(exist_ok=False)
     core=bytearray(Path(a.source_core).read_bytes())
-    if len(core)!=0x400000 or core[0x2000:0x2008]!=b"PD2NEXT1":raise ValueError("source-built core contract")
+    if len(core)!=CORE or core[0x2000:0x2008]!=b"PD2NEXT1":raise ValueError("source-built core contract")
     if a.interactive_monitor and not a.monitor:raise ValueError("interactive monitor requires its endpoint")
     struct.pack_into(">8I",core,0x95000,0x434f4e31,32,2 if a.line_primary else 1,9,0 if a.line_primary else a.model,10 if a.monitor else 0,int(a.interactive_monitor),0)
     (out/"console.core").write_bytes(core)

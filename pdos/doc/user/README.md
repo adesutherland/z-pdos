@@ -1,7 +1,7 @@
 # Run and build z/PDOS
 
 The quickest way to explore the system is the **PDOS image ZIP** from the
-[0.2.0 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.2.0).
+[0.2.1 release](https://github.com/adesutherland/z-pdos/releases/tag/v0.2.1).
 The Classic tools downloads are separate packages for building mainframe
 software on your host computer.
 
@@ -12,7 +12,7 @@ The default source-built K/U route and its accepted scope are described in
 
 You need Hercules and a 3270 terminal client on your computer. The recorded
 guest qualification used Hercules 4.9.1.0-SDL, one z/Architecture CPU and
-256 MiB of real storage. Other emulator versions need their own evidence.
+512 MiB of real storage for 0.2.1. Other emulator versions need their own evidence.
 
 1. Download the image ZIP and release `SHA256SUMS`. Verify the ZIP against the
    release checksum inventory. Extract it and keep an untouched copy.
@@ -34,7 +34,7 @@ The supplied configuration selects:
 ```text
 ARCHMODE z/Arch
 CPUMODEL 2064
-MAINSIZE 256
+MAINSIZE 512
 NUMCPU 1
 CNSLPORT 127.0.0.1:3270
 CODEPAGE 819/1047
@@ -46,10 +46,15 @@ CODEPAGE 819/1047
 Run from the image directory so the relative disk path resolves correctly.
 The 100-cylinder disk contains `PLOAD.SYS`, the `PDOS.SYS` handover,
 `CONFIG.SYS`, `COMMAND.EXE`, the protected `KCORE.BIN`, U PCOMM in
-`U.COMMAND`, and `PDOS.STORE`. It includes no cREXX application packages
-or IBM guest system.
+`U.COMMAND`, and `PDOS.STORE`, plus the C applications/examples and pinned
+cREXX TSO31 package. It includes no IBM guest system.
 
-The [0.2.0 release record](../qualification/RELEASE-0.2.0.md) distinguishes
+The **0.2.1 image** additionally builds a small C record
+line editor, utilities and examples, and bundles pinned cREXX TSO31 commands.
+See [APPLICATIONS](APPLICATIONS.md) for EDIT, safe SAVE AS, C examples and
+the RXC → RXAS → RXVM source workflow.
+
+The [0.2.1 release record](../qualification/RELEASE-0.2.1.md) distinguishes
 local operator acceptance from the hosted image archive and host packages.
 The bundled P6 record describes its exact reviewed K/U workload evidence.
 Container hashes and native payload hashes are separate identities.

@@ -32,7 +32,7 @@ main: procedure = .int
     flag = "-DP4_TEST_MODE=" || mode
     address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR :flag -S -I pdpclib/src -I pdos/src :source -o :asm"
     if rc <> 0 then return rc
-    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
     if rc <> 0 then return rc
     objects[i] = object
   end
@@ -40,7 +40,7 @@ main: procedure = .int
   sources[6] = "pdos/tests/two-space/p4/console-native.asm"
   do i = 5 to 6
     source = sources[i]; object = work || "/part" || i || ".obj"
-    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :source :object"
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :source :object"
     if rc <> 0 then return rc
     objects[i] = object
   end
@@ -58,7 +58,7 @@ main: procedure = .int
   if rc <> 0 then return rc
   wide_source = "pdos/tests/two-space/p4/console-wide.asm"; wide_object = work || "/P4CAP64.obj"
   wide_module = work || "/P4CAP64.rdw"
-  address crexx "run :classicas --profile z900 --literal-limit 4096 --macros :wide_source :wide_object"
+  address crexx "run :classicas --profile z900 --capacity-profile desktop --macros :wide_source :wide_object"
   if rc <> 0 then return rc
   address crexx "run :linker --oformat mvs --image-base 0 --amode 64 --rmode ANY -e @@MAIN -o :wide_module :wide_object"
   return rc

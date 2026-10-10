@@ -1,0 +1,11 @@
+/* SPDX-License-Identifier: MIT; cREXX Level B, compiled on the guest. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  i=.int
+  say "Hello from cREXX on z/PDOS."
+  do i=1 to args.0
+    say "argument "||i||": "||args[i]
+  end
+  return 0

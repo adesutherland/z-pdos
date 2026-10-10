@@ -79,8 +79,11 @@ Input (99, flag 0 primary or 1 monitor) selects
 one source at a completed boundary; called-program changes restore on unwind.
 TTY Mode (102) accepts plain mode 0; other modes return 20.
 
-Line Key (3) returns bytes plus AID; PCOMM owns PF5/PF6 recall policy. Existing
-Line Read (2) returns Enter submissions. Line Set (4) explicitly replaces the
+Line Key (3) returns bytes plus AID; PCOMM owns PF5/PF6 recall policy.
+Workbench actions are consumed by the controller; unassigned AIDs, including
+PF3/PF4 and PA, reach the semantic key caller. Raw session input retains its
+complete AID and cursor contract.
+Existing Line Read (2) returns Enter submissions. Line Set (4) explicitly replaces the
 dock after an AID: cursor offset 8, length/pointer 12/16/20, generation 28.
 Pending attention prevents replacement. Ordinary output, scroll and focus
 updates never clear the dock, reset its MDT or move its cursor. Injected and

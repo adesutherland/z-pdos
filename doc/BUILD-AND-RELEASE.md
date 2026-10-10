@@ -1,8 +1,8 @@
 # Install, build and release the Classic tools
 
-Version 0.2.0 packages the protected K64/C31 kernel and shared-U base image,
+Version 0.2.1 packages the protected K64/C31 kernel and shared-U Workbench image,
 plus Classic tools for macOS Apple Silicon/Intel, Linux x64 and Windows x64.
-The [release record](../pdos/doc/qualification/RELEASE-0.2.0.md) distinguishes
+The [release record](../pdos/doc/qualification/RELEASE-0.2.1.md) distinguishes
 review, local source build, exact operator acceptance, hosted builds and
 publication. The [P6 record](../pdos/doc/qualification/TWO-SPACE-P6-2026-10-07.md)
 contains the completed architecture/workload qualification.
@@ -25,11 +25,11 @@ establish 0.2.0 artifact acceptance.
 | macOS Apple Silicon | `macos-arm64-signed.pkg` or `macos-arm64-signed.zip` | PKG installer or portable directory. |
 | macOS Intel | `macos-x86_64-signed.pkg` or `macos-x86_64-signed.zip` | PKG installer or portable directory. |
 | Linux x64 | `linux-x64.zip` | Extract and use the `bin` directory. |
-| Windows x64 | `windows-x64-signed-setup.exe` or `windows-x64-signed.zip` | Signed per-user installer or portable directory. |
+| Windows x64 | `windows-x64-unsigned-setup.exe` or `windows-x64-unsigned.zip` initially | Per-user installer or portable directory; separate local signing replaces these when qualified. |
 | Run the operating system | `pdos-image.zip` | Follow the [OS boot guide](../pdos/doc/user/README.md). |
 | Inspect or rebuild the release | `source.tar.gz` | Corresponding maintained source and recipes. |
 
-These are filename suffixes; release assets start with `z-pdos-0.2.0-`.
+These are filename suffixes; release assets start with `z-pdos-0.2.1-`.
 Verify downloads against the release's `SHA256SUMS` before use. The image ZIP
 also has an internal inventory for its extracted files.
 
@@ -85,9 +85,9 @@ crexx -nokeep scripts/build.crexx --args full-test
 To stage, verify and create a local macOS development package:
 
 ```sh
-crexx -nokeep scripts/release.crexx --args stage macos-arm64 0.2.0-dev.local
-crexx -nokeep scripts/release.crexx --args verify macos-arm64 0.2.0-dev.local
-PDOS_APPLE_SIGNING=unsigned crexx -nokeep scripts/release.crexx --args package macos-arm64 0.2.0-dev.local
+crexx -nokeep scripts/release.crexx --args stage macos-arm64 0.2.1-dev.local
+crexx -nokeep scripts/release.crexx --args verify macos-arm64 0.2.1-dev.local
+PDOS_APPLE_SIGNING=unsigned crexx -nokeep scripts/release.crexx --args package macos-arm64 0.2.1-dev.local
 ```
 
 Use the corresponding platform key `macos-x86_64`, `linux-x64` or
@@ -132,11 +132,13 @@ installer filename escaping is owned by `scripts/windows-inventory.crexx`.
 Linux also builds a fresh 100-cylinder CCKD disk from source. Loader,
 relocation, dataset, compression-readback and corruption checks must pass.
 The image archive records actual tool identities and includes a Hercules
-configuration and boot instructions. It has only the base OS; no private disk
-or cREXX application package is copied into it. These host checks do not start
-a guest or establish new application execution.
+configuration and boot instructions. It includes the maintained C utilities
+and examples, and the SHA256-pinned canonical cREXX beta3 TSO31 compiler,
+assembler, runtime and libraries. No private disk or IBM guest is copied into
+it. These host checks do not start a guest; the application qualification
+record owns actual execution evidence.
 
-A pushed version tag such as `v0.2.0` runs the release matrix. Publication waits
+A pushed version tag such as `v0.2.1` runs the release matrix. Publication waits
 for all required host and image jobs; prerelease suffixes produce prereleases.
 The workflow creates neither the tag nor a development commit. Trusted branch
 and manual builds can exercise signing, but only version-tag pushes publish a

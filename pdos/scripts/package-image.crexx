@@ -5,7 +5,7 @@ options levelb
 import rxfnsb
 main: procedure = .int
   arg args = .string[]
-  i = .int
+  i = .int; target = .string
   if args.0 <> 2 then return 2
   work = args.1; version = args.2
   call require left(work,11) = "build/pdos/" & pos("..",work) = 0, "owned image output"
@@ -42,10 +42,54 @@ main: procedure = .int
   source = "pdos/UPSTREAM.md"
   address crexx "run cmake -E copy :source :payload"
   call require rc = 0, "Paul Edwards and upstream attribution"
+  bundled = .int; bundled = 0
+  source = work || "/image/bundle.json"
+  address crexx "run test -f :source"
+  if rc = 0 then do
+    bundled = 1
+    address crexx "run cmake -E copy :source :payload"
+    call require rc = 0, "application bundle identities"
+    source = work || "/image/container-compare.json"
+    address crexx "run cmake -E copy :source :payload"
+    call require rc = 0, "compressed CKD record readback receipt"
+    source = work || "/apps/inputs.sha256"; target = payload || "/apps-inputs.sha256"
+    address crexx "run cmake -E copy :source :target"
+    call require rc = 0, "C application producer identities"
+    source = work || "/command/inputs.sha256"; target = payload || "/command-inputs.sha256"
+    address crexx "run cmake -E copy :source :target"
+    call require rc = 0, "command producer identities"
+    source = "pdos/doc/user/APPLICATIONS.md"
+    address crexx "run cmake -E copy :source :payload"
+    call require rc = 0, "application operator guide"
+    source = "pdos/doc/qualification/APPLICATIONS-2026-10-10.md"
+    address crexx "run cmake -E copy :source :payload"
+    call require rc = 0, "application qualification scope"
+    source = "pdos/doc/architecture/CAPACITY-REVIEW-2026-10-10.md"
+    address crexx "run cmake -E copy :source :payload"
+    call require rc = 0, "reviewed machine and assembler capacities"
+    source = "pdos/doc/licenses/README.md"; target = payload || "/BUNDLE-NOTICES.md"
+    address crexx "run cmake -E copy :source :target"
+    call require rc = 0, "bundle source attribution"
+    notices = "CREXX-LICENSE SDK-LICENSE NEWLIB-LICENSE GCC-GPL-3.0 GCC-RUNTIME-EXCEPTION"
+    do i = 1 to words(notices)
+      source = "pdos/doc/licenses/" || word(notices,i) || ".txt"
+      address crexx "run cmake -E copy :source :payload"
+      call require rc = 0, "upstream bundle notices"
+    end
+    source = "pdpclib/LICENSE"; target = payload || "/PDPCLIB-LICENSE.txt"
+    address crexx "run cmake -E copy :source :target"
+    call require rc = 0, "selected C runtime notices"
+  end
+  source = "pdos/doc/qualification/RELEASE-" || version || ".md"
+  address crexx "run test -f :source"
+  if rc = 0 then do
+    address crexx "run cmake -E copy :source :payload"
+    call require rc = 0, "version-specific release scope"
+  end
   record = payload || "/hercules.cnf"
   call lineout record,"ARCHMODE z/Arch"
   call lineout record,"CPUMODEL 2064"
-  call lineout record,"MAINSIZE 256"
+  call lineout record,"MAINSIZE 512"
   call lineout record,"NUMCPU 1"
   call lineout record,"CNSLPORT 127.0.0.1:3270"
   call lineout record,"CODEPAGE 819/1047"
@@ -65,7 +109,13 @@ main: procedure = .int
   call lineout record,"Connect a model-2 3270 terminal as 0009@127.0.0.1:3270."
   call lineout record,"Connect a Telnet 3215 monitor as 000A@127.0.0.1:3270 before IPL 01B9."
   call lineout record,"EXIT commits the transcript, reports K SHUTDOWN and enters disabled wait."
-  call lineout record,"No cREXX applications or shared Lab guest assets are bundled."
+  if bundled then call lineout record,"Includes EDIT, DISKMAP, utilities, C examples and pinned cREXX beta3 TSO31 RXC/RXAS/RXVM; see APPLICATIONS.md and BUNDLE-NOTICES.md."
+  else call lineout record,"No cREXX applications are present in this selected bare image."
+  if bundled then call lineout record,"Read APPLICATIONS-2026-10-10.md and CAPACITY-REVIEW-2026-10-10.md for this development increment's qualification and storage limits."
+  source = "pdos/doc/qualification/RELEASE-" || version || ".md"
+  address crexx "run test -f :source"
+  if rc = 0 then call lineout record,"Read RELEASE-" || version || ".md for release selection and reused guest evidence."
+  call lineout record,"No private shared Lab guest assets are bundled."
   call lineout record,"inputs.sha256 and outputs.sha256 retain producer paths for provenance."
   call lineout record,"Use SHA256SUMS to verify the files in this distributed image archive."
   call lineout record

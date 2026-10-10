@@ -34,7 +34,7 @@ main: procedure = .int
       asm = work || "/part" || i || ".asm"; object = work || "/part" || i || ".obj"
       address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src :source -o :asm"
       if rc <> 0 then return rc
-      address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+      address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
       if rc <> 0 then return rc
       objects[i] = object
     end

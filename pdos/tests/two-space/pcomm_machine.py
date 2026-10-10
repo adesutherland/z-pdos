@@ -2,6 +2,7 @@
 """Control a disposable PCOMM diagnostic IPL using observed terminal events."""
 import json
 from pathlib import Path
+from machine_profile import CORE, REAL
 import queue
 import re
 import struct
@@ -24,7 +25,7 @@ def run(disk_arg, core_arg, hercules_arg, output_arg, mode="normal"):
     while console == script:
         script = unused_loopback_port()
     config = out / "machine.cnf"
-    config.write_text("ARCHLVL ESAME\nMAINSIZE 256\nNUMCPU 1\nCPUMODEL 2064\n"
+    config.write_text("ARCHLVL ESAME\nMAINSIZE 512\nNUMCPU 1\nCPUMODEL 2064\n"
                       "DIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\n"
                       f"CNSLPORT 127.0.0.1:{console}\n01B9 3390 {disk}\n0009 3270\n")
     startup = out / "run.rc"
@@ -114,7 +115,7 @@ def run(disk_arg, core_arg, hercules_arg, output_arg, mode="normal"):
         if action('String("EXIT")').returncode or action("Enter()").returncode:
             raise RuntimeError("EXIT AID submission failed")
         await_wait_state(events, proc, out / "console.log")
-        proc.stdin.write(f'stopall\nsavecore "{out / "result.core"}" 0 3fffff\nquit\n')
+        proc.stdin.write(f'stopall\nsavecore "{out / "result.core"}" 0 {CORE-1:x}\nquit\n')
         proc.stdin.flush()
         proc.wait(timeout=20)
         checks["guest_shutdown_event"] = True
@@ -125,7 +126,7 @@ def run(disk_arg, core_arg, hercules_arg, output_arg, mode="normal"):
         except Exception:
             pass
         if proc and proc.poll() is None:
-            proc.stdin.write(f'stopall\nsavecore "{out / "result.core"}" 0 3fffff\nquit\n')
+            proc.stdin.write(f'stopall\nsavecore "{out / "result.core"}" 0 {CORE-1:x}\nquit\n')
             proc.stdin.flush()
             try:
                 proc.wait(timeout=20)
@@ -142,6 +143,7 @@ def run(disk_arg, core_arg, hercules_arg, output_arg, mode="normal"):
     raw_path = out / "result.core"
     if raw_path.exists():
         raw = raw_path.read_bytes()
+        checks["bootstrap_core_capture_complete"] = len(raw) == CORE
         get = lambda offset: struct.unpack_from(">I", raw, offset)[0]
         checks["root_invocation_reaped"] = get(0x4f5c) == 1 and get(0x4f60) == 0
         checks["no_controlled_child_left"] = get(0x4f00) == 0
@@ -159,7 +161,7 @@ def run(disk_arg, core_arg, hercules_arg, output_arg, mode="normal"):
     checks["disk_unchanged"] = disk_hash == digest(disk)
     if failure:
         checks["completed_without_failure"] = False
-    receipt = {"profile": "ESAME model 2064, 256 MiB, one CPU, 3390 01B9, 3270 model 2",
+    receipt = {"profile": "ESAME model 2064, 512 MiB, one CPU, 3390 01B9, 3270 model 2",
                "pass": all(checks.values()), "mode": mode, "checks": checks, "failure": failure,
                "disk_sha256": disk_hash, "core_sha256": digest(core),
                "hercules_sha256": digest(hercules), "hercules_argv": command,

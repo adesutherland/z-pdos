@@ -16,15 +16,17 @@ implementation, is our first substantial application. Its compiler, assembler
 and virtual machine exercise loading, storage, files, terminal input and error
 handling together.
 
-[Version 0.2.0](https://github.com/adesutherland/z-pdos/releases/tag/v0.2.0)
+[Version 0.2.1](https://github.com/adesutherland/z-pdos/releases/tag/v0.2.1)
 · [Run z/PDOS](pdos/doc/user/README.md)
 · [Understand the architecture](pdos/doc/architecture/README.md)
 · [Documentation](doc/README.md)
 
-The develop branch includes a [0.2.1 console development checkpoint](pdos/doc/qualification/CONSOLE-STAGE3-2026-10-09.md):
-Workbench panels/history, tested monitor recovery, basic printer output and a
-DASD allocation graph. Its bounded qualification is separate from complete
-3270 conformance, the remaining provider/coverage audit and a 0.2.1 release.
+Version 0.2.1 adds the retained Workbench console, a small C record line editor,
+utilities, a DASD allocation graph and canonical cREXX TSO31 commands.
+The default machine has 512 MiB real storage and generous kernel/assembler
+capacities. The [release record](pdos/doc/qualification/RELEASE-0.2.1.md)
+links the bounded console and application qualification. Complete 3270
+conformance, larger files and disk-layout expansion remain separate work.
 
 ## What works today
 
@@ -47,7 +49,7 @@ remain outside that result. Selected native CMS-to-CMS and TSO-to-TSO calls
 restore the caller's registers, file cursors, personality state and terminal
 ownership after return or a recoverable child fault.
 
-The normal machine uses **one z/Architecture CPU and 256 MiB real storage**.
+The normal development machine uses **one z/Architecture CPU and 512 MiB real storage**.
 The C console driver supports configured 3270 models 2–5, a line-only primary,
 and an optional Telnet 3215 text monitor. Ordered text is also committed to a
 durable store on the IPL disk; raw screens or lost monitor output produce
@@ -121,7 +123,10 @@ loading, memory and service calls through to their implementation.
 
 To explore the OS, download the **PDOS image ZIP**, keep an untouched copy,
 and follow the [boot guide](pdos/doc/user/README.md). The image contains the
-base OS only; cREXX applications are separate downloads.
+published 0.2.0 base OS; cREXX applications for that release are separate
+downloads. The [0.2.1 development source image](pdos/doc/user/APPLICATIONS.md)
+also builds a small C line editor, utilities and examples, and bundles the
+pinned cREXX TSO31 compiler, assembler and VM.
 
 To develop software on your computer, choose the **Classic tools package**
 for your host. The [installation guide](doc/BUILD-AND-RELEASE.md) explains the

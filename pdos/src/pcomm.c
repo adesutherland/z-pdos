@@ -423,9 +423,27 @@ static void processInput(void)
 #ifdef PDOS_TWO_SPACE
     else if (ins_strcmp(buf, "console") == 0)
     {
-        if(ins_strcmp(p,"input primary")==0)rc=(int)TUIHAND(0U);
+        if(ins_strcmp(p,"status")==0){
+            unsigned char caps[64],monitor[32];
+            rc=(int)TUICAPS(caps);if(!rc)rc=(int)TUIMON(monitor);
+            if(!rc){
+                printf("CONSOLE: %s / device %04X / %ux%u\n",
+                    resultWord(caps+8U)==TSA_DEVICE_3270?"3270":"line",
+                    resultWord(caps+12U),resultWord(caps+16U),resultWord(caps+20U));
+                printf("CONSOLE: address format %u / features %08X / generation %u\n",
+                    resultWord(caps+40U),resultWord(caps+48U),resultWord(caps+60U));
+                printf("CONSOLE: panels %s / colour %s / key events %s\n",
+                    resultWord(caps+48U)&TSA_FEATURE_WORKBENCH?"yes":"no",
+                    resultWord(caps+48U)&TSA_FEATURE_COLOUR?"yes":"no",
+                    resultWord(caps+48U)&TSA_FEATURE_KEY_EVENTS?"yes":"no");
+                printf("CONSOLE: monitor %04X state %u / input %s / capture gaps %u\n",
+                    resultWord(monitor+8U),resultWord(monitor+12U),
+                    resultWord(monitor+20U)?"monitor":"primary",resultWord(monitor+16U));
+            }
+        }
+        else if(ins_strcmp(p,"input primary")==0)rc=(int)TUIHAND(0U);
         else if(ins_strcmp(p,"input monitor")==0)rc=(int)TUIHAND(1U);
-        else {printf("CONSOLE INPUT PRIMARY|MONITOR\n");rc=8;}
+        else {printf("CONSOLE STATUS | INPUT PRIMARY|MONITOR\n");rc=8;}
         if(rc)printf("PCOMM: input selection unavailable (%d)\n",rc);
     }
 #endif
@@ -784,6 +802,22 @@ static void dodir(char *pattern)
 
 static void dohelp(char *topic)
 {
+#ifdef PDOS_TWO_SPACE
+    if (ins_strcmp(topic,"EDIT")==0) {
+        printf("EDIT dataset (optional): 4096 native FB/VB records, 256 bytes each.\n");
+        printf("INPUT/INSERT, PRINT, DELETE, CHANGE, LOCATE, UNDO.\n");
+        printf("SAVE AS separate empty exchange dataset; QUIT or QUIT DISCARD.\n");
+        printf("Use VOLSER:dataset for a mounted volume. EDIT HELP lists syntax.\n");
+        return;
+    }
+    if (ins_strcmp(topic,"UTILITIES")==0) {
+        printf("DISKMAP: DASD graph; Enter refresh / N volume / Q return.\n");
+        printf("FIND literal dataset; HEX dataset; CMP/FC first second.\n");
+        printf("HELLO args, RECIO source target and PANEL are C examples.\n");
+        printf("EXAMPLE.HELLO/RECIO/PANEL/REXX are native source datasets.\n");
+        return;
+    }
+#endif
     if (ins_strcmp(topic, "CMS") == 0)
     {
         printf("CMS CHECK 31 RXVM|RXAS|RXC validates a staged MODULE.\n");
@@ -800,6 +834,10 @@ static void dohelp(char *topic)
         printf("Native TSO-style load modules may run when their mode and\n");
         printf("services are supported. HELP CMS lists the CMS qualification.\n");
         printf("Datasets are shown with DIR; host tools prepare and check disks.\n");
+#ifdef PDOS_TWO_SPACE
+        printf("The normal development image bundles cREXX beta.3 TSO31.\n");
+        printf("RXC, RXAS, RXVM; use -l CREXX for the bundled library.\n");
+#endif
         return;
     }
     if (ins_strcmp(topic, "ADVANCED") == 0)
@@ -811,6 +849,9 @@ static void dohelp(char *topic)
         return;
     }
     printf("z/PDOS PCOMM: first steps\n");
+#ifdef PDOS_TWO_SPACE
+    printf("CONSOLE STATUS; HELP EDIT; HELP UTILITIES; HELP TSO\n");
+#endif
     printf("VERSION  show release version, interface and build-identity location\n");
     printf("DIR      list datasets, dates, formats and extents\n");
     printf("DEVICES  list attached addresses; VOLUMES lists mounted DASD\n");

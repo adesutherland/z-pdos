@@ -2,7 +2,7 @@
 
 The default `image.crexx` recipe builds the protected K64/C31 kernel and U
 PCOMM, then constructs a fresh 100-cylinder 3390. Maintained source supplies
-all mainframe code and macros. No prebuilt mainframe objects, proprietary
+the operating system, C applications and macros. No prebuilt OS objects, proprietary
 compiler/assembler/binder or IBM macro library is required. Run recipes from
 the repository root; outputs belong under ignored `build/pdos/`.
 
@@ -14,6 +14,8 @@ the repository root; outputs belong under ignored `build/pdos/`.
 | K64 nucleus | `twospace_normal.S`, `twospace_entry64.inc`, `twospace_nucleus64.inc`, built by GNU s390 assembler/linker under the z900 instruction ceiling. |
 | C31 K and handover | `twospace_boot.c`, `twospace_service.c`, DAT, gate, memory, placement, invocation, channel, native-file and console source; maintained Classic C/Assembler/Linker. |
 | U command processor | `pcomm.c`, `twospace_ui.c`, native entry and checked K service linkage. |
+| U C applications | `src/apps/`, built by `apps.crexx` with the selected Classic tools and PDPCLIB runtime. |
+| Bundled cREXX applications | Pinned public v1.0.0-beta.3 mainframe ZIP; unchanged TSO31 RXC/RXAS/RXVM and LIBRARY/IOQUAL. This is an external application input, not an OS build dependency. |
 | Shared runtime and macros | Maintained `pdpclib/src/`, selected `pdos-zarch` modules and Classic linkage interfaces; no copied runtime or patch stack. |
 | Host orchestration/checks | cREXX, CMake, native C tools, make/Bison/Flex for Classic C, Clang sanitizers, Python for explicit binary/emulator interfaces, and `shasum`. |
 | Disk utilities | Hercules `dasdload`, `cckd2ckd`, `ckd2cckd`; the emulator is a separate guest-test input. |
@@ -25,20 +27,27 @@ the repository root; outputs belong under ignored `build/pdos/`.
    route; its intermediate PDOS does not become the 0.2 kernel.
 2. `two-space-command.crexx` builds U PCOMM and its C presentation/native stage.
 3. `two-space-next.crexx ... normal` builds the K64 nucleus, protected C31
-   services and sparse K/U tables into the normal 4 MiB core. Its normal route
+   services and sparse K/U tables into the normal 16 MiB core. Its normal route
    performs host checks and creates the core; it does not start Hercules.
 4. `two-space-ipl.crexx ... command` builds the C31 handover, packs the core,
    stages U PCOMM and the durable store, installs explicit IPL records, and
    compares the disk after compressed readback. The bare route does not start
    a guest or require a cREXX application package.
+5. The default factory builds EDIT, FIND, HEX, CMP/FC, HELLO, RECIO, PANEL and
+   DISKMAP. `bundle.crexx` verifies the public cREXX ZIP and native identities,
+   stages its explicit collections plus native C/cREXX source examples, and
+   checks each CKD record after compression. Set `ZPDOS_CREXX_PACKAGE` to an
+   existing matching ZIP to build offline. The explicit diagnostic workload
+   route retains its separately supplied CMS/TSO stages.
 
 The final disk is `<work>/image/media/pdos00.cckd`. It contains PLOAD.SYS,
 PDOS.SYS, CONFIG.SYS, COMMAND.EXE, KCORE.BIN, U.COMMAND and PDOS.STORE. The
-normal build root carries combined `inputs.sha256`, `outputs.sha256` and
+normal development image also contains the [applications and collections](../user/APPLICATIONS.md).
+The normal build root carries combined `inputs.sha256`, `outputs.sha256` and
 `versions.log`; base/kernel/image manifests retain detailed producer inputs.
 The root VERSION and guest `zpdos-version.h` must agree.
 
-`package-image.crexx` packages that K/U disk, its producer manifests, licence,
+`package-image.crexx` packages that K/U disk, its producer manifests, licences,
 attribution and operator/qualification guides. The hosted Linux build supplies
 GNU s390 Binutils explicitly and packages this same default route. Host tool
 packages are built on four hosts; that does not establish a guest run on each.

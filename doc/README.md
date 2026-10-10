@@ -22,6 +22,9 @@ qualifies the protected K64/C31 kernel, shared U applications, native calls,
 console and disk/tape workflows. The
 [0.2.0 release record](../pdos/doc/qualification/RELEASE-0.2.0.md) keeps local
 build, operator acceptance and downloadable artifact identities separate.
+The [0.2.1 record](../pdos/doc/qualification/RELEASE-0.2.1.md) adds Workbench,
+the C editor/utilities, canonical cREXX bundle and the 512 MiB capacity profile,
+with separate console/application results and release artifact gates.
 Earlier 0.1/0.1.1 qualification reports describe their one-space inputs.
 
 The [2 October reorganisation record](REORGANISATION-20261002.md) and

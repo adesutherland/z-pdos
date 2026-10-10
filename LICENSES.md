@@ -6,6 +6,13 @@ require a separately licensed proprietary mainframe compiler, assembler,
 binder or IBM macro library. Ordinary host build tools and Hercules utilities
 remain external inputs.
 
+The 0.2.1 development image also consumes the pinned public cREXX
+v1.0.0-beta.3 TSO31 application package. Its unchanged application binaries
+include the selected modern SDK runtime; this external bundle is distinct
+from the source-built OS and Classic C applications. The [bundle notice](pdos/doc/licenses/README.md)
+records upstream source identities and carries cREXX, SDK, Newlib and GCC
+runtime terms. The root MIT licence does not replace them.
+
 This is a statement about the build's dependencies. The repository contains
 several licences, and the [root MIT licence](LICENSE) covers only original
 project material. It does not relicense inherited source or external manuals.

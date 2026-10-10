@@ -1,0 +1,83 @@
+/* SPDX-License-Identifier: MIT; source-built normal U31 application pack. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  i=.int; j=.int
+  source=.string;object=.string;name=.string;editor=.string;utilities=.string
+  if args.0<>6 then do
+    say "usage: apps.crexx NEW-build/pdos/output BASE_BUILD COMMAND_BUILD CLASSIC_CC CLASSIC_AS CLASSIC_LD"
+    return 2
+  end
+  work=args.1; base=args.2; command=args.3; cc=args.4; classicas=args.5; ld=args.6
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  common=.string[]; sources=.string[]; allsources=.string[]
+  modules="ui console 3270 workbench surface history display recordio"
+  do i=1 to words(modules)
+    source="pdos/src/twospace_"||word(modules,i)||".c"
+    object=compile(source,work||"/"||word(modules,i),cc,classicas)
+    common[i]=object;allsources[allsources.0+1]=source
+  end
+  source="pdos/src/apps/edit_core.c";editor=compile(source,work||"/edit_core",cc,classicas)
+  allsources[allsources.0+1]=source
+  source="pdos/src/apps/utilities.c";utilities=compile(source,work||"/utilities",cc,classicas)
+  allsources[allsources.0+1]=source
+  native=.string[]
+  native[1]=command||"/part5.obj";native[2]=command||"/part1.obj"
+  native[3]=command||"/part2.obj";native[4]=command||"/part6.obj"
+  native[5]=base||"/support/MVSSUPA.obj";native[6]=command||"/stdlib.obj"
+  runtime="START CTYPE STRING TIME ERRNO ASSERT LOCALE MATH SETJMP SIGNAL MEMMGR"
+  do i=1 to words(runtime)
+    native[i+6]=base||"/c/objects/"||word(runtime,i)||".obj"
+  end
+  programs="edit find hex cmp hello recio panel diskmap"
+  packer=work||"/pack-tso"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src pdos/src/twospace_tso.c pdos/tests/two-space/tso_pack.c -o :packer"
+  if rc<>0 then return rc
+  do i=1 to words(programs)
+    name=word(programs,i);source="pdos/src/apps/"||name||".c"
+    object=compile(source,work||"/"||name,cc,classicas);allsources[allsources.0+1]=source
+    objects=.string[];objects[1]=object
+    do j=1 to common.0
+      objects[j+1]=common[j]
+    end
+    if name="edit" then objects[objects.0+1]=editor
+    if name="find" | name="hex" | name="cmp" then objects[objects.0+1]=utilities
+    module=work||"/"||name||".rdw";map=work||"/"||name||".map";stage=work||"/"||name||".bin"
+    address crexx "run :ld --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@CRT0 -Map :map -o :module :native[] :objects[]"
+    if rc<>0 then return rc
+    address crexx "run :packer :module :stage classic31"
+    if rc<>0 then return rc
+  end
+  allsources[allsources.0+1]="pdos/scripts/apps.crexx"
+  allsources[allsources.0+1]="pdos/src/twospace_recordio.h"
+  allsources[allsources.0+1]="pdos/src/apps/edit_core.h"
+  allsources[allsources.0+1]="pdos/src/apps/utilities.h"
+  allsources[allsources.0+1]="pdos/src/twospace_ui.h"
+  allsources[allsources.0+1]="pdos/src/twospace_abi.h"
+  allsources[allsources.0+1]="pdos/src/twospace_tso.c"
+  allsources[allsources.0+1]="pdos/tests/two-space/tso_pack.c"
+  headers="console 3270 workbench surface history display tso"
+  do i=1 to words(headers)
+    allsources[allsources.0+1]="pdos/src/twospace_"||word(headers,i)||".h"
+  end
+  hashes=.string[]
+  address crexx "run shasum -a 256 :allsources[] :native[]" output hashes
+  if rc<>0 then return rc
+  do i=1 to hashes.0
+    call lineout work||"/inputs.sha256",hashes[i]
+  end
+  call lineout work||"/inputs.sha256"
+  return 0
+compile: procedure = .string
+  arg source=.string,stem=.string,cc=.string,classicas=.string
+  asm=stem||".asm";object=stem||".obj"
+  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR -S -I pdpclib/src -I pdos/src :source -o :asm"
+  if rc<>0 then exit rc
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+  if rc<>0 then exit rc
+  return object

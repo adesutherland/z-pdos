@@ -1,3 +1,6 @@
 # Exact-cell design boards preserve their full 80/132-column row padding.
 pdos/doc/architecture/console-designs/*-80.txt whitespace=-blank-at-eol
 pdos/doc/architecture/console-designs/*-132.txt whitespace=-blank-at-eol
+# Canonical bundle notices retain their exact upstream bytes.
+pdos/doc/licenses/NEWLIB-LICENSE.txt whitespace=-blank-at-eol,-space-before-tab
+pdos/doc/licenses/GCC-RUNTIME-EXCEPTION.txt whitespace=-blank-at-eof

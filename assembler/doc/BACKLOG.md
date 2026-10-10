@@ -64,3 +64,22 @@ passed the recorded 0.1 source-to-image and guest route.
 - Acceptance: CLI rejects invalid limits, the default rejects a 5000-symbol source without publishing an object, selected capacity assembles it, existing CLI checks pass, and the PD-024 service assembles with the selected capacity.
 
 - Evidence: `classic_cli_contracts` passes invalid bounds, unchanged default capacity and the independently generated 5000-symbol source with selected capacity. The reviewed PD-024 native24 service assembles 51262 statements and 4142 symbols using an explicit 8192 limit, then links and passes the bounded guest matrix; portable core/API unchanged.
+
+## AS-007: Coordinated desktop assembler capacities
+
+- Type: improvement / capacity
+- Status: Done
+- Target: Desktop CLI and maintained PDOS build interface
+- Observation: The 32 MiB host budget and scattered 4096/8192 overrides risk another avoidable build failure as K grows. The supplied-storage core already streams replayable source and sequential object output.
+- Direction: Add named bootstrap/desktop capacity profiles, checked storage/fixup overrides and measured storage diagnostics. Keep bootstrap defaults and classic object/source constraints explicit; select desktop in PDOS recipes.
+- Acceptance: Invalid/overflowing options and insufficient storage leave output absent; profile overrides work in documented order; existing and desktop profiles produce identical objects for the same source; actual K/app compile, assemble and link succeed with recorded headroom.
+- Evidence: CLI contracts pass desktop and macro object comparisons, bootstrap/default refusal, ordered overrides and storage exhaustion. The fresh 10 October PDOS image compiles, assembles and links all K/C applications with the desktop profile, then passes the 68-check bounded application matrix. The actual service uses 215,779,644 of 268,435,456 host bytes and leaves 78 percent of its enlarged guest service bank free. Object/source format and checked wrapper bounds remain explicit.
+
+## AS-008: Explicit character-constant code page at the PDOS interface
+
+- Type: interface / encoding
+- Status: Open
+- Target: Desktop product selection and portable character-constant emission
+- Observation: The assembler's `mf_ascii_to_ebcdic` table is CP037 and is used for character constants as well as object names. PDOS's modern console and native text adapters use IBM1047. The 10 October native editor walkthrough shows bracket literals as different glyphs; the new operator messages now use portable punctuation.
+- Direction: Review an explicit data/character-constant code-page selection for modern PDOS consumers, preserving classic object-name encoding, macro comparison semantics and the unchanged CP037 bootstrap default. Do not change the shared conversion table globally or silently convert runtime file data.
+- Acceptance: Independent CP037/IBM1047 literal-byte vectors, compatible object names and macro/source replay, exact native C string and record-byte behavior, and affected guest consumers. This is a separate selected interface slice; the desktop capacity profile does not change encoding.

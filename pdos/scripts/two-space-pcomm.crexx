@@ -44,7 +44,7 @@ main: procedure = .int
   objects[1] = stdioobj; objects[2] = nativeobj; objects[3] = entryobj
   do i = 1 to 3
     from = sources[i]; target = objects[i]
-    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :from :target"
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :from :target"
     if rc <> 0 then return rc
   end
   linkobjects = .string[]
@@ -81,7 +81,7 @@ main: procedure = .int
   if rc <> 0 then return rc
   childobj = out || "/PDTEST.obj"; childmodule = out || "/PDTEST.mvs"
   childstage = out || "/PDTEST.stage"
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/tests/two-space/pcomm_child.asm :childobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/tests/two-space/pcomm_child.asm :childobj"
   if rc <> 0 then return rc
   address crexx "run :ld --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@MAIN -o :childmodule :childobj"
   if rc <> 0 then return rc

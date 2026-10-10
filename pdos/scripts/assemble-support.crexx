@@ -25,7 +25,7 @@ main: procedure = .int
     deck = work || "/" || member || ".obj"
     address crexx "run cmake -E rm -f :deck"
     if rc <> 0 then return rc
-    address crexx "run :cli --profile z900 --literal-limit 4096 --macro-model-limit 4096 --macro-limit 128 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage -I pdpclib/src/interfaces/pdos31 :source :deck"
+    address crexx "run :cli --profile z900 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage -I pdpclib/src/interfaces/pdos31 :source :deck"
     if rc <> 0 then return rc
     say member "handwritten object passes"
   end

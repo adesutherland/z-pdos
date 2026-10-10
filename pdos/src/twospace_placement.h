@@ -5,7 +5,7 @@
 #ifndef PDOS_TWO_SPACE_PLACEMENT_H
 #define PDOS_TWO_SPACE_PLACEMENT_H
 
-#define TSP_SLOTS 128
+#define TSP_SLOTS 512
 #define TSP_OK 0
 #define TSP_BAD -1
 #define TSP_COLLISION -2

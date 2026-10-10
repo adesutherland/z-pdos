@@ -321,7 +321,7 @@ app_high:
     larl %r2, high_data_va
     lg %r2, 0(%r2)
     st %r15, 60(%r2)
-    lghi %r0, 4096          /* 256 MiB exceeds the whole named real profile */
+    lghi %r0, 8192          /* 512 MiB exceeds available real storage */
     sllg %r0, %r0, 16
     lghi %r1, 0
     lghi %r15, 0x30

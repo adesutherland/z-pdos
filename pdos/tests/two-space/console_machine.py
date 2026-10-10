@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from machine_profile import CORE, REAL
 import queue
 import re
 import socket
@@ -52,6 +53,20 @@ def submitted_cursor_resets(records):
     """The field-clear write itself positions the locked cursor at its start."""
     clears=[r for r in records if len(r) in (9,13) and r[:3]==b"\xf1\xc1\x11" and r[5]==0x3c and r[8]==0]
     return bool(clears) and all(len(r)==13 and r[9:]==b"\x11"+r[3:5]+b"\x13" for r in clears)
+
+def expected_outputs(texts,cases):
+    for case in cases:
+        if len(case)<4 or not case[3]:continue
+        match=re.match(r"PCOMM END ([0-9]+) ",case[1])
+        if match:
+            begin="PCOMM BEGIN "+match[1]+" "
+            starts=[i for i,text in enumerate(texts) if text.startswith(begin)]
+            ends=[i for i,text in enumerate(texts) if text==case[1]]
+            if len(starts)!=1 or len(ends)!=1 or starts[0]>=ends[0]:return False
+            section="\n".join(texts[starts[0]+1:ends[0]+1])
+        else:section="\n".join(texts)
+        if any(text not in section for text in case[3]):return False
+    return True
 
 class LineClient:
     def __init__(self,port,device):
@@ -111,7 +126,7 @@ def until(test,proc,log,limit=180):
 
 def parse_transcript(raw):
     magic,real,length,hi,lo,gaps,monitor,read_owner,screen_owner,rows,cols,kind=struct.unpack_from(">12I",raw,0x3aa00)
-    if magic!=0x434f4e31 or real<0x400000 or length>0x200000:raise ValueError("K transcript receipt")
+    if magic!=0x434f4e31 or real<CORE or length>0x200000:raise ValueError("K transcript receipt")
     data=raw[real:real+length];events=[];at=0;sequence=0
     while at<len(data):
         version,event,shi,slo,size,token,encoding,flags=struct.unpack_from(">8I",data,at)
@@ -129,7 +144,7 @@ def run(a):
     disk=Path(a.disk).resolve();core=Path(a.core).resolve();herc=Path(a.hercules).resolve()
     port=unused_loopback_port();script=unused_loopback_port();before=digest(disk)
     primary="3215 noprompt" if a.line_primary else "3270"
-    cfg="ARCHLVL ESAME\nMAINSIZE 256\nNUMCPU 1\nCPUMODEL 2064\nDIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\nCODEPAGE 819/1047\n"
+    cfg="ARCHLVL ESAME\nMAINSIZE 512\nNUMCPU 1\nCPUMODEL 2064\nDIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\nCODEPAGE 819/1047\n"
     cfg+=f"CNSLPORT 127.0.0.1:{port}\n01B9 3390 {disk}\n0009 {primary}\n"
     attachments=[]
     for option,address in (("cms_exchange","01BA"),("fixture_exchange","01BB")):
@@ -267,11 +282,12 @@ def run(a):
                     source=response[2] if len(response)>2 else "primary"
                     def input_ready():
                         shown=client.text() if client else terminal_action(script,"Ascii()").stdout
-                        if prompt in shown:
-                            if len(response)>3 and isinstance(response[3],int) and prompt_capture.text().count(prompt)<response[3]:return False
+                        if prompt in shown and not (len(response)>3 and isinstance(response[3],int) and prompt_capture.text().count(prompt)<response[3]):
                             return True
                         prefix=re.match(r"PCOMM END [0-9]+",marker)
-                        if prefix and prefix[0] in shown:raise RuntimeError("application ended before input: "+prefix[0])
+                        captured=prompt_capture.text() if prompt_capture else ""
+                        if prefix and (prefix[0] in shown or prefix[0] in captured):
+                            raise RuntimeError("application ended before input: "+prefix[0])
                         return False
                     until(input_ready,proc,log)
                     if source=="disconnect":
@@ -283,6 +299,11 @@ def run(a):
                     if source=="monitor":
                         if not monitor:raise ValueError("monitor input source unavailable")
                         monitor.enter(text)
+                    elif source=="key":
+                        if client or not re.fullmatch(r"PF\((?:[1-9]|10)\)",text):
+                            raise ValueError("checked 3270 PF1-PF10 action required")
+                        until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
+                        terminal_action(script,text)
                     elif client:client.enter(text)
                     else:
                         until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
@@ -296,7 +317,10 @@ def run(a):
                         actual=re.search(re.escape(prefix[0])+r" (?:RC|OS)=[^\n]*",monitor.text() if a.workbench_normal and monitor else shown)
                         if actual:raise RuntimeError("command result: "+actual[0]+"; expected "+marker)
                     return None
-                shown=until(completed,proc,log)
+                # Success still requires the observed native BEGIN/END result.
+                # A larger allocation example has an explicit failure watchdog.
+                limit=180 if command=="HELLO --memory-check" else 60
+                shown=until(completed,proc,log,limit)
                 screens.append(shown)
                 if a.editor and command=="VERSION" and not client:
                     until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
@@ -393,7 +417,7 @@ def run(a):
             except (OSError,RuntimeError,TimeoutError,subprocess.TimeoutExpired):pass
         if proc.poll() is None:
             try:
-                proc.stdin.write(f'stopall\npsw\ngpr\ncr\nsavecore "{out/"result.core"}" 0 fffffff\nquit\n');proc.stdin.flush()
+                proc.stdin.write(f'stopall\npsw\ngpr\ncr\nsavecore "{out/"result.core"}" 0 {REAL-1:x}\nquit\n');proc.stdin.flush()
             except OSError as exc:error=error or str(exc)
             try:proc.wait(timeout=30)
             except subprocess.TimeoutExpired:proc.terminate();proc.wait(timeout=10)
@@ -419,11 +443,11 @@ def run(a):
         thread.join(timeout=2)
     checks={"guest_event_sequence_completed":error is None,"hercules_exit_zero":proc.returncode==0}
     raw=(out/"result.core").read_bytes() if (out/"result.core").exists() else b"";transcript=None;metrics=None;service_cost=None
-    if len(raw)==0x10000000:
+    if len(raw)==REAL:
         observed=struct.unpack_from(">8I",raw,0x3c800)
         if observed[0]==0x4d455431:
             metrics=dict(zip(("magic","real_bytes_at_stop","observed_peak_real_bytes","total_free_low_u_bytes","largest_low_u_start","largest_low_u_bytes","minimum_observed_largest_low_u_bytes","invocation_depth"),observed))
-            checks["observed_real_frames_within_guest"]=observed[1]<=observed[2]<=0x10000000
+            checks["observed_real_frames_within_guest"]=observed[1]<=observed[2]<=REAL
             checks["final_observed_invocation_depth_zero"]=observed[7]==0
         checks["native_console_app_rc_zero"]=(struct.unpack_from(">2I",raw,0x4f5c)==(1,0) if a.pcomm or a.normal else error is None and struct.unpack_from(">2I",raw,0x12880)==(0,0))
         try:
@@ -468,7 +492,7 @@ def run(a):
                 if a.rootfault:checks["kernel_unwinds_unhealthy_pcomm"]=len(ends)==1 and tuple(ends[0]["result"][1:6])==(12,1,0,0,0xffffffff)
                 if a.editor:checks["recall_and_whole_fragment_refusal"]=(out/"editor.screen").exists()
                 checks["ordered_command_results"]=ordered_results(texts,cases) and all(any(marker in text for text in texts) for case in cases for marker in [case[1]])
-                checks["expected_native_output"]=all(text in "\n".join(texts) for case in cases if len(case)>3 for text in case[3])
+                checks["expected_native_output"]=expected_outputs(texts,cases)
                 if a.monitor:
                     captured=(out/"monitor.txt").read_text()
                     checks["attached_line_capture_complete"]=all(captured.splitlines().count(text)==texts.count(text) for text in set(texts) if text) and texts[-1] in captured

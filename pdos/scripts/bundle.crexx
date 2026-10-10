@@ -1,0 +1,68 @@
+/* SPDX-License-Identifier: MIT; normal application media, no guest start. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  i=.int
+  if args.0<>6 then return 2
+  work=args.1;prior=args.2;core=args.3;apps=args.4;archive=args.5;herc=args.6
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  paths=.string[]
+  address crexx "pwd" output paths
+  root=strip(paths.1);input=root||"/"||work||"-inputs";out=root||"/"||work
+  packer=apps||"/pack-tso"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/scripts/bundle-media.py prepare :prior :apps :archive :packer :input"
+  if rc<>0 then return rc
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :input :core :herc"
+  if rc<>0 then return rc
+  source=out||"/media/pdos00.ckd";target=out||"/media/bundled.ckd"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/scripts/bundle-media.py install :source :target :input"
+  if rc<>0 then return rc
+  source=out||"/media/pdos00.cckd";compressor=herc||"/ckd2cckd"
+  /* The old container is disposable build output, never a running guest. */
+  address crexx "run cmake -E rm :source"
+  if rc<>0 then return rc
+  address crexx "run :compressor -q -bz2 -cyls 100 :target :source"
+  if rc<>0 then return rc
+  reader=herc||"/cckd2ckd";roundtrip=out||"/media/bundle-readback.ckd"
+  address crexx "run :reader -q -cyls 100 :source :roundtrip"
+  if rc<>0 then return rc
+  receipt=out||"/container-compare.json"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/scripts/bundle-media.py verify :target :roundtrip :receipt"
+  if rc<>0 then return rc
+  destination=out||"/media/pdos00.ckd"
+  address crexx "run cmake -E copy :target :destination"
+  if rc<>0 then return rc
+  destination=out||"/outputs.sha256"
+  address crexx "run cmake -E rm :destination"
+  if rc<>0 then return rc
+  outputs=.string[];hashes=.string[]
+  outputs[1]=out||"/media/pdos00.ckd";outputs[2]=out||"/media/pdos00.cckd"
+  outputs[3]=out||"/media/kcore.bin"
+  address crexx "run shasum -a 256 :outputs[]" output hashes
+  if rc<>0 then return rc
+  do i=1 to hashes.0
+    call lineout destination,hashes[i]
+  end
+  call lineout destination
+  inputfiles=.string[]
+  inputfiles[1]="pdos/scripts/bundle.crexx";inputfiles[2]="pdos/scripts/bundle-media.py"
+  inputfiles[3]=archive;inputfiles[4]=core;inputfiles[5]=apps||"/inputs.sha256"
+  inputfiles[6]=input||"/bundle.json";inputfiles[7]=input||"/installed.json"
+  inputfiles[8]="pdos/scripts/conformance-media.py"
+  inputfiles[9]="pdos/scripts/ibm1047.table"
+  inputfiles[10]="pdos/tests/two-space/pack_core.py"
+  inputfiles[11]="pdos/tests/two-space/machine_profile.py"
+  hashes=.string[]
+  address crexx "run shasum -a 256 :inputfiles[]" output hashes
+  if rc<>0 then return rc
+  do i=1 to hashes.0
+    call lineout out||"/inputs.sha256",hashes[i]
+  end
+  call lineout out||"/inputs.sha256"
+  source=input||"/bundle.json";destination=out||"/bundle.json"
+  address crexx "run cmake -E copy :source :destination"
+  if rc<>0 then return rc
+  return 0

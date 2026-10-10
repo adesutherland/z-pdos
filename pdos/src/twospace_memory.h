@@ -15,7 +15,7 @@
 #define TSM_COLLISION -3
 #define TSM_ABSENT -4
 #define TSM_CORRUPT -5
-#define TSM_ALLOCS 128U
+#define TSM_ALLOCS 512U
 #define TSM_OVERLAYS 4U
 typedef void (*TSMKEY)(unsigned int real_page, unsigned int key,
                        void *context);

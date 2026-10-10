@@ -365,7 +365,7 @@ restart:
         rc=console_panel_take(f->token,text,capacity,count,aid);
         if(rc!=16U){if(rc)return rc;if(*aid==0x7dU){console_panel_waiting(0U);return 0U;}
             rc=console_panel_key(f->token,text,*count,*aid,console_panel_cursor(f->token));
-            if(raw_mode==2U&&(*aid==0xf5U||*aid==0xf6U||*aid==0x6dU)){if(rc&&rc!=20U)return rc;return 0U;}if(rc&&rc!=20U)return rc;}
+            if(raw_mode==2U&&(rc==20U||*aid==0x6dU)){if(rc&&rc!=20U)return rc;return 0U;}if(rc&&rc!=20U)return rc;}
     }
     if(raw_mode!=1U&&console_panel_enabled()){tc_next_input=console_panel_source();console_panel_waiting(1U);rc=tc_render();if(rc)return rc;}
     if(tc_next_input&&(!tc_monitor_ssid||tc_monitor_stale||tc_monitor_state!=TSA_MONITOR_ONLINE))return 16U;
@@ -469,7 +469,9 @@ again:
              * command. A separate event service exposes the complete AID. */
             if(console_panel_enabled()){
                 rc=console_panel_key(f->token,n>=6U?text:0,*count,*aid,cursor);
-                if(raw_mode==2U&&(*aid==0xf5U||*aid==0xf6U||*aid==0x6dU)){if(rc==20U)rc=0U;goto done;}
+                /* Workbench consumes its own actions. Other AIDs belong
+                 * to the semantic key caller, including PF3/PF4 and PA. */
+                if(raw_mode==2U&&(rc==20U||*aid==0x6dU)){if(rc==20U)rc=0U;goto done;}
                 if(rc==20U)rc=0U;if(rc)goto done;
                 if(console_panel_source()!=tc_next_input){if(console_v1_cancel(f->token))return 12U;goto restart;}
                 control[0]=0xc2U;rc=tc_output(&console_channel,tc_ssid,1U,control,1U);
@@ -587,6 +589,7 @@ static unsigned int console_v1_service(TSGREQUEST *request)
     unsigned char header[64],field_bytes[24],answer[64],text[256];TTCFIELD fields[64];
     TSPADDR pointer;unsigned int op=request->direction,rc,i,count,n=0U,aid=0U,at=0U,length;
     if(op==TSA_IO_DASD_STATUS)return media_status(request);
+    if(op==TSA_IO_RECORD_FILE)return record_file_service(request);
     if(op>=TSA_IO_DEVICE_OPEN&&op<=TSA_IO_DEVICE_QUERY)return console_device_service(request);
     if(op>=TSA_IO_WORKBENCH&&op<=TSA_IO_PANEL_COMMIT)return console_panel_service(request);
     if(!frame||*(volatile const unsigned int *)0x3000U||*(volatile const unsigned int *)0x3010U)return 8U;

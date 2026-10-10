@@ -1,0 +1,25 @@
+/* SPDX-License-Identifier: MIT; narrow native instruction check. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>4 then return 2
+  work=args.1;gnu_as=args.2;gnu_ld=args.3;hercules=args.4
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  object=work||"/launch.o";stub=work||"/launch.bin"
+  address crexx "run :gnu_as -m64 -march=z900 pdos/tests/two-space/launch.S -o :object"
+  if rc<>0 then return rc
+  address crexx "run :gnu_ld -m elf64_s390 --oformat binary -Ttext 0x800000 -e launch :object -o :stub"
+  if rc<>0 then return rc
+  object=work||"/probe.o";probe=work||"/probe.bin"
+  address crexx "run :gnu_as -m64 -march=z900 pdos/tests/two-space/launch_probe.S -o :object"
+  if rc<>0 then return rc
+  address crexx "run :gnu_ld -m elf64_s390 --oformat binary -Ttext 0x1000 -e launch_copy_done :object -o :probe"
+  if rc<>0 then return rc
+  runout=work||"/run"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/launch_machine.py :stub :probe :hercules :runout"
+  return rc

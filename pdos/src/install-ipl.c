@@ -138,7 +138,9 @@ static void validate(FILE *disk, const char **files, int installed,
     dataset(disk,"PDOS.SYS",files[1],45,60,18452);
     dataset(disk,"COMMAND.EXE",files[2],75,90,18452);
     dataset(disk,"CONFIG.SYS",files[3],60,75,10);
-    if (successor) dataset(disk,"KCORE.BIN",files[4],90,105,18452);
+    /* The workstation sparse package reserves six cylinders, including
+       room for the complete service bank and its bounded record transport. */
+    if (successor) dataset(disk,"KCORE.BIN",files[4],90,180,18452);
 }
 static void unchanged(FILE *input, FILE *output, int transport)
 {

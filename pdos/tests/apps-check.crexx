@@ -1,0 +1,34 @@
+/* SPDX-License-Identifier: MIT; focused checks before source freeze. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>1 then return 2
+  work=args.1
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  exe=work||"/edit-check"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/apps/edit_core.c pdos/tests/edit.c -o :exe"
+  if rc<>0 then return rc
+  address crexx "run :exe"
+  if rc<>0 then return rc
+  source="pdos/src/twospace_recordio.inc";target=work||"/recordio-under-test.inc"
+  changed=.int;changed=0;row=.string
+  do while lines(source)>0
+    row=linein(source)
+    if pos("*(volatile const unsigned int *)0x3000U",row)>0 then changed=changed+1
+    if pos("*(volatile const unsigned int *)0x3010U",row)>0 then changed=changed+1
+    row=changestr("*(volatile const unsigned int *)0x3000U",row,"0U")
+    row=changestr("*(volatile const unsigned int *)0x3010U",row,"0U")
+    call lineout target,row
+  end
+  call lineout target
+  if changed<>2 then return 3
+  exe=work||"/recordio-check"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src -I :work pdos/tests/recordio.c -o :exe"
+  if rc<>0 then return rc
+  address crexx "run :exe"
+  return rc

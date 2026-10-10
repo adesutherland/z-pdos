@@ -330,3 +330,24 @@ A single comma is accepted as the absent operand on CSECT/DSECT, including
 section reselection. Additional operand slots remain unsupported. The physical
 card joiner distinguishes T'/K'/N' immediate parameter attributes from quoted
 character strings, including mixed logical conditions in definitions.
+
+## Desktop capacity profile
+
+Use `--capacity-profile desktop` for maintained desktop product builds. It
+selects a 256 MiB total host allocation budget, 65536 symbols, 65536 literals,
+262144 fixups, 16384 macro model statements, 256 macro definitions, 1 MiB
+definition text and depth 32. The unchanged default is `bootstrap` (32 MiB).
+This selection changes supplied storage only, not the instruction profile,
+source language or classic object format. Macro facilities still require
+`--macros`. Options are applied from left to right: a profile resets its
+budgets, and following explicit limits override them.
+
+`--storage-limit 1..268435456` chooses bytes and `--fixup-limit 0..1048576`
+chooses relocation capacity. Existing symbol/literal/macro limits remain
+available. Exhaustion invalidates assembly without publishing an object.
+The CLI reports actual host storage requested, the selected budget and
+symbol/literal/fixup capacities. Core record/storage interfaces stream source
+and output; no expanded compilation unit needs to fit in a command argument
+or one input buffer. Card, classic object identifier/name widths and 64-section
+bounds remain checked format/interface limits. Large symbol tables still use
+linear lookup; this capacity increase is not an indexed-symbol performance claim.

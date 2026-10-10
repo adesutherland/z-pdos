@@ -4,6 +4,7 @@ import rxfnsb
 main: procedure = .int
   arg args = .string[]
   i = .int
+  source = .string; flag = .string; asm = .string; object = .string
   if args.0 <> 5 then return 2
   work = args.1; base = args.2; cc = args.3; classicas = args.4; linker = args.5
   if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
@@ -21,21 +22,21 @@ main: procedure = .int
     source = sources[i]; flag = flags[i]; asm = work || "/part" || i || ".asm"; object = work || "/part" || i || ".obj"
     address system quote(cc) || " -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR " || flag || " -S -I pdpclib/src -I pdos/src " || quote(source) || " -o " || quote(asm)
     if rc <> 0 then return rc
-    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
     if rc <> 0 then return rc
     objects[i] = object
   end
   sources[5] = "pdos/src/twospace_pcomm.asm"; sources[6] = "pdos/src/twospace_ui.asm"
   do i = 5 to 6
     source = sources[i]; object = work || "/part" || i || ".obj"
-    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :source :object"
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :source :object"
     if rc <> 0 then return rc
     objects[i] = object
   end
   source = "pdpclib/src/stdlib.c"; asm = work || "/stdlib.asm"; object = work || "/stdlib.obj"
-  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR -DPDP_HEAP_CHUNK_BYTES=16769024 -S -I pdpclib/src :source -o :asm"
+  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR -DMULMEM -DPDP_HEAP_CHUNK_BYTES=16769024 -S -I pdpclib/src :source -o :asm"
   if rc <> 0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
   if rc <> 0 then return rc
   command_stdlib = object
   native = .string[]
@@ -54,7 +55,32 @@ main: procedure = .int
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src pdos/src/twospace_tso.c pdos/tests/two-space/tso_pack.c -o :pack"
   if rc <> 0 then return rc
   address crexx "run :pack :module :stage classic31"
-  return rc
+  if rc <> 0 then return rc
+  inputs = sources; headers = .string[]; hashes = .string[]
+  inputs[inputs.0+1] = "pdpclib/src/stdlib.c"
+  inputs[inputs.0+1] = "pdos/scripts/two-space-command.crexx"
+  inputs[inputs.0+1] = "pdos/src/twospace_ui.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_abi.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_tso.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_tso.c"
+  inputs[inputs.0+1] = "pdos/src/zpdos-version.h"
+  inputs[inputs.0+1] = "pdos/tests/two-space/tso_pack.c"
+  address crexx "run rg --files pdpclib/src" output headers
+  if rc <> 0 then return rc
+  address crexx "run shasum -a 256 :inputs[] :headers[] :native[] :cc :classicas :linker" output hashes
+  if rc <> 0 then return rc
+  do i = 1 to hashes.0
+    call lineout work||"/inputs.sha256",hashes[i]
+  end
+  call lineout work||"/inputs.sha256"
+  hashes = .string[]
+  address crexx "run shasum -a 256 :module :stage :pack" output hashes
+  if rc <> 0 then return rc
+  do i = 1 to hashes.0
+    call lineout work||"/outputs.sha256",hashes[i]
+  end
+  call lineout work||"/outputs.sha256"
+  return 0
 quote: procedure = .string
   arg value = .string
   return "'" || changestr("'",value,"'\''") || "'"

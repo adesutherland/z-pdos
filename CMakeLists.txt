@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(z_pdos_classic_tools VERSION 0.2.0 LANGUAGES C)
+project(z_pdos_classic_tools VERSION 0.2.1 LANGUAGES C)
 set(CMAKE_C_STANDARD 90)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)

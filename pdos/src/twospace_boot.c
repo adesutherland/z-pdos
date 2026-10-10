@@ -11,7 +11,7 @@
 #define BLOCK 18452U
 #define CORE_SIZE TSF_CORE_BYTES
 #define PAGE 4096U
-#define DATA_RECORDS 40U
+#define DATA_RECORDS TSF_PACKAGE_DATA_RECORDS
 #define DIAG (*(volatile unsigned int *)0x30000U)
 #define DETAIL ((volatile unsigned int *)0x30000U)
 #define FAIL(n) do { DIAG = 0x54530000U | (unsigned int)(n); return (n); } while (0)
@@ -173,18 +173,16 @@ int main(int argc, char **argv)
         crc32_bytes(stub,launch_len) != launch_crc) FAIL(28);
     if (be32(core+0x2000U) != 0x5044324eU ||
         !zeroes(core+0x4000U,16U) ||
-        !zeroes(core+TSF_KPOOL_REAL,
-                TSF_CHANNEL_REAL-TSF_KPOOL_REAL)) FAIL(29);
+        !zeroes(core+TSF_KPOOL_REAL,TSF_KPOOL_BYTES)||
+        !zeroes(core+TSF_UPOOL_REAL,TSF_UPOOL_BYTES)) FAIL(29);
     /* The real interruption/context island and all mapped service slots are
        owned even when their initial bytes are zero and omitted from disk. */
     if (TSRINIT(&final_core,CORE_SIZE) != TSR_OK) FAIL(30);
     for (i=0U; i<CORE_SIZE/PAGE;) {
         unsigned int first;
-        if (i >= (TSF_SERVICE_EXT_REAL+TSF_SERVICE_EXT_BYTES)/PAGE &&
-            !(i >= TSF_SERVICE_MORE_REAL/PAGE &&
-              i < (TSF_SERVICE_MORE_REAL+TSF_SERVICE_MORE_BYTES)/PAGE) &&
-            !(i >= TSF_SERVICE_EXTRA_REAL/PAGE &&
-              i < (TSF_SERVICE_EXTRA_REAL+TSF_SERVICE_EXTRA_BYTES)/PAGE) &&
+        if (i >= TSF_BOOT_LOW_BYTES/PAGE &&
+            !(i >= TSF_SERVICE_REAL/PAGE &&
+              i < (TSF_SERVICE_REAL+TSF_SERVICE_BYTES)/PAGE) &&
             !(i >= TSF_KSTACK_EXT_REAL/PAGE &&
               i < (TSF_KSTACK_EXT_REAL+TSF_KSTACK_EXT_BYTES)/PAGE) &&
             !(i >= TSF_PC_REAL/PAGE &&
@@ -195,11 +193,9 @@ int main(int argc, char **argv)
         }
         first=i++;
         while (i<CORE_SIZE/PAGE &&
-               (i < (TSF_SERVICE_EXT_REAL+TSF_SERVICE_EXT_BYTES)/PAGE ||
-                (i >= TSF_SERVICE_MORE_REAL/PAGE &&
-                 i < (TSF_SERVICE_MORE_REAL+TSF_SERVICE_MORE_BYTES)/PAGE) ||
-                (i >= TSF_SERVICE_EXTRA_REAL/PAGE &&
-                 i < (TSF_SERVICE_EXTRA_REAL+TSF_SERVICE_EXTRA_BYTES)/PAGE) ||
+               (i < TSF_BOOT_LOW_BYTES/PAGE ||
+                (i >= TSF_SERVICE_REAL/PAGE &&
+                 i < (TSF_SERVICE_REAL+TSF_SERVICE_BYTES)/PAGE) ||
                 (i >= TSF_KSTACK_EXT_REAL/PAGE &&
                  i < (TSF_KSTACK_EXT_REAL+TSF_KSTACK_EXT_BYTES)/PAGE) ||
                 (i >= TSF_PC_REAL/PAGE &&

@@ -10,7 +10,7 @@ identifies the 0.2.0 candidate and operator acceptance separately.
 ## Boot and execution
 
 ```text
-Hercules: one z/Architecture CPU, 256 MiB, 3390 and terminal devices
+Hercules: one z/Architecture CPU, 512 MiB, 3390 and terminal devices
   │ IPL 01B9
   ▼
 PLOAD.SYS → PDOS.SYS C31 handover → KCORE.BIN
@@ -57,9 +57,11 @@ scheduler or isolation between applications sharing U.
 
 Dynamic address translation maps sparse U virtual pages to separately owned
 real frames. K administers those frames and its table aliases; U cannot map
-K's body, stack or private tables. The normal profile uses 256 MiB real
-storage. K's original 4 MiB bootstrap reservation contains its 96-page C31
-code bank and protected 128 KiB C stack, plus low-real channel resources.
+K's body, stack or private tables. The normal development profile uses 512 MiB real storage and a 16 MiB
+bootstrap reservation. K has a contiguous 2 MiB C31 service bank, a protected
+512 KiB C stack and separate 3 MiB K/U DAT pools. The reviewed layout is in
+[the capacity review](CAPACITY-REVIEW-2026-10-10.md). The released 0.2.0 image
+and earlier qualification records retain their original 256 MiB profile.
 Disk I/O uses a separate workspace at real `0x3e0000`; terminal I/O uses
 `0x3f0000`. These real reservations consume no low-U virtual interval.
 

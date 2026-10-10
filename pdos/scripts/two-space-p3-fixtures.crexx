@@ -21,7 +21,7 @@ main: procedure = .int
     source_inputs[i] = source
     object = work || "/" || member || ".obj"
     module = work || "/" || member || ".module"
-    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros :source :object"
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros :source :object"
     if rc <> 0 then return rc
     address crexx "run :classicld --oformat cms --image-base 35651584 --amode 31 --rmode ANY -e @@MAIN -o :module :object"
     if rc <> 0 then return rc
@@ -38,16 +38,16 @@ main: procedure = .int
     adapter_asm = work || "/FILECON.asm"; adapter = work || "/FILECON.obj"
     address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DTSU_NATIVE_FILES -S -I pdpclib/src pdos/src/twospace_pcomm.c -o :adapter_asm"
     if rc <> 0 then return rc
-    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :adapter_asm :adapter"
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :adapter_asm :adapter"
     if rc <> 0 then return rc
     stdio_source = library || "/check/source/pdpclib/stdio.c"
     stdio_asm = work || "/FILESTD.asm"; stdio = work || "/FILESTD.obj"
     address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdpclib/src -DUSE_MEMMGR -D__aopen=tsuopen -D__aread=tsuread -D__awrite=tsuwrite -D__aclose=tsuclose -D__dynal=tsudyn :stdio_source -o :stdio_asm"
     if rc <> 0 then return rc
-    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :stdio_asm :stdio"
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :stdio_asm :stdio"
     if rc <> 0 then return rc
     entry = work || "/FILESTART.obj"
-    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_pcomm.asm :entry"
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_pcomm.asm :entry"
     if rc <> 0 then return rc
     do i = 1 to 4
       member = word("D0TFPA D0TFCH D0TFLPA D0TFLCH",i)
@@ -59,11 +59,11 @@ main: procedure = .int
       if i = 3 then expected = "-DP3_EXPECT=12"
       address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdpclib/src -DUSE_MEMMGR :expected :source -o :asm"
       if rc <> 0 then return rc
-      address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+      address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
       if rc <> 0 then return rc
       stub_source = "pdos/tests/two-space/p3/" || word("tso-file-link tso-file-exit tso-fault-link tso-fault-exit",i) || ".asm"
       stub = work || "/" || member || "-stub.obj"
-      address crexx "run :classicas --profile s370 --literal-limit 4096 --macros :stub_source :stub"
+      address crexx "run :classicas --profile s370 --capacity-profile desktop --macros :stub_source :stub"
       if rc <> 0 then return rc
       objects = .string[]
       objects[1] = entry; objects[2] = library || "/c/objects/START.obj"

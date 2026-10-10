@@ -15,7 +15,7 @@
 #define TSR_LOAD 1U
 #define TSR_COPY 2U
 #define TSR_RUN 4U
-#define TSR_MAX 128U
+#define TSR_MAX 512U
 
 typedef struct {
     unsigned int start;

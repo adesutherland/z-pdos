@@ -20,29 +20,29 @@ int main(void)
                   built.ubytes,built.uasce) != TSD_OK) return 1;
     va.hi=0U; va.lo=0x0201f000U;
     if (TSDLOOKUP(&k,va,&found) != TSD_OK || found.hi ||
-        found.lo != 0x8f000U || TSDLOOKUP(&u,va,&found) != TSD_MISSING)
+        found.lo != TSF_SERVICE_REAL+31U*4096U || TSDLOOKUP(&u,va,&found) != TSD_MISSING)
         return 5;
     va.lo=TSF_TRAMPOLINE_VA;
     if (TSDLOOKUP(&k,va,&found) != TSD_OK || found.hi ||
         found.lo != 0xf000U || TSDLOOKUP(&u,va,&found) != TSD_MISSING)
         return 6;
     va.hi=pa.hi=0U;
-    for (i=0U; i<16384U; ++i) {
+    for (i=0U; i<81920U; ++i) {
         va.lo=0x04000000U+i*4096U;
-        pa.lo=0x400000U+i*4096U;
+        pa.lo=TSF_CORE_BYTES+i*4096U;
         if (TSDMAP(&u,va,pa) != TSD_OK) return 2;
     }
     va.hi=1U;
     for (i=0U; i<32768U; ++i) {
         va.lo=0x20000000U+i*4096U;
-        pa.lo=0x5000000U+i*4096U;
+        pa.lo=TSF_CORE_BYTES+0x14000000U+i*4096U;
         if (TSDMAP(&u,va,pa) != TSD_OK) return 3;
     }
     va.lo=0x27fff000U;
     if (TSDLOOKUP(&u,va,&found) != TSD_OK ||
-        found.hi || found.lo != 0xcfff000U ||
+        found.hi || found.lo != TSF_CORE_BYTES+0x1bfff000U ||
         u.used > TSF_UPOOL_BYTES) return 4;
-    printf("simultaneous 64 MiB U31 and 128 MiB U64 DAT: %u of %u bytes\n",
+    printf("simultaneous 320 MiB U31 and 128 MiB U64 DAT: %u of %u bytes\n",
            u.used,TSF_UPOOL_BYTES);
     free(core);
     return 0;

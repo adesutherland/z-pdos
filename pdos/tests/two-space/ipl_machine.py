@@ -13,6 +13,7 @@ import time
 import zlib
 
 from machine import digest
+from machine_profile import CORE, REAL, KPOOL, UPOOL, KBYTES, UBYTES
 from service_machine import judge
 from store_check import inspect
 
@@ -80,7 +81,7 @@ def page_unmapped(raw, root, virtual):
         if entry == 0x20:
             return True
         origin = entry & ~4095
-        if origin < 0x280000 or origin >= 0x3e0000:
+        if origin < UPOOL or origin >= UPOOL+UBYTES:
             return False
     return False
 
@@ -92,7 +93,7 @@ def page_real(raw, root, virtual):
                (lo >> 20) & 2047, (lo >> 12) & 255)
     origin = root & ~4095
     for level, index in enumerate(indexes):
-        if origin < 0x280000 or origin >= 0x3e0000:
+        if origin < UPOOL or origin >= UPOOL+UBYTES:
             return None
         entry = struct.unpack_from(">Q", raw, origin + index * 8)[0]
         if entry == (0x400 if level == 4 else 0x20):
@@ -113,7 +114,7 @@ def registered_cache_page(raw, virtual):
         owner,mode,hi,lo,size,real,active,entry=struct.unpack_from(">8I",raw,0x35020+32*i)
         address=(hi<<32)|lo
         if address<=virtual<address+((size+4095)&~4095):
-            return real>=0x400000 and not active and page_real(raw,0x28000f,virtual)==real+virtual-address
+            return real>=CORE and not active and page_real(raw,(UPOOL|0xf),virtual)==real+virtual-address
     return False
 
 
@@ -138,7 +139,7 @@ def run(args):
     while script_port == console_port:
         script_port = unused_loopback_port()
     out.joinpath("machine.cnf").write_text(
-        "ARCHLVL ESAME\nMAINSIZE 256\nNUMCPU 1\nCPUMODEL 2064\n"
+        "ARCHLVL ESAME\nMAINSIZE 512\nNUMCPU 1\nCPUMODEL 2064\n"
         "DIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\n"
         f"CNSLPORT 127.0.0.1:{console_port}\n"
         f"01B9 3390 {disk}\n0009 3270\n")
@@ -282,7 +283,7 @@ def run(args):
             application_screen = shown.stdout
         out.joinpath("terminal.application-screen").write_text(application_screen)
         proc.stdin.write("stopall\npsw\ngpr\ncr\n"
-        f"savecore \"{out / 'result.core'}\" 0 fffffff\nquit\n")
+        f"savecore \"{out / 'result.core'}\" 0 {REAL-1:x}\nquit\n")
         proc.stdin.flush()
         proc.stdin.close()
         proc.wait(timeout=60)
@@ -295,7 +296,7 @@ def run(args):
             try:
                 if proc.stdin and not proc.stdin.closed:
                     proc.stdin.write("stopall\npsw\ngpr\ncr\n"
-                        f"savecore \"{out / 'failure.core'}\" 0 fffffff\nquit\n")
+                        f"savecore \"{out / 'failure.core'}\" 0 {REAL-1:x}\nquit\n")
                     proc.stdin.flush()
                     proc.stdin.close()
                 proc.wait(timeout=10)
@@ -317,7 +318,7 @@ def run(args):
     out.joinpath("hercules.log").write_text(log)
     result_path = out / "result.core"
     raw=b""
-    if result_path.exists() and result_path.stat().st_size == 0x10000000:
+    if result_path.exists() and result_path.stat().st_size == REAL:
         raw = result_path.read_bytes()
         reference = core.read_bytes()
         try:
@@ -365,21 +366,21 @@ def run(args):
             checks["guest_built_asces"] = raw[0x4000:0x4010] == reference[0x4000:0x4010]
             checks["guest_built_dat_tables"] = (
                 struct.unpack_from(">I",raw,0x40b0)[0] ==
-                    zlib.crc32(reference[0x100000:0x280000]) and
+                    zlib.crc32(reference[KPOOL:KPOOL+KBYTES]) and
                 struct.unpack_from(">I",raw,0x40b4)[0] ==
-                    zlib.crc32(reference[0x280000:0x3e0000]) and
-                raw[0x100000:0x280000] == reference[0x100000:0x280000])
+                    zlib.crc32(reference[UPOOL:UPOOL+UBYTES]) and
+                raw[KPOOL:KPOOL+KBYTES] == reference[KPOOL:KPOOL+KBYTES])
             checks["runtime_u_pages_released"] = (
-                (bool(args.cms24) or page_unmapped(raw, 0x28000f, 0x22000)) and
-                page_unmapped(raw, 0x28000f, 0x02010000) and
+                (bool(args.cms24) or page_unmapped(raw, (UPOOL|0xf), 0x22000)) and
+                page_unmapped(raw, (UPOOL|0xf), 0x02010000) and
                 (bool(args.cms24) or bool(args.cms31) or
-                 raw[0x280000:0x3e0000] == reference[0x280000:0x3e0000]))
+                 raw[UPOOL:UPOOL+UBYTES] == reference[UPOOL:UPOOL+UBYTES]))
             wide31 = struct.unpack_from(">Q",raw,0x121d0)[0]
             wide64 = struct.unpack_from(">Q",raw,0x121e8)[0]
             checks["wide_heap_endpoints_unmapped_after_free"] = (
                 0x02010000 <= wide31 <= 0x7c000000 and
                 wide64 == 0x0000000120000000 and
-                all(page_unmapped(raw,0x28000f,at) for at in
+                all(page_unmapped(raw,(UPOOL|0xf),at) for at in
                     (wide31,wide31+0x03fff000,
                      wide64,wide64+0x07fff000)))
             version = "crexx-1.0.0-beta.3 (Bytecode Mode)".encode("cp037")
@@ -390,19 +391,19 @@ def run(args):
                 pages24 = (image24 + 4095) // 4096
                 checks["cms24_u_fixed_image_contract"] = (
                     entry24 == 0x20000 and image24 == 1681088 and
-                    0x400000 <= real24 < 0x10000000 and
-                    real24 + pages24 * 4096 <= 0x10000000 and
+                    CORE <= real24 < REAL and
+                    real24 + pages24 * 4096 <= REAL and
                     low_free == 0x00f00000 - 0x20000 - pages24 * 4096 and
                     raw[real24:real24+16] == staged24[148:164] and
-                    all(page_real(raw,0x28000f,0x20000+i*4096) ==
+                    all(page_real(raw,(UPOOL|0xf),0x20000+i*4096) ==
                         real24+i*4096 for i in range(pages24)))
                 stack_real, stack_bytes = struct.unpack_from(">2I",raw,0x4114)
                 checks["cms24_guarded_backed_stack"] = (
                     stack_bytes == 0xff000 and
-                    0x400000 <= stack_real < 0x10000000 and
-                    stack_real + stack_bytes <= 0x10000000 and
-                    page_unmapped(raw,0x28000f,0xf00000) and
-                    all(page_real(raw,0x28000f,0xf01000+i*4096) ==
+                    CORE <= stack_real < REAL and
+                    stack_real + stack_bytes <= REAL and
+                    page_unmapped(raw,(UPOOL|0xf),0xf00000) and
+                    all(page_real(raw,(UPOOL|0xf),0xf01000+i*4096) ==
                         stack_real+i*4096 for i in range(stack_bytes//4096)) and
                     raw[stack_real+stack_bytes-4096] == 0x5a)
                 parent24, push24, executed24, returned24, restored24, child24 = \
@@ -418,7 +419,7 @@ def run(args):
                 checks["cms24_native_rxvm_version"] = (
                     0x20000 <= plist24 < 0x00f00000 and
                     allocated24 == rxvm24_rc == released24 == 0 and
-                    (page_unmapped(raw,0x28000f,plist24) or
+                    (page_unmapped(raw,(UPOOL|0xf),plist24) or
                      args.native_pairs and registered_cache_page(raw,plist24)) and
                     struct.unpack_from(">I",raw,0x4300)[0] ==
                     ((19 if args.cms_input else 14) if args.cms24file else 1) and
@@ -436,7 +437,7 @@ def run(args):
                         io_probe == push == allocated == io_rc ==
                         audit == released == returned == 0 and
                         0x1bb000 <= io_plist < 0xf00000 and
-                        (page_unmapped(raw,0x28000f,io_plist) or
+                        (page_unmapped(raw,(UPOOL|0xf),io_plist) or
                          args.native_pairs and registered_cache_page(raw,io_plist)) and
                         restored == int.from_bytes(staged24[148:152],"big") and
                         extra == (18 if args.cms_input else 13) and
@@ -455,23 +456,23 @@ def run(args):
                     checks["cms24_gap_restored_after_second_run"] = all(
                         (args.tso24 and 0x400000 <= at < 0x50c000) or
                         (args.native_pairs and registered_cache_page(raw,at)) or
-                        page_unmapped(raw,0x28000f,at)
+                        page_unmapped(raw,(UPOOL|0xf),at)
                         for at in range(0x1bb000,0xf00000,4096))
             if args.cms31:
                 real, entry, image_bytes, blocks = struct.unpack_from(">4I",raw,0x40e0)
                 staged = (disk.parent / "cms31-rxvm.bin").read_bytes()
                 pages = (image_bytes + 4095) // 4096
                 checks["cms31_u_image_contract"] = (
-                    0x400000 <= real < 0x10000000 and
+                    CORE <= real < REAL and
                     entry == 0x03000000 and image_bytes == 4238296 and
-                    blocks == 239 and real + pages * 4096 <= 0x10000000 and
+                    blocks == 239 and real + pages * 4096 <= REAL and
                     raw[real:real+16] == staged[148:164] and
-                    all(page_real(raw,0x28000f,0x03000000+i*4096) ==
+                    all(page_real(raw,(UPOOL|0xf),0x03000000+i*4096) ==
                         real+i*4096 for i in range(pages)))
                 lowcore_real = struct.unpack_from(">I",raw,0x40f8)[0]
                 checks["cms31_u_lowcore_is_separate_from_k_prefix"] = (
-                    0x400000 <= lowcore_real < 0x10000000 and
-                    page_real(raw,0x28000f,0) == lowcore_real and
+                    CORE <= lowcore_real < REAL and
+                    page_real(raw,(UPOOL|0xf),0) == lowcore_real and
                     raw[lowcore_real+0x14:lowcore_real+0x18] ==
                         b"\x00\x00\x01\x00" and
                     raw[lowcore_real+0x10c:lowcore_real+0x110] ==
@@ -502,10 +503,10 @@ def run(args):
                             second_entry == 0x05000000 and
                             second_bytes == image_bytes and
                             second_blocks == blocks and
-                            0x400000 <= second_real < 0x10000000 and
+                            CORE <= second_real < REAL and
                             (real+pages*4096 <= second_real or
                              second_real+pages*4096 <= real) and
-                            all(page_real(raw,0x28000f,0x05000000+i*4096) ==
+                            all(page_real(raw,(UPOOL|0xf),0x05000000+i*4096) ==
                                 second_real+i*4096 for i in range(pages)))
                         checks["cms31_ioqual_native_result"] = (
                             struct.unpack_from(">2I",raw,0x12270) == (0,0) and
@@ -551,7 +552,7 @@ def run(args):
                 checks["cms31_native_rxvm_version"] = (
                     0x01000000 <= plist < 0x80000000 and
                     allocated == rxvm_rc == released == 0 and
-                    page_unmapped(raw,0x28000f,plist) and
+                    page_unmapped(raw,(UPOOL|0xf),plist) and
                     struct.unpack_from(">I",raw,0x20000)[0] >= 1 and
                     struct.unpack_from(">I",raw,0x20004)[0] == len(version) and
                     raw[0x20008:0x20008+len(version)] == version and
@@ -560,11 +561,11 @@ def run(args):
                 controlled_fault_page = struct.unpack_from(">Q",raw,0x124b0)[0]
                 checks["controlled_child_fault_page_unmapped"] = (
                     0x02010000 <= controlled_fault_page < 0x80000000 and
-                    page_unmapped(raw,0x28000f,controlled_fault_page))
+                    page_unmapped(raw,(UPOOL|0xf),controlled_fault_page))
                 reap_address = struct.unpack_from(">Q",raw,0x12390)[0]
                 checks["native_reap_page_unmapped_after_return"] = (
                     0x02010000 <= reap_address < 0x80000000 and
-                    page_unmapped(raw,0x28000f,reap_address))
+                    page_unmapped(raw,(UPOOL|0xf),reap_address))
                 tso_real, tso_bytes, tso_entry, tso_blocks, tso_input_fnv = \
                     struct.unpack_from(">5I",raw,0x4600)
                 tso_pages = (tso_bytes+4095)//4096
@@ -583,11 +584,11 @@ def run(args):
                     checks["unchanged_tso31_ioqual_summary"]=0<native_length<=132 and ("SUMMARY: PASS=10 FAIL=0 SKIP=1" if args.native_input else "SUMMARY: PASS=9 FAIL=0 SKIP=2") in raw[0x30110:0x30110+native_length].decode("cp037")
                 checks["tso31_checked_image_in_shared_u"] = (
                     struct.unpack_from(">I",raw,0x122dc)[0] == 0 and
-                    tso_real >= 0x400000 and tso_bytes == 1094960 and
+                    tso_real >= CORE and tso_bytes == 1094960 and
                     tso_entry == 0x07000000 and tso_blocks == 76 and
                     tso_input_fnv == 0x5db419ae and
                     tso_hash == 0x5c5cc22d and
-                    all(page_real(raw,0x28000f,0x07000000+i*4096) ==
+                    all(page_real(raw,(UPOOL|0xf),0x07000000+i*4096) ==
                         tso_real+i*4096 for i in range(tso_pages)))
                 tso_arg, tso_alloc, tso_rc, tso_free = struct.unpack_from(
                     ">Q3I",raw,0x122e0)
@@ -598,7 +599,7 @@ def run(args):
                 checks["tso31_native_rxvm_version"] = (
                     0x01000000 <= tso_arg < 0x80000000 and
                     tso_alloc == tso_rc == tso_free == 0 and
-                    page_unmapped(raw,0x28000f,tso_arg) and
+                    page_unmapped(raw,(UPOOL|0xf),tso_arg) and
                     tso_attempts >= 1 and tso_requested <= 132 and
                     tso_lines >= 1 and tso_unknown == 0 and
                     0 < tso_length <= 132 and
@@ -613,11 +614,11 @@ def run(args):
                 tso_map_hash = struct.unpack_from(">I",raw,0x4654)[0]
                 checks["tso64_any_checked_image_in_shared_u"] = (
                     struct.unpack_from(">I",raw,0x122f4)[0] == 0 and
-                    tso_real >= 0x400000 and tso_bytes == 767728 and
+                    tso_real >= CORE and tso_bytes == 767728 and
                     tso_entry == 0x09000000 and tso_blocks == 45 and
                     tso_input_fnv == 0x007eda54 and
                     tso_map_hash == 0x94d5943a and
-                    all(page_real(raw,0x28000f,0x09000000+i*4096) ==
+                    all(page_real(raw,(UPOOL|0xf),0x09000000+i*4096) ==
                         tso_real+i*4096 for i in range(tso_pages)))
                 tso_arg, tso_alloc, tso_rc, tso_free = struct.unpack_from(
                     ">Q3I",raw,0x122f8)
@@ -631,13 +632,13 @@ def run(args):
                 checks["tso64_any_native_rxvm_version"] = (
                     0x01000000 <= tso_arg < 0x80000000 and
                     tso_alloc == tso_rc == tso_free == 0 and
-                    page_unmapped(raw,0x28000f,tso_arg) and
+                    page_unmapped(raw,(UPOOL|0xf),tso_arg) and
                     tso_attempts >= 1 and tso_requested <= 132 and
                     (iarv_calls,iarv_last_op,iarv_hi,iarv_lo,iarv_detaches) ==
                     (2,3,1,0x20000000,1) and
                     iarv_get_segments == 128 and
-                    page_unmapped(raw,0x28000f,0x120000000) and
-                    page_unmapped(raw,0x28000f,0x127fff000) and
+                    page_unmapped(raw,(UPOOL|0xf),0x120000000) and
+                    page_unmapped(raw,(UPOOL|0xf),0x127fff000) and
                     tso_lines >= 1 and tso_unknown == 0 and
                     0 < tso_length <= 132 and
                     "crexx-1.0.0-beta.3 (Bytecode Mode)" in
@@ -651,17 +652,17 @@ def run(args):
                     struct.unpack_from(">Q",raw,0x12350)[0] == 0x300000 and
                     0x20000 <= blocker <= 0x400000 and
                     blocker+0x300000 > 0x400000 and
-                    page_unmapped(raw,0x28000f,blocker))
+                    page_unmapped(raw,(UPOOL|0xf),blocker))
                 t24_real, t24_bytes, t24_entry, t24_blocks, t24_input, \
                     t24_image = struct.unpack_from(">6I",raw,0x4680)
                 t24_pages = (t24_bytes+4095)//4096
                 checks["tso24_checked_low_image_in_shared_u"] = (
                     struct.unpack_from(">I",raw,0x1230c)[0] == 0 and
-                    t24_real >= 0x400000 and t24_bytes == 1096496 and
+                    t24_real >= CORE and t24_bytes == 1096496 and
                     t24_entry == 0x00400000 and t24_blocks == 76 and
                     t24_input == 0xe7ad6705 and
                     t24_image == 0x06b3cf06 and
-                    all(page_real(raw,0x28000f,0x400000+i*4096) ==
+                    all(page_real(raw,(UPOOL|0xf),0x400000+i*4096) ==
                         t24_real+i*4096 for i in range(t24_pages)))
                 checks["tso24_oversized_low_request_fails_without_fallback"] = (
                     struct.unpack_from(">I",raw,0x12310)[0] == 4 and
@@ -678,13 +679,13 @@ def run(args):
                 checks["tso24_native_rxvm_version_and_low_storage"] = (
                     0x20000 <= t24_arg < 0x1000000 and
                     t24_alloc == t24_rc == t24_free == 0 and
-                    page_unmapped(raw,0x28000f,t24_arg) and
+                    page_unmapped(raw,(UPOOL|0xf),t24_arg) and
                     t24_allocations == t24_releases == 3 and
                     (stack_bytes,output_bytes,heap_bytes) ==
                     (0x100000,256,0x400000) and
                     all(0x20000 <= at < 0x1000000 and
                         at+size <= 0x1000000 and
-                        page_unmapped(raw,0x28000f,at)
+                        page_unmapped(raw,(UPOOL|0xf),at)
                         for at,size in ((stack,stack_bytes),
                                         (output,output_bytes),
                                         (heap,heap_bytes))) and
@@ -696,12 +697,12 @@ def run(args):
                     "crexx-1.0.0-beta.3 (Bytecode Mode)" in
                     application_screen)
             checks["checked_handover_report"] = (report[0] == 0x54535232 and
-                real_bytes == 0x10000000 and stage >= 0x400000 and
-                stage + 0x400000 <= launch and launch + 4096 <= real_bytes and
-                kpool == 0x100000 and upool == 0x280000 and
-                200704 < kbytes <= 0x180000 and
+                real_bytes == REAL and stage >= CORE and
+                stage + CORE <= launch and launch + 4096 <= real_bytes and
+                kpool == KPOOL and upool == UPOOL and
+                200704 < kbytes <= KBYTES and
                 struct.unpack_from(">I",raw,0x40b8)[0] == 94208 and
-                (94208 < ubytes <= 0x160000 if args.cms24 or args.cms31
+                (94208 < ubytes <= UBYTES if args.cms24 or args.cms31
                  else ubytes == 94208))
             checks["guest_dat_unmap_remap_ptlb"] = struct.unpack_from(">I",raw,0x40a0)[0] == 2
             judged["handover"] = {"stage_real": hex(stage),
@@ -802,10 +803,10 @@ def run(args):
         for i in range(min(count,32)):
             owner,mode,hi,lo,size,real,leases,entry=struct.unpack_from(">8I",raw,0x35020+32*i)
             address=(hi<<32)|lo
-            resident &= bool(owner and size and not leases and real>=0x400000 and
+            resident &= bool(owner and size and not leases and real>=CORE and
                              address<=entry<address+size and
                              (mode!=24 or address+size<=0x1000000) and
-                             all(page_real(raw,0x28000f,address+offset)==real+offset
+                             all(page_real(raw,(UPOOL|0xf),address+offset)==real+offset
                                  for offset in range(0,(size+4095)&~4095,4096)))
         checks["native_co_resident_images_keep_exact_real_backing"]=bool(resident)
         if args.native_case=="missing":
@@ -831,7 +832,7 @@ def run(args):
         checks["native_high_load_delete_three_bodies"]=(
             len(raw)>=0x4f90 and struct.unpack_from(">3I",raw,0x4f80)==(3,3,1))
         address=struct.unpack_from(">Q",raw,0x4f88)[0] if len(raw)>=0x4f90 else 0
-        checks["native_high_last_body_unmapped_after_delete"]=address>=0x130000000 and page_unmapped(raw,0x28000f,address)
+        checks["native_high_last_body_unmapped_after_delete"]=address>=0x130000000 and page_unmapped(raw,(UPOOL|0xf),address)
         lines=[]
         if len(raw)>=0x3d184:
             count=struct.unpack_from(">I",raw,0x3c000)[0]
@@ -854,7 +855,7 @@ def run(args):
             checks["native_tso_parent_file_cursor_survives_child_"+label]=(
                 len(raw)>=0x12818 and struct.unpack_from(">2I",raw,0x12800+16*index)==(0,37))
     judged["pass"] = all(checks.values())
-    receipt = {"profile": "ESAME, model 2064, 256 MiB, one CPU, 3390 01B9, 3270 0009",
+    receipt = {"profile": "ESAME, model 2064, 512 MiB, one CPU, 3390 01B9, 3270 0009",
                "disk_sha256_before_ipl": disk_before,
                "disk_sha256_after_ipl": digest(disk),
                "source_core_sha256": digest(core),

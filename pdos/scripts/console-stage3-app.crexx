@@ -26,12 +26,12 @@ main: procedure = .int
     if kind="dbcs" then flag="-DFAM_DBCS=1"
     address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR :flag -S -I pdpclib/src -I pdos/src :source -o :asm"
     if rc<>0 then return rc
-    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
     if rc<>0 then return rc
     objects[i]=object
   end
   source="pdos/src/twospace_ui.asm";object=work||"/ui.obj"
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros :source :object"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros :source :object"
   if rc<>0 then return rc
   objects[objects.0+1]=object
   native=.string[];native[1]=library||"/entry.obj";native[2]=library||"/stdio.obj";native[3]=library||"/console.obj"

@@ -30,6 +30,10 @@ int main(void)
         for(i=0;i<256;++i)input[6+i]=0xc1;
         assert(TTCINPUT(&cap,input,262,view.entry_row*cap.columns+1,answer,256,&n,&aid)==TTC_OK&&n==256&&aid==0x7d);
         assert(TTCINPUT(&cap,input,3,view.entry_row*cap.columns+1,answer,256,&n,&aid)==TTC_OK&&n==0);
+        input[0]=0xf3U;
+        assert(TTCINPUT(&cap,input,3,view.entry_row*cap.columns+1,answer,256,&n,&aid)==TTC_OK&&n==0&&aid==0xf3U);
+        input[0]=0x6cU;
+        assert(TTCINPUT(&cap,input,1,view.entry_row*cap.columns+1,answer,256,&n,&aid)==TTC_OK&&n==0&&aid==0x6cU);
         stream[0]=0x27;stream[1]=0x7e;stream[2]=0xc3;stream[3]=0x11;
         TTCADDR(&cap,112,stream+4);stream[6]=0x1d;stream[7]=0xf0;stream[8]=0xc1;
         assert(TTCRAW(&cap,stream,9,&command)==TTC_OK&&command==13);

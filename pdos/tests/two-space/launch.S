@@ -5,10 +5,23 @@
 launch:
     larl %r4, launch_info
     lg %r0, 8(%r4)
-    lg %r1, 24(%r4)
+    lg %r8, 24(%r4)
     lg %r2, 16(%r4)
+    lghi %r6, 128
+    sllg %r6, %r6, 16
+    /* MVCL length is 24 bits even in AMODE64. Copy in 8 MiB chunks;
+       a 16 MiB descriptor must never become a zero-length move. */
+1:
+    lgr %r1, %r8
+    clgr %r1, %r6
+    jle 2f
+    lgr %r1, %r6
+2:
+    lgr %r5, %r1
     lgr %r3, %r1
     mvcl %r0, %r2
+    sgr %r8, %r5
+    jnz 1b
     lpswe 32(%r4)
 .balign 8
 launch_info:

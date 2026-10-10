@@ -1,0 +1,452 @@
+[
+  [
+    "MOUNT 01BB FTX001",
+    "PCOMM END 1 RC=0",
+    [],
+    []
+  ],
+  [
+    "CONSOLE STATUS",
+    "PDOS00:\\>",
+    [],
+    [
+      "CONSOLE:",
+      "capture gaps 0"
+    ],
+    "prompt"
+  ],
+  [
+    "HELP EDIT",
+    "PDOS00:\\>",
+    [],
+    [
+      "4096 native FB/VB records"
+    ],
+    "prompt"
+  ],
+  [
+    "HELLO one two",
+    "PCOMM END 2 RC=0",
+    [],
+    [
+      "Hello from a C application in U.",
+      "argument 1: one",
+      "argument 2: two"
+    ]
+  ],
+  [
+    "RXC -v",
+    "PCOMM END 3 RC=0",
+    [],
+    [
+      "crexx-1.0.0-beta.3"
+    ]
+  ],
+  [
+    "RXAS -v",
+    "PCOMM END 4 RC=0",
+    [],
+    []
+  ],
+  [
+    "RXVM -v",
+    "PCOMM END 5 RC=0",
+    [],
+    []
+  ],
+  [
+    "EDIT EXAMPLE.REXX",
+    "PCOMM END 6 RC=0",
+    [
+      [
+        "EDIT>",
+        "HELP",
+        "primary",
+        1
+      ],
+      [
+        "EDIT>",
+        "PRINT 1 11",
+        "primary",
+        2
+      ],
+      [
+        "EDIT>",
+        "QUIT",
+        "primary",
+        3
+      ]
+    ],
+    [
+      "EDIT / HELP",
+      "Hello from cREXX on z/PDOS."
+    ]
+  ],
+  [
+    "FIND Hello EXAMPLE.REXX",
+    "PCOMM END 7 RC=0",
+    [],
+    [
+      "FIND: 1 matching records"
+    ]
+  ],
+  [
+    "HEX FTX001:EDIT.FB",
+    "PCOMM END 8 RC=0",
+    [],
+    [
+      "HEX: record 2, 8 bytes",
+      "C1 40 40 40 40 40 40 40"
+    ]
+  ],
+  [
+    "CMP FTX001:EDIT.IN FTX001:EDIT.IN",
+    "PCOMM END 9 RC=0",
+    [],
+    [
+      "CMP: logical records identical"
+    ]
+  ],
+  [
+    "FC FTX001:EDIT.IN FTX001:EDIT.FB",
+    "PCOMM END 10 RC=4",
+    [],
+    [
+      "CMP: files differ"
+    ]
+  ],
+  [
+    "EDIT FTX001:EDIT.IN",
+    "PCOMM END 11 RC=0",
+    [
+      [
+        "EDIT>",
+        "PRINT 1 4",
+        "primary",
+        4
+      ],
+      [
+        "EDIT>",
+        "LOCATE omega",
+        "primary",
+        5
+      ],
+      [
+        "EDIT>",
+        "CHANGE 3 /omega/OMEGA/",
+        "primary",
+        6
+      ],
+      [
+        "EDIT>",
+        "INSERT 0 start",
+        "primary",
+        7
+      ],
+      [
+        "EDIT>",
+        "DELETE 1",
+        "primary",
+        8
+      ],
+      [
+        "EDIT>",
+        "UNDO",
+        "primary",
+        9
+      ],
+      [
+        "EDIT>",
+        "UNDO",
+        "primary",
+        10
+      ],
+      [
+        "EDIT>",
+        "SAVE AS FTX001:FULL.OUT",
+        "primary",
+        11
+      ],
+      [
+        "EDIT>",
+        "SAVE AS FTX001:SHORT.OUT",
+        "primary",
+        12
+      ],
+      [
+        "EDIT>",
+        "SAVE AS PDOS00:EXAMPLE.REXX",
+        "primary",
+        13
+      ],
+      [
+        "EDIT>",
+        "QUIT",
+        "primary",
+        14
+      ],
+      [
+        "EDIT>",
+        "SAVE AS FTX001:EDIT.OUT",
+        "primary",
+        15
+      ],
+      [
+        "EDIT>",
+        "QUIT",
+        "primary",
+        16
+      ]
+    ],
+    [
+      "EDIT: save refused/failed (16); changes retained",
+      "EDIT: save refused/failed (8); changes retained",
+      "EDIT: save refused/failed (20); changes retained",
+      "EDIT: unsaved changes; SAVE AS or QUIT DISCARD",
+      "EDIT: saved 4 records to FTX001:EDIT.OUT",
+      "(7 bytes)",
+      "(256 bytes)"
+    ]
+  ],
+  [
+    "EDIT FTX001:EDIT.OUT",
+    "PCOMM END 12 RC=0",
+    [
+      [
+        "EDIT>",
+        "PRINT 1 4",
+        "primary",
+        17
+      ],
+      [
+        "EDIT>",
+        "INPUT 4",
+        "primary",
+        18
+      ],
+      [
+        "INPUT> . ends input; .. inserts a dot",
+        "",
+        "primary",
+        1
+      ],
+      [
+        "INPUT> . ends input; .. inserts a dot",
+        "  padded  ",
+        "primary",
+        2
+      ],
+      [
+        "INPUT> . ends input; .. inserts a dot",
+        "..",
+        "primary",
+        3
+      ],
+      [
+        "INPUT> . ends input; .. inserts a dot",
+        "QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ",
+        "primary",
+        4
+      ],
+      [
+        "INPUT> . ends input; .. inserts a dot",
+        ".",
+        "primary",
+        5
+      ],
+      [
+        "EDIT>",
+        "UNDO",
+        "primary",
+        19
+      ],
+      [
+        "EDIT>",
+        "UNDO",
+        "primary",
+        20
+      ],
+      [
+        "EDIT>",
+        "SAVE AS FTX001:INPUT.OUT",
+        "primary",
+        21
+      ],
+      [
+        "EDIT>",
+        "QUIT",
+        "primary",
+        22
+      ]
+    ],
+    [
+      "EDIT: saved 8 records to FTX001:INPUT.OUT"
+    ]
+  ],
+  [
+    "RECIO FTX001:EDIT.OUT FTX001:COPY.OUT",
+    "PCOMM END 13 RC=0",
+    [],
+    [
+      "RECIO: status=0"
+    ]
+  ],
+  [
+    "CMP FTX001:EDIT.OUT FTX001:COPY.OUT",
+    "PCOMM END 14 RC=0",
+    [],
+    [
+      "CMP: logical records identical"
+    ]
+  ],
+  [
+    "EDIT",
+    "PCOMM END 15 RC=0",
+    [
+      [
+        "EDIT>",
+        "INSERT 0 short",
+        "primary",
+        23
+      ],
+      [
+        "EDIT>",
+        "SAVE AS FTX001:FB.OUT",
+        "primary",
+        24
+      ],
+      [
+        "EDIT>",
+        "QUIT",
+        "primary",
+        25
+      ]
+    ],
+    [
+      "EDIT: saved 1 records to FTX001:FB.OUT"
+    ]
+  ],
+  [
+    "EDIT FTX001:FB.OUT",
+    "PCOMM END 16 RC=0",
+    [
+      [
+        "EDIT>",
+        "PRINT 1 1",
+        "primary",
+        26
+      ],
+      [
+        "EDIT>",
+        "QUIT",
+        "primary",
+        27
+      ]
+    ],
+    [
+      "short"
+    ]
+  ],
+  [
+    "EDIT FTX001:BAD.FORMAT",
+    "PCOMM END 17 RC=8",
+    [],
+    [
+      "EDIT: open refused (20)"
+    ]
+  ],
+  [
+    "DISKMAP",
+    "PCOMM END 18 RC=0",
+    [
+      [
+        "Enter refresh / N next volume / Q return",
+        "Q"
+      ]
+    ],
+    [
+      "DASD"
+    ]
+  ],
+  [
+    "PANEL",
+    "PCOMM END 19 RC=0",
+    [
+      [
+        "Enter text / Q or PF3 returns",
+        "test"
+      ],
+      [
+        "PANEL: AID=7D, submitted=4 bytes",
+        "PF(3)",
+        "key"
+      ]
+    ],
+    [
+      "PANEL: AID=7D, submitted=4 bytes"
+    ]
+  ],
+  [
+    "RXC -l CREXX -i CREXX -o CREXX/HELLO.rxas HELLO",
+    "PCOMM END 20 RC=0",
+    [],
+    []
+  ],
+  [
+    "RXAS -l CREXX HELLO",
+    "PCOMM END 21 RC=0",
+    [],
+    []
+  ],
+  [
+    "RXVM -l CREXX CREXX/HELLO.rxbin -a one two",
+    "PCOMM END 22 RC=0",
+    [],
+    [
+      "Hello from cREXX on z/PDOS.",
+      "argument 1: one",
+      "argument 2: two"
+    ]
+  ],
+  [
+    "FIND absent FTX001:EDIT.IN",
+    "PCOMM END 23 RC=4",
+    [],
+    [
+      "FIND: 0 matching records"
+    ]
+  ],
+  [
+    "RECIO FTX001:EDIT.OUT FTX001:COPY.OUT",
+    "PCOMM END 24 RC=16",
+    [],
+    [
+      "RECIO: status=16"
+    ]
+  ],
+  [
+    "HEX FTX001:EDIT.IN",
+    "PCOMM END 25 RC=0",
+    [],
+    [
+      "HEX: record 2, 0 bytes",
+      "HEX: record 4, 256 bytes"
+    ]
+  ],
+  [
+    "HELLO complete",
+    "PCOMM END 26 RC=0",
+    [],
+    [
+      "argument 1: complete"
+    ]
+  ],
+  [
+    "HELLO --memory-check",
+    "PCOMM END 27 RC=0",
+    [],
+    [
+      "HELLO: 320 MiB allocated, every page verified, released"
+    ]
+  ]
+]

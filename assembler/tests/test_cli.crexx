@@ -44,6 +44,13 @@ main: procedure = .int
   call run_case cli, "--symbol-limit 0", 2, stdout_path, stderr_path, "zero symbol capacity"
   call run_case cli, "--symbol-limit 65537", 2, stdout_path, stderr_path, "excessive symbol capacity"
   call run_case cli, "--symbol-limit 9999999999999999999999", 2, stdout_path, stderr_path, "overflowing symbol capacity"
+  call run_case cli, "--capacity-profile", 2, stdout_path, stderr_path, "missing capacity profile"
+  call run_case cli, "--capacity-profile giant", 2, stdout_path, stderr_path, "unknown capacity profile"
+  call run_case cli, "--storage-limit 0", 2, stdout_path, stderr_path, "zero storage budget"
+  call run_case cli, "--storage-limit 268435457", 2, stdout_path, stderr_path, "excessive storage budget"
+  call run_case cli, "--storage-limit 9999999999999999999999", 2, stdout_path, stderr_path, "overflowing storage budget"
+  call run_case cli, "--fixup-limit -1", 2, stdout_path, stderr_path, "negative fixup capacity"
+  call run_case cli, "--fixup-limit 1048577", 2, stdout_path, stderr_path, "excessive fixup capacity"
   symbols_source=work||"/symbols.asm";symbols_deck=work||"/symbols.obj"
   call erase symbols_source
   call lineout symbols_source,"S CSECT"
@@ -57,6 +64,19 @@ main: procedure = .int
   call run_case cli, shellquote(symbols_source)||" "||shellquote(symbols_deck),1,stdout_path,stderr_path,"default symbol capacity enforced"
   call absent symbols_deck
   call run_case cli,"--symbol-limit 8192 "||shellquote(symbols_source)||" "||shellquote(symbols_deck),0,stdout_path,stderr_path,"explicit symbol capacity"
+  desktop_deck=work||"/desktop.obj";call erase desktop_deck
+  call run_case cli,"--capacity-profile desktop "||shellquote(symbols_source)||" "||shellquote(desktop_deck),0,stdout_path,stderr_path,"desktop capacity"
+  call require pos("of 268435456 bytes",readfile(stderr_path))>0,"desktop storage budget receipt"
+  call require pos("symbols=65536 literals=65536 fixups=262144",readfile(stderr_path))>0,"desktop capacities receipt"
+  address shell "cmake -E compare_files "||shellquote(symbols_deck)||" "||shellquote(desktop_deck)
+  call require rc=0,"capacity profiles preserve object meaning"
+  call erase desktop_deck
+  call run_case cli,"--capacity-profile desktop --symbol-limit 4096 "||shellquote(symbols_source)||" "||shellquote(desktop_deck),1,stdout_path,stderr_path,"explicit override after profile"
+  call absent desktop_deck
+  call run_case cli,"--capacity-profile desktop --capacity-profile bootstrap "||shellquote(symbols_source)||" "||shellquote(desktop_deck),1,stdout_path,stderr_path,"bootstrap profile restores defaults"
+  call absent desktop_deck
+  call run_case cli,"--capacity-profile desktop --storage-limit 1024 "||shellquote(forms)||" "||shellquote(desktop_deck),1,stdout_path,stderr_path,"storage exhaustion without publication"
+  call absent desktop_deck
   limits_source = work || "/limits.asm"; limits_deck = work || "/limits.obj"
   call writefile limits_source, "S CSECT" || '0a'x || " USING S,12" || '0a'x || " L 1,=F'1'" || '0a'x || " L 2,=F'2'" || '0a'x || " END S" || '0a'x
   call erase limits_deck
@@ -86,6 +106,10 @@ main: procedure = .int
     call run_case cli, "--macros --macro-model-limit 1 " || shellquote(macros_source) || " " || shellquote(macros_deck), 1, stdout_path, stderr_path, "macro model capacity enforced"
     call absent macros_deck
     call run_case cli, "--macros --macro-limit 2 --macro-model-limit 2 " || shellquote(macros_source) || " " || shellquote(macros_deck), 0, stdout_path, stderr_path, "sufficient explicit macro capacities"
+    call erase desktop_deck
+    call run_case cli,"--capacity-profile desktop --macros "||shellquote(macros_source)||" "||shellquote(desktop_deck),0,stdout_path,stderr_path,"desktop macro capacity"
+    address shell "cmake -E compare_files "||shellquote(macros_deck)||" "||shellquote(desktop_deck)
+    call require rc=0,"desktop macro object meaning"
     macro_error = work || "/macro-error.asm"; macro_error_deck = work || "/macro-error.obj"
     call writefile macro_error, changestr("|", " MACRO|&N SERVICE|&N NO_SUCH_SERVICE ,| MEND| CSECT|TEST SERVICE| END TEST|", '0a'x)
     call erase macro_error_deck

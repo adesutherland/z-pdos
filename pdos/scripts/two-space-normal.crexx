@@ -37,7 +37,21 @@ main: procedure = .int
   core = out || "/kernel/run/image.core"; image = work || "/image"
   if args.0 = 4 then do
     stage = out || "/command/u-command.bin"
-    address crexx "run crexx -nokeep pdos/scripts/two-space-ipl.crexx --args :image :core :gnuas :gnuld :herc command :stage"
+    bootstrap = work || "/bootstrap-image"
+    address crexx "run crexx -nokeep pdos/scripts/two-space-ipl.crexx --args :bootstrap :core :gnuas :gnuld :herc command :stage"
+    if rc <> 0 then return rc
+    apps = work || "/apps"; absolute_command = out || "/command"
+    address crexx "run crexx -nokeep pdos/scripts/apps.crexx --args :apps :absolute_base :absolute_command :cc :classicas :linker"
+    if rc <> 0 then return rc
+    archive = getenv("ZPDOS_CREXX_PACKAGE")
+    if archive = "" then do
+      archive = out || "/CREXX-v1.0.0-beta.3-mainframe.zip"
+      url = "https://github.com/adesutherland/CREXX/releases/download/v1.0.0-beta.3/CREXX-v1.0.0-beta.3-mainframe.zip"
+      address crexx "run curl -fL --retry 2 -o :archive :url"
+      if rc <> 0 then return rc
+    end
+    absolute_bootstrap = out || "/bootstrap-image"; absolute_apps = out || "/apps"
+    address crexx "run crexx -nokeep pdos/scripts/bundle.crexx --args :image :absolute_bootstrap :core :absolute_apps :archive :herc"
     if rc <> 0 then return rc
     call receipts out,gnuas,gnuld
     say "Normal K/U image: " || out || "/image/media/pdos00.cckd"

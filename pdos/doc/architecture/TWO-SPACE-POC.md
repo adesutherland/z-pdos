@@ -47,10 +47,12 @@ banked output store and transcript remain on the IPL disk when an exchange
 volume is selected. Native sequential exchange COPY writes and verifies its
 physical target; native raw tape retains U/32767 record attributes.
 
-K C31 uses a 96-page bank and a 128 KiB protected stack within the original
-4 MiB real core. Its trampoline is K `0x02060000`. The larger stack accommodates
-the existing record-copy routine; tape dispatch is factored so its buffers
-do not accumulate on that copy stack. These mappings have no U alias.
+The 0.2.1 development profile uses a 512-page (2 MiB) K C31 bank and a
+512 KiB protected stack within a 16 MiB reserved core. The trampoline is K
+`0x02800000`; the service, stack and 3 MiB K/U DAT pools have disjoint real
+backing. K maps a 512 MiB real aperture; U has none of these mappings. See
+[the capacity review](CAPACITY-REVIEW-2026-10-10.md). Earlier frozen P6
+evidence retains its 96-page bank, 128 KiB stack and 256 MiB machine.
 PCOMM's below-line control storage starts after the declared fixed CMS24 image;
 its 16 MiB C arena remains above the line. Application heap targets remain
 64 MiB for 31-bit and 128 MiB for 64-bit profiles. Exact observations and

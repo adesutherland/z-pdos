@@ -35,15 +35,17 @@ main: procedure = .int
   end
   inputs[inputs.0+1]="pdos/src/twospace_dasd.c"
   inputs[inputs.0+1]="pdos/src/twospace_dasd.h"
+  inputs[inputs.0+1]="pdos/src/twospace_recordio.h"
+  inputs[inputs.0+1]="pdos/src/twospace_recordio.inc"
   asm=work||"/TWOSVC.asm"; object=work||"/TWOSVC.obj"
   address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR -S -I pdos/src -I pdpclib/src pdos/src/twospace_service.c -o :asm"
   if rc<>0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 8192 --symbol-limit 8192 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
   if rc<>0 then return rc
   invasm=work||"/TSV.asm";invobj=work||"/TSV.obj";invtest=work||"/invocation-test"
   address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src pdos/src/twospace_invocation.c -o :invasm"
   if rc<>0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :invasm :invobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :invasm :invobj"
   if rc<>0 then return rc
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_invocation.c pdos/tests/two-space/invocation.c -o :invtest"
   if rc<>0 then return rc
@@ -52,7 +54,7 @@ main: procedure = .int
   sessionasm=work||"/TDS.asm";sessionobj=work||"/TDS.obj"
   address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src pdos/src/twospace_session.c -o :sessionasm"
   if rc<>0 then return rc
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :sessionasm :sessionobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :sessionasm :sessionobj"
   if rc<>0 then return rc
   consoleobjects=.string[]
   modules="3270 history surface workbench dasd"; names="T27 TPH TWF TWB TDA"
@@ -60,7 +62,7 @@ main: procedure = .int
     source="pdos/src/twospace_"||word(modules,i)||".c";name=word(names,i);casm=work||"/"||name||".asm";cobj=work||"/"||name||".obj"
     address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src :source -o :casm"
     if rc<>0 then return rc
-    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :casm :cobj"
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :casm :cobj"
     if rc<>0 then return rc
     consoleobjects[i]=cobj
   end

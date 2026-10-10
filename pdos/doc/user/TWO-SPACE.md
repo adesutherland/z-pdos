@@ -13,8 +13,10 @@ Legacy results remain separate from K/U qualification.
 
 Use the owning checkout on develop, prepared Classic C/assembler/linker tools,
 GNU s390 assembler/linker, Hercules and, for workload qualification, the frozen beta-3 CMS/TSO stage inputs
-listed in the [ABI inventory](../architecture/TWO-SPACE-ABI.md). A bare default
-image needs no application ZIP:
+listed in the [ABI inventory](../architecture/TWO-SPACE-ABI.md). The default
+development image builds the [C applications](APPLICATIONS.md) and downloads
+the pinned public cREXX beta-3 TSO31 ZIP. Set `ZPDOS_CREXX_PACKAGE` to an
+already downloaded matching ZIP to build offline:
 
 ```sh
 crexx -nokeep pdos/scripts/image.crexx --args \
@@ -40,7 +42,7 @@ producer manifests are under that build's kernel directory. With explicit
 console arguments, use the configured `normal.core` at the build root for
 the guest gate.
 
-A normal guest needs ESAME, one CPU, 256 MiB real storage, that disk at 01B9,
+A normal guest needs ESAME, one CPU, 512 MiB real storage, that disk at 01B9,
 a primary device matching the selected configuration at 0009 and, when
 selected, `000A 3215 noprompt`. Connect the terminals before IPL 01B9. K
 starts U PCOMM; an ordinary EXIT returns to K, commits the transcript and
@@ -61,7 +63,7 @@ monitor refuses selection. While interactive monitor input is pending, Clear
 on the primary cancels the exact monitor request and restores primary input.
 The monitor needs an actual reconnect before it can be selected again.
 
-The opt-in `DISKMAP` C application shows actual mounted DASD allocation: a
+The bundled `DISKMAP` C application shows actual mounted DASD allocation: a
 capacity bar, cylinder map, reserved/allocated/free track counts and the largest
 unallocated run. Enter refreshes, N selects the next registered volume and Q
 returns to PCOMM. It uses the read-only K storage service and also prints a

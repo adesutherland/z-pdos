@@ -138,12 +138,12 @@ main: procedure = .int
     source = "pdos/src/" || name || ".c"
     address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src -I pdpclib/src -DUSE_MEMMGR :source -o :asm"
     call require rc = 0, "Classic C31 " || name
-    address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :obj"
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :obj"
     call require rc = 0, "Classic assembler " || name
     boot_objects[i] = obj
   end
   tlbobj = out || "/twospace_tlb.obj"
-  address crexx "run :classicas --profile s370 --literal-limit 4096 --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_tlb.asm :tlbobj"
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/src/twospace_tlb.asm :tlbobj"
   call require rc = 0, "Classic assembler single-CPU PTLB"
   c = out || "/base/c/objects"; support = out || "/base/support"
   objects = .string[]
@@ -191,7 +191,7 @@ main: procedure = .int
   call lineout ctl,"PDOS.SYS SEQ pdos.sys CYL 1 1 0 PS F 18452 18452"
   call lineout ctl,"CONFIG.SYS SEQ config.sys CYL 1 1 0 PS F 10 10"
   call lineout ctl,"COMMAND.EXE SEQ command.exe CYL 1 1 0 PS F 18452 18452"
-  call lineout ctl,"KCORE.BIN SEQ kcore.bin CYL 1 1 0 PS F 18452 18452"
+  call lineout ctl,"KCORE.BIN SEQ kcore.bin CYL 6 6 0 PS F 18452 18452"
   if cms24 <> "" then do
     cms24media = media || "/cms24-rxvm.bin"
     address crexx "run cmake -E copy :cms24 :cms24media"
@@ -297,6 +297,7 @@ main: procedure = .int
   if tso31 <> "" then inputs[29] = tso31
   if tso64 <> "" then inputs[30] = tso64
   if tso24 <> "" then inputs[31] = tso24
+  inputs[inputs.0+1] = "pdos/tests/two-space/machine_profile.py"
   manifest = out || "/inputs.sha256"
   address system "shasum -a 256 " || quoted(inputs) || " > " || shellquote(manifest)
   call require rc = 0, "successor IPL producer identities"

@@ -2952,6 +2952,8 @@ static unsigned int call_alloc(unsigned int,unsigned int *,unsigned char **);
 #include "twospace_media.inc"
 #include "twospace_command.inc"
 #include "twospace_file.inc"
+#include "twospace_recordio.h"
+#include "twospace_recordio.inc"
 #include "twospace_call.inc"
 #include "twospace_high.inc"
 #include "twospace_console.inc"

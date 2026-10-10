@@ -1,0 +1,99 @@
+/* SPDX-License-Identifier: MIT; combined reviewed application guest matrix.
+ * Operator must hold the fleet maintenance reservation and verify cleanup.
+ * Inputs are a fresh standard build and installed Hercules tools; no Lab
+ * disks or application binaries enter this recipe. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  i=.int;j=.int;row=.string
+  if args.0<>4 then return 2
+  work=args.1;normal=args.2;herc=args.3;selection=args.4
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 | left(normal,1)<>"/" | left(herc,1)<>"/" then return 2
+  profiles="model2 model5 monochrome line"
+  if selection<>"all" then do
+    if wordpos(selection,profiles)=0 then return 2
+    profiles=selection
+  end
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  locations=.string[]
+  address crexx "pwd" output locations
+  root=strip(locations.1);out=root||"/"||work;media=out||"/fixtures"
+  address crexx "run mkdir -p :media"
+  if rc<>0 then return rc
+  control=media||"/ctl.txt"
+  call lineout control,"FTX001 3390-1 100"
+  call lineout control,"SYSVTOC VTOC CYL 2"
+  datasets="EDIT.IN EDIT.FB FULL.OUT EDIT.OUT INPUT.OUT COPY.OUT SHORT.OUT FB.OUT BAD.FORMAT"
+  do i=1 to words(datasets)
+    name=word(datasets,i);format="VB 260 2640"
+    if name="EDIT.FB" | name="SHORT.OUT" | name="FB.OUT" then format="FB 8 80"
+    if name="BAD.FORMAT" then format="U 0 18452"
+    call lineout control,name||" EMPTY CYL 1 1 0 PS "||format
+  end
+  call lineout control
+  loader=herc||"/dasdload"
+  address crexx "cd :media"
+  address crexx "run :loader -bz2 ctl.txt empty.cckd"
+  if rc<>0 then return rc
+  address crexx "cd :root"
+  reader=herc||"/cckd2ckd";compressor=herc||"/ckd2cckd";hercules=herc||"/hercules"
+  source=media||"/empty.cckd";flat=media||"/empty.ckd";staged=media||"/exchange.ckd";exchange=media||"/exchange.cckd"
+  address crexx "run :reader -q -cyls 100 :source :flat"
+  if rc<>0 then return rc
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/apps-media.py stage :flat :staged"
+  if rc<>0 then return rc
+  address crexx "run :compressor -q -bz2 -cyls 100 :staged :exchange"
+  if rc<>0 then return rc
+  do j=1 to words(profiles)
+    profile=word(profiles,j);model="2";primary="3270";core=normal||"/kernel/run/image.core"
+    flags=.string[];flags[1]="--normal";flags[2]="--monitor";flags[3]="--workbench-normal"
+    disk=out||"/"||profile||".cckd";source=normal||"/image/media/pdos00.cckd"
+    commands="pdos/tests/apps-commands.json"
+    if profile="line" then do
+      primary="line";flags[4]="--line-primary";commands=out||"/line-commands.json"
+      input="pdos/tests/apps-commands.json"
+      do while lines(input)>0
+        row=linein(input);row=changestr('"PF(3)"',row,'"Q"');row=changestr('"key"',row,'"primary"')
+        /* Hercules's 3215 keyboard buffer is 150 bytes including CRLF. */
+        row=changestr(copies("Q",256),row,copies("Q",148))
+        call lineout commands,row
+      end
+      call lineout commands
+    end
+    if profile="model2" | profile="model5" then flags[4]="--colour"
+    if profile="model5" then model="5"
+    if profile="model5" | profile="line" then do
+      configured=out||"/"||profile||".core"
+      address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_core.py configure :core :configured :model :primary monitor"
+      if rc<>0 then return rc
+      core=configured;fresh=work||"/"||profile||"-image";prior=normal||"/image-inputs"
+      address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :fresh :prior :core :herc"
+      if rc<>0 then return rc
+      source=root||"/"||fresh||"/media/pdos00.ckd";target=out||"/"||profile||"-bundled.ckd"
+      bundle=out||"/"||profile||"-bundle-inputs";original=normal||"/image-inputs"
+      /* install writes its own receipt: never mutate producer inputs. */
+      address crexx "run cmake -E copy_directory :original :bundle"
+      if rc<>0 then return rc
+      address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/scripts/bundle-media.py install :source :target :bundle"
+      if rc<>0 then return rc
+      address crexx "run :compressor -q -bz2 -cyls 100 :target :disk"
+      if rc<>0 then return rc
+    end
+    else do
+      address crexx "run cmake -E copy :source :disk"
+      if rc<>0 then return rc
+    end
+    runout=out||"/"||profile||"-run"
+    address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_machine.py :disk :core :hercules :runout --model :model --commands :commands --fixture-exchange :exchange :flags[]"
+    if rc<>0 then return rc
+    source=runout||"/fixture_exchange.cckd";flat=out||"/"||profile||"-exchange.ckd";receipt=out||"/"||profile||"-records.json"
+    address crexx "run :reader -q -cyls 100 :source :flat"
+    if rc<>0 then return rc
+    oracle="verify";if profile="line" then oracle="verify-line"
+    address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/apps-media.py :oracle :staged :flat :receipt"
+    if rc<>0 then return rc
+  end
+  say "Combined application/console QA complete: "||profiles
+  return 0

@@ -16,6 +16,8 @@ import sys
 import time
 
 from machine import digest, qword
+from machine_profile import (CORE, REAL, KPOOL, UPOOL, KBYTES, UBYTES,
+    SERVICE, SERVICE_BYTES, SERVICE_PAGES, STACK, STACK_PAGES, TRAMPOLINE, VALUES)
 
 KCORE = 0x0100000000000000
 LOW_REQUEST = 0x21000
@@ -98,10 +100,10 @@ def load_elf(path):
     expected = {(0, 0), (0x1000, 0x1000), (0x2000, 0x2000), (0x4000, 0x4000),
                 (0x20000, 0x5000), (0x110000000, 0x6000),
                 (0x21000, 0x7000), (0x22000, 0x8000),
-                (KCORE, 0x9000), (0x02060000, 0xf000),
+                (KCORE, 0x9000), (TRAMPOLINE, 0xf000),
                 (0x02000000, 0x11000), (HIGH_REQUEST, 0x12000),
                 (0x110002000, 0x13000), (0x110003000, 0x1f000)}
-    core = bytearray(0x400000)
+    core = bytearray(CORE)
     actual = set()
     for i in range(phnum):
         kind, perms, off, va, pa, filesz, memsz, align = struct.unpack_from(
@@ -124,44 +126,31 @@ def make_core(elf, classic, dat_emit, out, normal=False):
     if normal:
         struct.pack_into(">I",core,0x95020,0x54534e31)
     service = Path(classic).read_bytes()
-    if not 0 < len(service) <= 96 * 4096:
-        raise ValueError("Classic C service exceeds 96 reserved pages")
-    core[0xa000:0xf000] = service[:5 * 4096].ljust(5 * 4096, b"\0")
-    core[0x14000:0x1f000] = service[5 * 4096:16 * 4096].ljust(11 * 4096, b"\0")
-    core[0x80000:0x90000] = service[16 * 4096:32 * 4096].ljust(16 * 4096, b"\0")
-    core[0xa0000:0xe0000] = service[32 * 4096:].ljust(64 * 4096, b"\0")
+    if not 0 < len(service) <= SERVICE_BYTES:
+        raise ValueError("Classic C service exceeds reserved service bank")
+    core[SERVICE:SERVICE+SERVICE_BYTES] = service.ljust(SERVICE_BYTES, b"\0")
     # Classic PDPPRLG uses R13's 76-byte slot as the next frame pointer.
     struct.pack_into(">I", core, 0x1004c, 0x03000100)
     struct.pack_into(">I", core, 0x10060, 0x03000080)
     kernel = {0: 0, 0x1000: 0x1000, 0x2000: 0x2000,
               0x3000: 0x3000, 0x4000: 0x4000,
-              0x02060000: 0xf000, 0x03000000: 0x10000,
+              TRAMPOLINE: 0xf000, 0x03000000: 0x10000,
               0x03001000: 0x92000, 0x03002000: 0x93000,
               0x03003000: 0x94000, KCORE: 0x9000}
-    kernel.update({0x02000000 + 4096 * i:
-                   (0xa000 + 4096 * i if i < 5 else
-                    0x14000 + (i - 5) * 4096 if i < 16 else
-                    0x80000 + (i - 16) * 4096 if i < 32 else
-                    0xa0000 + (i - 32) * 4096)
-                   for i in range(96)})
-    kernel.update({0x03000000+4096*i:0xe0000+4096*(i-4) for i in range(4,32)})
+    kernel.update({0x02000000 + 4096 * i: SERVICE + 4096 * i
+                   for i in range(SERVICE_PAGES)})
+    kernel.update({0x03000000+4096*i:STACK+4096*(i-4) for i in range(4,STACK_PAGES)})
     application = {0x20000: 0x5000, 0x21000: 0x7000,
                    0x02000000: 0x11000, 0x110000000: 0x6000,
                    HIGH_REQUEST: 0x12000, 0x110002000: 0x13000,
                    0x110003000: 0x1f000}
     if normal:
         application={}
-    pools = ((0x100000, 0x280000), (0x280000, 0x3e0000))
+    pools = ((KPOOL, KPOOL+KBYTES), (UPOOL, UPOOL+UBYTES))
     if any(lo <= pa < hi for pa in (*kernel.values(), *application.values())
            for lo, hi in pools):
         raise ValueError("DAT real pool overlaps image backing")
-    private_kernel_frames = {0, 0x1000, 0x2000, 0x3000, 0x4000,
-                             0x9000, 0xa000, 0xb000, 0xc000,
-                             0xd000, 0xe000, 0xf000, 0x10000,
-                             *(0x14000 + i * 4096 for i in range(11)),
-                             *(0x80000 + i * 4096 for i in range(21)),
-                             *(0xa0000 + i * 4096 for i in range(64)),
-                             *(0xe0000 + i * 4096 for i in range(28))}
+    private_kernel_frames = set(kernel.values())
     if private_kernel_frames.intersection(application.values()):
         raise ValueError("U maps private K real frame")
     if any(0x3e0000 <= pa < 0x400000 for pa in application.values()):
@@ -176,28 +165,29 @@ def make_core(elf, classic, dat_emit, out, normal=False):
         kasce, kbytes, uasce, ubytes = map(int, built.stdout.split())
     except ValueError as exc:
         raise ValueError("malformed DAT builder result") from exc
-    if (kasce, uasce) != (0x10000f, 0x28000f) or \
-            kbytes > 0x180000 or ubytes > 0x160000:
+    if (kasce, uasce) != (KPOOL|0xf, UPOOL|0xf) or \
+            kbytes > KBYTES or ubytes > UBYTES:
         raise ValueError("DAT builder returned unexpected ASCE or size")
     built_core = image.read_bytes()
-    if qword(built_core, 0x100000 + 8 * 8) == 0x20 or \
-            qword(built_core, 0x280000 + 8 * 8) != 0x20:
+    if qword(built_core, KPOOL + 8 * 8) == 0x20 or \
+            qword(built_core, UPOOL + 8 * 8) != 0x20:
         raise ValueError("high K R1 entry or U isolation absent")
     kstats = {"table_bytes": kbytes, "table_4k_frames": kbytes // 4096,
-              "mapped_pages": len(kernel) + 65536 + 0x2e0000 // 4096}
+              "mapped_pages": len(kernel) + REAL//4096 + (KBYTES+UBYTES)//4096}
     ustats = {"table_bytes": ubytes, "table_4k_frames": ubytes // 4096,
               "mapped_pages": len(application)}
     return {"kernel_asce": hex(kasce), "application_asce": hex(uasce),
             "kernel_dat": kstats, "application_dat": ustats,
             "kernel_mappings": {hex(k): hex(v) for k, v in kernel.items()},
             "application_mappings": {hex(k): hex(v) for k, v in application.items()},
-            "kernel_table_aliases": {"kernel": ["0x5000000", "0x517ffff"],
-                                     "application_tables": ["0x5180000", "0x52dffff"]},
-            "kernel_real_aperture": ["0x8000000", "0x17ffffff"],
+            "kernel_table_aliases": {"kernel": [hex(VALUES["TSF_KPOOL_VA"]), hex(VALUES["TSF_KPOOL_VA"]+KBYTES-1)],
+                                     "application_tables": [hex(VALUES["TSF_UPOOL_VA"]), hex(VALUES["TSF_UPOOL_VA"]+UBYTES-1)]},
+            "kernel_real_aperture": [hex(VALUES["TSF_KAPERTURE_VA"]), hex(VALUES["TSF_KAPERTURE_VA"]+REAL-1)],
             "kernel_pages_in_application_low_virtual": 0,
             "application_low_virtual_bytes": sum(4096 for va in application if va < 0x1000000),
             "application_low_unmapped_bytes": 0x1000000 - sum(4096 for va in application if va < 0x1000000),
-            "classic_service_size": len(service), "real_memory_bytes": 0x10000000}
+            "classic_service_size": len(service), "classic_service_capacity": SERVICE_BYTES,
+            "classic_service_headroom": SERVICE_BYTES-len(service), "real_memory_bytes": REAL}
 
 
 def judge(raw, log, ipl=False, cms24=False, cms31=False,
@@ -215,7 +205,7 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
               "nested_kernel_svc": qword(raw, 0x2018) == 1,
               "nested_kernel_psw_key_zero": qword(raw, 0x21a0) &
                     0x048f000000000000 == 0x0400000000000000,
-              "nested_kernel_asce": qword(raw, 0x21a8) == 0x10000f,
+              "nested_kernel_asce": qword(raw, 0x21a8) == (KPOOL|0xf),
               "context_depth_bounded_at_exit": qword(raw, 0x710) == 0x3200,
               "recoverable_u_program_fault": qword(raw, 0x2180) == 1 and
                     struct.unpack_from(">I",raw,0x12014)[0] == 0xfffffffc,
@@ -473,7 +463,7 @@ def judge(raw, log, ipl=False, cms24=False, cms31=False,
           (2 * (1 + (0x00100000 // 4096) + 1 +
                 (0x00400000 // 4096)) if ipl else 0)
           if tso24 else 0)) and
-        0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= 0x160000)
+        0x17000 <= struct.unpack_from(">I",raw,0x4098)[0] <= UBYTES)
     if not ipl:
         # A rejected selector formerly created two compatibility mappings.
         # In this diskless image there is no valid image to initialize; the
@@ -532,7 +522,7 @@ def run(args):
     manifest["tools_sha256"] = {name: digest(getattr(args, name)) for name in
                                 ("assembler", "linker", "classic_cc", "classic_as", "classic_ld", "hercules", "dat_emit")}
     out.joinpath("machine.cnf").write_text(
-        "ARCHLVL ESAME\nMAINSIZE 256\nNUMCPU 1\nCPUMODEL 2064\n"
+        "ARCHLVL ESAME\nMAINSIZE 512\nNUMCPU 1\nCPUMODEL 2064\n"
         "DIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\n")
     out.joinpath("run.rc").write_text(
         f"sysclear\narchlvl esame\nloadcore \"{out / 'image.core'}\"\n"

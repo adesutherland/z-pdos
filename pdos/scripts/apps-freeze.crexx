@@ -1,0 +1,52 @@
+/* SPDX-License-Identifier: MIT; reviewed source/input identities, no guest. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  i=.int
+  if args.0<>1 then return 2
+  work=args.1
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  files=.string[];hashes=.string[];rows=.string[]
+  address crexx "run rg --files pdos/src pdos/scripts pdos/tests pdpclib/src assembler/src assembler/tests assembler/scripts" output files
+  if rc<>0 then return rc
+  kept=.string[]
+  do i=1 to files.0
+    if pos("__pycache__/",files[i])=0 then kept[kept.0+1]=files[i]
+  end
+  files=kept
+  files[files.0+1]="VERSION"
+  address crexx "run shasum -a 256 :files[]" output hashes
+  if rc<>0 then return rc
+  do i=1 to hashes.0
+    call lineout work||"/sources.sha256",hashes[i]
+  end
+  call lineout work||"/sources.sha256"
+  tools=.string[]
+  tools[1]="build/compiler/mvs/gcc/mf-classic-cc"
+  tools[2]="build/tools/assembler/mf-classic-as"
+  tools[3]="build/tools/linker/mf-classic-ld"
+  address crexx "run shasum -a 256 :tools[]" output hashes
+  if rc<>0 then return rc
+  do i=1 to hashes.0
+    call lineout work||"/tools.sha256",hashes[i]
+  end
+  call lineout work||"/tools.sha256"
+  address crexx "run git rev-parse HEAD" output rows
+  if rc<>0 then return rc
+  call lineout work||"/review.txt","Reviewed parent: "||rows.1
+  call lineout work||"/review.txt","Full review and focused C90/ASan/UBSan checks complete."
+  call lineout work||"/review.txt","See pdos/doc/qualification/APPLICATIONS-2026-10-10.md for review repairs, capacity and bounded matrix."
+  call lineout work||"/review.txt","Pinned cREXX ZIP SHA256 fd11ae260bba169653126a861ecae545cee9bcfbe1fad4083c4a913241e3aedd"
+  call lineout work||"/review.txt"
+  address crexx "run git status --short" output rows
+  if rc<>0 then return rc
+  do i=1 to rows.0
+    call lineout work||"/status.txt",rows[i]
+  end
+  call lineout work||"/status.txt"
+  return 0
