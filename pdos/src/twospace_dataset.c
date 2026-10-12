@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 #include "twospace_dataset.h"
+#include "twospace_fileprofile.h"
+#if defined(TSF_LARGE_FILES)
+#include "twospace_dasd.h"
+#endif
 
 static unsigned int word16(const unsigned char *p)
 { return ((unsigned int)p[0]<<8) | (unsigned int)p[1]; }
@@ -29,7 +33,7 @@ int TSKDSCB(TSKREAD read_record, void *context,
             TSKEXTENT *extent, unsigned char data[96])
 {
     const unsigned char *record;
-    unsigned int cylinder, head, number, i, visits=0U;
+    unsigned int cylinder, head, number, i, visits=0U, cylinders=100U;
     TSKEXTENT found;
     int count;
     if (!read_record || !name || !extent || !name_length ||
@@ -44,6 +48,14 @@ int TSKDSCB(TSKREAD read_record, void *context,
     head=word16(record+17U);
     number=record[19U];
     if (cylinder != 1U || head >= 15U || !number) return TSK_CORRUPT;
+#if defined(TSF_LARGE_FILES)
+    {
+        unsigned int tracks;
+        count=read_record(context,1U,0U,1U,140U,&record);
+        if(count!=140||TDAGEOM(record,140U,&cylinders,&tracks)||
+           cylinders>TSFP_CYLINDERS)return TSK_CORRUPT;
+    }
+#endif
     while (cylinder <= 2U && visits < 1500U) {
         ++visits;
         count=read_record(context,cylinder,head,number,140U,&record);
@@ -66,7 +78,7 @@ int TSKDSCB(TSKREAD read_record, void *context,
             found.logical_length=word16(record+88U);
             found.organisation=word16(record+82U);
             if (found.start_cylinder < 3U ||
-                found.end_cylinder >= 100U ||
+                found.end_cylinder >= cylinders ||
                 found.start_head >= 15U || found.end_head >= 15U ||
                 found.start_cylinder > found.end_cylinder ||
                 (found.start_cylinder == found.end_cylinder &&

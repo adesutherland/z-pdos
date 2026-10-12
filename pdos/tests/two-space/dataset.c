@@ -39,6 +39,11 @@ int main(void)
     label[15]=0U; label[16]=1U; label[17]=label[18]=0U;
     label[19]=1U;
     other[44]=0xf4U;
+#if defined(TSF_LARGE_FILES)
+    other[62U]=2U;other[63U]=0U;other[64U]=0U;other[65U]=15U;
+    other[107U]=0U;other[108U]=1U;other[109U]=other[110U]=0U;
+    other[111U]=0U;other[112U]=2U;other[113U]=0U;other[114U]=14U;
+#endif
     for (i=0U; i<sizeof target; ++i) match[i]=target[i];
     match[44]=0xf1U; match[59]=1U;
     match[84]=0x80U; match[86]=0x48U; match[87]=0x14U;
@@ -56,10 +61,14 @@ int main(void)
     if (TSKFIND(read_record,0,target,sizeof target,&extent) != TSK_CORRUPT ||
         memcmp(&extent,&unchanged,sizeof extent)) return 2;
     match[59]=1U;
+#if defined(TSF_LARGE_FILES)
+    match[111]=2U;match[112]=0U;
+#else
     match[112]=100U;
+#endif
     if (TSKFIND(read_record,0,target,sizeof target,&extent) != TSK_CORRUPT ||
         memcmp(&extent,&unchanged,sizeof extent)) return 3;
-    match[112]=4U;
+    match[111]=0U;match[112]=4U;
     fail_volume=1U;
     if (TSKFIND(read_record,0,target,sizeof target,&extent) != TSK_CORRUPT ||
         memcmp(&extent,&unchanged,sizeof extent)) return 4;

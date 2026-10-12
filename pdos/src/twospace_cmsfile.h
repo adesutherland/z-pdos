@@ -4,11 +4,12 @@
  */
 #ifndef PDOS_TWO_SPACE_CMSFILE_H
 #define PDOS_TWO_SPACE_CMSFILE_H
+#include "twospace_fileprofile.h"
 
 #define TSIF_OK 0
 #define TSIF_BAD -1
 #define TSIF_BLOCK 18452U
-#define TSIF_LIMIT (3U*1024U*1024U)
+#define TSIF_LIMIT TSFP_CMS_INPUT_LIMIT
 
 typedef struct {
     unsigned int profile;

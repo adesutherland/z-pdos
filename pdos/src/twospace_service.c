@@ -158,7 +158,7 @@ static CMSHEAP cms_heaps[TSV_MAX_DEPTH];
 /* Each open input, including one reopened by a nested app, owns its cursor. */
 static TSISTATE cms_inputs;
 #define CMS_OUTPUT_SLOTS 4U
-#define CMS_OUTPUT_BYTES 0x200000U
+#define CMS_OUTPUT_BYTES TSFP_OBJECT_LIMIT
 typedef struct {
     unsigned char id[18];
     unsigned int real, length, cursor, records, source_bytes;

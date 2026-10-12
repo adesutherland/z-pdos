@@ -1,0 +1,50 @@
+/* Derive the selected MVSSUPA private output-member layout from its actual
+   assembler symbols. The additional CSECT is host-only and never executed. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>4 then return 2
+  as_tool=args.1; source=args.2; macros=args.3; out=args.4
+  address crexx "run test ! -e :out"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :out"
+  if rc<>0 then return rc
+  lines=readlines(source); probe=out||"/member-layout.asm"; i=.int; ends=.int
+  ends=0
+  do i=1 to lines.0
+    if word(lines[i],1)="END" then do
+      ends=ends+1
+      call lineout probe,"FILEABI  CSECT"
+      call lineout probe,"FILEABI  AMODE 31"
+      call lineout probe,"FILEABI  RMODE ANY"
+      call lineout probe,"         DC    A(OPENCLOS-IHADCB)"
+      call lineout probe,"         DC    A(ZDDN-IHADCB)"
+      call lineout probe,"         DC    A(ZMEM-IHADCB)"
+      call lineout probe,"         DC    A(ZMEM-OPENCLOS)"
+    end
+    call lineout probe,lines[i]
+  end
+  call lineout probe
+  if ends<>1 then return 2
+  object=out||"/member-layout.obj"
+  address crexx "run :as_tool --profile z900 --macros --macro-model-limit 4096 --macro-limit 128 -I :macros -I pdpclib/src/interfaces/tso31 -I pdpclib/src/interfaces/pdos31 -I pdpclib/src/interfaces/classic-linkage :probe :object"
+  if rc<>0 then return rc
+  helper="pdos/tests/two-space/native_member_layout.py"; receipt=out||"/member-layout.json"
+  contract="pdos/src/twospace_native_file_abi.h"
+  address crexx "run python3 -B :helper :object :receipt :contract"
+  if rc<>0 then return rc
+  inputs=.string[]; hashes=.string[]
+  call arrayappend inputs,source;call arrayappend inputs,probe;call arrayappend inputs,object
+  call arrayappend inputs,as_tool;call arrayappend inputs,helper;call arrayappend inputs,receipt
+  call arrayappend inputs,contract
+  call arrayappend inputs,"pdos/scripts/check-tso-member-layout.crexx"
+  address crexx "run shasum -a 256 :inputs[]" output hashes
+  if rc<>0 then return rc
+  manifest=out||"/member-layout.sha256"
+  do i=1 to hashes.0
+    call lineout manifest,hashes[i]
+  end
+  call lineout manifest
+  say "NATIVE TSO MEMBER LAYOUT RECORDED" receipt
+  return 0

@@ -8,6 +8,8 @@ import sys
 
 TRACK = 56832
 BLOCK = 18452
+LARGE_BANK_BLOCKS = 911
+LARGE_LIMIT = 16 * 1024 * 1024
 
 def fnv(data):
     h = 0x811c9dc5
@@ -27,8 +29,14 @@ def records(track):
 
 def inspect(path):
     raw = Path(path).read_bytes()
-    if len(raw) != 512 + 1500 * TRACK:
+    tracks=(len(raw)-512)//TRACK
+    if len(raw) != 512+tracks*TRACK or tracks not in (1500,7680):
         raise ValueError("not the selected flat 3390")
+    large=tracks==7680
+    bank_blocks=LARGE_BANK_BLOCKS if large else 115
+    limit=LARGE_LIMIT if large else 0x200000
+    first=int(large)
+    wanted=first+8*2*bank_blocks
     extent = None
     for number in range(15, 45):
         track = raw[512 + number * TRACK:512 + (number+1) * TRACK]
@@ -38,12 +46,14 @@ def inspect(path):
                 extent = (first_c * 15 + first_h, last_c * 15 + last_h)
     if extent is None:
         raise ValueError("no durable store extent")
+    if not 0<=extent[0]<=extent[1]<tracks or (extent[1]-extent[0]+1)*3<wanted:
+        raise ValueError("durable store extent too small or outside geometry")
     blocks = []
     outside = hashlib.sha256(raw[:20]+raw[32:512])
-    for number in range(1500):
+    for number in range(tracks):
         track = raw[512+number*TRACK:512+(number+1)*TRACK]
         if extent[0] <= number <= extent[1]:
-            if number-extent[0] >= (8*2*115+2)//3:
+            if number-extent[0] >= (wanted+2)//3:
                 continue
             found = [(r, data, key, size) for r, data, key, size in records(track) if r]
             if len(found) != 3 or any((r,key,size) != (i+1,0,BLOCK) for i,(r,_,key,size) in enumerate(found)):
@@ -60,16 +70,20 @@ def inspect(path):
                 raise ValueError("missing CKD end marker")
             outside.update(struct.pack(">II",number,end+8))
             outside.update(track[:end+8])
+    if large:
+        descriptor=blocks[0]
+        if descriptor[:8]!=b"PDSTLAY2" or struct.unpack_from(">5I",descriptor,8)!=(2,BLOCK,LARGE_BANK_BLOCKS,8,LARGE_LIMIT) or fnv(descriptor[:28])!=struct.unpack_from(">I",descriptor,28)[0] or any(descriptor[32:]):
+            raise ValueError("large-file STORE layout descriptor mismatch")
     files = []
     for slot in range(8):
         banks = []
         for bank in range(2):
-            base = (slot * 2 + bank) * 115
+            base = first+(slot * 2 + bank) * bank_blocks
             h = blocks[base]
             if h[:8] != b"PDSTOR01":
                 continue
             version, sequence, kind, key_bytes, size, expected, erased = struct.unpack_from(">7I",h,8)
-            if version != 1 or not sequence or not 0 < key_bytes <= 56 or size > 0x200000 or erased > 1 or fnv(h[:92]) != struct.unpack_from(">I",h,92)[0]:
+            if version != 1 or not sequence or not 0 < key_bytes <= 56 or size > limit or erased > 1 or fnv(h[:92]) != struct.unpack_from(">I",h,92)[0]:
                 raise ValueError("bad committed store header")
             data = b"".join(blocks[base+1:base+1+(size+BLOCK-1)//BLOCK])[:size]
             if fnv(data) != expected:
@@ -111,7 +125,7 @@ def inspect(path):
                 at+=size+2
             item["native_blocks_hex"]=native_blocks
         files.append(item)
-    return {"outside_store_sha256":outside.hexdigest(),"conversion_header_bytes_20_31":raw[20:32].hex(),"extent_tracks":extent,"files":files}
+    return {"outside_store_sha256":outside.hexdigest(),"conversion_header_bytes_20_31":raw[20:32].hex(),"cylinders":tracks//15,"store_layout":2 if large else 1,"object_limit":limit,"bank_blocks":bank_blocks,"extent_tracks":extent,"files":files}
 
 def main():
     if len(sys.argv) != 3:

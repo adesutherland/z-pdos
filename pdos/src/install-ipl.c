@@ -9,7 +9,11 @@
 
 #define TRACK 56832
 #define HEADS 15
-#define TRACKS 1500
+#if defined(TSF_LARGE_FILES)
+#define TRACKS (512 * HEADS)
+#else
+#define TRACKS (100 * HEADS)
+#endif
 #define REQUIRE(x) do { if (!(x)) { \
     fprintf(stderr,"IPL image:%d: %s\n",__LINE__,#x); exit(1); } } while (0)
 static unsigned char track[TRACK], compare[TRACK];
@@ -199,6 +203,6 @@ int main(int argc, char **argv)
     input = fopen(argv[1],"rb"); output = fopen(argv[2],"rb"); REQUIRE(input && output);
     unchanged(input,output,0); REQUIRE(fclose(input) == 0);
     validate(output,files,1,successor); REQUIRE(fclose(output) == 0);
-    puts("100-cylinder CKD image: source IPL vectors, placement and complete payload readback pass");
+    printf("%u-cylinder CKD image: source IPL vectors, placement and complete payload readback pass\n",(unsigned)(TRACKS/HEADS));
     return 0;
 }

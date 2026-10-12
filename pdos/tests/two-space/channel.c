@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "twospace_channel.h"
+#include "twospace_fileprofile.h"
 
 static unsigned int word(const unsigned char *p)
 {
@@ -114,6 +115,10 @@ int main(void)
     channel.quarantined=0U;
     if(TSCBUILDCONSCMD(&channel,6U,TSC_MAX_INPUT,1U)!=TSC_OK||
        base[0x202U]!=0x40U||base[0x203U]!=0U)return 26;
+    if(TSCBUILDREAD(&channel,TSFP_CYLINDERS-1U,14U,1U,0x06U,80U)!=TSC_OK||
+       TSCBUILDREAD(&channel,TSFP_CYLINDERS,0U,1U,0x06U,80U)!=TSC_BAD||
+       TSCBUILDV(&channel,TSFP_CYLINDERS-1U,14U,1U,80U,3U)!=TSC_OK||
+       TSCBUILDV(&channel,TSFP_CYLINDERS,0U,1U,80U,3U)!=TSC_BAD)return 27;
     free(real);
     return 0;
 }

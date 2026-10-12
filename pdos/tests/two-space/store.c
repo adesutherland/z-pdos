@@ -4,6 +4,19 @@
 #include <string.h>
 #include "twospace_store.h"
 typedef struct { unsigned char *disk;unsigned int writes,fail; } DISK;
+#if TSFP_LAYOUT == 2U
+static void put(unsigned char *p,unsigned int n)
+{ p[0]=(unsigned char)(n>>24);p[1]=(unsigned char)(n>>16);
+  p[2]=(unsigned char)(n>>8);p[3]=(unsigned char)n; }
+static void format(unsigned char *p)
+{
+    unsigned int h=0x811c9dc5U,i;
+    memcpy(p,"PDSTLAY2",8U);put(p+8U,2U);put(p+12U,18452U);
+    put(p+16U,911U);put(p+20U,8U);put(p+24U,0x1000000U);
+    for(i=0U;i<28U;++i)h=(h^p[i])*0x01000193U;
+    put(p+28U,h);
+}
+#endif
 static int io(void *opaque,unsigned int record,unsigned int write,
                unsigned char *block)
 {
@@ -23,10 +36,20 @@ int main(void)
     out=(unsigned char *)malloc(TSS_LIMIT);
     if(!s||!d.disk||!a||!b||!out)return 1;
     d.writes=d.fail=0U;
+#if TSFP_LAYOUT == 2U
+    if(TSSINIT(s,io,&d)!=TSS_BAD||d.writes)return 10;
+    format(d.disk);d.disk[16U]^=1U;
+    if(TSSINIT(s,io,&d)!=TSS_BAD||d.writes)return 11;
+    format(d.disk);d.disk[32U]=1U;
+    if(TSSINIT(s,io,&d)!=TSS_BAD||d.writes)return 12;
+    d.disk[32U]=0U;
+#endif
     for(i=0U;i<TSS_LIMIT;++i){a[i]=(unsigned char)(i%251U);b[i]=(unsigned char)(255U-i%241U);}
     if(TSSINIT(s,io,&d)!=TSS_OK||TSSREAD(s,31U,key,4U,out,TSS_LIMIT,&n)!=TSS_ABSENT)
         return 2;
     if(TSSPUT(s,31U,key,4U,a,TSS_LIMIT)!=TSS_OK)return 3;
+    if(TSSPUT(s,31U,key,4U,a,TSS_LIMIT+1U)!=TSS_BAD||
+       TSSREAD(s,31U,key,4U,out,TSS_LIMIT-1U,&n)!=TSS_FULL)return 13;
     memset(s,0,sizeof *s);
     if(TSSINIT(s,io,&d)!=TSS_OK||TSSREAD(s,31U,key,4U,out,TSS_LIMIT,&n)!=TSS_OK||
        n!=TSS_LIMIT||memcmp(a,out,n))return 4;

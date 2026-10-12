@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT
  * Selected native TSO file lists, copied into the owning K service.
  * The producer's PDPCLIB layouts and U callbacks remain the application ABI. */
+#include "twospace_native_file_abi.h"
 #define SFDDS 8U
 #define SFFILES 8U
 #define SF_DD_HANDLE 0x200U
@@ -353,8 +354,8 @@ static unsigned int sf_dcb(unsigned int svc)
     file->cylinder=dd->extent.start_cylinder;file->head=dd->extent.start_head;file->record=0U;
     for(i=0U;i<52U;++i)file->key[i]=i<dd->bytes?dd->dsn[i]:0x40U;
     if(dd->extent.organisation==0x0200U&&mode==0x8fU){
-        if(sf_span((saved[3]&0x7fffffffU)+0x90U,8U,0U,file->key+44U,1U)||
-           file->key[44U]==0x40U){sf_cleanup(handle,f);TSVFORGET(&native_invocations,f->token,TSV_FILE,handle);return 12U;}
+        if(sf_span((saved[3]&0x7fffffffU)+TSF_OPEN_MEMBER_DELTA,8U,0U,file->key+44U,1U)||
+           !file->key[44U]||file->key[44U]==0x40U){sf_cleanup(handle,f);TSVFORGET(&native_invocations,f->token,TSV_FILE,handle);return 12U;}
         file->member=1U;
     }
     sf_compat();

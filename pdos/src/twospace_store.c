@@ -39,9 +39,9 @@ static int find(TSSSTATE *s,unsigned int kind,const unsigned char *key,
     if(!s||!s->io||!key||!n||n>TSS_KEY||!slot||!bank||!empty) return TSS_BAD;
     *empty=TSS_SLOTS;
     for(i=0U;i<TSS_SLOTS;++i) {
-        if(s->io(s->context,i*2U*TSS_BANK_BLOCKS,0U,s->block)) return TSS_IO;
+        if(s->io(s->context,TSS_FIRST_BLOCK+i*2U*TSS_BANK_BLOCKS,0U,s->block)) return TSS_IO;
         copy(a,s->block,96U);valid_a=header(a);
-        if(s->io(s->context,(i*2U+1U)*TSS_BANK_BLOCKS,0U,s->block))return TSS_IO;
+        if(s->io(s->context,TSS_FIRST_BLOCK+(i*2U+1U)*TSS_BANK_BLOCKS,0U,s->block))return TSS_IO;
         copy(b,s->block,96U);valid_b=header(b);
         if(!valid_a&&!valid_b) {if(*empty==TSS_SLOTS)*empty=i;continue;}
         j=valid_b&&(!valid_a||word(b+12U)>word(a+12U))?1U:0U;
@@ -54,7 +54,27 @@ static int find(TSSSTATE *s,unsigned int kind,const unsigned char *key,
     return TSS_ABSENT;
 }
 int TSSINIT(TSSSTATE *s,TSSIO io,void *context)
-{ if(!s||!io)return TSS_BAD;s->io=io;s->context=context;return TSS_OK; }
+{
+    if(!s||!io)return TSS_BAD;
+    s->io=0;s->context=0;
+#if TSFP_LAYOUT == 2U
+    /* Fresh layout 2 has an immutable checked descriptor before the banks.
+     * Refuse legacy, mismatched and damaged media before any bank write. */
+    {
+        static const unsigned char magic[8]={0x50U,0x44U,0x53U,0x54U,
+                                             0x4cU,0x41U,0x59U,0x32U};
+        unsigned int i;
+        if(io(context,0U,0U,s->block))return TSS_IO;
+        for(i=0U;i<8U&&s->block[i]==magic[i];++i){}
+        if(i!=8U||word(s->block+8U)!=2U||word(s->block+12U)!=TSS_BLOCK||
+           word(s->block+16U)!=TSS_BANK_BLOCKS||word(s->block+20U)!=TSS_SLOTS||
+           word(s->block+24U)!=TSS_LIMIT||
+           hash(0x811c9dc5U,s->block,28U)!=word(s->block+28U))return TSS_BAD;
+        for(i=32U;i<TSS_BLOCK;++i)if(s->block[i])return TSS_BAD;
+    }
+#endif
+    s->io=io;s->context=context;return TSS_OK;
+}
 
 int TSSSIZE(TSSSTATE *s,unsigned int kind,const unsigned char *key,
              unsigned int n,unsigned int *bytes)
@@ -74,7 +94,7 @@ int TSSREAD(TSSSTATE *s,unsigned int kind,const unsigned char *key,
     rc=find(s,kind,key,n,&slot,&bank,h,&empty);if(rc)return rc;
     if(word(h+32U))return TSS_ABSENT;
     size=word(h+24U);if(size>cap)return TSS_FULL;
-    sum=0x811c9dc5U;record=(slot*2U+bank)*TSS_BANK_BLOCKS+1U;
+    sum=0x811c9dc5U;record=TSS_FIRST_BLOCK+(slot*2U+bank)*TSS_BANK_BLOCKS+1U;
     for(at=0U;at<size;at+=take) {
         take=size-at;if(take>TSS_BLOCK)take=TSS_BLOCK;
         if(s->io(s->context,record++,0U,s->block))return TSS_IO;
@@ -97,7 +117,7 @@ static int commit(TSSSTATE *s,unsigned int kind,const unsigned char *key,
     if(rc==TSS_ABSENT){
         if(empty==TSS_SLOTS)return TSS_FULL;slot=empty;bank=0U;seq=1U;
     }else{seq=word(h+12U);if(seq==0xffffffffU)return TSS_FULL;++seq;bank^=1U;}
-    base=(slot*2U+bank)*TSS_BANK_BLOCKS;record=base+1U;
+    base=TSS_FIRST_BLOCK+(slot*2U+bank)*TSS_BANK_BLOCKS;record=base+1U;
     expected=hash(0x811c9dc5U,data,bytes);
     /* Invalidate the inactive bank first. Never overwrite the active bank. */
     zero(s->block,TSS_BLOCK);

@@ -3,6 +3,7 @@
  * A bank header is published only after payload write and readback. */
 #ifndef PDOS_TWO_SPACE_STORE_H
 #define PDOS_TWO_SPACE_STORE_H
+#include "twospace_fileprofile.h"
 
 #define TSS_OK 0
 #define TSS_ABSENT -1
@@ -11,10 +12,11 @@
 #define TSS_FULL -4
 #define TSS_DELETED -5
 #define TSS_BLOCK 18452U
-#define TSS_LIMIT 0x200000U
+#define TSS_LIMIT TSFP_OBJECT_LIMIT
 #define TSS_SLOTS 8U
-#define TSS_BANK_BLOCKS 115U
-#define TSS_RECORDS (TSS_SLOTS * 2U * TSS_BANK_BLOCKS)
+#define TSS_BANK_BLOCKS (1U + (TSS_LIMIT + TSS_BLOCK - 1U) / TSS_BLOCK)
+#define TSS_FIRST_BLOCK (TSFP_LAYOUT - 1U)
+#define TSS_RECORDS (TSS_FIRST_BLOCK + TSS_SLOTS * 2U * TSS_BANK_BLOCKS)
 #define TSS_KEY 56U
 
 typedef int (*TSSIO)(void *context, unsigned int record, unsigned int write,

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "twospace_channel.h"
+#include "twospace_fileprofile.h"
 
 static void put16(unsigned char *p, unsigned int value)
 { p[0]=(unsigned char)(value>>8); p[1]=(unsigned char)value; }
@@ -50,7 +51,7 @@ int TSCBUILDREAD(TSCSTATE *s, unsigned int cylinder, unsigned int head,
 {
     unsigned char *base, *orb, *seek, *search, *chain;
     unsigned int real;
-    if (!s || !s->aperture || s->quarantined || s->occupied || cylinder >= 100U || head >= 15U ||
+    if (!s || !s->aperture || s->quarantined || s->occupied || cylinder >= TSFP_CYLINDERS || head >= 15U ||
         !record || record > 255U ||
         (command != 0x06U && command != 0x0eU && command != 0x1eU) ||
         !capacity || capacity > TSC_MAX_RECORD)
@@ -152,7 +153,7 @@ int TSCCHECKEND(const TSCSTATE *s,unsigned int capacity)
 int TSCBUILDV(TSCSTATE *s,unsigned int cylinder,unsigned int head,unsigned int record,unsigned int bytes,unsigned int records)
 {
     unsigned char *base,*chain;unsigned int i,at=8U,stride;
-    if(!s||!s->aperture||s->quarantined||s->occupied||cylinder>=100U||head>=15U||!record||record>255U||
+    if(!s||!s->aperture||s->quarantined||s->occupied||cylinder>=TSFP_CYLINDERS||head>=15U||!record||record>255U||
        !records||records>TSC_MAX_VECTOR||records>256U-record||!bytes||bytes>TSC_MAX_RECORD)return TSC_BAD;
     stride=bytes+8U;if(stride>TSC_MAX_DATA/records)return TSC_BAD;
     base=s->aperture+s->region_real;clear(base,TSC_DATA_OFFSET+records*stride);chain=base+TSC_CCW_OFFSET;

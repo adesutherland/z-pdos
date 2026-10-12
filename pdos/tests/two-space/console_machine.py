@@ -594,8 +594,14 @@ def run(a):
     before_store=disk.parent.parent/"store-before.json"
     if transcript is not None and before_store.exists():
         flat=out/"stopped.ckd"
-        subprocess.run([str(herc.parent/"cckd2ckd"),"-q","-cyls","100",str(disk),str(flat)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        stored=inspect(flat);initial=json.loads(before_store.read_text())
+        initial=json.loads(before_store.read_text())
+        cylinders=initial.get("cylinders",100)
+        if cylinders not in (100,512):
+            raise ValueError("unsupported stopped STORE geometry")
+        subprocess.run([str(herc.parent/"cckd2ckd"),"-q","-cyls",str(cylinders),str(disk),str(flat)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        stored=inspect(flat)
+        if stored["cylinders"]!=cylinders:
+            raise ValueError("stopped STORE geometry differs from initial readback")
         if a.stage3=="graph":
             from stage3_actor import stopped_graph
             checks["graph_totals_match_independent_stopped_vtoc"]=stopped_graph(flat,out)

@@ -4,11 +4,18 @@ options levelb
 import rxfnsb
 main: procedure = .int
   arg args = .string[]
-  if args.0 <> 7 & args.0 <> 8 then do
+  if args.0 <> 7 & args.0 <> 8 & args.0 <> 9 then do
     say "Usage: crexx -nokeep pdos/scripts/two-space-next.crexx --args FRESH_BUILD_DIR GNU_AS GNU_LD CLASSIC_CC CLASSIC_AS CLASSIC_LD HERCULES"
     return 2
   end
-  if args.0 = 8 then if args.8 <> "pcomm" & args.8 <> "files" & args.8 <> "files-input" & args.8 <> "all-input" & args.8 <> "pairs" & args.8 <> "high" & args.8 <> "calls" & args.8 <> "console" & args.8 <> "normal" then return 2
+  if args.0 >= 8 then if args.8 <> "pcomm" & args.8 <> "files" & args.8 <> "files-input" & args.8 <> "all-input" & args.8 <> "pairs" & args.8 <> "high" & args.8 <> "calls" & args.8 <> "console" & args.8 <> "normal" then return 2
+  file_profile=.string[]
+  geometry_source=.string[]
+  if args.0=9 then do
+    if args.8<>"normal" | args.9<>"large-files" then return 2
+    file_profile.1="-DTSF_LARGE_FILES=1"
+    geometry_source.1="pdos/src/twospace_dasd.c"
+  end
   work = args.1
   gnuas = args.2; gnuld = args.3
   classiccc = args.4; classicas = args.5; classicld = args.6
@@ -55,7 +62,7 @@ main: procedure = .int
   tsoasm = out || "/TST.asm"; tsoobj = out || "/TST.obj"
   datmap = out || "/TSD.map"; datbin = out || "/TSD.bin"
   address crexx "cd pdos/src"
-  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. -I../../pdpclib/src -DUSE_MEMMGR twospace_service.c -o :compiled"
+  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ :file_profile[] -S -I. -I../../pdpclib/src -DUSE_MEMMGR twospace_service.c -o :compiled"
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_gate.c -o :gateasm"
   if rc <> 0 then return rc
@@ -69,21 +76,21 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_invocation.c -o :invasm"
   if rc <> 0 then return rc
-  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_channel.c -o :chanasm"
+  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ :file_profile[] -S -I. twospace_channel.c -o :chanasm"
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_io.c -o :ioasm"
   if rc <> 0 then return rc
-  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_dataset.c -o :dsasm"
+  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ :file_profile[] -S -I. twospace_dataset.c -o :dsasm"
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_cms.c -o :cmsasm"
   if rc <> 0 then return rc
-  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_cmsfile.c -o :cmsfileasm"
+  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ :file_profile[] -S -I. twospace_cmsfile.c -o :cmsfileasm"
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_cmscursor.c -o :cmscursorasm"
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_tso.c -o :tsoasm"
   if rc <> 0 then return rc
-  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_store.c -o :storeasm"
+  address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ :file_profile[] -S -I. twospace_store.c -o :storeasm"
   if rc <> 0 then return rc
   address crexx "run :classiccc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I. twospace_console.c -o :consoleasm"
   if rc <> 0 then return rc
@@ -200,11 +207,11 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :memtest"
   if rc <> 0 then return rc
-  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_channel.c pdos/tests/two-space/channel.c -o :chantest"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer :file_profile[] -I pdos/src pdos/src/twospace_channel.c pdos/tests/two-space/channel.c -o :chantest"
   if rc <> 0 then return rc
   address crexx "run :chantest"
   if rc <> 0 then return rc
-  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_dataset.c pdos/tests/two-space/dataset.c -o :dstest"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer :file_profile[] -I pdos/src pdos/src/twospace_dataset.c :geometry_source[] pdos/tests/two-space/dataset.c -o :dstest"
   if rc <> 0 then return rc
   address crexx "run :dstest"
   if rc <> 0 then return rc
@@ -212,7 +219,7 @@ main: procedure = .int
   if rc <> 0 then return rc
   address crexx "run :cmstest"
   if rc <> 0 then return rc
-  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_cmsfile.c pdos/tests/two-space/cmsfile.c -o :cmsfiletest"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer :file_profile[] -I pdos/src pdos/src/twospace_cmsfile.c pdos/tests/two-space/cmsfile.c -o :cmsfiletest"
   if rc <> 0 then return rc
   address crexx "run :cmsfiletest"
   if rc <> 0 then return rc
@@ -221,14 +228,14 @@ main: procedure = .int
   address crexx "run :cmscursortest"
   if rc <> 0 then return rc
   storetest = out || "/store-test"
-  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/src/twospace_store.c pdos/tests/two-space/store.c -o :storetest"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer :file_profile[] -I pdos/src pdos/src/twospace_store.c pdos/tests/two-space/store.c -o :storetest"
   if rc <> 0 then return rc
   address crexx "run :storetest"
   if rc <> 0 then return rc
   datemit = out || "/dat-emit"
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src pdos/src/twospace_dat.c pdos/src/twospace_fixture.c pdos/src/twospace_placement.c pdos/tests/two-space/dat_emit.c -o :datemit"
   if rc <> 0 then return rc
-  if args.0 = 8 & args.8 = "normal" then do
+  if args.0 >= 8 & args.8 = "normal" then do
     normaltest = out || "/normal-test"
     address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_dat.c pdos/src/twospace_fixture.c pdos/tests/two-space/normal.c -o :normaltest"
     if rc <> 0 then return rc
@@ -237,7 +244,7 @@ main: procedure = .int
   end
   asobject = out || "/service.o"
   elf = out || "/service.elf"
-  if args.0 = 8 then do
+  if args.0 >= 8 then do
     if args.8 = "normal" then address crexx "run :gnuas -m64 -march=z900 pdos/src/twospace_normal.S -o :asobject"
     else if args.8 = "pcomm" then address crexx "run :gnuas -m64 -march=z900 --defsym PCOMM_LAUNCH=1 pdos/tests/two-space/service.S -o :asobject"
     else if args.8 = "pairs" then address crexx "run :gnuas -m64 -march=z900 --defsym NATIVE_PAIRS=1 pdos/tests/two-space/service.S -o :asobject"
@@ -324,6 +331,8 @@ main: procedure = .int
   source_inputs[69] = "pdos/tests/two-space/normal_core.py"
   source_inputs[70] = "pdos/src/twospace_environment.inc"
   source_inputs[71] = "pdos/src/twospace_command_router.h"
+  source_inputs[72] = "pdos/src/twospace_fileprofile.h"
+  source_inputs[73] = "pdos/src/twospace_native_file_abi.h"
   hashes = .string[]
   address crexx "run shasum -a 256 :source_inputs[]" output hashes
   if rc <> 0 then return rc
@@ -331,8 +340,10 @@ main: procedure = .int
     call lineout out || "/inputs.sha256",hashes[i]
   end
   call lineout out || "/inputs.sha256"
+  call lineout out||"/file-profile.txt",word("default large-files",1+file_profile.0)
+  call lineout out||"/file-profile.txt"
   runout = out || "/run"
-  if args.0 = 8 & args.8 = "normal" then address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_core.py :elf :binary :datemit :runout"
-  else if args.0 = 8 then address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pcomm_core.py :elf :binary :datemit :runout"
+  if args.0 >= 8 & args.8 = "normal" then address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_core.py :elf :binary :datemit :runout"
+  else if args.0 >= 8 then address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pcomm_core.py :elf :binary :datemit :runout"
   else address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/service_machine.py :elf :binary :runout :gnuas :gnuld :classiccc :classicas :classicld :herctool :datemit"
   return rc

@@ -10,7 +10,17 @@ main: procedure = .int
   if args.0 <> 5 & args.0 <> 6 & args.0 <> 7 & args.0 <> 8 & args.0 <> 9 & args.0 <> 10 & args.0 <> 11 & args.0 <> 12 & args.0 <> 13 & args.0 <> 14 & args.0 <> 15 & args.0 <> 16 then return usage()
   if args.0 = 16 then if args.16 <> "image-only" then return usage()
   bare = 0
-  if args.0 = 7 then if args.6 = "command" then bare = 1
+  if args.0 = 7 | args.0 = 8 then if args.6 = "command" then bare = 1
+  large=0
+  if bare=1 & args.0=8 then do
+    if args.8<>"large-files" then return usage()
+    large=1
+  end
+  cylinders="100"; store_cylinders="42"; file_profile=.string[]
+  installer=.string
+  if large=1 then do
+    cylinders="512"; store_cylinders="325"; file_profile.1="large-files"
+  end
   work = args.1; core = args.2; gnuas = args.3; gnuld = args.4; hercdir = args.5
   pcomm = ""
   if bare = 1 then pcomm = args.7
@@ -124,6 +134,11 @@ main: procedure = .int
   call require rc = 0, "real-frame lifetime and release controls"
   base = work || "/base"
   call runlog "crexx -nokeep pdos/scripts/one-space-image.crexx --args " || shellquote(base) || " " || shellquote(hercdir), out || "/base-build.log"
+  if large=1 then do
+    installer=out||"/base/install-ipl"
+    address crexx "run cc -std=c89 -Wall -Wextra -Werror -DTSF_LARGE_FILES=1 pdos/src/install-ipl.c -o :installer"
+    call require rc=0,"512-cylinder checked IPL writer"
+  end
   classiccc = root || "/build/compiler/mvs/gcc/mf-classic-cc"
   classicas = root || "/build/tools/assembler/mf-classic-as"
   classicld = root || "/build/tools/linker/mf-classic-ld"
@@ -185,7 +200,7 @@ main: procedure = .int
   call runlog "env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pack_core.py " || shellquote(core) || " " || shellquote(launchbin) || " " || shellquote(package), out || "/package.log"
   call put_binary config,'F0F0F0F940F3F2F7F015'x
   ctl = media || "/ctl.txt"
-  call lineout ctl,"PDOS00 3390-1 100"
+  call lineout ctl,"PDOS00 3390-1 "||cylinders
   call lineout ctl,"PLOAD.SYS SEQ pload.sys TRK 10 1 0 PS F 18452 18452"
   call lineout ctl,"SYSVTOC VTOC CYL 2"
   call lineout ctl,"PDOS.SYS SEQ pdos.sys CYL 1 1 0 PS F 18452 18452"
@@ -254,17 +269,17 @@ main: procedure = .int
     call lineout ctl,"TSO31.PDTEST SEQ pdtest.bin CYL 1 1 0 PS F 18452 18452"
   end
   storefile = media || "/store.bin"
-  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/store_media.py :storefile"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/store_media.py :storefile :file_profile[]"
   call require rc = 0, "preformatted durable output store"
-  call lineout ctl,"PDOS.STORE SEQ store.bin CYL 42 1 0 PS F 18452 18452"
+  call lineout ctl,"PDOS.STORE SEQ store.bin CYL "||store_cylinders||" 1 0 PS F 18452 18452"
   call lineout ctl
   installer = out || "/base/install-ipl"
   address crexx "cd :media"
   call runlog shellquote(hercdir || "/dasdload") || " -bz2 ctl.txt datasets.cckd", media || "/dasdload.log"
-  call runlog shellquote(hercdir || "/cckd2ckd") || " -q -cyls 100 datasets.cckd datasets.ckd", media || "/cckd2ckd.log"
+  call runlog shellquote(hercdir || "/cckd2ckd") || " -q -cyls "||cylinders||" datasets.cckd datasets.ckd", media || "/cckd2ckd.log"
   call runlog shellquote(installer) || " datasets.ckd pdos00.ckd pload.sys pdos.sys command.exe config.sys kcore.bin", media || "/ipl-check.log"
-  call runlog shellquote(hercdir || "/ckd2cckd") || " -q -bz2 -cyls 100 pdos00.ckd pdos00.cckd", media || "/ckd2cckd.log"
-  call runlog shellquote(hercdir || "/cckd2ckd") || " -q -cyls 100 pdos00.cckd readback.ckd", media || "/readback.log"
+  call runlog shellquote(hercdir || "/ckd2cckd") || " -q -bz2 -cyls "||cylinders||" pdos00.ckd pdos00.cckd", media || "/ckd2cckd.log"
+  call runlog shellquote(hercdir || "/cckd2ckd") || " -q -cyls "||cylinders||" pdos00.cckd readback.ckd", media || "/readback.log"
   call runlog shellquote(installer) || " --compare pdos00.ckd readback.ckd pload.sys pdos.sys command.exe config.sys kcore.bin", media || "/roundtrip-check.log"
   before = out || "/store-before.json"
   call runlog "env PYTHONDONTWRITEBYTECODE=1 python3 " || shellquote(root || "/pdos/tests/two-space/store_check.py") || " " || shellquote(media || "/readback.ckd") || " " || shellquote(before), out || "/store-before.log"
@@ -378,5 +393,6 @@ require: procedure = .int
   return 0
 
 usage: procedure = .int
+  say "Fresh large-file qualification: ... CORE GNU_AS GNU_LD HERCULES_BIN command PCOMM large-files"
   say "usage: crexx -nokeep pdos/scripts/two-space-ipl.crexx --args NEW-build/pdos/output core-image GNU_AS GNU_LD HERCULES_BIN_DIR [PINNED_CMS24_STAGE [PINNED_CMS31_STAGE [PINNED_CMS31_IOQUAL_STAGE [PINNED_CMS31_LIBRARY_STAGE [PINNED_CMS24_IO24_STAGE [PINNED_TSO31_STAGE [PINNED_TSO64_ANY_STAGE [PINNED_TSO24_STAGE]]]]]]]]"
   return 2

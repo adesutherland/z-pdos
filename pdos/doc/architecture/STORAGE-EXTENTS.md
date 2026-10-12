@@ -82,3 +82,50 @@ metadata, insufficient space and reboot selection need explicit controls.
 The selected format/version and byte layout must be reviewed before changing
 persistent media. A full combined guest QA run follows the small checks for
 each implemented slice.
+
+## Disposable ADDRESS large-file qualification profile
+
+The current cREXX Classic libraries require more than the default 3 MiB CMS
+input and 2 MiB STORE/output limits. The explicit `large-files` recipe profile
+selects 16 MiB ordinary CMS input and STORE objects on a fresh 512-cylinder
+3390. It reserves a 325-cylinder STORE extent: eight slots, two 911-block banks
+per slot, and one immutable descriptor record, using F18452 records.
+`PDSTLAY2` identifies the layout and checks version, block size, bank stride,
+slot count and limit before bank access. Old or mismatched media is refused
+before writes. This is a bounded bank-layout prerequisite, not the proposed
+extent-allocated STORE v2 or an in-place migration.
+
+Both recipes must select the same profile. `two-space-next.crexx` takes
+`normal large-files` as its final two arguments; the bare
+`two-space-ipl.crexx` route takes `command PCOMM-STAGE large-files`. The native
+dataset/channel admission, checked installer, producer and stopped-media
+oracle agree on 512 cylinders. The independent operation-37 first-track
+transfer retains its existing contract. The stopped console actor selects
+100 or 512 cylinders from the independently recorded initial STORE geometry.
+Other historical Lab helpers that enforce 100 cylinders need an explicit
+larger-profile path before use.
+
+CMS output is padded to F18452 blocks. Its largest fitting framed logical
+length is 16,772,868 bytes, including the 64-byte envelope and record lengths;
+the remaining 4,348 bytes below 16 MiB do not form a complete output block.
+Ordinary-file framing also counts against input capacity. STORE tombstones
+retain their key slots. A fresh B/Classic chain plus transcript uses seven
+keys per personality, so qualify CMS and TSO on separately fresh STORE state.
+EOF-only or labelled blank physical placeholders make generated names visible
+to the current directory views; they must never contain an old valid result.
+
+The larger profile still uses whole-file backing. Four CMS output slots can
+reserve 64 MiB; eight TSO output slots can reserve 128 MiB per invocation,
+in addition to heaps, input files, child images and loader workspace. The
+512 MiB machine is a selected qualification profile, not proof that arbitrary
+depth with every file open fits. Measure peak storage and caller-resource
+recovery during the real script campaign. Managed/default images are unchanged.
+
+The [12 October ADDRESS campaign](../qualification/ADDRESS-CREXX-2026-10-12.md)
+now qualifies this bounded prerequisite with two B and two Classic lifetimes
+per personality, independent six-output/transcript/guard checks and normal
+resource/fleet recovery. Observed full-workflow real-frame peaks are
+340,123,648 bytes for CMS31 and 328,568,832 for TSO31 on the 512 MiB machine.
+Those observations are not native application heap high-water measurements
+or arbitrary maximum-depth capacity proof. Streaming, extent allocation,
+slot/tombstone reuse and STORE-v2 migration remain the PD-030 roadmap.
