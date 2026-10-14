@@ -1,0 +1,35 @@
+/* SPDX-License-Identifier: MIT; source-built native Stage 1 device probe. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  i=.int
+  if args.0<>6 then return 2
+  work=args.1;base=args.2;command=args.3;cc=args.4;classicas=args.5;ld=args.6
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  source="pdos/tests/batch/device_probe.c";asm=work||"/probe.asm";object=work||"/probe.obj"
+  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR -S -I pdpclib/src -I pdos/src :source -o :asm"
+  if rc<>0 then return rc
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+  if rc<>0 then return rc
+  uiasm=work||"/ui.asm";uiobj=work||"/ui.obj"
+  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src pdos/src/twospace_ui.c -o :uiasm"
+  if rc<>0 then return rc
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :uiasm :uiobj"
+  if rc<>0 then return rc
+  native=.string[];native[1]=command||"/part5.obj";native[2]=command||"/part1.obj"
+  native[3]=command||"/part2.obj";native[4]=command||"/part6.obj"
+  native[5]=base||"/support/MVSSUPA.obj";native[6]=command||"/stdlib.obj"
+  common="START CTYPE STRING TIME ERRNO ASSERT LOCALE MATH SETJMP SIGNAL MEMMGR"
+  do i=1 to words(common)
+    native[i+6]=base||"/c/objects/"||word(common,i)||".obj"
+  end
+  module=work||"/D4BATCH.rdw";map=work||"/D4BATCH.map";stage=work||"/D4BATCH.bin";packer=command||"/pack-tso"
+  address crexx "run :ld --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@CRT0 -Map :map -o :module :native[] :object :uiobj"
+  if rc<>0 then return rc
+  address crexx "run :packer :module :stage classic31"
+  return rc

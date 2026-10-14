@@ -23,6 +23,7 @@
 #include "twospace_display.h"
 #include "twospace_transcript.h"
 #include "twospace_command_router.h"
+#include "twospace_batch.h"
 typedef struct channel_context CHANNELCONTEXT;
 
 static unsigned int user_rights(unsigned int frame, void *unused);
@@ -58,6 +59,7 @@ static unsigned int console_device_init(void);
 static unsigned int console_device_geometry_check(TTCCAP *,unsigned int);
 static unsigned int console_device_geometry(TTCCAP *);
 static unsigned int console_device_reap(unsigned int);
+static unsigned int batch_device_close(unsigned int,unsigned int);
 static unsigned int console_panel_service(TSGREQUEST *);
 static unsigned int console_panel_enabled(void);
 static unsigned int console_panel_render(void);
@@ -1411,6 +1413,7 @@ static int native_clean(unsigned int token, const TSVRESOURCE *resource,
     unsigned int i;
     (void)token;
     if (!frame || !resource) return 1;
+    if(resource->kind==TSV_BATCH_DEVICE)return batch_device_close(token,resource->handle)?1:0;
     if(resource->kind==TSV_PANEL)return console_panel_close(token,resource->handle);
     if(resource->kind==TSV_DEVICE_SESSION){if(console_device_reap(token))return 1;return console_device_close(token,resource->handle)?1:0;}
     if(resource->kind==TSV_HIGH_IMAGE)return high_cleanup(resource->handle,frame);
@@ -2981,6 +2984,7 @@ static unsigned int call_alloc(unsigned int,unsigned int *,unsigned char **);
 #include "twospace_device.inc"
 #include "twospace_panel.inc"
 #include "twospace_environment.inc"
+#include "twospace_batch.inc"
 
 static unsigned int service_request(TSGREQUEST *request)
 {
@@ -2994,7 +2998,10 @@ static unsigned int service_request(TSGREQUEST *request)
     if(request->svc==TCM_SVC)return env_service(request);
     if(request->svc==246U&&TSVTOP(&native_invocations)&&env_current()&&env_current()->active)
         return env_finish(1U);
-    if(request->svc==TSA_IO_SVC)return console_v1_service(request);
+    if(request->svc==TSA_IO_SVC){
+        if(request->direction>=TSA_IO_BATCH_OPEN&&request->direction<=TSA_IO_BATCH_STATUS)return batch_device_service(request);
+        return console_v1_service(request);
+    }
     if(request->svc==198U)return channel_benchmark(request);
     if(console_v1_enabled()&&tc_legacy_control(request->svc))return 20U;
     if(request->svc==199U&&normal_boot()){

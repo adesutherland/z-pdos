@@ -68,6 +68,12 @@ int main(void)
     assert(TSVHAS(&stack,parent,TSV_DEVICE_SESSION,808U)==TSV_OK);
     assert(TSVOWN(&stack,parent,TSV_PANEL,909U)==TSV_OK);
     assert(TSVHAS(&stack,parent,TSV_PANEL,909U)==TSV_OK);
+    assert(TSVOWN(&stack,parent,TSV_BATCH_DEVICE,1010U)==TSV_OK);
+    assert(TSVHAS(&stack,parent,TSV_BATCH_DEVICE,1010U)==TSV_OK);
+    assert(TSVHAS(&stack,parent+1U,TSV_BATCH_DEVICE,1010U)==TSV_BUSY);
+    assert(TSVFORGET(&stack,parent,TSV_BATCH_DEVICE,1010U)==TSV_OK);
+    assert(TSVHAS(&stack,parent,TSV_BATCH_DEVICE,1010U)==TSV_STALE);
+    assert(TSVOWN(&stack,parent,TSV_RESOURCE_LAST+1U,1011U)==TSV_BAD);
     assert(TSVHAS(&stack,parent+1U,TSV_PANEL,909U)==TSV_BUSY);
     assert(TSVFORGET(&stack,parent,TSV_PANEL,909U)==TSV_OK);
     assert(TSVFORGET(&stack,parent,TSV_DEVICE_SESSION,808U)==TSV_OK);

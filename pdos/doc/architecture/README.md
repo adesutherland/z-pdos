@@ -8,6 +8,13 @@ format/migration and production guest qualification.
 shared U/C dispatcher, checked synchronous K continuation and bounded
 CMS31/TSO31 compatibility interfaces.
 
+[Card-reader batch jobs and 3270 job forms](BATCH-JOBS.md) record the selected
+13 October direction: preserve the Workbench/line console, add a 3505/1403
+batch transport shared with z/OS/Hercules, and use one job service for reader,
+console and forms. [PD-033](../BACKLOG.md#pd-033-card-reader-batch-jobs-and-3270-job-forms)
+owns the staged plan. [Stage 1's neutral reader/printer subset](../qualification/BATCH-STAGE1-2026-10-13.md)
+is locally qualified; native batch jobs, DDs, JCL and forms remain later work.
+
 z/PDOS boots from a source-built 3390 disk and runs selected native CMS and
 TSO applications. Version 0.2 uses two translations on one z/Architecture
 CPU: a protected supervisor address space **K**, and one shared application

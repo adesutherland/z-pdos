@@ -24,6 +24,13 @@ and an application's service call.
 - [Application command environments](architecture/COMMAND-ENVIRONMENTS.md)
   and [review/freeze record](qualification/COMMAND-ENVIRONMENTS-2026-10-10.md):
   shared U/C dispatch and the bounded CMS31/TSO31/PDOS client increment.
+- [Card-reader batch jobs and 3270 job forms](architecture/BATCH-JOBS.md):
+  selected console-preserving design; [PD-033](BACKLOG.md#pd-033-card-reader-batch-jobs-and-3270-job-forms)
+  owns the staged implementation and qualification gates; jobs, DDs, JCL and
+  forms remain later work.
+- [Initial batch contracts and reader/printer proof](qualification/BATCH-STAGE1-2026-10-13.md):
+  locally qualified Stage 1 neutral devices on model 2 and plain line consoles;
+  native batch jobs, DDs, JCL and forms remain later stages.
 - [Development guide](development/README.md): source map and change contracts.
 - [Build contract](development/BUILD-CONTRACT.md): recorded acceptance stages.
 - [0.1 guest qualification](qualification/QUALIFICATION.md): exact historical

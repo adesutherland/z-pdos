@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "profile": "serial TSO31, IBM1047, exact shared candidate package",
+  "status": "Stage 0 contract; runnable batch cases require Stage 3 entry/DD services",
+  "cases": [
+    {"id": "B01", "job": "direct-version.jcl", "route": "direct MVS EXEC PGM", "expect": "RC 0 and candidate RXVM version in SYSOUT"},
+    {"id": "B02", "route": "CRXCG", "expect": "fresh compile/assemble/run RC 0; exact text and RXBIN records"},
+    {"id": "B03", "route": "CRXCL/CRXLGO", "expect": "matching RXLINK/providers; exact linked RXBIN and program outputs"},
+    {"id": "B04", "route": "native DD probe", "expect": "exact FB/VB text, padding, empty records and ordered 00-FF bytes"},
+    {"id": "B05", "route": "missing DD/library", "expect": "truthful failure, no operator input consumed, no stale output executed"},
+    {"id": "B06", "route": "invalid source in CRXCG", "expect": "compiler nonzero; dependent steps skipped; job reports failure"},
+    {"id": "B07", "job": "background-version.jcl", "route": "background TSO/IKJEFT01", "expect": "CALL command RC 0; complete SYSTSPRT and no terminal dependency"},
+    {"id": "B08", "route": "native ADDRESS TSO31", "expect": "declared launcher/environment, command RC and exact DD output match z/OS"},
+    {"id": "B09", "route": "intentional application RC 8", "expect": "OS success and application RC 8 remain distinct"},
+    {"id": "B10", "route": "active CANCEL and capacity refusal", "expect": "owned unwind/cleanup, truthful failure and intact console"}
+  ]
+}

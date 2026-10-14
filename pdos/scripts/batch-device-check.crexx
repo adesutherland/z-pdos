@@ -1,0 +1,34 @@
+/* SPDX-License-Identifier: MIT; PD-033 host checks before source freeze. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>1 then return 2
+  work=args.1
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  binary=work||"/batch-channel"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_channel.c pdos/src/twospace_batch.c pdos/tests/batch/channel.c -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary"
+  if rc<>0 then return rc
+  io=work||"/shared-io"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_channel.c pdos/src/twospace_io.c pdos/tests/two-space/io.c -o :io"
+  if rc<>0 then return rc
+  address crexx "run :io"
+  if rc<>0 then return rc
+  invocation=work||"/invocation"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_invocation.c pdos/tests/two-space/invocation.c -o :invocation"
+  if rc<>0 then return rc
+  address crexx "run :invocation"
+  if rc<>0 then return rc
+  native=work||"/batch-native.inc";service=work||"/batch-service"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/batch/service_fixture.py pdos/src/twospace_batch.inc :native"
+  if rc<>0 then return rc
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src -I :work pdos/src/twospace_channel.c pdos/src/twospace_batch.c pdos/src/twospace_io.c pdos/src/twospace_invocation.c pdos/tests/batch/service.c -o :service"
+  if rc<>0 then return rc
+  address crexx "run :service"
+  return rc

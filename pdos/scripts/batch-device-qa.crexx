@@ -1,0 +1,21 @@
+/* SPDX-License-Identifier: MIT; frozen Stage 1 media and physical device QA.
+ * The operator holds the fleet maintenance reservation and verifies cleanup.
+ * The named media are disposable. This never adopts a managed fleet image.
+ */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>4 then return 2
+  media=args.1;herc=args.2;work=args.3;primary=args.4
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  if primary<>"3270" & primary<>"line" then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  disk=media||"/media/pdos00.cckd";core=media||"-inputs/normal.core";hercules=herc||"/hercules"
+  flags=.string[]
+  if primary="line" then flags[1]="--line-primary"
+  else flags[1]="--colour"
+  commands="pdos/tests/batch/commands.json"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/console_machine.py :disk :core :hercules :work --normal --monitor --workbench-normal --batch-devices --model 2 --commands :commands :flags[]"
+  return rc

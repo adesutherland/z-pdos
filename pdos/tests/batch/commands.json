@@ -1,0 +1,18 @@
+[
+  ["VERSION", "PDIO1"],
+  ["D4BATCH", "PCOMM END 1 RC=0", [
+    ["PD033 RELOAD READY", "reload", "batch"],
+    ["PD033 RELOAD READY", "GO"],
+    ["PD033 INTERVENTION READY", "intervention", "batch"],
+    ["PD033 INTERVENTION READY", "GO"],
+    ["PD033 DECK REJECT READY", "reject-short", "batch"],
+    ["PD033 DECK REJECT READY", "GO"],
+    ["PD033 PRINTER OFFLINE READY", "printer-offline", "batch"],
+    ["PD033 PRINTER OFFLINE READY", "GO"],
+    ["PD033 RESTORE READY", "restore", "batch"],
+    ["PD033 RESTORE READY", "GO"]
+  ], "PD033 DEVICE PASS"],
+  ["D4BATCH cleanup", "PCOMM END 2 RC=0", [], "PD033 CLEANUP PASS"],
+  ["HELLO", "PCOMM END 3 RC=0"],
+  ["RXVM -v", "PCOMM END 4 RC=0"]
+]

@@ -10,6 +10,7 @@ import re
 import socket
 import struct
 import subprocess
+import sys
 import shutil
 import threading
 import time
@@ -183,6 +184,7 @@ def run(a):
     port=unused_loopback_port();script=unused_loopback_port();before=digest(disk)
     primary="3215 noprompt" if a.line_primary else "3270"
     cfg="ARCHLVL ESAME\nMAINSIZE 512\nNUMCPU 1\nCPUMODEL 2064\nDIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\nCODEPAGE 819/1047\n"
+    if a.batch_devices:cfg+="LEGACYSENSEID ON\n"
     cfg+=f"CNSLPORT 127.0.0.1:{port}\n01B9 3390 {disk}\n0009 {primary}\n"
     attachments=[]
     for option,address in (("cms_exchange","01BA"),("fixture_exchange","01BB")):
@@ -201,6 +203,10 @@ def run(a):
         cfg+=f"0561 3420 {target}\n"
     if a.monitor:cfg+="000A 3215 noprompt\n"
     if a.stage3 in ("family","dbcs"):cfg+="000B 3287\n"
+    if a.batch_devices:
+        sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"batch"))
+        from actor import prepare as batch_prepare
+        cfg+=batch_prepare(out)
     (out/"machine.cnf").write_text(cfg);(out/"run.rc").write_text("sysclear\n")
     cmd=[str(herc),"-t","-f",str(out/"machine.cnf"),"-o",str(out/"console.log"),"-r",str(out/"run.rc")]
     proc=subprocess.Popen(cmd,cwd=out,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
@@ -328,6 +334,11 @@ def run(a):
                             raise RuntimeError("application ended before input: "+prefix[0])
                         return False
                     until(input_ready,proc,log)
+                    if source=="batch":
+                        if not a.batch_devices:raise ValueError("batch action requires explicit device profile")
+                        from actor import action as batch_action
+                        batch_action(text,proc,log,out)
+                        continue
                     if source=="disconnect":
                         if not monitor:raise ValueError("monitor already absent")
                         monitor_parts.append(monitor.text());monitor.close();monitor=None
@@ -580,7 +591,14 @@ def run(a):
                     checks["scroll_and_child_return_repaint"]=all(x in screens[-1] for x in ("z/PDOS PCOMM","PCOMM END 2 RC=0","crexx-1.0.0-beta.3")) if a.pcomm else all(x in screens[0] for x in ("Console qualification","LINE 079:","crexx-1.0.0-beta.3","CONSOLE INPUT 1:"))
         except (ValueError,struct.error) as exc:checks["transcript_framing"]=False;error=error or str(exc)
     else:checks["stopped_core_complete"]=False
-    receipt={"profile":{"model":a.model,"colour":a.colour,"basic":a.basic,"editor":a.editor,"oversize":a.oversize,"workbench":a.workbench,"transfer":a.transfer,"workbench_normal":a.workbench_normal,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw,"stage3":a.stage3},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
+    if a.batch_devices:
+        try:
+            from actor import inspect as batch_inspect
+            checks.update(batch_inspect(out))
+        except Exception as exc:
+            checks["batch_capture_complete"]=False
+            if error is None:error=repr(exc)
+    receipt={"profile":{"model":a.model,"colour":a.colour,"basic":a.basic,"editor":a.editor,"oversize":a.oversize,"workbench":a.workbench,"transfer":a.transfer,"workbench_normal":a.workbench_normal,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw,"stage3":a.stage3,"batch_devices":a.batch_devices},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
     if service_cost is not None:receipt["service_cost"]=service_cost
     if a.normal and transcript is not None and any(e.get("text","").startswith("PD25 ") for e in transcript["events"]):
         from io_benchmark_check import observations
@@ -622,6 +640,7 @@ if __name__=="__main__":
     p.add_argument("--colour",action="store_true");p.add_argument("--workbench",action="store_true");p.add_argument("--oversize");p.add_argument("--workbench-normal",action="store_true");p.add_argument("--basic",action="store_true");p.add_argument("--transfer",action="store_true");p.add_argument("--editor",action="store_true")
     for flag in ("monitor","line-primary","handoff","raw","disconnect","pcomm","normal","rootfault","early-input"):p.add_argument("--"+flag,action="store_true")
     p.add_argument("--commands")
+    p.add_argument("--batch-devices",action="store_true")
     p.add_argument("--stage3",choices=("graph","family","dbcs","recovery","policy"))
     for name in ("cms-exchange","fixture-exchange","tape-input"):p.add_argument("--"+name)
     p.add_argument("--tape-output",action="store_true")

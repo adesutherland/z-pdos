@@ -42,6 +42,13 @@ names the separate locally tested image. P6 now adds the protected K/U route and
 TSO24, CMS24 compiler/assembler and broader CMS/TSO services remain separate
 work. See the [0.2.0 record](qualification/RELEASE-0.2.0.md) for its release gates.
 
+The selected 13 October operator increment is
+[PD-033](#pd-033-card-reader-batch-jobs-and-3270-job-forms): preserve the current
+console, add a 3505/1403 native batch route shared with z/OS/Hercules, and
+provide 3270 job forms over the same service. Its bounded device/job proofs
+can use admitted existing media; retained spool/history and larger workloads
+depend on PD-030's selected storage slice.
+
 ### Phase 2 delivery contract
 
 1. **DASD discovery and selection.** `DEVICES` shows attached channel addresses
@@ -793,3 +800,105 @@ be K-only and explicitly budgeted rather than consuming low U placement.
 - Acceptance: Exact selected-source assembler proof and mismatch rejection; newlib/MVSSUPA binary write/reopen/replace of similarly named members; stopped journal keys/payload readback; affected PDOS CMS/TSO real-script replay and normal resource recovery. Preserve the failed media and earlier receipts.
 - Review: [Native PDS member review](qualification/ADDRESS-PDS-MEMBER-REVIEW-2026-10-12.md). This private service work area is qualified against named maintained SDK inputs, not arbitrary vendor implementations. Managed images remain unchanged.
 - Evidence: [12 October ADDRESS qualification](qualification/ADDRESS-CREXX-2026-10-12.md) records the native binary member write/reopen/replace, full CMS/TSO B and Classic compiler/runtime chains, independent stopped output/transcript/guard validation and normal final fleet handback. Source/core and runtime/fixture/media freezes remain separate; older failed receipts are preserved.
+
+## PD-033: Card-reader batch jobs and 3270 job forms
+
+- Type: improvement / native compatibility / release qualification
+- Status: In progress
+- Target: pdos-zarch K/U, Hercules 3505 reader and 1403 printer, native TSO31 batch/DD services, PCOMM and retained 3270 panels
+- Observation: The current product has a retained Workbench console, semantic line/teletype delivery, a common owned channel engine, scoped native invocations/DDs and bounded 3287 printing. PCOMM command files do not provide a JCL job service, and the 3287 facility is not a 3505/1403 batch route. Native TPUT/TGET and invocation-local DDs do not establish background-TSO or preallocated job-DD compatibility.
+- Direction selected (13 October): Keep the existing console as the human/LLM operator surface. Add the same card-deck/printer transport used for z/OS on Hercules. Card reader, console submission and 3270 Submit/Jobs/Output forms share one job service. Start with serial TSO31 jobs and a strict documented JCL subset for cREXX; preserve existing foreground and native behavior.
+- Authorization (13 October): Implement Stage 0 and the Stage 1 card reader/printer proof. Use a disposable qualification image, preserve current console behavior, and review/freeze before guest QA. Stages 2–6, managed-image adoption and publication remain separate increments. The existing PD-030 storage scope is unchanged.
+- Design: [Batch job contract](architecture/BATCH-JOBS.md). Evidence for reusable components: [owned I/O qualification](qualification/IO-FOUNDATION-2026-10-09.md), [console checkpoint](qualification/CONSOLE-STAGE3-2026-10-09.md), [ADDRESS qualification](qualification/ADDRESS-CREXX-2026-10-12.md) and [storage direction](architecture/STORAGE-EXTENTS.md).
+- Overall acceptance: Submit common cREXX JCL through the actual virtual reader on PDOS and a named z/OS/Hercules guest; execute the pinned native package with prebound DDs and real batch I/O; collect complete job/step/DD printer reports and exact dataset outputs; reproduce the same job behavior through the PDOS console and 3270 forms. Distinguish application RC, OS/service failure, execution completion and print delivery. Recover the console and all resources after success, failure and cancellation. Close only the selected qualified profile, with wider services and released artifacts separately identified.
+- Stage 0/1 checkpoint (13 October): Initial capacities, entry/reference cases and neutral device ABI are selected. The implemented 3505/1403 subset passes four host control groups, a fresh complete native build and 46 harness checks across model 2 and plain 3215 guest runs. Independent stopped endpoint/record/transcript readback and normal cleanup pass. [The dated result](qualification/BATCH-STAGE1-2026-10-13.md) pins review freezes, repairs, exact inputs and limits. This closes the selected Stage 0 contract and Stage 1 local device proof, not the complete PD-033 item or a release.
+- Transport finding: The installed Hercules reader presents EOF for a truncated EBCDIC host file. The host adapter rejects non-80-byte framing before configuration/devinit. Physical partial-transfer rejection is checked in the portable/actual-provider host controls; it is not claimed as a Hercules partial-card guest result.
+
+### Delivery sequence and stage gates
+
+The stages below belong to this item; they are not another work queue. Each
+implementation stage receives final source review, focused checks and an exact
+source/input freeze before expensive guest qualification. A repair returns to
+review and a new freeze. Reuse unchanged checks with an explicit dependency
+review. A stage passes only when its stated result has been recorded.
+
+| Stage | Deliverable | Gate before advancing |
+| --- | --- | --- |
+| 0 | Freeze the shared job, console, native-entry, JCL and spool contracts | Reviewable reference jobs and independent expected results; bounded capacities and active-job control behavior agreed in the contract |
+| 1 | Actual 3505 reads and 1403 writes on the common I/O engine | Fresh PDOS IPL proves exact input records, readable print records, reload/EOF, errors and unchanged console operation |
+| 2 | Serial job/step execution, bounded spool and operator recovery | Two sequential jobs with truthful return/failure states, closed output and no DD, storage, terminal or I/O leaks |
+| 3 | Prebound native DDs and genuine batch input/output | Native TSO31 probes and cREXX tools read/write the allocated DDs without consuming operator input; batch ABI and native reference match |
+| 4 | Common JCL conversion, procedures and console submission | The cREXX build/run procedures execute through the reader and console; malformed/unsupported jobs are rejected before program execution |
+| 5 | 3270 Submit, Jobs and Output forms | The same expanded jobs/results as the other routes, with model/line, ownership, retry and recovery checks |
+| 6 | Paired qualification controller and release checkpoint | Exact-package PDOS/z/OS comparison, failure controls, stopped dataset readback and clean-consumer IVP; manual release/install gates remain explicit |
+
+### Stage 0: Freeze contracts and reference jobs
+
+The selected initial bounds, native entry inventory, reference cases and Stage
+1 device ABI are pinned in [the Stage 0 contract](architecture/BATCH-STAGE0.md).
+Implementation/qualification status is recorded here and in dated receipts.
+
+- Pin the one-CPU K/U development profile, machine/console devices and generous TSO31 heap/storage budget. Inventory current channel, invocation, DD, panel and STORE limits before setting bounded job/step/DD/spool capacities.
+- Select direct native batch entry versus a required batch-TSO command launcher using the actual candidate's ABI. Inventory the QSAM/BSAM and GETLINE/PUTLINE forms reached by those entries. Do not assume an EXEC PGM invocation can use a foreground command-processor parameter list.
+- Freeze serial dispatch and the active-job K control subset. Preserve ordinary PCOMM behavior at idle; specify status/notices/cancel and busy/queued responses while shared U is executing a native step. Select a bounded recovery mechanism for a CPU-bound step as well as a blocked I/O step; do not imply a second shell or general scheduler.
+- Freeze reader framing, converter/PROC grammar, immutable job descriptors, DD inheritance/override/disposition, spool publication and restart behavior. Syntax errors start no programs; resource failure, skipped steps and print errors have separate results.
+- Establish the common source procedures: CRXC builds RXBIN; CRXCG builds/runs; CRXCL/CRXLGO must declare retained/temporary linked-RXBIN outputs. Reserve SYSLMOD for native modules and keep any future native wrapper/packager separate.
+- Prepare portable jobs for a tiny C batch probe, supplied RXBIN, fresh compile/assemble/run, linking/library lookup, DD records and ADDRESS TSO31. Keep source/data/deck/code-page/hash identities and expected RC/record results independent of the implementation.
+- Gate: The reference jobs and selected launchers have an explicit native z/OS proof path, each grammar/ABI feature has an owner, and capacities fit a reviewed spool/media profile. Open service/PROC questions are resolved before code depending on them is accepted.
+
+### Stage 1: Reader and printer device proof
+
+- Add configurable 3505/1403 registration, CCW builders and status/sense validation in K over the common completion engine; give each device its own owned real workspace. Extend the source image/recipe's optional batch device profile with collision checks.
+- Read complete 80-byte EBCDIC cards; distinguish EOF, no medium/intervention, short transfer, unit/channel error and late status. Qualify a second deck after reload/attention without rebooting.
+- Write bounded 1403 records with explicit line/page control. Keep 3287 behavior and console/monitor ownership independent. Retain incomplete-print errors rather than claiming an accepted channel request was a delivered report.
+- Gate: Fresh Classic build/link/image/IPL, exact card hashes, independently checked Hercules print output, absent-device/error/retry controls, workspace cleanup and the affected 3270/line console regressions. No JCL execution claim yet.
+
+### Stage 2: Serial job service and bounded spool
+
+- Add K-owned job/step/result descriptors and a serial dispatch gate using current native invocation/unwind services. Exercise an explicit test descriptor before introducing the JCL converter.
+- Admit complete job input before queue publication; assign non-reused job identities and separate execution from print state. Preserve step OS status, normal RC, abnormal failure and skip reason; final results follow close/disposition cleanup.
+- Use a reviewed bounded single-job spool envelope within admitted storage for the first proof. Preflight its slot/byte usage together with transcript, libraries, temporary files and outputs. Reject exhaustion explicitly and keep the existing STORE layout/default media intact.
+- Implement the frozen K status/notices/cancel route, idle console restoration and controlled recovery of CPU-bound, faulting and I/O-blocked steps. Reader/printer operations never own batch terminal input. Hold/release and purge follow checked ownership.
+- On restart, retain a committed result or report interrupted execution; do not automatically replay uncertain dataset writes. Reprint retained output without rerunning the job.
+- Gate: Two sequential descriptor jobs, normal RC 0/nonzero, load failure, child fault, print failure, quota refusal, cancellation and interrupted-spool controls. Prove terminal/input isolation, return to the current console and no resource leaks by actual state/readback.
+
+### Stage 3: Native DD and batch I/O compatibility
+
+- Add a step allocation context above invocation-local DD tables. Bind DDs before entry, support scoped lookup/inheritance and preserve the caller's existing bindings across nested commands and unwind.
+- Implement the chosen dataset/member, in-stream, DUMMY, concatenation, temporary-data and SYSOUT adapters with explicit FB/VB framing, EOF, empty-record and encoding behavior. Freeze the selected DCB/SPACE/DISP semantics and protect unrelated datasets.
+- Implement the native batch entry/service forms selected in Stage 0. Maintain correct foreground behavior; do not hide an application's TPUT-only background bug by routing all terminal output to spool.
+- Treat upstream cREXX/SDK batch-capable entry/runtime work as a separate owned prerequisite. Once available, pin one package for both targets; do not qualify a PDOS-only executable as that shared-package result.
+- Gate: Direct batch probe and selected TSO31 cREXX executions on real DD bindings, with exact native reference results. Include missing DD, empty input, ordered binary bytes, reopen/replace, temporary PASS/delete, nested DD visibility, invalid native spans, failed writes and final cleanup. Operator input remains untouched.
+
+### Stage 4: JCL, procedures and console submission
+
+- Implement supplied-storage JCL conversion/expansion in U into the checked job descriptor. Admit only the frozen JOB, EXEC PGM/PARM/PROC, symbols/overrides and DD subset, including actual continuation/quoting and in-stream delimiters needed by the shared decks.
+- Resolve the configured procedure and program-library search order. Support explicit site/library bindings, DD concatenation, stepname.ddname overrides, selected temporary datasets/dispositions and stop conditions. Unsupported operands produce precise card/column diagnostics before execution.
+- Deliver common CRXC/CRXCG and the reviewed CRXCL/CRXLGO variants with their truthful RXBIN outputs. Distinguish native load libraries from bytecode libraries; document launchers, DDs and supported storage requests.
+- Add console HELP and job commands through the same service. Proposed operations are SUBMIT dataset/member, JOBS, STATUS, OUTPUT with step/DD selection, HOLD/RELEASE, CANCEL and explicit PURGE. An in-stream console submit uses explicit framing and cannot execute an accidentally truncated deck.
+- Gate: Reader and console submissions of the same job produce the same expanded descriptors, steps and dataset results. Run fresh build/link/go plus expected failure/skip cases. Reject malformed/incomplete decks, unsupported JCL, bad PROC/symbols, missing libraries and resource limits without partial execution. This is the first unattended cREXX batch checkpoint.
+
+### Stage 5: Retained 3270 job forms
+
+- Build Submit, Jobs and Output as U presentation over the established checked service. Submit validates source/member, PROC, parameters and DD overrides and shows the generated JCL; Jobs exposes execution/print status and controls; Output selects expanded step/DD and pages ordered records.
+- Use the existing field, cursor, AID, model, panel and terminal ownership contracts. Preserve Clear/repaint, monochrome, IBM1047 and the semantic teletype path. Display active-job control limitations rather than assuming a concurrent U form controller.
+- Bind submission retry tokens and job actions to real identities. Repeated Enter/reconnect must not submit an unintended second job or act on a stale job; deliberate resubmission is distinct. Purge refuses active or owned records.
+- Gate: Models 2–5, monochrome and a plain line console; long/invalid fields, cursor/AIDs, reconnect/repaint, retry, busy state, job failure and console return. Compare forms-generated JCL, allocations and results with reader/console execution; include nested foreground/ADDRESS ownership regressions.
+- Dependency: A fixed single-job prototype is possible within declared limits. Useful retained job lists, larger spool records and workload history require the selected PD-030 capacity/allocation/recovery slice; this stage must not silently introduce another persistent layout.
+
+### Stage 6: Paired qualification and release checkpoint
+
+- Retain cREXX orchestration under pdos/scripts/ for the product and Mainframe Lab tools/lab.crexx for private fleet coordination. Separate Stage/Submit/Wait/Collect/Assert so a submission acknowledgment cannot pass a run.
+- Use the actual 3505/1403 transport for both PDOS and a leased named z/OS/Hercules guest. Configure and verify the guest JES reader/printer route, unique run/job identities and printer-file boundaries. Parse each system's real job/step outcome and normalize only declared presentation differences.
+- Pin candidate binaries, runtime/libraries, PROC sources, test inputs, deck code page and expected records. Qualify supplied RXBIN and a fresh compile/assemble/link/run chain, native DD/input/output, current ADDRESS TSO31, expected nonzero RC, missing DD/library, compiler error, cancellation and resource exhaustion.
+- Verify exact datasets independently after shutdown/export. Printer translation/pagination is report evidence, not the binary oracle. Assert all required test counts and known skips explicitly; an incomplete log or timeout fails the harness.
+- After TSO31 passes, select and qualify affected TSO64 ANY/HIGH cells separately; preserve constrained 24-bit and CMS regression boundaries. Record source/media/runtime freezes and the exact unchanged evidence reused.
+- Gate: Documented clean-consumer PDOS IVP through cards/printer and forms, paired z/OS native results, recovery/restart and affected console/media regressions. Update guides and name remaining unsupported features. Manual installation, IBM Binder/RECEIVE validation, release-image selection and publication remain separate release gates.
+
+### Dependencies and ownership
+
+- PD-025 owns the reusable channel/completion foundation; PD-021/022/024 own existing console, panels and text semantics. Extend their checked contracts rather than maintain parallel drivers or bypass terminal leases.
+- PD-030 owns storage capacity, extents and persistent migration. Admit a bounded prototype explicitly; retained history and full-library jobs must fit a selected qualified storage slice before being advertised.
+- PD-032's scoped native member identity and the ADDRESS/environment ABI remain explicit dependencies of the native DD/command cases. Reuse their exact evidence only if the affected services and package inputs are unchanged.
+- Kernel/job/device/file changes belong to pdos/src/; U converter/forms and small probes belong to the same component. Maintained PDPCLIB belongs to pdpclib/src/, application entry/runtime changes to CREXX or mainframe-cross-sdk, and native output/linker fixes to their owning component. Product automation is cREXX; a required binary/media interface helper may use its existing necessary language.
+- Keep only this item as the live delivery queue. Design changes update architecture/BATCH-JOBS.md; supported behavior goes in user guides only after qualification; dated receipts own exact results. No private correspondence, credentials, guest disks or native reference listings enter the product repository.
