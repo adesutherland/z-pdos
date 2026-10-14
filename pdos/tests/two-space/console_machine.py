@@ -179,12 +179,14 @@ def parse_transcript(raw):
             "sha256":hashlib.sha256(data).hexdigest()}
 
 def run(a):
+    if a.job_cut and not (a.batch_jobs and a.normal):raise ValueError("job cut requires explicit normal batch proof")
+    if a.batch_devices and a.batch_jobs:raise ValueError("choose one batch fixture")
     out=Path(a.output).resolve();out.mkdir(exist_ok=False)
     disk=Path(a.disk).resolve();core=Path(a.core).resolve();herc=Path(a.hercules).resolve()
     port=unused_loopback_port();script=unused_loopback_port();before=digest(disk)
     primary="3215 noprompt" if a.line_primary else "3270"
     cfg="ARCHLVL ESAME\nMAINSIZE 512\nNUMCPU 1\nCPUMODEL 2064\nDIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\nCODEPAGE 819/1047\n"
-    if a.batch_devices:cfg+="LEGACYSENSEID ON\n"
+    if a.batch_devices or a.batch_jobs:cfg+="LEGACYSENSEID ON\n"
     cfg+=f"CNSLPORT 127.0.0.1:{port}\n01B9 3390 {disk}\n0009 {primary}\n"
     attachments=[]
     for option,address in (("cms_exchange","01BA"),("fixture_exchange","01BB")):
@@ -207,6 +209,10 @@ def run(a):
         sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"batch"))
         from actor import prepare as batch_prepare
         cfg+=batch_prepare(out)
+    if a.batch_jobs:
+        sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"batch"))
+        from job_actor import prepare as job_prepare
+        cfg+=job_prepare(out)
     (out/"machine.cnf").write_text(cfg);(out/"run.rc").write_text("sysclear\n")
     cmd=[str(herc),"-t","-f",str(out/"machine.cnf"),"-o",str(out/"console.log"),"-r",str(out/"run.rc")]
     proc=subprocess.Popen(cmd,cwd=out,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
@@ -334,6 +340,11 @@ def run(a):
                             raise RuntimeError("application ended before input: "+prefix[0])
                         return False
                     until(input_ready,proc,log)
+                    if source=="job":
+                        if not a.batch_jobs:raise ValueError("job action requires explicit profile")
+                        from job_actor import action as job_action
+                        job_action(text,proc,log,out)
+                        continue
                     if source=="batch":
                         if not a.batch_devices:raise ValueError("batch action requires explicit device profile")
                         from actor import action as batch_action
@@ -405,10 +416,11 @@ def run(a):
                     editor_screen=terminal_action(script,"Ascii()").stdout
                     if "command exceeds" not in editor_screen:raise ValueError("shell refusal is not visible")
                     (out/"editor.screen").write_text(editor_screen)
-            if client:client.enter("EXIT")
-            else:
-                until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
-                terminal_action(script,'String("EXIT")');terminal_action(script,"Enter()")
+            if not a.job_cut:
+                if client:client.enter("EXIT")
+                else:
+                    until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
+                    terminal_action(script,'String("EXIT")');terminal_action(script,"Enter()")
         elif a.pcomm:
             until(lambda:"welcome to pcomm" in terminal_action(script,"Ascii()").stdout,proc,log)
             for command,marker in (("VERSION","PDIO1"),("CMS RUN 31 RXVM -v","PCOMM END 1 RC=0"),("RXVM -v","PCOMM END 2 RC=0")):
@@ -453,11 +465,14 @@ def run(a):
             until(lambda:log.read_text(errors="replace").count("0:000A COMM: client")>=2,proc,log,20)
             terminal_action(script,'String("NEXT")');terminal_action(script,"Enter()")
         end=time.monotonic()+180
-        while "disabled wait state" not in log.read_text(errors="replace"):
+        while not a.job_cut and "disabled wait state" not in log.read_text(errors="replace"):
             if proc.poll() is not None or time.monotonic()>end:raise TimeoutError("console completion event")
             time.sleep(.05)
     except (OSError,RuntimeError,TimeoutError,ValueError,subprocess.TimeoutExpired) as exc:error=str(exc)
     finally:
+        if a.batch_jobs:
+            from job_actor import close as job_close
+            job_close()
         if error and a.normal and not a.rootfault and proc.poll() is None:
             try:
                 recover_shutdown(proc,log,client,script)
@@ -512,7 +527,13 @@ def run(a):
             texts=[e["text"] for e in transcript["events"] if e["type"]==2]
             if a.workbench or a.workbench_normal and not client:
                 checks["submitted_field_clear_resets_locked_cursor"]=submitted_cursor_resets(received_records((out/"3270.trace").read_text()))
-            if a.stage3:
+            if a.job_cut:
+                checks.pop("final_observed_invocation_depth_zero",None)
+                checks.pop("native_console_app_rc_zero",None)
+                checks.pop("input_and_screen_leases_released",None)
+                checks["intentional_cut_has_no_execution_END"]=not any(e["type"]==3 for e in transcript["events"])
+                checks["intentional_cut_control_prompt_observed"]=any("JOB CONTROL:" in text for text in texts)
+            elif a.stage3:
                 checks.update(stage3_checks)
                 checks["stage3_client_rc_zero"]=checks["native_console_app_rc_zero"]
             elif a.workbench:
@@ -598,7 +619,14 @@ def run(a):
         except Exception as exc:
             checks["batch_capture_complete"]=False
             if error is None:error=repr(exc)
-    receipt={"profile":{"model":a.model,"colour":a.colour,"basic":a.basic,"editor":a.editor,"oversize":a.oversize,"workbench":a.workbench,"transfer":a.transfer,"workbench_normal":a.workbench_normal,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw,"stage3":a.stage3,"batch_devices":a.batch_devices},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
+    if a.batch_jobs:
+        try:
+            from job_actor import inspect as job_inspect
+            checks.update(job_inspect(out,raw,a.job_cut))
+        except Exception as exc:
+            checks["job_spool_and_device_capture_complete"]=False
+            if error is None:error=repr(exc)
+    receipt={"profile":{"model":a.model,"colour":a.colour,"basic":a.basic,"editor":a.editor,"oversize":a.oversize,"workbench":a.workbench,"transfer":a.transfer,"workbench_normal":a.workbench_normal,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw,"stage3":a.stage3,"batch_devices":a.batch_devices,"batch_jobs":a.batch_jobs,"job_cut":a.job_cut},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
     if service_cost is not None:receipt["service_cost"]=service_cost
     if a.normal and transcript is not None and any(e.get("text","").startswith("PD25 ") for e in transcript["events"]):
         from io_benchmark_check import observations
@@ -625,7 +653,10 @@ def run(a):
             checks["graph_totals_match_independent_stopped_vtoc"]=stopped_graph(flat,out)
         checks["disk_outside_store_unchanged"]=stored["outside_store_sha256"]==initial["outside_store_sha256"]
         logs=[f for f in stored["files"] if f["kind"]==0x5443 and not f["erased"]]
-        checks["durable_transcript_readback"]=len(logs)==1 and logs[0]["sha256"]==transcript["sha256"]
+        if not a.job_cut:checks["durable_transcript_readback"]=len(logs)==1 and logs[0]["sha256"]==transcript["sha256"]
+        if a.batch_jobs:
+            spools=[f for f in stored["files"] if f["kind"]==0x50444a32 and not f["erased"]]
+            checks["durable_job_spool_readback"]=len(spools)==1 and spools[0]["sha256"]==digest(out/"job-spool.bin")
         (out/"store-after.json").write_text(json.dumps(stored,indent=2)+"\n");flat.unlink()
         receipt["pass"]=all(checks.values())
     (out/"receipt.json").write_text(json.dumps(receipt,indent=2)+"\n")
@@ -641,6 +672,8 @@ if __name__=="__main__":
     for flag in ("monitor","line-primary","handoff","raw","disconnect","pcomm","normal","rootfault","early-input"):p.add_argument("--"+flag,action="store_true")
     p.add_argument("--commands")
     p.add_argument("--batch-devices",action="store_true")
+    p.add_argument("--batch-jobs",action="store_true")
+    p.add_argument("--job-cut",action="store_true")
     p.add_argument("--stage3",choices=("graph","family","dbcs","recovery","policy"))
     for name in ("cms-exchange","fixture-exchange","tape-input"):p.add_argument("--"+name)
     p.add_argument("--tape-output",action="store_true")

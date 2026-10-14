@@ -47,6 +47,8 @@ int main(void)
     for(i=0U;i<TSS_LIMIT;++i){a[i]=(unsigned char)(i%251U);b[i]=(unsigned char)(255U-i%241U);}
     if(TSSINIT(s,io,&d)!=TSS_OK||TSSREAD(s,31U,key,4U,out,TSS_LIMIT,&n)!=TSS_ABSENT)
         return 2;
+    if(TSSADMIT(s,31U,key,4U,TSS_LIMIT)!=TSS_OK||
+       TSSADMIT(s,31U,key,4U,TSS_LIMIT+1U)!=TSS_FULL||d.writes)return 14;
     if(TSSPUT(s,31U,key,4U,a,TSS_LIMIT)!=TSS_OK)return 3;
     if(TSSPUT(s,31U,key,4U,a,TSS_LIMIT+1U)!=TSS_BAD||
        TSSREAD(s,31U,key,4U,out,TSS_LIMIT-1U,&n)!=TSS_FULL)return 13;
@@ -65,5 +67,9 @@ int main(void)
     if(TSSERASE(s,31U,key,4U)!=TSS_OK||
        TSSREAD(s,31U,key,4U,out,TSS_LIMIT,&n)!=TSS_ABSENT||
        TSSREAD(s,24U,key,4U,out,TSS_LIMIT,&n)!=TSS_OK)return 9;
+    for(i=0U;i<6U;++i)if(TSSPUT(s,100U+i,key,4U,a,1U))return 15;
+    n=d.writes;
+    if(TSSADMIT(s,500U,key,4U,262144U)!=TSS_FULL||d.writes!=n||
+       TSSADMIT(s,24U,key,4U,262144U)!=TSS_OK||d.writes!=n)return 16;
     free(s);free(d.disk);free(a);free(b);free(out);return 0;
 }

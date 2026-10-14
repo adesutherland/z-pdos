@@ -1,0 +1,52 @@
+/* SPDX-License-Identifier: MIT; fresh Stage 2 media, never starts a guest. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>7 then return 2
+  work=args.1;prior=args.2;core=args.3;app=args.4;herc=args.5;model=args.6;primary=args.7
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  if model<>"2" & model<>"5" then return 2
+  if primary<>"3270" & primary<>"line" then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  locations=.string[]
+  address crexx "pwd" output locations
+  root=strip(locations.1);input=root||"/"||work||"-inputs";media=input||"/media";support=input||"/base"
+  address crexx "run test ! -e :input"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :media :support"
+  if rc<>0 then return rc
+  source=prior||"/media"
+  address crexx "run cmake -E copy_directory :source :media"
+  if rc<>0 then return rc
+  do probe=1 to 2
+    appname="D4JOB"
+    if probe=2 then appname="D4STEP"
+    source=app||"/"||appname||".bin";target=media||"/"||appname||".bin"
+    address crexx "run cmake -E copy :source :target"
+    if rc<>0 then return rc
+  end
+  before=media||"/ctl.txt";control=media||"/batch-ctl.txt"
+  do while lines(before)>0
+    row=linein(before)
+    if word(row,1)="PDOS.STORE" then do
+      call lineout control,"TSO31.D4JOB SEQ D4JOB.bin CYL 1 1 0 PS F 18452 18452"
+      call lineout control,"TSO31.D4STEP SEQ D4STEP.bin CYL 1 1 0 PS F 18452 18452"
+    end
+    call lineout control,row
+  end
+  call lineout control
+  address crexx "run cmake -E rename :control :before"
+  if rc<>0 then return rc
+  source=prior||"/launch.bin"
+  address crexx "run cmake -E copy :source :input"
+  if rc<>0 then return rc
+  source=prior||"/base/install-ipl"
+  address crexx "run cmake -E copy :source :support"
+  if rc<>0 then return rc
+  configured=input||"/normal.core"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_core.py configure :core :configured :model :primary monitor"
+  if rc<>0 then return rc
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :input :configured :herc"
+  return rc

@@ -14,7 +14,13 @@ static int channel_start_native(unsigned int ssid,unsigned char *orb,unsigned ch
 static int channel_poll_native(unsigned int ssid,unsigned char *irb,void *context)
 {(void)context;return TSCPOLL(ssid,irb);}
 static int channel_wait_native(unsigned int ssid,unsigned char *irb,unsigned int idle,void *context)
-{(void)context;return idle?TSCWAITI(ssid,irb):TSCWAITN(ssid,irb);}
+{
+    int rc;(void)context;rc=idle?TSCWAITI(ssid,irb):TSCWAITN(ssid,irb);
+    if(job_active()&&*(volatile const unsigned int *)0x4fb8U){
+        if(job_wait_control())return -1;
+    }
+    return rc;
+}
 static int channel_clear_native(unsigned int ssid,unsigned char *irb,void *context)
 {(void)context;return TSCCLEAR(ssid,irb);}
 static int channel_notice_native(TSCSTATE *s,unsigned int ssid,const unsigned char *irb,void *context)

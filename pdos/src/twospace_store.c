@@ -84,6 +84,15 @@ int TSSSIZE(TSSSTATE *s,unsigned int kind,const unsigned char *key,
     rc=find(s,kind,key,n,&slot,&bank,h,&empty);if(rc)return rc;
     if(word(h+32U))return TSS_DELETED;*bytes=word(h+24U);return TSS_OK;
 }
+int TSSADMIT(TSSSTATE *s,unsigned int kind,const unsigned char *key,
+              unsigned int n,unsigned int bytes)
+{
+    unsigned char h[96];unsigned int slot,bank,empty;int rc;
+    if(bytes>TSS_LIMIT)return TSS_FULL;
+    rc=find(s,kind,key,n,&slot,&bank,h,&empty);
+    if(rc==TSS_OK)return TSS_OK;
+    return rc==TSS_ABSENT?(empty<TSS_SLOTS?TSS_OK:TSS_FULL):rc;
+}
 
 int TSSREAD(TSSSTATE *s,unsigned int kind,const unsigned char *key,
              unsigned int n,unsigned char *data,unsigned int cap,

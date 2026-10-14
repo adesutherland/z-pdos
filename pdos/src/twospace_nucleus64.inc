@@ -142,6 +142,8 @@ trace_not_cms_fst:
     je storage_no_record
     chi %r2, 246
     je storage_no_record
+    chi %r2, 197
+    je storage_no_record
     chi %r2, 248
     je storage_no_record
     chi %r2, 249
@@ -216,6 +218,10 @@ storage_no_record:
     br %r1
 .global kcore_after_c
 kcore_after_c:
+    lghi %r3,0x4fbc
+    l %r4,0(%r3)
+    chi %r4,0
+    jne unhandled_interrupt /* failed job cleanup retains ownership */
     lghi %r3,0x4f54
     l %r4,0(%r3)
     chi %r4,0
@@ -379,6 +385,24 @@ external_context_ready:
     ni 0x726, 0xf7           /* acknowledge comparator watchdog */
     lctlg %c0, %c0, 0x720
 external_event_ready:
+    /* PD-033 interrupt-key control: never re-enter C during a K wait.
+       U can enter the serial controller; K records a deferred safe point. */
+    chi %r2, 0x40
+    jne no_job_key
+    lghi %r3, 0x4fb4
+    l %r4, 0(%r3)
+    chi %r4, 0
+    je no_job_key
+    lghi %r3, 0x4fb8
+    lghi %r4, 1
+    st %r4, 0(%r3)
+    tm 0x81(%r1), 0x01
+    jz no_job_key
+    lghi %r3, 0x3000
+    lghi %r4, 197
+    st %r4, 0xa0(%r3)
+    j kcore
+no_job_key:
     lghi %r1, 0x2190
     lg %r2, 0(%r1)
     aghi %r2, 1

@@ -1,0 +1,21 @@
+[
+  ["VERSION","PDIO1"],
+  ["D4JOB","PCOMM END 1 RC=0",[
+    ["PD033 JOB PRINTER OFFLINE READY","printer-offline","job"],
+    ["PD033 JOB PRINTER OFFLINE READY","GO"],
+    ["PD033 JOB PRINTER RESTORE READY","printer-restore","job"],
+    ["PD033 JOB PRINTER RESTORE READY","GO"],
+    ["PD033 CPU CANCEL READY","interrupt","job"],
+    ["JOB CONTROL:","STATUS"],
+    ["JOB ACTIVE;","NOPE"],
+    ["BUSY: USE","CANCEL"],
+    ["PD033 IO CANCEL READY","io-arm","job"],
+    ["PD033 IO CANCEL READY","GO"],
+    ["JOB STEP WAITING FOR DEVICE","io-interrupt","job"],
+    ["JOB CONTROL:","CANCEL"],
+    ["JOB CONTROL:","io-unblock","job"],
+    ["PD033 JOB ISOLATION READY","GO"]
+  ],"PD033 JOB PASS"],
+  ["HELLO","PCOMM END 2 RC=0"],
+  ["RXVM -v","PCOMM END 3 RC=0"]
+]

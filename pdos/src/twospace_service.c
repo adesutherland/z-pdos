@@ -24,6 +24,14 @@
 #include "twospace_transcript.h"
 #include "twospace_command_router.h"
 #include "twospace_batch.h"
+#include "twospace_job.h"
+static unsigned int job_active(void);
+static unsigned int job_is_root(unsigned int);
+static unsigned int job_wait_control(void);
+static void job_cleanup_failed(void);
+static unsigned int job_allocation_ok(unsigned int);
+static unsigned int job_abort(void);
+static unsigned int job_step_done(unsigned int,unsigned int,unsigned int,unsigned int,unsigned int);
 typedef struct channel_context CHANNELCONTEXT;
 
 static unsigned int user_rights(unsigned int frame, void *unused);
@@ -1402,7 +1410,7 @@ static unsigned int native_begin(TSGREQUEST *request)
     request->address.hi=0U;
     request->address.lo=token;
     *(volatile unsigned int *)0x4f50U=token;
-    console_v1_begin(&native_invocations.frame[native_invocations.depth-1U]);
+    if(!job_active())console_v1_begin(&native_invocations.frame[native_invocations.depth-1U]);
     return 0U;
 }
 
@@ -1704,6 +1712,7 @@ static unsigned int storage_service(TSGREQUEST *request)
     if (TSVTOP(&native_invocations) && !frame) return 8U;
     task=frame ? frame->runtime_owner : 1U;
     if (request->address.hi == 0U && request->address.lo == 0U) {
+        if(!job_allocation_ok(request->length))return 4U;
         if ((flags & 0x30U) == 0x30U) {
             if(frame&&frame->amode==24U){
                 storage_mode=24U;minimum.hi=maximum.hi=0U;
@@ -2985,6 +2994,7 @@ static unsigned int call_alloc(unsigned int,unsigned int *,unsigned char **);
 #include "twospace_panel.inc"
 #include "twospace_environment.inc"
 #include "twospace_batch.inc"
+#include "twospace_job.inc"
 
 static unsigned int service_request(TSGREQUEST *request)
 {
@@ -2995,10 +3005,20 @@ static unsigned int service_request(TSGREQUEST *request)
     int result;
     if (!request) return 0xffffffffU;
     if (attach()) return 0xfffffffaU;
+    if(request->svc==197U)return job_interrupt();
+    if(job_active()&&request->svc==TSA_IO_SVC){
+        if(request->direction==TSA_IO_JOB_EMIT)return job_service(request);
+        if(request->direction>=TSA_IO_BATCH_OPEN&&request->direction<=TSA_IO_BATCH_STATUS)return batch_device_service(request);
+        return 20U;
+    }
+    /* A batch step has no terminal lease. Native terminal and command entry
+       remains a Stage 3 prerequisite, rather than disguised spool output. */
+    if(job_active()&&(request->svc==93U||request->svc==94U||request->svc==202U||request->svc==204U||request->svc==205U||request->svc==TCM_SVC))return 20U;
     if(request->svc==TCM_SVC)return env_service(request);
     if(request->svc==246U&&TSVTOP(&native_invocations)&&env_current()&&env_current()->active)
         return env_finish(1U);
     if(request->svc==TSA_IO_SVC){
+        if(request->direction>=TSA_IO_JOB_SUBMIT&&request->direction<=TSA_IO_JOB_EMIT)return job_service(request);
         if(request->direction>=TSA_IO_BATCH_OPEN&&request->direction<=TSA_IO_BATCH_STATUS)return batch_device_service(request);
         return console_v1_service(request);
     }
@@ -3208,6 +3228,10 @@ static void service_observe(void)
 unsigned int pdosTwoSpaceService(TSGREQUEST *request)
 {
     unsigned int rc=service_request(request);
+    if(job_active()&&!job_cancelling){
+        unsigned char *j=TJBFIND(&job_pool,job_owner,job_id);
+        if(j&&TJBWORD(j+48U))rc=job_abort();
+    }
     if(normal_boot()&&request&&request->svc==202U&&
        !*(volatile const unsigned int *)0x4f54U){
         const TSVFRAME *f=native_caller(*(volatile const unsigned int *)0x308cU);

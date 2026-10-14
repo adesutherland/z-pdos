@@ -1,0 +1,7 @@
+[["D4JOB interrupt","JOB CONTROL:",[
+  ["PD033 RESTART CUT READY","interrupt","job"],
+  ["JOB CONTROL:","STATUS"],
+  ["JOB ACTIVE;","CONTINUE"],
+  ["JOB ACTIVE;","interrupt","job"],
+  ["JOB CONTROL:","STATUS","primary",3]
+]]]

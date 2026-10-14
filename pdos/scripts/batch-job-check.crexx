@@ -1,0 +1,22 @@
+/* SPDX-License-Identifier: MIT; Stage 2 focused implementation checks. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>1 then return 2
+  work=args.1
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  binary=work||"/job-test"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_job.c pdos/tests/batch/job.c -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary"
+  if rc<>0 then return rc
+  store=work||"/store-test"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_store.c pdos/tests/two-space/store.c -o :store"
+  if rc<>0 then return rc
+  address crexx "run :store"
+  return rc

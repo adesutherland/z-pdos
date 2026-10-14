@@ -38,4 +38,6 @@ int TSSPUT(TSSSTATE *state, unsigned int kind, const unsigned char *key,
             unsigned int bytes);
 int TSSERASE(TSSSTATE *state, unsigned int kind, const unsigned char *key,
               unsigned int key_bytes);
+/* Read-only slot/byte admission for an existing or new bounded object. */
+int TSSADMIT(TSSSTATE *,unsigned int,const unsigned char *,unsigned int,unsigned int);
 #endif

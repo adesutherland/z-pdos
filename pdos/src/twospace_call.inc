@@ -37,6 +37,7 @@ static unsigned int call_alloc(unsigned int bytes,unsigned int *virtual_address,
     const TSVFRAME *f=TSVTOP(&native_invocations);TSPADDR low,high,address;
     unsigned int i,rc;
     if(!f)return 8U;
+    if(!job_allocation_ok(bytes))return 4U;
     low.hi=high.hi=0U;low.lo=f->amode==24U?0x20000U:0x30000000U;
     high.lo=f->amode==24U?0xffffffU:0x7fffffffU;
     rc=TSMALLOC(&storage,f->runtime_owner,f->amode==24U?24U:31U,low,high,bytes,0,&address);
@@ -108,7 +109,7 @@ static unsigned int call_launch(TSLIMAGE *image,const unsigned char *parameters,
     *(volatile unsigned int *)0x4f00U=controlled_launches;
     command_enter(image->entry,arg,stack+128U,0xb80U);
     {volatile unsigned int *saved=(volatile unsigned int *)0x3000U;
-     saved[32U]=0x04810000U|(image->mode==64U?1U:0U);
+     saved[32U]=0x04810000U|(image->mode==64U?1U:0U)|(job_active()?0x01000000U:0U);
      saved[33U]=image->mode==24U?0U:0x80000000U;
      saved[29U]=image->mode==31U?0x80000b80U:0xb80U;
      if(image->personality==TSV_TSO&&image->mode==64U)
@@ -149,11 +150,12 @@ static unsigned int native_call_finish(void)
     }
     f->controlled=0U;end.address.hi=0U;end.address.lo=token;
     end.length=end.direction=0U;end.svc=236U;rc=native_end(&end);
-    if(rc){f->controlled=3U;return rc;}
+    if(rc){f->controlled=3U;if(job_active())job_cleanup_failed();return rc;}
     --controlled_launches;*(volatile unsigned int *)0x4f00U=controlled_launches;
     command_restore(&caller);saved[0U]=0U;saved[1U]=status;saved[30U]=0U;saved[31U]=app_rc;
     call_result(status,kind==2U?1U:0U,0U,kind==1U,app_rc,token);
-    console_v1_end(token,call_last_result);
+    if(job_is_root(token))return job_step_done(token,status,kind==1U,app_rc,kind==2U?1U:0U);
+    if(!job_active())console_v1_end(token,call_last_result);
     env_run_result(status,app_rc);
     if(!native_invocations.depth)
         *(volatile unsigned int *)0x4f9cU=*(volatile const unsigned int *)0x40acU;

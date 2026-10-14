@@ -30,7 +30,9 @@ and an application's service call.
   forms remain later work.
 - [Initial batch contracts and reader/printer proof](qualification/BATCH-STAGE1-2026-10-13.md):
   locally qualified Stage 1 neutral devices on model 2 and plain line consoles;
-  native batch jobs, DDs, JCL and forms remain later stages.
+  native prebound DD/batch runtime, JCL and forms remain later stages.
+- [Serial jobs, spool and operator recovery](qualification/BATCH-STAGE2-2026-10-14.md):
+  Stage 2's descriptor service, 93 guest checks, printer retry and interrupted-job recovery; current console preserved.
 - [Development guide](development/README.md): source map and change contracts.
 - [Build contract](development/BUILD-CONTRACT.md): recorded acceptance stages.
 - [0.1 guest qualification](qualification/QUALIFICATION.md): exact historical
