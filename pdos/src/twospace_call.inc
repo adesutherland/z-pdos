@@ -141,6 +141,8 @@ static unsigned int native_call_finish(void)
     kind=saved[39U];
     if(kind!=1U&&kind!=2U)return 12U;
     status=kind==2U?12U:0U;app_rc=kind==2U?0xffffffffU:saved[31U];
+    rc=sf_batch_finish(f->token,kind==1U);
+    if(rc){status=rc;app_rc=0xffffffffU;job_native_error(rc);}
     if(kind==2U)++*(volatile unsigned int *)0x4f90U;
     caller=f->caller;token=f->token;
     if(call_overlay_task[depth]){
@@ -153,8 +155,8 @@ static unsigned int native_call_finish(void)
     if(rc){f->controlled=3U;if(job_active())job_cleanup_failed();return rc;}
     --controlled_launches;*(volatile unsigned int *)0x4f00U=controlled_launches;
     command_restore(&caller);saved[0U]=0U;saved[1U]=status;saved[30U]=0U;saved[31U]=app_rc;
-    call_result(status,kind==2U?1U:0U,0U,kind==1U,app_rc,token);
-    if(job_is_root(token))return job_step_done(token,status,kind==1U,app_rc,kind==2U?1U:0U);
+    call_result(status,kind==2U?1U:0U,0U,kind==1U&&!status,app_rc,token);
+    if(job_is_root(token))return job_step_done(token,status,kind==1U&&!status,app_rc,kind==2U?1U:0U);
     if(!job_active())console_v1_end(token,call_last_result);
     env_run_result(status,app_rc);
     if(!native_invocations.depth)

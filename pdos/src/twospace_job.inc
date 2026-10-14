@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: MIT; serial K job provider. No JCL/DD adapter. */
+/* SPDX-License-Identifier: MIT; serial K job provider and native DD scope. */
 static TJBPOOL job_pool;
 static unsigned int job_real,job_ready,job_failed,job_id,job_owner,job_token;
 static unsigned int job_base_depth,job_output_error,job_cancelling;
@@ -7,6 +7,24 @@ static TSVCONTEXT job_caller;
 static const unsigned char job_key[11]={0x50U,0x44U,0x30U,0x33U,0x33U,0x2eU,0x53U,0x50U,0x4fU,0x4fU,0x4cU};
 static const unsigned char job_dd[8]={0xd1U,0xc5U,0xe2U,0xd4U,0xe2U,0xc7U,0xd3U,0xc7U};
 static unsigned int job_active(void){return job_id!=0U;}
+static unsigned int job_dd_scope(void)
+{return job_id&&native_invocations.depth>job_base_depth;}
+static void job_native_error(unsigned int rc)
+{if(job_id&&!job_output_error)job_output_error=rc;}
+static int job_record(void *context,const unsigned char *data,unsigned int n)
+{
+    const unsigned char *e=(const unsigned char *)context;unsigned char blank=0x40U;
+    return TJBAPP(&job_pool,job_owner,job_id,e+32U,9U,n?data:&blank,n?n:1U);
+}
+static unsigned int job_native_output(const unsigned char *entry,const unsigned char *block,unsigned int n)
+{
+    unsigned char *j=TJBFIND(&job_pool,job_owner,job_id);unsigned int cost,rc;
+    if(!job_dd_scope()||!j)return 12U;
+    rc=(unsigned int)TJDOUT(entry,block,n,&cost,0,0);if(rc)return rc;
+    if(cost>TJBWORD(j+20U)-TJBWORD(j+24U)){job_native_error(4U);return 4U;}
+    rc=(unsigned int)TJDOUT(entry,block,n,&cost,job_record,(void *)entry);
+    if(!rc)rc=job_commit();if(rc)job_native_error(rc);return rc;
+}
 static unsigned int job_allocation_ok(unsigned int bytes)
 {
     unsigned int d,r,a,used=0U,rounded;
@@ -104,6 +122,7 @@ static unsigned int job_dispatch(void)
         if(job_commit()){TJBEND(&job_pool,job_owner,job_id,12U,0U,0U,0U,0U);continue;}
         command_restore(&job_caller);
         rc=load_native(TSV_TSO,31U,s+8U,&image);
+        if(!rc)rc=sf_batch_begin(TJBDDS(&job_pool,job_id),TJBWORD(j+12U)+1U);
         if(!rc){
             n=TJBWORD(s+16U);for(i=0U;i<sizeof parameters;++i)parameters[i]=0U;
             parameters[0U]=(unsigned char)(n>>8);parameters[1U]=(unsigned char)n;
@@ -114,6 +133,7 @@ static unsigned int job_dispatch(void)
                 *(volatile unsigned int *)0x4fb4U=job_token;return 0U;}
         }
         if(native_invocations.depth>job_base_depth){job_cleanup_failed();return 12U;}
+        sf_batch_end();
         if(job_note("LOAD FAILURE ",rc))job_output_error=4U;
         if(TJBEND(&job_pool,job_owner,job_id,rc,0U,0U,0U,0U))return 12U;
         if(job_commit())job_failed=1U;
@@ -122,6 +142,7 @@ static unsigned int job_dispatch(void)
 static unsigned int job_step_done(unsigned int token,unsigned int os,unsigned int valid,unsigned int rc,unsigned int abnormal)
 {
     if(!job_id||token!=job_token)return 12U;
+    sf_batch_end();
     job_token=0U;*(volatile unsigned int *)0x4fb4U=0U;
     if(job_note("STEP OS ",os)||job_note("STEP RC ",valid?rc:0xffffffffU))job_output_error=4U;
     if(job_cancelling){os=16U;valid=0U;abnormal=3U;}
@@ -204,7 +225,7 @@ static unsigned int job_print(unsigned char *j,TBCENDPOINT *e)
 }
 static unsigned int job_service(TSGREQUEST *request)
 {
-    const TSVFRAME *f=TSVTOP(&native_invocations);unsigned char h[TJB_REQUEST_BYTES],descriptor[TJB_DESC_BYTES],data[132],*j,*s;
+    const TSVFRAME *f=TSVTOP(&native_invocations);unsigned char h[TJB_REQUEST_BYTES],descriptor[TJD_BYTES],data[132],*j,*s;
     unsigned int op=request->direction,owner,id,n,offset,rc,i,selector;TSPADDR payload;TBCENDPOINT *e;
     if(!f||request->length!=sizeof h||*(volatile const unsigned int *)0x3000U||*(volatile const unsigned int *)0x3010U||
        tc_span(request->address,sizeof h,TSG_READ,h,0U)||tc_span(request->address,sizeof h,TSG_WRITE,h,0U)||
@@ -223,7 +244,7 @@ static unsigned int job_service(TSGREQUEST *request)
     }
     if(job_id)return 16U;owner=native_invocations.frame[0U].token;
     if(op==TSA_IO_JOB_SUBMIT){
-        if(id||selector||offset||TJBWORD(h+20U)||n!=sizeof descriptor||batch_overlap(request->address,sizeof h,payload,n)||tc_span(payload,n,TSG_READ,descriptor,1U))return 8U;
+        if(id||selector||offset||TJBWORD(h+20U)||n!=TJB_DESC_BYTES||batch_overlap(request->address,sizeof h,payload,n)||tc_span(payload,n,TSG_READ,descriptor,1U))return 8U;
         rc=(unsigned int)TJBCHECK(descriptor,n);if(rc)return rc;
         rc=job_attach();if(rc)return rc;
         rc=(unsigned int)TJBSUB(&job_pool,owner,descriptor,n,&id);if(rc)return rc;
@@ -239,7 +260,11 @@ static unsigned int job_service(TSGREQUEST *request)
         return tc_span(request->address,sizeof h,TSG_WRITE,h,1U);
     }
     j=TJBFIND(&job_pool,owner,id);if(!j)return 8U;
-    if(op==TSA_IO_JOB_STATUS){
+    if(op==TSA_IO_JOB_BIND){
+        if(selector||offset||TJBWORD(h+20U)||n!=TJD_BYTES||batch_overlap(request->address,sizeof h,payload,n)||tc_span(payload,n,TSG_READ,descriptor,1U))return 8U;
+        rc=(unsigned int)TJBBIND(&job_pool,owner,id,descriptor,n);if(rc)return rc;
+        if(job_commit())return 12U;
+    }else if(op==TSA_IO_JOB_STATUS){
         if(TJBWORD(h+20U)||offset)return 8U;
         if(selector){if(selector>TJBWORD(j+16U)||n!=TJB_STEP_BYTES||batch_overlap(request->address,sizeof h,payload,n)||tc_span(payload,n,TSG_WRITE,descriptor,0U))return 8U;
             s=TJBSTEP(j,selector-1U);if(tc_span(payload,n,TSG_WRITE,s,1U))return 8U;TJBPUT(h+32U,n);}

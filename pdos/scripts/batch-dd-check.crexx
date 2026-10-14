@@ -1,0 +1,17 @@
+/* SPDX-License-Identifier: MIT; Stage 3 focused checks, no guest mutation. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>1 then return 2
+  work=args.1
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  binary=work||"/jobdd-test"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_job.c pdos/src/twospace_jobdd.c pdos/tests/batch/jobdd.c -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary"
+  return rc

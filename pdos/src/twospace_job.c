@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "twospace_job.h"
+#include "twospace_jobdd.h"
 unsigned int TJBWORD(const unsigned char *p)
 {return ((unsigned int)p[0]<<24)|((unsigned int)p[1]<<16)|((unsigned int)p[2]<<8)|p[3];}
 void TJBPUT(unsigned char *p,unsigned int n)
@@ -23,6 +24,15 @@ unsigned char *TJBFIND(TJBPOOL *p,unsigned int owner,unsigned int id)
 unsigned char *TJBOUT(TJBPOOL *p,unsigned int id)
 {unsigned int i;if(!p||!p->bytes||!id)return 0;
  for(i=0U;i<TJB_SLOTS;++i)if(TJBWORD(slot(p,i))==id)return p->bytes+TJB_OUTPUT_BASE+i*TJB_PRINT_BYTES;return 0;}
+unsigned char *TJBDDS(TJBPOOL *p,unsigned int id)
+{unsigned int i;if(!p||!p->bytes||!id)return 0;
+ for(i=0U;i<TJB_SLOTS;++i)if(TJBWORD(slot(p,i))==id)return p->bytes+TJB_DD_BASE+i*TJD_BYTES;return 0;}
+int TJBBIND(TJBPOOL *p,unsigned int owner,unsigned int id,const unsigned char *d,unsigned int n)
+{unsigned char *j=TJBFIND(p,owner,id),*target;int rc;
+ if(!j||!d||n!=TJD_BYTES)return TJB_BAD;
+ if(TJBWORD(j+8U)!=TJB_QUEUED&&TJBWORD(j+8U)!=TJB_HELD)return TJB_BUSY;
+ target=TJBDDS(p,id);if(TJBWORD(target))return TJB_BUSY;
+ rc=TJDCHK(d,TJBWORD(j+16U));if(rc)return rc;copy(target,d,n);TJBPUT(p->bytes+4U,2U);return 0;}
 int TJBINIT(TJBPOOL *p,unsigned char *b,unsigned int n)
 {if(!p||!b||n!=TJB_BYTES)return TJB_BAD;zero(b,n);TJBPUT(b,0x50444a32U);TJBPUT(b+4U,1U);p->bytes=b;return 0;}
 int TJBCHECK(const unsigned char *d,unsigned int n)
@@ -45,7 +55,7 @@ int TJBSUB(TJBPOOL *p,unsigned int owner,const unsigned char *d,unsigned int n,u
  *id=TJBWORD(p->bytes+8U)+1U;TJBPUT(p->bytes+8U,*id);zero(j,TJB_SLOT_BYTES);
  TJBPUT(j,*id);TJBPUT(j+4U,owner);TJBPUT(j+8U,TJB_QUEUED);TJBPUT(j+16U,TJBWORD(d+16U));TJBPUT(j+20U,TJBWORD(d+20U));copy(j+64U,d+8U,8U);
  for(k=0U;k<TJBWORD(d+16U);++k)copy(TJBSTEP(j,k),d+32U+k*TJB_STEP_BYTES,TJB_STEP_BYTES);
- zero(TJBOUT(p,*id),TJB_PRINT_BYTES);return 0;}
+ zero(TJBOUT(p,*id),TJB_PRINT_BYTES);zero(TJBDDS(p,*id),TJD_BYTES);return 0;}
 int TJBACT(TJBPOOL *p,unsigned int owner,unsigned int id,unsigned int action)
 {unsigned char *j=TJBFIND(p,owner,id);unsigned int state;if(!j)return TJB_BAD;state=TJBWORD(j+8U);
  if(action==1U&&state==TJB_QUEUED){TJBPUT(j+8U,TJB_HELD);return 0;}
@@ -54,7 +64,7 @@ int TJBACT(TJBPOOL *p,unsigned int owner,unsigned int id,unsigned int action)
   if(state!=TJB_RUNNING){unsigned int i;for(i=0U;i<TJB_SLOTS;++i){unsigned int other=TJBWORD(slot(p,i)+8U);if(other==TJB_RUNNING||other>=TJB_DONE)return TJB_BUSY;}}
   TJBPUT(j+48U,1U);if(state!=TJB_RUNNING){unsigned int i;TJBPUT(j+8U,TJB_CANCELLED);TJBPUT(j+32U,16U);
    for(i=0U;i<TJBWORD(j+16U);++i){TJBPUT(TJBSTEP(j,i)+148U,TJB_SKIP);TJBPUT(TJBSTEP(j,i)+144U,3U);}}return 0;}
- if(action==4U&&state>=TJB_DONE&&TJBWORD(j+28U)!=TJB_PRINT_ACTIVE){zero(TJBOUT(p,id),TJB_PRINT_BYTES);zero(j,TJB_SLOT_BYTES);return 0;}
+ if(action==4U&&state>=TJB_DONE&&TJBWORD(j+28U)!=TJB_PRINT_ACTIVE){zero(TJBOUT(p,id),TJB_PRINT_BYTES);zero(TJBDDS(p,id),TJD_BYTES);zero(j,TJB_SLOT_BYTES);return 0;}
  return TJB_BUSY;}
 int TJBSTART(TJBPOOL *p,unsigned int owner,unsigned int id)
 {unsigned char *j=TJBFIND(p,owner,id);unsigned int i,completed=0U;if(!j)return TJB_BAD;
@@ -86,9 +96,12 @@ int TJBAPP(TJBPOOL *p,unsigned int owner,unsigned int id,const unsigned char dd[
  TJBPUT(j+52U,TJBWORD(j+52U)+1U);TJBPUT(j+24U,used+24U+n);return 0;}
 int TJBLOAD(TJBPOOL *p,unsigned char *b,unsigned int n)
 {unsigned int i,k,active=0U,wait=0U,completed=0U,max=0U;
- if(!p||!b||n!=TJB_BYTES||TJBWORD(b)!=0x50444a32U||TJBWORD(b+4U)!=1U)return TJB_BAD;
+ if(!p||!b||n!=TJB_BYTES||TJBWORD(b)!=0x50444a32U||(TJBWORD(b+4U)!=1U&&TJBWORD(b+4U)!=2U))return TJB_BAD;
  for(i=16U;i<TJB_BASE;++i)if(b[i])return TJB_BAD;
  for(i=0U;i<TJB_SLOTS;++i){unsigned char *j=b+TJB_BASE+i*TJB_SLOT_BYTES;unsigned int state=TJBWORD(j+8U),id=TJBWORD(j),count=TJBWORD(j+16U),used=TJBWORD(j+24U),at=0U,seq=0U;
+  {const unsigned char *dd=b+TJB_DD_BASE+i*TJD_BYTES;
+   if(TJBWORD(dd)){if(TJBWORD(b+4U)!=2U||!state||TJDCHK(dd,count))return TJB_BAD;}
+   else for(k=0U;k<TJD_BYTES;++k)if(dd[k])return TJB_BAD;}
   if(!state){for(k=0U;k<TJB_SLOT_BYTES;++k)if(j[k])return TJB_BAD;continue;}
   if(state>TJB_INTERRUPTED||!id||!TJBWORD(j+4U)||!count||count>TJB_STEPS||TJBWORD(j+12U)>count||!name(j+64U)||TJBWORD(j+20U)<256U||TJBWORD(j+20U)>TJB_PRINT_BYTES||used>TJBWORD(j+20U)||TJBWORD(j+28U)>TJB_PRINT_FAILED||TJBWORD(j+36U)>1U||TJBWORD(j+48U)>1U)return TJB_BAD;
   if(id>max)max=id;for(k=0U;k<i;++k)if(TJBWORD(b+TJB_BASE+k*TJB_SLOT_BYTES)==id)return TJB_BAD;
@@ -102,6 +115,7 @@ int TJBLOAD(TJBPOOL *p,unsigned char *b,unsigned int n)
    if(!len||len>132U||24U+len>used-at||TJBWORD(r)!=++seq||!TJBWORD(r+4U)||TJBWORD(r+4U)>count||!name(r+16U)||(TJBWORD(r+12U)!=9U&&TJBWORD(r+12U)!=0x89U))return TJB_BAD;at+=24U+len;}
   if(seq!=TJBWORD(j+52U))return TJB_BAD;
  }
+ for(i=TJB_DD_BASE+TJB_SLOTS*TJD_BYTES;i<TJB_BYTES;++i)if(b[i])return TJB_BAD;
  if(active>1U||wait>1U||completed>1U||(active&&completed)||max>TJBWORD(b+8U)||(!active&&TJBWORD(b+12U)))return TJB_BAD;
  p->bytes=b;
  /* A queued descriptor needs explicit release after restart. Uncertain

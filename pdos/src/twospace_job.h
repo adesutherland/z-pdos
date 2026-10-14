@@ -7,6 +7,7 @@
 #define TJB_PRINT_BYTES 81920U
 #define TJB_BASE 32U
 #define TJB_OUTPUT_BASE (TJB_BASE+TJB_SLOTS*TJB_SLOT_BYTES)
+#define TJB_DD_BASE (TJB_OUTPUT_BASE+TJB_SLOTS*TJB_PRINT_BYTES)
 #define TJB_STEPS 8U
 #define TJB_STEP_BYTES 160U
 #define TJB_DESC_BYTES (32U+TJB_STEPS*TJB_STEP_BYTES)
@@ -64,4 +65,9 @@ int TJBEND(TJBPOOL *,unsigned int owner,unsigned int id,unsigned int os,
 int TJBAPP(TJBPOOL *,unsigned int owner,unsigned int id,const unsigned char dd[8],
            unsigned int command,const unsigned char *data,unsigned int bytes);
 unsigned char *TJBOUT(TJBPOOL *,unsigned int id);
+/* Optional Stage 3 allocation descriptor in the formerly reserved tail.
+ * Version-1 Stage 2 envelopes with a zero tail remain readable. Binding
+ * upgrades the envelope to version 2; older kernels must reject it. */
+unsigned char *TJBDDS(TJBPOOL *,unsigned int id);
+int TJBBIND(TJBPOOL *,unsigned int owner,unsigned int id,const unsigned char *,unsigned int);
 #endif

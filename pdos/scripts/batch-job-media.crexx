@@ -3,7 +3,12 @@ options levelb
 import rxfnsb
 main: procedure = .int
   arg args=.string[]
-  if args.0<>7 then return 2
+  if args.0<>7 & args.0<>8 then return 2
+  count=2
+  if args.0=8 then do
+    if args.8<>"dd" then return 2
+    count=3
+  end
   work=args.1;prior=args.2;core=args.3;app=args.4;herc=args.5;model=args.6;primary=args.7
   if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
   if model<>"2" & model<>"5" then return 2
@@ -20,9 +25,10 @@ main: procedure = .int
   source=prior||"/media"
   address crexx "run cmake -E copy_directory :source :media"
   if rc<>0 then return rc
-  do probe=1 to 2
+  do probe=1 to count
     appname="D4JOB"
     if probe=2 then appname="D4STEP"
+    if probe=3 then appname="D4DDCH"
     source=app||"/"||appname||".bin";target=media||"/"||appname||".bin"
     address crexx "run cmake -E copy :source :target"
     if rc<>0 then return rc
@@ -33,6 +39,7 @@ main: procedure = .int
     if word(row,1)="PDOS.STORE" then do
       call lineout control,"TSO31.D4JOB SEQ D4JOB.bin CYL 1 1 0 PS F 18452 18452"
       call lineout control,"TSO31.D4STEP SEQ D4STEP.bin CYL 1 1 0 PS F 18452 18452"
+      if count=3 then call lineout control,"TSO31.D4DDCH SEQ D4DDCH.bin CYL 1 1 0 PS F 18452 18452"
     end
     call lineout control,row
   end

@@ -180,13 +180,13 @@ def parse_transcript(raw):
 
 def run(a):
     if a.job_cut and not (a.batch_jobs and a.normal):raise ValueError("job cut requires explicit normal batch proof")
-    if a.batch_devices and a.batch_jobs:raise ValueError("choose one batch fixture")
+    if sum((a.batch_devices,a.batch_jobs,a.batch_dd))>1:raise ValueError("choose one batch fixture")
     out=Path(a.output).resolve();out.mkdir(exist_ok=False)
     disk=Path(a.disk).resolve();core=Path(a.core).resolve();herc=Path(a.hercules).resolve()
     port=unused_loopback_port();script=unused_loopback_port();before=digest(disk)
     primary="3215 noprompt" if a.line_primary else "3270"
     cfg="ARCHLVL ESAME\nMAINSIZE 512\nNUMCPU 1\nCPUMODEL 2064\nDIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\nCODEPAGE 819/1047\n"
-    if a.batch_devices or a.batch_jobs:cfg+="LEGACYSENSEID ON\n"
+    if a.batch_devices or a.batch_jobs or a.batch_dd:cfg+="LEGACYSENSEID ON\n"
     cfg+=f"CNSLPORT 127.0.0.1:{port}\n01B9 3390 {disk}\n0009 {primary}\n"
     attachments=[]
     for option,address in (("cms_exchange","01BA"),("fixture_exchange","01BB")):
@@ -209,7 +209,7 @@ def run(a):
         sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"batch"))
         from actor import prepare as batch_prepare
         cfg+=batch_prepare(out)
-    if a.batch_jobs:
+    if a.batch_jobs or a.batch_dd:
         sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"batch"))
         from job_actor import prepare as job_prepare
         cfg+=job_prepare(out)
@@ -626,7 +626,14 @@ def run(a):
         except Exception as exc:
             checks["job_spool_and_device_capture_complete"]=False
             if error is None:error=repr(exc)
-    receipt={"profile":{"model":a.model,"colour":a.colour,"basic":a.basic,"editor":a.editor,"oversize":a.oversize,"workbench":a.workbench,"transfer":a.transfer,"workbench_normal":a.workbench_normal,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw,"stage3":a.stage3,"batch_devices":a.batch_devices,"batch_jobs":a.batch_jobs,"job_cut":a.job_cut},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
+    if a.batch_dd:
+        try:
+            from dd_actor import inspect as dd_inspect
+            checks.update(dd_inspect(out,raw))
+        except Exception as exc:
+            checks["native_batch_dd_capture_complete"]=False
+            if error is None:error=repr(exc)
+    receipt={"profile":{"model":a.model,"colour":a.colour,"basic":a.basic,"editor":a.editor,"oversize":a.oversize,"workbench":a.workbench,"transfer":a.transfer,"workbench_normal":a.workbench_normal,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw,"stage3":a.stage3,"batch_devices":a.batch_devices,"batch_jobs":a.batch_jobs,"batch_dd":a.batch_dd,"job_cut":a.job_cut},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
     if service_cost is not None:receipt["service_cost"]=service_cost
     if a.normal and transcript is not None and any(e.get("text","").startswith("PD25 ") for e in transcript["events"]):
         from io_benchmark_check import observations
@@ -654,7 +661,7 @@ def run(a):
         checks["disk_outside_store_unchanged"]=stored["outside_store_sha256"]==initial["outside_store_sha256"]
         logs=[f for f in stored["files"] if f["kind"]==0x5443 and not f["erased"]]
         if not a.job_cut:checks["durable_transcript_readback"]=len(logs)==1 and logs[0]["sha256"]==transcript["sha256"]
-        if a.batch_jobs:
+        if a.batch_jobs or a.batch_dd:
             spools=[f for f in stored["files"] if f["kind"]==0x50444a32 and not f["erased"]]
             checks["durable_job_spool_readback"]=len(spools)==1 and spools[0]["sha256"]==digest(out/"job-spool.bin")
         (out/"store-after.json").write_text(json.dumps(stored,indent=2)+"\n");flat.unlink()
@@ -673,6 +680,7 @@ if __name__=="__main__":
     p.add_argument("--commands")
     p.add_argument("--batch-devices",action="store_true")
     p.add_argument("--batch-jobs",action="store_true")
+    p.add_argument("--batch-dd",action="store_true")
     p.add_argument("--job-cut",action="store_true")
     p.add_argument("--stage3",choices=("graph","family","dbcs","recovery","policy"))
     for name in ("cms-exchange","fixture-exchange","tape-input"):p.add_argument("--"+name)

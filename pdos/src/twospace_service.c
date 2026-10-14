@@ -25,7 +25,12 @@
 #include "twospace_command_router.h"
 #include "twospace_batch.h"
 #include "twospace_job.h"
+#include "twospace_jobdd.h"
 static unsigned int job_active(void);
+static unsigned int job_commit(void);
+static unsigned int job_dd_scope(void);
+static unsigned int job_native_output(const unsigned char *,const unsigned char *,unsigned int);
+static void job_native_error(unsigned int);
 static unsigned int job_is_root(unsigned int);
 static unsigned int job_wait_control(void);
 static void job_cleanup_failed(void);
@@ -3018,7 +3023,7 @@ static unsigned int service_request(TSGREQUEST *request)
     if(request->svc==246U&&TSVTOP(&native_invocations)&&env_current()&&env_current()->active)
         return env_finish(1U);
     if(request->svc==TSA_IO_SVC){
-        if(request->direction>=TSA_IO_JOB_SUBMIT&&request->direction<=TSA_IO_JOB_EMIT)return job_service(request);
+        if(request->direction>=TSA_IO_JOB_SUBMIT&&request->direction<=TSA_IO_JOB_BIND)return job_service(request);
         if(request->direction>=TSA_IO_BATCH_OPEN&&request->direction<=TSA_IO_BATCH_STATUS)return batch_device_service(request);
         return console_v1_service(request);
     }

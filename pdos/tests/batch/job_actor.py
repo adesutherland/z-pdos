@@ -90,7 +90,7 @@ def close():
 
 def decode(raw):
     word=lambda p:struct.unpack_from(">I",raw,p)[0]
-    if len(raw)!=262144 or word(0)!=0x50444a32 or word(4)!=1:raise ValueError("job envelope identity")
+    if len(raw)!=262144 or word(0)!=0x50444a32 or word(4) not in (1,2):raise ValueError("job envelope identity")
     jobs=[]
     for i in range(3):
         at=32+2048*i

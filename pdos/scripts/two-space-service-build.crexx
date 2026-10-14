@@ -7,7 +7,8 @@ main: procedure = .int
   arg args=.string[]
   i=.int;j=.int
   source=.string; expected=.string; row=.string; name=.string
-  if args.0<>5 then return 2
+  if args.0<>5 & args.0<>6 then return 2
+  if args.0=6 then if args.6<>"normal" then return 2
   work=args.1; prior=args.2; cc=args.3; classicas=args.4; ld=args.5
   if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
   address crexx "run test ! -e :work"
@@ -15,7 +16,7 @@ main: procedure = .int
   address crexx "run mkdir -p :work"
   if rc<>0 then return rc
   identities=prior||"/inputs.sha256"; inputs=.string[]; hashes=.string[]
-  rebuilt="twospace_3270.c twospace_3270.h twospace_console.h twospace_history.c twospace_history.h twospace_surface.c twospace_workbench.c twospace_workbench.h twospace_dasd.c twospace_dasd.h twospace_batch.c twospace_batch.h twospace_job.c twospace_job.h"
+  rebuilt="twospace_3270.c twospace_3270.h twospace_console.h twospace_history.c twospace_history.h twospace_surface.c twospace_workbench.c twospace_workbench.h twospace_dasd.c twospace_dasd.h twospace_batch.c twospace_batch.h twospace_job.c twospace_job.h twospace_jobdd.c twospace_jobdd.h"
   do while lines(identities)>0
     row=linein(identities);source=word(row,2);expected=word(row,1)
     changed=.int; changed=0
@@ -43,6 +44,8 @@ main: procedure = .int
   inputs[inputs.0+1]="pdos/src/twospace_job.c"
   inputs[inputs.0+1]="pdos/src/twospace_job.h"
   inputs[inputs.0+1]="pdos/src/twospace_job.inc"
+  inputs[inputs.0+1]="pdos/src/twospace_jobdd.c"
+  inputs[inputs.0+1]="pdos/src/twospace_jobdd.h"
   asm=work||"/TWOSVC.asm"; object=work||"/TWOSVC.obj"
   address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR -S -I pdos/src -I pdpclib/src pdos/src/twospace_service.c -o :asm"
   if rc<>0 then return rc
@@ -63,7 +66,7 @@ main: procedure = .int
   address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :sessionasm :sessionobj"
   if rc<>0 then return rc
   consoleobjects=.string[]
-  modules="3270 history surface workbench dasd batch job"; names="T27 TPH TWF TWB TDA TBC TJB"
+  modules="3270 history surface workbench dasd batch job jobdd"; names="T27 TPH TWF TWB TDA TBC TJB TJD"
   do i=1 to words(modules)
     source="pdos/src/twospace_"||word(modules,i)||".c";name=word(names,i);casm=work||"/"||name||".asm";cobj=work||"/"||name||".obj"
     address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src :source -o :casm"
@@ -73,7 +76,7 @@ main: procedure = .int
     consoleobjects[i]=cobj
   end
   objects=.string[]; objects[1]=prior||"/TSMENTRY.obj";objects[2]=object
-  common="TSG TSD TSM TSR TSP TSV TSC TIO TBC TJB TSK TSH TSIF TSI TST TSS TTC T27 TDS TPH TWF TWD TWB TDA TTX TSCH TSTLB TSMKEY"
+  common="TSG TSD TSM TSR TSP TSV TSC TIO TBC TJB TJD TSK TSH TSIF TSI TST TSS TTC T27 TDS TPH TWF TWD TWB TDA TTX TSCH TSTLB TSMKEY"
   do i=1 to words(common)
     name=word(common,i);source=prior||"/"||name||".obj"
     if name="TSV" then source=invobj
@@ -99,5 +102,6 @@ main: procedure = .int
   end
   call lineout work||"/objects.sha256"
   elf=prior||"/service.elf"; emit=prior||"/dat-emit"; out=work||"/run"
-  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pcomm_core.py :elf :binary :emit :out"
+  if args.0=6 then address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_core.py :elf :binary :emit :out"
+  else address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pcomm_core.py :elf :binary :emit :out"
   return rc

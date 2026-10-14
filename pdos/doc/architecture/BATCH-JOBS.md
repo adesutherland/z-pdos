@@ -8,7 +8,9 @@ I/O conventions shared with z/OS on Hercules.
 
 This is the selected overall design. The [Stage 1 device subset](../qualification/BATCH-STAGE1-2026-10-13.md)
 is locally guest-qualified, as is the [Stage 2 serial descriptor/spool subset](../qualification/BATCH-STAGE2-2026-10-14.md).
-Native batch DD/runtime, JCL conversion and job forms remain later stages.
+The [first Stage 3 native DD increment](../qualification/BATCH-STAGE3-2026-10-14.md)
+is locally qualified. Further DD adapters, the shared batch runtime/native
+reference, JCL conversion and job forms remain open.
 [The Stage 2 contract](BATCH-STAGE2.md) describes its bounded service and control.
 [The Stage 0 contract](BATCH-STAGE0.md) pins initial capacities, reference
 cases, native entry requirements and the Stage 1 neutral device ABI.

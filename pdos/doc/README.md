@@ -26,13 +26,16 @@ and an application's service call.
   shared U/C dispatch and the bounded CMS31/TSO31/PDOS client increment.
 - [Card-reader batch jobs and 3270 job forms](architecture/BATCH-JOBS.md):
   selected console-preserving design; [PD-033](BACKLOG.md#pd-033-card-reader-batch-jobs-and-3270-job-forms)
-  owns the staged implementation and qualification gates; jobs, DDs, JCL and
-  forms remain later work.
+  owns the staged implementation and qualification gates; the checkpoints
+  below distinguish the delivered subsets from later DD/JCL/forms work.
 - [Initial batch contracts and reader/printer proof](qualification/BATCH-STAGE1-2026-10-13.md):
   locally qualified Stage 1 neutral devices on model 2 and plain line consoles;
   native prebound DD/batch runtime, JCL and forms remain later stages.
 - [Serial jobs, spool and operator recovery](qualification/BATCH-STAGE2-2026-10-14.md):
   Stage 2's descriptor service, 93 guest checks, printer retry and interrupted-job recovery; current console preserved.
+- [First native batch DD checkpoint](qualification/BATCH-STAGE3-2026-10-14.md):
+  prebound bindings, native BSAM input/SYSOUT and nested DD ownership pass 52
+  local checks; the remaining Stage 3 adapters and shared package are open.
 - [Development guide](development/README.md): source map and change contracts.
 - [Build contract](development/BUILD-CONTRACT.md): recorded acceptance stages.
 - [0.1 guest qualification](qualification/QUALIFICATION.md): exact historical

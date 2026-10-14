@@ -14,7 +14,10 @@ batch transport shared with z/OS/Hercules, and use one job service for reader,
 console and forms. [PD-033](../BACKLOG.md#pd-033-card-reader-batch-jobs-and-3270-job-forms)
 owns the staged plan. [Stage 1's neutral reader/printer subset](../qualification/BATCH-STAGE1-2026-10-13.md)
 is locally qualified, followed by [Stage 2's serial descriptor/spool service](../qualification/BATCH-STAGE2-2026-10-14.md).
-Native prebound DD/batch runtime, JCL and forms remain later work.
+[Stage 3's first native DD increment](BATCH-STAGE3.md) has a
+[local checkpoint](../qualification/BATCH-STAGE3-2026-10-14.md).
+Further DD adapters, the shared batch runtime/native reference, JCL and forms
+remain open.
 
 z/PDOS boots from a source-built 3390 disk and runs selected native CMS and
 TSO applications. Version 0.2 uses two translations on one z/Architecture

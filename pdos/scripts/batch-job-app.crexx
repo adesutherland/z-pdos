@@ -1,25 +1,44 @@
-/* SPDX-License-Identifier: MIT; source-built native Stage 2 job probes. */
+/* SPDX-License-Identifier: MIT; source-built native job/DD probes. */
 options levelb
 import rxfnsb
 main: procedure = .int
   arg args=.string[]
   i=.int
-  if args.0<>6 then return 2
+  if args.0<>6 & args.0<>7 then return 2
+  count=2
+  if args.0=7 then do
+    if args.7<>"dd" then return 2
+    count=3
+  end
   work=args.1;base=args.2;command=args.3;cc=args.4;classicas=args.5;ld=args.6
   if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
   address crexx "run test ! -e :work"
   if rc<>0 then return 2
   address crexx "run mkdir -p :work"
   if rc<>0 then return rc
-  do probe=1 to 2
+  do probe=1 to count
   source="pdos/tests/batch/job_probe.c"
   appname="D4JOB"
   if probe=2 then do
     source="pdos/tests/batch/job_step.c";appname="D4STEP"
   end
+  if args.0=7 then do
+    source="pdos/tests/batch/dd_probe.c"
+    if probe=2 then source="pdos/tests/batch/dd_step.c"
+    if probe=3 then do
+      source="pdos/tests/batch/dd_child.c";appname="D4DDCH"
+    end
+  end
   ;asm=work||"/"||appname||"-probe.asm";object=work||"/"||appname||"-probe.obj"
   address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR -S -I pdpclib/src -I pdos/src :source -o :asm"
   if rc<>0 then return rc
+  extra=.string[]
+  if args.0=7 then do
+    ddnative=work||"/"||appname||"-native.obj"
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage pdos/tests/batch/dd_native.asm :ddnative"
+    if rc<>0 then return rc
+    extra.1=ddnative
+  end
   address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
   if rc<>0 then return rc
   uiasm=work||"/"||appname||"-ui.asm";uiobj=work||"/"||appname||"-ui.obj"
@@ -30,17 +49,31 @@ main: procedure = .int
   native=.string[];native[1]=command||"/part5.obj";native[2]=command||"/part1.obj"
   native[3]=command||"/part2.obj";native[4]=command||"/part6.obj"
   native[5]=base||"/support/MVSSUPA.obj";native[6]=command||"/stdlib.obj"
+  if args.0=7 & probe>1 then do
+    stdasm=work||"/"||appname||"-stdio.asm";stdobj=work||"/"||appname||"-stdio.obj"
+    address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR -S -I pdpclib/src pdpclib/src/stdio.c -o :stdasm"
+    if rc<>0 then return rc
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :stdasm :stdobj"
+    if rc<>0 then return rc
+    /* Direct native stdio: no PCOMM standard-DD/terminal interception. */
+    native[2]=stdobj
+  end
   common="START CTYPE STRING TIME ERRNO ASSERT LOCALE MATH SETJMP SIGNAL MEMMGR"
   do i=1 to words(common)
     native[i+6]=base||"/c/objects/"||word(common,i)||".obj"
   end
   jobasm=work||"/"||appname||"-job.asm";jobobj=work||"/"||appname||"-job.obj"
+  ddasm=work||"/"||appname||"-dd.asm";ddobj=work||"/"||appname||"-dd.obj"
   address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src pdos/src/twospace_job.c -o :jobasm"
   if rc<>0 then return rc
   address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :jobasm :jobobj"
   if rc<>0 then return rc
+  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src pdos/src/twospace_jobdd.c -o :ddasm"
+  if rc<>0 then return rc
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :ddasm :ddobj"
+  if rc<>0 then return rc
   module=work||"/"||appname||".rdw";map=work||"/"||appname||".map";stage=work||"/"||appname||".bin";packer=command||"/pack-tso"
-  address crexx "run :ld --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@CRT0 -Map :map -o :module :native[] :object :uiobj :jobobj"
+  address crexx "run :ld --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@CRT0 -Map :map -o :module :native[] :object :uiobj :jobobj :ddobj :extra[]"
   if rc<>0 then return rc
   address crexx "run :packer :module :stage classic31"
   if rc<>0 then return rc
