@@ -16,8 +16,9 @@ owns the staged plan. [Stage 1's neutral reader/printer subset](../qualification
 is locally qualified, followed by [Stage 2's serial descriptor/spool service](../qualification/BATCH-STAGE2-2026-10-14.md).
 [Stage 3's first native DD increment](BATCH-STAGE3.md) has a
 [local checkpoint](../qualification/BATCH-STAGE3-2026-10-14.md).
-Further DD adapters, the shared batch runtime/native reference, JCL and forms
-remain open.
+[Native datasets, concatenation and temporary data](BATCH-STAGE3-DATA.md)
+extend it with a [second local checkpoint](../qualification/BATCH-STAGE3-DATA-2026-10-14.md).
+The shared batch runtime/native reference, JCL and forms remain open.
 
 z/PDOS boots from a source-built 3390 disk and runs selected native CMS and
 TSO applications. Version 0.2 uses two translations on one z/Architecture

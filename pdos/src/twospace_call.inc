@@ -63,6 +63,9 @@ static unsigned int call_launch(TSLIMAGE *image,const unsigned char *parameters,
     unsigned int rc,arg,stack,depth,i,returned;unsigned char *arg_real,*stack_real;
     if(!image||(!bytes&&image->personality!=TSV_TSO)||bytes>1024U||
        native_invocations.depth>=TSV_MAX_DEPTH)return 8U;
+    /* Each batch entry gets validated initial writable program state,
+     * including nested inactive modules. Never refresh an active image. */
+    if(job_active()){rc=load_refresh(image);if(rc)return rc;}
     begin.address.hi=begin.address.lo=begin.direction=0U;
     begin.length=256U+image->owner;begin.svc=235U;
     rc=native_begin(&begin);if(rc)return rc;

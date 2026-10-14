@@ -26,6 +26,7 @@
 #include "twospace_batch.h"
 #include "twospace_job.h"
 #include "twospace_jobdd.h"
+#include "twospace_jobtemp.h"
 static unsigned int job_active(void);
 static unsigned int job_commit(void);
 static unsigned int job_dd_scope(void);

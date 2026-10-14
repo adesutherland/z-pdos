@@ -9,6 +9,14 @@
 #define TJD_INLINE 2U
 #define TJD_DUMMY 3U
 #define TJD_SYSOUT 4U
+#define TJD_TEMP 5U
+#define TJD_CONCAT 3U
+#define TJD_PASS 1U
+#define TJD_DELETE 2U
+#define TJD_KEEP 3U
+#define TJD_NEW 1U
+#define TJD_OLD 2U
+#define TJD_TEMP_LIMIT 2097152U
 #define TJD_INPUT 1U
 #define TJD_OUTPUT 2U
 #define TJD_FB 0x90U
@@ -16,7 +24,11 @@
 /* All integers are big endian. Header: version, size, entry count, step
  * count, encoding (1 = IBM1047 text / uninterpreted binary octets), reserved.
  * Entry: step (1 based), kind, direction, RECFM, LRECL, BLKSIZE, inline
- * offset/bytes, DD[8], DSN[44], member[8], reserved. Inline data is a packed
+ * offset/bytes, DD[8], DSN[44], member[8], flags. Version 1 flags are zero.
+ * Version 2 flags: bits 0..1 concatenation ordinal (head=0), bits 8..9
+ * temporary normal disposition, bits 16..17 temporary NEW/OLD status.
+ * TEMP uses offset as its byte quota, DSN as name[8]+36 blanks, no member.
+ * TEMP KEEP is PASS; all temporary data is deleted at job end. Inline data is a packed
  * sequence of halfword lengths and exact logical records, including VB empty
  * records. No implicit conversion, trimming or newline interpretation. */
 unsigned int TJDWORD(const unsigned char *);

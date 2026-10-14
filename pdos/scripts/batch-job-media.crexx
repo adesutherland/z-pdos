@@ -6,7 +6,7 @@ main: procedure = .int
   if args.0<>7 & args.0<>8 then return 2
   count=2
   if args.0=8 then do
-    if args.8<>"dd" then return 2
+    if args.8<>"dd" & args.8<>"dd-data" then return 2
     count=3
   end
   work=args.1;prior=args.2;core=args.3;app=args.4;herc=args.5;model=args.6;primary=args.7
@@ -46,6 +46,10 @@ main: procedure = .int
   call lineout control
   address crexx "run cmake -E rename :control :before"
   if rc<>0 then return rc
+  if args.0=8 then if args.8="dd-data" then do
+    address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/batch/dd_data.py prepare :media"
+    if rc<>0 then return rc
+  end
   source=prior||"/launch.bin"
   address crexx "run cmake -E copy :source :input"
   if rc<>0 then return rc
@@ -56,4 +60,8 @@ main: procedure = .int
   address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_core.py configure :core :configured :model :primary monitor"
   if rc<>0 then return rc
   address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :input :configured :herc"
+  if rc<>0 then return rc
+  if args.0=8 then if args.8="dd-data" then do
+    address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/batch/dd_data.py stage :work :herc"
+  end
   return rc

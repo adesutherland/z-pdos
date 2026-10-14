@@ -35,7 +35,10 @@ and an application's service call.
   Stage 2's descriptor service, 93 guest checks, printer retry and interrupted-job recovery; current console preserved.
 - [First native batch DD checkpoint](qualification/BATCH-STAGE3-2026-10-14.md):
   prebound bindings, native BSAM input/SYSOUT and nested DD ownership pass 52
-  local checks; the remaining Stage 3 adapters and shared package are open.
+  local checks.
+- [Native datasets, concatenation and temporary data](qualification/BATCH-STAGE3-DATA-2026-10-14.md):
+  the next Stage 3 increment passes 99 checks; shared-package/native-reference
+  qualification, JCL and job forms remain open.
 - [Development guide](development/README.md): source map and change contracts.
 - [Build contract](development/BUILD-CONTRACT.md): recorded acceptance stages.
 - [0.1 guest qualification](qualification/QUALIFICATION.md): exact historical

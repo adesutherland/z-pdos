@@ -46,7 +46,9 @@ static unsigned int job_memory_room(void)
 static void job_cleanup_failed(void)
 {
     unsigned char *j=TJBFIND(&job_pool,job_owner,job_id);
-    if(j){TJBPUT(j+44U,12U);TJBPUT(TJBSTEP(j,TJBWORD(j+12U))+140U,12U);}
+    if(j){unsigned int step=TJBWORD(j+12U),count=TJBWORD(j+16U);
+        TJBPUT(j+44U,12U);if(count&&step>=count)step=count-1U;
+        if(count)TJBPUT(TJBSTEP(j,step)+140U,12U);}
     job_failed=1U;*(volatile unsigned int *)0x4fbcU=1U;
 }
 static unsigned int job_is_root(unsigned int token){return job_id&&token==job_token;}
@@ -93,6 +95,7 @@ static unsigned int job_done(void)
     unsigned char h[TJB_REQUEST_BYTES],*j=TJBFIND(&job_pool,job_owner,job_id);
     volatile unsigned int *saved=(volatile unsigned int *)0x3000U;unsigned int rc=0U,i,id=job_id;
     if(!j)return 12U;
+    if(sf_temp_end()){job_cleanup_failed();return 12U;}
     if(job_note("JOB END STATE ",TJBWORD(j+8U))){
         if(TJBWORD(j+8U)==TJB_DONE){TJBPUT(j+8U,TJB_FAILED);TJBPUT(j+32U,4U);TJBPUT(j+36U,0U);TJBPUT(j+40U,0xffffffffU);}
     }
@@ -142,11 +145,13 @@ static unsigned int job_dispatch(void)
 static unsigned int job_step_done(unsigned int token,unsigned int os,unsigned int valid,unsigned int rc,unsigned int abnormal)
 {
     if(!job_id||token!=job_token)return 12U;
+    if(sf_temp_step()){job_cleanup_failed();return 12U;}
     sf_batch_end();
     job_token=0U;*(volatile unsigned int *)0x4fb4U=0U;
-    if(job_note("STEP OS ",os)||job_note("STEP RC ",valid?rc:0xffffffffU))job_output_error=4U;
     if(job_cancelling){os=16U;valid=0U;abnormal=3U;}
     else if(job_output_error){os=job_output_error;valid=0U;}
+    if(job_note("STEP OS ",os)||job_note("STEP RC ",valid?rc:0xffffffffU)){
+        job_output_error=4U;os=4U;valid=0U;}
     if(TJBEND(&job_pool,job_owner,job_id,os,valid,rc,abnormal,0U))return 12U;
     job_output_error=0U;
     if(job_commit())job_failed=1U;

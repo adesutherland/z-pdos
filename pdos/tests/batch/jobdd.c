@@ -58,5 +58,20 @@ int main(void)
  put(e+28U,0U);memset(d+TJD_DATA,0,TJD_BYTES-TJD_DATA);assert(!TJDCHK(d,2U));cursor=0U;assert(TJDBLOCK(e,d+TJD_DATA,0U,&cursor,block,sizeof block,&n)==1);
  e=entry(TJD_SYSOUT,TJD_FB,133U,133U);assert(TJDCHK(d,2U)==8);
  e=entry(TJD_DUMMY,TJD_FB,80U,80U);assert(!TJDCHK(d,2U));
+ /* Version-2 like concatenation: ordinal components, input only, exact
+  * RECFM/LRECL but independent block size. Output/unlike are refused. */
+ put(d,2U);memcpy(d+32U+TJD_ENTRY,e,TJD_ENTRY);put(d+8U,2U);
+ put(d+32U+TJD_ENTRY+92U,1U);put(d+32U+TJD_ENTRY+20U,160U);assert(!TJDCHK(d,2U));
+ put(d,1U);assert(TJDCHK(d,2U)==8);put(d,2U);
+ put(d+32U+TJD_ENTRY+8U,TJD_OUTPUT);assert(TJDCHK(d,2U)==8);put(d+32U+TJD_ENTRY+8U,TJD_INPUT);
+ put(d+32U+TJD_ENTRY+16U,40U);assert(TJDCHK(d,2U)==8);put(d+32U+TJD_ENTRY+16U,80U);
+ put(d+32U+TJD_ENTRY+92U,2U);assert(TJDCHK(d,2U)==8);
+ e=entry(TJD_TEMP,TJD_FB,4U,8U);put(d,2U);put(e+8U,TJD_OUTPUT);put(e+24U,64U);
+ memset(e+40U,0x40,44U);e[40U]=0xe3U;put(e+92U,TJD_NEW<<16|TJD_KEEP<<8);assert(!TJDCHK(d,2U));
+ put(e+24U,TJD_TEMP_LIMIT+1U);assert(TJDCHK(d,2U)==8);put(e+24U,64U);
+ put(e+8U,TJD_INPUT);assert(TJDCHK(d,2U)==8);put(e+92U,TJD_OLD<<16|TJD_DELETE<<8);assert(!TJDCHK(d,2U));
+ assert(!TJBSUB(&p,7U,job,sizeof job,&id)&&!TJBBIND(&p,7U,id,d,sizeof d)&&TJBWORD(pool+4U)==3U);
+ assert(!TJBLOAD(&p,pool,sizeof pool));assert(!TJBACT(&p,7U,id,3U)&&!TJBACT(&p,7U,id,4U));
+ e=entry(TJD_DUMMY,TJD_FB,80U,80U);assert(!TJBSUB(&p,7U,job,sizeof job,&id)&&!TJBBIND(&p,7U,id,d,sizeof d)&&TJBWORD(pool+4U)==3U);
  puts("batch DD descriptor, FB/VB, binary, empty, persistence and ownership controls passed");return 0;
 }

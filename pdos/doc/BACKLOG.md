@@ -811,7 +811,8 @@ be K-only and explicitly budgeted rather than consuming low U placement.
 - Authorization (13 October): Implement Stage 0 and the Stage 1 card reader/printer proof. Use a disposable qualification image, preserve current console behavior, and review/freeze before guest QA. Stages 2–6, managed-image adoption and publication remain separate increments. The existing PD-030 storage scope is unchanged.
 - Authorization (14 October): Commit the Stage 0/1 baseline locally and implement Stage 2 serial descriptors, bounded spool and operator recovery. Baseline commit `70b6f02` contains the selected contracts and device proof. Following acceptance, I authorised the local Stage 2 commit and Stage 3 implementation with prebound native DDs and genuine batch I/O. Push, managed-image adoption and Stages 4–6 remain separate decisions.
 - Design: [Batch job contract](architecture/BATCH-JOBS.md). Evidence for reusable components: [owned I/O qualification](qualification/IO-FOUNDATION-2026-10-09.md), [console checkpoint](qualification/CONSOLE-STAGE3-2026-10-09.md), [ADDRESS qualification](qualification/ADDRESS-CREXX-2026-10-12.md) and [storage direction](architecture/STORAGE-EXTENTS.md).
-- Stage 3 continuation authorised (14 October): Commit the first native DD checkpoint locally, then qualify dataset/member I/O and implement concatenation and job-owned temporary PASS/DELETE/KEEP support. Push, managed-image adoption and the shared SDK/cREXX/native-reference gate remain separate decisions.
+- Stage 3 continuation authorised (14 October): Commit the first native DD checkpoint locally, then qualify dataset/member I/O and implement concatenation and job-owned temporary PASS/DELETE/KEEP support. The first checkpoint is local commit `3676128`. Push, managed-image adoption and the shared SDK/cREXX/native-reference gate remain separate decisions.
+- Stage 3 package/reference authorised (14 October): Commit the data checkpoint locally, then implement and qualify one shared SDK/cREXX batch package on PDOS and a named native z/OS reference to complete the selected Stage 3 gate. Preserve the console and distinguish direct batch from background TSO. JCL/PROCs, job forms, managed adoption, push and release remain later decisions.
 - Overall acceptance: Submit common cREXX JCL through the actual virtual reader on PDOS and a named z/OS/Hercules guest; execute the pinned native package with prebound DDs and real batch I/O; collect complete job/step/DD printer reports and exact dataset outputs; reproduce the same job behavior through the PDOS console and 3270 forms. Distinguish application RC, OS/service failure, execution completion and print delivery. Recover the console and all resources after success, failure and cancellation. Close only the selected qualified profile, with wider services and released artifacts separately identified.
 - Stage 0/1 checkpoint (13 October): Initial capacities, entry/reference cases and neutral device ABI are selected. The implemented 3505/1403 subset passes four host control groups, a fresh complete native build and 46 harness checks across model 2 and plain 3215 guest runs. Independent stopped endpoint/record/transcript readback and normal cleanup pass. [The dated result](qualification/BATCH-STAGE1-2026-10-13.md) pins review freezes, repairs, exact inputs and limits. This closes the selected Stage 0 contract and Stage 1 local device proof, not the complete PD-033 item or a release.
 - Transport finding: The installed Hercules reader presents EOF for a truncated EBCDIC host file. The host adapter rejects non-80-byte framing before configuration/devinit. Physical partial-transfer rejection is checked in the portable/actual-provider host controls; it is not claimed as a Hercules partial-card guest result.
@@ -874,9 +875,15 @@ implemented immutable DD descriptor, step lookup/inheritance and selected
 native BSAM dataset/in-stream/DUMMY/SYSOUT adapters. The
 [first checkpoint](qualification/BATCH-STAGE3-2026-10-14.md) passes 52 checks
 across line and model 2 consoles, with native binary input, nested DD ownership,
-exact SYSOUT/printer output and independent resource handback. Dataset/member
-coverage, concatenation, temporary dispositions and the shared SDK/cREXX
-package/native-reference gate remain open.
+exact SYSOUT/printer output and independent resource handback. The
+[data contract](architecture/BATCH-STAGE3-DATA.md) and
+[second checkpoint](qualification/BATCH-STAGE3-DATA-2026-10-14.md) add locally
+qualified PS/PDS-member I/O through the native journal, ordered like input
+concatenation and job-owned temporary NEW/OLD/PASS/DELETE/KEEP. Its 99 checks
+include both console profiles, earlier DD probes and serial/cancellation
+regressions, with independent stopped ownership and exact STORE readback.
+The shared SDK/cREXX batch package and native-reference gate remain open;
+full Stage 3 is still In progress. JCL and job forms are later stages.
 
 - Add a step allocation context above invocation-local DD tables. Bind DDs before entry, support scoped lookup/inheritance and preserve the caller's existing bindings across nested commands and unwind.
 - Implement the chosen dataset/member, in-stream, DUMMY, concatenation, temporary-data and SYSOUT adapters with explicit FB/VB framing, EOF, empty-record and encoding behavior. Freeze the selected DCB/SPACE/DISP semantics and protect unrelated datasets.

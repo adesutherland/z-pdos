@@ -7,7 +7,7 @@ main: procedure = .int
   if args.0<>6 & args.0<>7 then return 2
   count=2
   if args.0=7 then do
-    if args.7<>"dd" then return 2
+    if args.7<>"dd" & args.7<>"dd-data" then return 2
     count=3
   end
   work=args.1;base=args.2;command=args.3;cc=args.4;classicas=args.5;ld=args.6
@@ -27,6 +27,11 @@ main: procedure = .int
     if probe=2 then source="pdos/tests/batch/dd_step.c"
     if probe=3 then do
       source="pdos/tests/batch/dd_child.c";appname="D4DDCH"
+    end
+    if args.7="dd-data" then do
+      source="pdos/tests/batch/dd_data_probe.c"
+      if probe=2 then source="pdos/tests/batch/dd_data_step.c"
+      if probe=3 then source="pdos/tests/batch/dd_data_child.c"
     end
   end
   ;asm=work||"/"||appname||"-probe.asm";object=work||"/"||appname||"-probe.obj"

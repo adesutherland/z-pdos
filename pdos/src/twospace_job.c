@@ -32,7 +32,8 @@ int TJBBIND(TJBPOOL *p,unsigned int owner,unsigned int id,const unsigned char *d
  if(!j||!d||n!=TJD_BYTES)return TJB_BAD;
  if(TJBWORD(j+8U)!=TJB_QUEUED&&TJBWORD(j+8U)!=TJB_HELD)return TJB_BUSY;
  target=TJBDDS(p,id);if(TJBWORD(target))return TJB_BUSY;
- rc=TJDCHK(d,TJBWORD(j+16U));if(rc)return rc;copy(target,d,n);TJBPUT(p->bytes+4U,2U);return 0;}
+ rc=TJDCHK(d,TJBWORD(j+16U));if(rc)return rc;copy(target,d,n);
+ if(TJBWORD(p->bytes+4U)<(TJDWORD(d)==2U?3U:2U))TJBPUT(p->bytes+4U,TJDWORD(d)==2U?3U:2U);return 0;}
 int TJBINIT(TJBPOOL *p,unsigned char *b,unsigned int n)
 {if(!p||!b||n!=TJB_BYTES)return TJB_BAD;zero(b,n);TJBPUT(b,0x50444a32U);TJBPUT(b+4U,1U);p->bytes=b;return 0;}
 int TJBCHECK(const unsigned char *d,unsigned int n)
@@ -96,11 +97,11 @@ int TJBAPP(TJBPOOL *p,unsigned int owner,unsigned int id,const unsigned char dd[
  TJBPUT(j+52U,TJBWORD(j+52U)+1U);TJBPUT(j+24U,used+24U+n);return 0;}
 int TJBLOAD(TJBPOOL *p,unsigned char *b,unsigned int n)
 {unsigned int i,k,active=0U,wait=0U,completed=0U,max=0U;
- if(!p||!b||n!=TJB_BYTES||TJBWORD(b)!=0x50444a32U||(TJBWORD(b+4U)!=1U&&TJBWORD(b+4U)!=2U))return TJB_BAD;
+ if(!p||!b||n!=TJB_BYTES||TJBWORD(b)!=0x50444a32U||TJBWORD(b+4U)<1U||TJBWORD(b+4U)>3U)return TJB_BAD;
  for(i=16U;i<TJB_BASE;++i)if(b[i])return TJB_BAD;
  for(i=0U;i<TJB_SLOTS;++i){unsigned char *j=b+TJB_BASE+i*TJB_SLOT_BYTES;unsigned int state=TJBWORD(j+8U),id=TJBWORD(j),count=TJBWORD(j+16U),used=TJBWORD(j+24U),at=0U,seq=0U;
   {const unsigned char *dd=b+TJB_DD_BASE+i*TJD_BYTES;
-   if(TJBWORD(dd)){if(TJBWORD(b+4U)!=2U||!state||TJDCHK(dd,count))return TJB_BAD;}
+   if(TJBWORD(dd)){if(TJBWORD(b+4U)<2U||(TJDWORD(dd)==2U&&TJBWORD(b+4U)!=3U)||!state||TJDCHK(dd,count))return TJB_BAD;}
    else for(k=0U;k<TJD_BYTES;++k)if(dd[k])return TJB_BAD;}
   if(!state){for(k=0U;k<TJB_SLOT_BYTES;++k)if(j[k])return TJB_BAD;continue;}
   if(state>TJB_INTERRUPTED||!id||!TJBWORD(j+4U)||!count||count>TJB_STEPS||TJBWORD(j+12U)>count||!name(j+64U)||TJBWORD(j+20U)<256U||TJBWORD(j+20U)>TJB_PRINT_BYTES||used>TJBWORD(j+20U)||TJBWORD(j+28U)>TJB_PRINT_FAILED||TJBWORD(j+36U)>1U||TJBWORD(j+48U)>1U)return TJB_BAD;

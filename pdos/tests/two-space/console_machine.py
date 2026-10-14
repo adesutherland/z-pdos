@@ -180,6 +180,7 @@ def parse_transcript(raw):
 
 def run(a):
     if a.job_cut and not (a.batch_jobs and a.normal):raise ValueError("job cut requires explicit normal batch proof")
+    if a.batch_data and not (a.batch_dd and a.normal):raise ValueError("batch data requires explicit normal DD proof")
     if sum((a.batch_devices,a.batch_jobs,a.batch_dd))>1:raise ValueError("choose one batch fixture")
     out=Path(a.output).resolve();out.mkdir(exist_ok=False)
     disk=Path(a.disk).resolve();core=Path(a.core).resolve();herc=Path(a.hercules).resolve()
@@ -628,12 +629,15 @@ def run(a):
             if error is None:error=repr(exc)
     if a.batch_dd:
         try:
-            from dd_actor import inspect as dd_inspect
+            if a.batch_data:
+                from dd_data_actor import inspect as dd_inspect
+            else:
+                from dd_actor import inspect as dd_inspect
             checks.update(dd_inspect(out,raw))
         except Exception as exc:
             checks["native_batch_dd_capture_complete"]=False
             if error is None:error=repr(exc)
-    receipt={"profile":{"model":a.model,"colour":a.colour,"basic":a.basic,"editor":a.editor,"oversize":a.oversize,"workbench":a.workbench,"transfer":a.transfer,"workbench_normal":a.workbench_normal,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw,"stage3":a.stage3,"batch_devices":a.batch_devices,"batch_jobs":a.batch_jobs,"batch_dd":a.batch_dd,"job_cut":a.job_cut},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
+    receipt={"profile":{"model":a.model,"colour":a.colour,"basic":a.basic,"editor":a.editor,"oversize":a.oversize,"workbench":a.workbench,"transfer":a.transfer,"workbench_normal":a.workbench_normal,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw,"stage3":a.stage3,"batch_devices":a.batch_devices,"batch_jobs":a.batch_jobs,"batch_dd":a.batch_dd,"batch_data":a.batch_data,"job_cut":a.job_cut},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
     if service_cost is not None:receipt["service_cost"]=service_cost
     if a.normal and transcript is not None and any(e.get("text","").startswith("PD25 ") for e in transcript["events"]):
         from io_benchmark_check import observations
@@ -664,6 +668,9 @@ def run(a):
         if a.batch_jobs or a.batch_dd:
             spools=[f for f in stored["files"] if f["kind"]==0x50444a32 and not f["erased"]]
             checks["durable_job_spool_readback"]=len(spools)==1 and spools[0]["sha256"]==digest(out/"job-spool.bin")
+        if a.batch_data:
+            from dd_data_actor import stored as data_stored
+            checks.update(data_stored(stored["files"]))
         (out/"store-after.json").write_text(json.dumps(stored,indent=2)+"\n");flat.unlink()
         receipt["pass"]=all(checks.values())
     (out/"receipt.json").write_text(json.dumps(receipt,indent=2)+"\n")
@@ -681,6 +688,7 @@ if __name__=="__main__":
     p.add_argument("--batch-devices",action="store_true")
     p.add_argument("--batch-jobs",action="store_true")
     p.add_argument("--batch-dd",action="store_true")
+    p.add_argument("--batch-data",action="store_true")
     p.add_argument("--job-cut",action="store_true")
     p.add_argument("--stage3",choices=("graph","family","dbcs","recovery","policy"))
     for name in ("cms-exchange","fixture-exchange","tape-input"):p.add_argument("--"+name)

@@ -14,4 +14,9 @@ main: procedure = .int
   address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_job.c pdos/src/twospace_jobdd.c pdos/tests/batch/jobdd.c -o :binary"
   if rc<>0 then return rc
   address crexx "run :binary"
+  if rc<>0 then return rc
+  binary=work||"/jobtemp-test"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/twospace_job.c pdos/src/twospace_jobdd.c pdos/src/twospace_jobtemp.c pdos/tests/batch/jobtemp.c -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary"
   return rc

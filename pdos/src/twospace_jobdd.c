@@ -38,22 +38,38 @@ static int records(const unsigned char *e,const unsigned char *p,unsigned int n)
 int TJDCHK(const unsigned char *d,unsigned int steps)
 {
  unsigned int i,k,count,data=TJD_DATA,per[8];
- if(!d||!steps||steps>8U||TJDWORD(d)!=1U||TJDWORD(d+4U)!=TJD_BYTES||
+ if(!d||!steps||steps>8U||(TJDWORD(d)!=1U&&TJDWORD(d)!=2U)||TJDWORD(d+4U)!=TJD_BYTES||
     TJDWORD(d+12U)!=steps||TJDWORD(d+16U)!=1U)return 8;
  count=TJDWORD(d+8U);if(count>TJD_COUNT||!empty(d+20U,12U))return 8;
  for(i=0U;i<8U;++i)per[i]=0U;
  for(i=0U;i<TJD_COUNT;++i){const unsigned char *e=d+32U+i*TJD_ENTRY;
-  unsigned int step,kind,mode,off,n;int rc;
+  unsigned int step,kind,mode,off,n,flags,ordinal;int rc;
   if(i>=count){if(!empty(e,TJD_ENTRY))return 8;continue;}
   step=TJDWORD(e);kind=TJDWORD(e+4U);mode=TJDWORD(e+8U);
   off=TJDWORD(e+24U);n=TJDWORD(e+28U);
-  if(!step||step>steps||++per[step-1U]>8U||!TJDNAME(e+32U)||
-     (mode!=TJD_INPUT&&mode!=TJD_OUTPUT)||!empty(e+92U,4U))return 8;
+  flags=TJDWORD(e+92U);ordinal=flags&TJD_CONCAT;
+  if((TJDWORD(d)==1U&&flags)||flags&~0x00030303U)return 8;
+  if(!step||step>steps||(!ordinal&&++per[step-1U]>8U)||!TJDNAME(e+32U)||
+     (mode!=TJD_INPUT&&mode!=TJD_OUTPUT))return 8;
   rc=attributes(e);if(rc)return rc;
+  if(ordinal){const unsigned char *old=i?e-TJD_ENTRY:0;
+   if(!old||mode!=TJD_INPUT||TJDWORD(old)!=step||TJDWORD(old+8U)!=TJD_INPUT||
+      !same(old+32U,e+32U,8U)||(TJDWORD(old+92U)&TJD_CONCAT)+1U!=ordinal||
+      TJDWORD(old+12U)!=TJDWORD(e+12U)||TJDWORD(old+16U)!=TJDWORD(e+16U))return 8;}
   for(k=0U;k<i;++k){const unsigned char *old=d+32U+k*TJD_ENTRY;
-   if(TJDWORD(old)==step&&same(old+32U,e+32U,8U))return 8;}
+   if(!ordinal&&TJDWORD(old)==step&&same(old+32U,e+32U,8U))return 8;}
+  if(kind!=TJD_TEMP&&(flags&~TJD_CONCAT))return 8;
   if(kind==TJD_DATASET){
    if(off||n||!dataset(e+40U)||(!empty(e+84U,8U)&&!TJDNAME(e+84U)))return 8;
+  }else if(kind==TJD_TEMP){
+   unsigned int status=(flags>>16)&3U,disp=(flags>>8)&3U;
+   if(TJDWORD(d)!=2U||!off||off>TJD_TEMP_LIMIT||n||!TJDNAME(e+40U)||
+      !empty(e+84U,8U)||!disp||!status||status>2U||
+      (mode==TJD_INPUT&&status!=TJD_OLD))return 8;
+   for(k=48U;k<84U;++k)if(e[k]!=0x40U)return 8;
+   for(k=0U;k<i;++k){const unsigned char *old=d+32U+k*TJD_ENTRY;
+    if(TJDWORD(old)==step&&TJDWORD(old+4U)==TJD_TEMP&&same(old+40U,e+40U,8U)&&
+       (TJDWORD(old+92U)&~TJD_CONCAT)!=(flags&~TJD_CONCAT))return 8;}
   }else{
    if(!empty(e+40U,52U))return 8;
    if(kind==TJD_INLINE){
