@@ -24,6 +24,13 @@ main: procedure = .int
     else if args.5="ui" then do
       commands="pdos/tests/batch/jcl-ui-commands.json";call arraydrop profile;ui=1
     end
+    else if args.5="walkthrough" | args.5="walkthrough-resume" then do
+      if primary<>"3270" then return 2
+      commands="pdos/tests/batch/forms-walkthrough-commands.json";call arraydrop profile;profile.1="--batch-walkthrough";ui=1
+      if args.5="walkthrough-resume" then do
+        commands="pdos/tests/batch/forms-resume-commands.json";profile.2="--walkthrough-resume"
+      end
+    end
     else if args.5="forms" then do
       if primary="line" then return 2
       commands="pdos/tests/batch/forms-commands.json";call arraydrop profile;profile.1="--batch-forms";ui=1

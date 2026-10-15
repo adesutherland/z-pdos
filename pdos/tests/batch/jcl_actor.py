@@ -58,7 +58,7 @@ def action(name,proc,log,out,client,script):
     if name=='spin-interrupt':return spin_interrupt(proc,log,out)
     if name.startswith('reader-'):
         member=name[7:]
-        if member not in ('C','CG'):raise ValueError('selected owned reader deck')
+        if member not in ('C','CG','LGO'):raise ValueError('selected owned reader deck')
         return _commands(proc,log,out,name,[f'devinit 000C {FIXTURES/(member+".fb80")} eof ebcdic'])
     if name in ('interrupt','printer-offline','printer-restore'):
         return old_action(name,proc,log,out)

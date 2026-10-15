@@ -16,7 +16,7 @@ static int contains(const char *p)
 {unsigned int i;char text[133];for(i=0U;i<form.shown;++i){assert(!TJCDEC(form.rows[i],132U,text));text[132]=0;if(strstr(text,p))return 1;}return 0;}
 int main(void)
 {
- unsigned int before,ticket,depth;unsigned char frozen_job[TJB_FULL_BYTES],frozen_dd[TJD_EXT_BYTES],wide[132],dd[8];char longfield[133];
+ unsigned int before,ticket,depth,argc;unsigned char frozen_job[TJB_FULL_BYTES],frozen_dd[TJD_EXT_BYTES],wide[132],dd[8];char longfield[133],arguments[101];
  /* Establish the actual console-route descriptor, then compare form preview. */
  assert(!console_protocol_test());memcpy(frozen_job,expected_job,sizeof frozen_job);memcpy(frozen_dd,expected_dd,sizeof frozen_dd);
  start();assert(!event("DECK APP.JCL(CASE)")&&!event("RUNHOLD YES")&&!event("PREVIEW"));
@@ -59,6 +59,16 @@ int main(void)
  assert(!event("OUT APP.SRC(RESULT)")&&!event("PREVIEW")&&state.result.steps==2U);
  assert(!event("PROC CRXCL")&&!event("PREVIEW")&&state.result.steps==3U);
  assert(!event("OUT ")&&!event("PROC CRXLGO")&&!event("PREVIEW")&&state.result.steps==4U);
+ /* Normal arguments produce the same checked procedure card, including
+    JCL apostrophe escaping; oversize edits cannot destroy a ready preview. */
+ assert(!event("ARGS -a SHARED")&&!strcmp(form.parameters,"ARGS='-a SHARED'")&&!event("PREVIEW")&&state.result.steps==4U);
+ assert(!event("ARGS can't")&&!event("PREVIEW"));
+ argc=TJBWORD(state.result.job+32U+3U*TJB_STEP_BYTES+16U);
+ assert(argc<sizeof arguments&&!TJCDEC(state.result.job+32U+3U*TJB_STEP_BYTES+24U,argc,arguments));arguments[argc]=0;
+ assert(!strcmp(arguments,"--no-autoload DD:RXBIN can't"));
+ ticket=form.ticket;memset(longfield,'X',61U);longfield[61]=0;strcpy(messages,"ARGS ");strcat(messages,longfield);
+ assert(event(messages)==8&&form.ready&&form.ticket==ticket);
+ assert(!event("ARGS")&&!strcmp(form.parameters,"ARGS=''")&&!event("PREVIEW"));
  assert(!event("PARAMS WORK=TOOLONG8")&&event("PREVIEW")!=0&&!form.ready);
  assert(!event("PARAMS WORK=SEVEN77")&&!event("PREVIEW")&&form.ready);
  assert(!event("OVERRIDE //COMP.SYSIN DD DUMMY")&&!form.ready&&!event("PREVIEW"));

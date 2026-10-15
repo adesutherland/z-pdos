@@ -95,7 +95,7 @@ def start_terminal(a,out,proc,log,port,script,trace_name):
         close_terminal(terminal,script)
         raise
 
-def form_observation(out,script,prompt,ordinal,epoch):
+def form_observation(out,script,prompt,ordinal,epoch,manual=False):
     """Full physical state; wire deltas alone need not repeat panel titles."""
     data={}
     for name,action in (("ascii","Ascii()"),("buffer","ReadBuffer(Ascii)"),("geometry","Query(ScreenCurSize)"),("cursor","Query(Cursor)")):
@@ -105,6 +105,10 @@ def form_observation(out,script,prompt,ordinal,epoch):
     stem="form-%03d"%ordinal
     (out/(stem+".screen")).write_text(data["ascii"])
     (out/(stem+".buffer")).write_text(data["buffer"])
+    if manual:
+        result=terminal_action(script,"PrintText(html,string)")
+        if result.returncode or '<html' not in result.stdout.lower():raise RuntimeError("actual terminal HTML capture failed")
+        (out/(stem+".html")).write_text(result.stdout)
     chroma=bool(set(re.findall(r"42=([0-9a-f]+)",data["buffer"]))&set(("f1","f2","f3","f4","f5","f6")))
     return {"prompt":prompt,"epoch":epoch,"screen":stem+".screen","buffer":stem+".buffer","geometry":" ".join(data["geometry"].split()),"cursor":data["cursor"].strip(),"has_colour":chroma}
 
@@ -232,10 +236,12 @@ def parse_transcript(raw):
             "sha256":hashlib.sha256(data).hexdigest()}
 
 def run(a):
-    forms_profile=a.batch_forms or a.batch_forms_complete or a.batch_forms_recovery
-    if sum((a.batch_forms,a.batch_forms_complete,a.batch_forms_recovery))>1:raise ValueError("choose one forms profile")
+    forms_profile=a.batch_forms or a.batch_forms_complete or a.batch_forms_recovery or a.batch_walkthrough
+    if sum((a.batch_forms,a.batch_forms_complete,a.batch_forms_recovery,a.batch_walkthrough))>1:raise ValueError("choose one forms profile")
     if forms_profile and not a.normal:raise ValueError("batch forms require normal console proof")
     if forms_profile and (a.batch_devices or a.batch_jobs or a.batch_dd):raise ValueError("choose forms or a descriptor matrix")
+    if a.walkthrough_resume and not a.batch_walkthrough:raise ValueError("resume requires walkthrough profile")
+    if a.batch_walkthrough and a.line_primary:raise ValueError("walkthrough needs physical3270")
     if a.job_cut and not (a.batch_jobs and a.normal):raise ValueError("job cut requires explicit normal batch proof")
     if a.batch_data and not (a.batch_dd and a.normal):raise ValueError("batch data requires explicit normal DD proof")
     if a.batch_jcl and not (a.batch_dd and a.normal):raise ValueError("batch JCL requires explicit normal DD proof")
@@ -383,7 +389,7 @@ def run(a):
             for case in cases:
                 command,marker=case[:2]
                 if len(case)>5:
-                    if not a.batch_jcl:raise ValueError("JCL pre-action requires explicit profile")
+                    if not (a.batch_jcl or a.batch_walkthrough):raise ValueError("JCL pre-action requires explicit profile")
                     from jcl_actor import action as jcl_action
                     for action in case[5]:jcl_action(action,proc,log,out,client,script)
                 # D4JOB executes eleven jobs, including repeated 192 MiB
@@ -417,7 +423,7 @@ def run(a):
                     until(input_ready,proc,log,matrix_limit)
                     if forms_profile and not client and (form_case or command=="FOWNER"):
                         until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
-                        form_observations.append(form_observation(out,script,prompt,len(form_observations)+1,primary_epoch))
+                        form_observations.append(form_observation(out,script,prompt,len(form_observations)+1,primary_epoch,a.batch_walkthrough))
                     if source=="forms-device":
                         if not a.batch_forms_complete or text not in ("printer-offline","printer-restore"):
                             raise ValueError("forms-device requires complete profile and selected printer action")
@@ -494,6 +500,11 @@ def run(a):
                 limit=matrix_limit if (a.batch_sdk and command=="D4JOB") or a.batch_jcl or form_case else 180 if command=="HELLO --memory-check" else 60
                 shown=until(completed,proc,log,limit)
                 screens.append(shown)
+                if a.batch_walkthrough:
+                    until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
+                    capture=terminal_action(script,"PrintText(html,string)")
+                    if capture.returncode or '<html' not in capture.stdout.lower():raise RuntimeError("manual command screen capture failed")
+                    (out/("command-%03d.html"%len(screens))).write_text(capture.stdout)
                 if a.editor and command=="VERSION" and not client:
                     until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
                     rows,cols=map(int,terminal_action(script,"Query(ScreenCurSize)").stdout.split())
@@ -754,7 +765,10 @@ def run(a):
             if error is None:error=repr(exc)
     if forms_profile:
         try:
-            if a.batch_forms_complete:from forms_complete_actor import inspect as forms_inspect
+            if a.batch_walkthrough:
+                from walkthrough_actor import inspect as walkthrough_inspect
+                forms_inspect=lambda out,raw:walkthrough_inspect(out,raw,a.walkthrough_resume)
+            elif a.batch_forms_complete:from forms_complete_actor import inspect as forms_inspect
             elif a.batch_forms_recovery:from forms_recovery_actor import inspect as forms_inspect
             else:from forms_actor import inspect as forms_inspect
             checks.update(forms_inspect(out,raw))
@@ -762,7 +776,7 @@ def run(a):
             checks["batch_forms_capture_complete"]=False
             if error is None:error=repr(exc)
     receipt={"profile":{"model":a.model,"colour":a.colour,"basic":a.basic,"editor":a.editor,"oversize":a.oversize,"workbench":a.workbench,"transfer":a.transfer,"workbench_normal":a.workbench_normal,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw,"stage3":a.stage3,"batch_devices":a.batch_devices,"batch_jobs":a.batch_jobs,"batch_dd":a.batch_dd,"batch_data":a.batch_data,"batch_sdk":a.batch_sdk,"batch_jcl":a.batch_jcl,"job_cut":a.job_cut},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
-    receipt["profile"].update(batch_forms=a.batch_forms,batch_forms_complete=a.batch_forms_complete,batch_forms_recovery=a.batch_forms_recovery)
+    receipt["profile"].update(batch_forms=a.batch_forms,batch_forms_complete=a.batch_forms_complete,batch_forms_recovery=a.batch_forms_recovery,batch_walkthrough=a.batch_walkthrough,walkthrough_resume=a.walkthrough_resume)
     if forms_profile and not a.line_primary:
         geometry="%d %d"%({2:(24,80),3:(32,80),4:(43,80),5:(27,132)}[a.model])
         checks["forms_full_physical_observations"]=bool(form_observations) and all(x["geometry"]==geometry for x in form_observations)
@@ -813,7 +827,8 @@ def run(a):
             from sdk_actor import stored as sdk_stored
             checks.update(sdk_stored(out,stored["files"]))
         if forms_profile:
-            if a.batch_forms_complete:from forms_complete_actor import stored as forms_stored
+            if a.batch_walkthrough:from walkthrough_actor import stored as forms_stored
+            elif a.batch_forms_complete:from forms_complete_actor import stored as forms_stored
             elif a.batch_forms_recovery:from forms_recovery_actor import stored as forms_stored
             else:from forms_actor import stored as forms_stored
             checks.update(forms_stored(out,stored["files"]))
@@ -837,6 +852,8 @@ if __name__=="__main__":
     p.add_argument("--batch-data",action="store_true")
     p.add_argument("--batch-sdk",action="store_true")
     p.add_argument("--batch-jcl",action="store_true")
+    p.add_argument("--batch-walkthrough",action="store_true")
+    p.add_argument("--walkthrough-resume",action="store_true")
     p.add_argument("--batch-forms",action="store_true")
     p.add_argument("--batch-forms-complete",action="store_true")
     p.add_argument("--batch-forms-recovery",action="store_true")

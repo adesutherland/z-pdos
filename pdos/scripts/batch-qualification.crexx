@@ -1,0 +1,50 @@
+/* SPDX-License-Identifier: MIT; host result collection and fail-closed assertion.
+ * Guest Stage/Submit/Wait remain operator actions. No action here opens a guest.
+ * A submission acknowledgement is not a complete actor/oracle receipt. */
+options levelb
+import rxfnsb
+main: procedure=.int
+  arg args=.string[]
+  if args.0=1 then do
+    if args.1<>"plan" then return 2
+    say "Stage: freeze and stage native programs, libraries, PROCs and FB80 cards."
+    say "Submit: record the actual job identity; acknowledgement is not success."
+    say "Wait: require that identity's terminal job/step outcomes, with a deadline."
+    say "Collect: collect RAW_RECEIPT NEW_SUMMARY after complete capture/readback."
+    say "Assert: assert SUMMARY EXPECTATIONS; exact input identity and check set."
+    say "All guest actions and media/device changes belong to the Mainframe Operator."
+    return 0
+  end
+  if args.0<>3 then return 2
+  action=args.1;input=args.2;output=args.3
+  if action<>"collect" & action<>"assert" then return 2
+  rows=.string[];errors=.string[];filter=.string;i=.int
+  if action="collect" then do
+    if input=output then return 2
+    address crexx "run test ! -e :output"
+    if rc<>0 then return 2
+    address crexx "run test ! -L :output"
+    if rc<>0 then return 2
+    filter='if type == "object" and (.checks | type == "object" and length > 0 and all(.[]; type == "boolean")) and (.pass | type == "boolean") and (.error == null) and ((.input_sha256 // .source_core_sha256) | type == "string" and test("^[0-9a-f]{64}$")) then {schema:"PD033-result-v1",phase:"collected",input_sha256:(.input_sha256 // .source_core_sha256),checks:.checks,pass:.pass,error:.error} else error("incomplete qualification receipt") end'
+    address crexx "run jq -e :filter :input" output rows error errors
+    if rc<>0 then do
+      say "INCOMPLETE RESULT: no summary created."
+      return 1
+    end
+    do i=1 to rows.0
+      call lineout output,rows[i]
+    end
+    call lineout output
+    say "COLLECTED ONLY; assert the frozen expectations before accepting a run."
+    return 0
+  end
+  /* The separate expectations file is reviewed/frozen BEFORE the guest run.
+     Exact keys/counts forbid accepting a truncated receipt or a weaker rerun. */
+  filter='($expected | length == 1) and ($expected[0] | type == "object") and .schema == "PD033-result-v1" and .phase == "collected" and .input_sha256 == $expected[0].input_sha256 and (.input_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and (.checks | type == "object" and length > 0 and all(.[]; . == true)) and ($expected[0].checks | type == "array" and length > 0 and all(.[]; type == "string") and (unique | length) == length) and ((.checks | keys | sort) == ($expected[0].checks | sort)) and .pass == true and .error == null'
+  address crexx "run jq -e --slurpfile expected :output :filter :input" output rows error errors
+  if rc<>0 then do
+    say "FAIL: missing/failed checks, incomplete result or frozen input mismatch."
+    return 1
+  end
+  say "PASS: complete result matches the frozen input and exact required check set."
+  return 0

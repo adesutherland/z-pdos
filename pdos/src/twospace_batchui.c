@@ -46,7 +46,7 @@ int TBFINIT(TBFSTATE *s,TJFSTATE *front,const TJFOPS *ops)
  memset(s,0,sizeof *s);s->front=front;s->backend=*ops;s->bridge=*ops;
  s->bridge.context=s;s->bridge.load=load;s->bridge.service=service;s->bridge.input=input;
  s->bridge.line=line;s->bridge.record=record;s->initialized=1U;s->screen=TBF_SUBMIT;
- s->hold=1U;s->height=8U;s->width=78U;strcpy(s->proc,"CRXCG");strcpy(s->notice,"Enter fields; PREVIEW validates without submitting");return 0;
+ s->hold=1U;s->height=8U;s->width=78U;strcpy(s->proc,"CRXCG");strcpy(s->notice,"Choose DECK, or PROC + SRC; ARGS sets program arguments; PREVIEW validates");return 0;
 }
 static int card(TBFSTATE *s,const char *p,unsigned int *bytes)
 {unsigned int n=(unsigned int)strlen(p);if(n>71U||*bytes>sizeof s->front->deck-80U)return 8;
@@ -111,14 +111,14 @@ static int edit(TBFSTATE *s,unsigned int index,const char *value)
 }
 int TBFEVENT(TBFSTATE *s,const char *text,unsigned int aid)
 {
- char command[257],action[40],*value,*p;unsigned int i,id;int rc=0;
+ char command[257],action[40],arguments[68],*value,*p;unsigned int i,id,at,need;int rc=0;
  if(!s||!s->initialized||!text||strlen(text)>256U)return 8;if(s->exit)return 16;
  if(s->revision==0xffffffffU){invalidate(s);s->exit=1U;return failure(s,"Form revision exhausted; returning to the console");}++s->revision;
  for(i=0U;text[i];++i){unsigned char encoded;if(TJCENC(text+i,1U,&encoded))return failure(s,"Only printable interface text is accepted");}
  s->notice[0]=0;s->rc=0U;
  if(aid==0x6dU){strcpy(s->notice,"Form repainted; submission attempt identity is preserved");return 0;}
  if(aid==0xf3U){if(s->screen==TBF_PREVIEW)s->screen=TBF_SUBMIT;else{invalidate(s);s->exit=1U;}return 0;}
- if(aid==0xf1U){strcpy(s->notice,"Fields: DECK/PROC/SRC/OUT/PARAMS; PREVIEW then SUBMIT; SELECT id; PRINT/RELEASE/CANCEL/PURGE; PF3 returns");return 0;}
+ if(aid==0xf1U){strcpy(s->notice,"DECK or PROC + SRC; ARGS value; PREVIEW then SUBMIT; SELECT id; OUTPUT/PRINT; PF3 returns");return 0;}
  if(aid==0xf7U)text="UP";else if(aid==0xf8U)text="DOWN";
  else if(aid==0xf4U)text="PREVIEW";else if(aid==0x7aU)text="SUBMIT";
  else if(aid==0x7bU)text="JOBS";else if(aid==0x7cU)text="OUTPUT";
@@ -131,6 +131,17 @@ int TBFEVENT(TBFSTATE *s,const char *text,unsigned int aid)
  if(!command[0]){strcpy(s->notice,"Enter refreshes; PREVIEW then explicit SUBMIT publishes");return 0;}
  if(!strcmp(command,"EXIT")||!strcmp(command,"QUIT")){if(*value)return failure(s,"EXIT takes no extra operands");invalidate(s);s->exit=1U;return 0;}
  if(!strcmp(command,"EDIT"))return edit(s,s->editing,value);
+ /* The normal user supplies program arguments, not JCL quoting. Keep the
+    advanced PARAMS card interface. Apostrophes survive both the procedure
+    argument and its substitution inside the common RUN's quoted PARM.
+    A refused edit must preserve both the prior value and its preview. */
+ if(!strcmp(command,"ARGS")){
+  strcpy(arguments,"ARGS='");at=6U;
+  for(i=0U;value[i];++i){need=value[i]=='\''?4U:1U;
+   if(at+need+2U>sizeof arguments)return failure(s,"ARGS is too long for one JCL parameter card; value and preview preserved");
+   for(id=0U;id<need;++id)arguments[at++]=value[i];}
+  arguments[at++]='\'';arguments[at]=0;rc=edit(s,4U,arguments);if(!rc)s->editing=4U;return rc;
+ }
  for(i=0U;i<7U;++i)if(!strcmp(command,field_names[i])){s->editing=i;return edit(s,i,value);}
  if(!strcmp(command,"OVERRIDE")){if(s->overrides==8U||strlen(value)>71U||strncmp(value,"//",2U))return failure(s,"OVERRIDE needs one complete // DD card, at most 71 characters; maximum eight");
   invalidate(s);strcpy(s->override[s->overrides++],value);strcpy(s->notice,"DD override added; PREVIEW required");return 0;}

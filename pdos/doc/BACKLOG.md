@@ -805,7 +805,7 @@ be K-only and explicitly budgeted rather than consuming low U placement.
 
 - Type: improvement / native compatibility / release qualification
 - Status: In progress
-- Current checkpoint (15 October): Stages 0–5 are accepted; Stage 6 is open. Stage 5 passes 212 assertions across six physical cells, independently reviewed through the Mainframe Operator. Source checkpoint `7f2898f` and Lab `ca598a85` are committed; subsequent qualification recipes/results are local working changes. The console is preserved. See the [Stage 5 result](qualification/BATCH-STAGE5-2026-10-15.md).
+- Current checkpoint (15 October): Stages 0–5 are accepted; Stage 6 is In progress. Stage 5 passes 212 assertions across six physical cells, independently reviewed through the Mainframe Operator. Source checkpoint `7f2898f` and Lab `ca598a85` are followed by accepted qualification commits `ca8bc60` and `cb88bd74`. Stage 6 is In progress under the 15 October authorisation, including illustrated manual rehearsals. The console is preserved. See the [Stage 5 result](qualification/BATCH-STAGE5-2026-10-15.md).
 - Target: pdos-zarch K/U, Hercules 3505 reader and 1403 printer, native TSO31 batch/DD services, PCOMM and retained 3270 panels
 - Observation: The current product has a retained Workbench console, semantic line/teletype delivery, a common owned channel engine, scoped native invocations/DDs and bounded 3287 printing. PCOMM command files do not provide a JCL job service, and the 3287 facility is not a 3505/1403 batch route. Native TPUT/TGET and invocation-local DDs do not establish background-TSO or preallocated job-DD compatibility.
 - Direction selected (13 October): Keep the existing console as the human/LLM operator surface. Add the same card-deck/printer transport used for z/OS on Hercules. Card reader, console submission and 3270 Submit/Jobs/Output forms share one job service. Start with serial TSO31 jobs and a strict documented JCL subset for cREXX; preserve existing foreground and native behavior.
@@ -1082,12 +1082,61 @@ originals match; temporary media/captures and exact maintenance are retired.
 
 ### Stage 6: Paired qualification and release checkpoint
 
-- Retain cREXX orchestration under pdos/scripts/ for the product and Mainframe Lab tools/lab.crexx for private fleet coordination. Separate Stage/Submit/Wait/Collect/Assert so a submission acknowledgment cannot pass a run.
-- Use the actual 3505/1403 transport for both PDOS and a leased named z/OS/Hercules guest. Configure and verify the guest JES reader/printer route, unique run/job identities and printer-file boundaries. Parse each system's real job/step outcome and normalize only declared presentation differences.
-- Pin candidate binaries, runtime/libraries, PROC sources, test inputs, deck code page and expected records. Qualify supplied RXBIN and a fresh compile/assemble/link/run chain, native DD/input/output, current ADDRESS TSO31, expected nonzero RC, missing DD/library, compiler error, cancellation and resource exhaustion.
-- Verify exact datasets independently after shutdown/export. Printer translation/pagination is report evidence, not the binary oracle. Assert all required test counts and known skips explicitly; an incomplete log or timeout fails the harness.
-- After TSO31 passes, select and qualify affected TSO64 ANY/HIGH cells separately; preserve constrained 24-bit and CMS regression boundaries. Record source/media/runtime freezes and the exact unchanged evidence reused.
-- Gate: Documented clean-consumer PDOS IVP through cards/printer and forms, paired z/OS native results, recovery/restart and affected console/media regressions. Update guides and name remaining unsupported features. Manual installation, IBM Binder/RECEIVE validation, release-image selection and publication remain separate release gates.
+Status: **In progress** (15 October authorisation). Stages 0–5 remain accepted.
+The Mainframe Operator owns all guest configuration, devices, sessions and
+qualification. Development owns host product changes, builds and independent
+acceptance. Use the existing build slots and retain concise results only.
+
+Manual-authoring finding: PARAMS was easy to mistake for program arguments,
+although it takes a complete procedure parameter card. The candidate adds
+`ARGS value` over the same generator, handling the two JCL quoting stages,
+empty arguments and expansion limits while retaining advanced PARAMS.
+Host controls check the actual expanded RUN parameter and preservation of a
+ready preview on refused edits. Guest/manual acceptance remains required.
+
+Stage 6 baseline (15 October): native z/OS 1.5 reference R5 is independently
+accepted at 7/7, with four CC0000 steps, exact 6,018-byte GOLINK/MANOUT and a
+rehearsed illustrated native manual. Native task handback is complete. PDOS
+R5 remains unqualified: COMP passed OS0/RC0, then the actor's 60-second watchdog
+expired during ASSEM because the new walkthrough profile is absent from its
+long batch-deadline conditions. The interrupted stop is not clean restart
+evidence. Review/check/refreeze the repair before replay; the planned fresh
+33-check and same-disk 31-check matrices remain outstanding. Current EDIT
+does not provide fullscreen member editing; the requested manual/source-edit
+workflow also needs the separately reviewed PD-027 direction. This baseline
+does not close Stage 6 or select a release/managed image.
+
+| Acceptance | Required result |
+| --- | --- |
+| S6-AC01 | Reviewed cREXX Stage/Submit/Wait/Collect/Assert orchestration, available through the Lab entry point. A submission acknowledgement cannot pass a run; incomplete/timeout/missing-case results fail. |
+| S6-AC02 | Actual 3505/1403 submission and output on PDOS and a leased named z/OS/Hercules reference, exact unique job identities, pinned codepage and printer boundaries; real native job/step outcomes. |
+| S6-AC03 | Pinned shared TSO31 programs, libraries, PROCs, source and data. Supplied RXBIN plus fresh compile/assemble/link/run, native DD/text/binary output and ADDRESS; expected nonzero RC, missing DD/library, compiler failure, cancellation and resource refusal are explicit. Reuse unchanged accepted cases by identity/dependency review. |
+| S6-AC04 | Clean-consumer PDOS IVP through cards/printer and forms, restart/recovery without automatic replay, intact console/resources and independent durable output checks. Printer text is not the binary oracle. |
+| S6-AC05 | Select affected TSO64 ANY/HIGH cases after TSO31; qualify separately or justify unchanged evidence by exact dependency review. Preserve the constrained 24-bit and CMS boundaries; record required counts and named skips. |
+| S6-AC06 | Separate PDOS and z/OS 3270 walkthrough manuals with actual screenshots, exact prerequisites, keystrokes/commands, source/job/procedure names, per-step RC checks and program output. Rehearse each end-to-end on the selected candidate; address defects exposed by the supported path before closure. |
+| S6-AC07 | Final source/input/result review and clean handback, updated guides and named unsupported features. Manual installation, IBM Binder/RECEIVE validation, managed/release-image selection and publication keep their separate gates. |
+
+Implementation sequence:
+
+1. Inventory the native 3270 facilities and physical JES reader/printer route,
+   select the paired finite matrix and manual workflow, and prepare the small
+   host interfaces. Complete code review and focused checks; freeze source,
+   candidate/runtime/library/PROC/input identities before guest use.
+2. Through the operator, qualify native z/OS first. Rehearse the native manual
+   and capture selected actual screens. Review application output separately
+   from submission and spool capture; independently check binary datasets.
+3. Qualify the clean PDOS candidate in the normal fixed slots through the same
+   card/printer service and the 3270 forms. Include restart/recovery and the
+   affected console/resource checks. Rehearse the PDOS manual and capture its
+   selected actual screens.
+4. Treat manual usability findings as acceptance findings. Make each necessary
+   repair in its owning source, review/check/refreeze it and replay the affected
+   path. Do not relabel old observations or silently weaken expected outcomes.
+5. Independently accept paired results and selected wider-profile reuse/runs;
+   verify the finished manuals against the sessions. Retain manual screenshot
+   deliverables outside Git, as explicitly requested, while retiring raw traces,
+   dumps, readbacks and disposable disks after acceptance. Close this stage only
+   when the required results and manuals are delivered.
 
 ### Dependencies and ownership
 

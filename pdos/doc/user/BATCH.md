@@ -54,8 +54,11 @@ through the common input area. PF5/PF6 select a field; PF2 prepares `EDIT value`
 there; Enter accepts it. Direct field commands work in that same area.
 
 Start with `DECK dataset(member)`, or choose `PROC CRXCG` and `SRC dataset(member)`
-to generate a common procedure call. CRXC/CRXCL also require OUT. PARAMS supplies
-a bounded parameter card, and OVERRIDE adds a complete qualified DD card.
+to generate a common procedure call. CRXC/CRXCL also require OUT.
+`ARGS -a SHARED` sets program arguments and quotes them for JCL. `ARGS` alone
+sets empty arguments. PARAMS remains the advanced complete procedure parameter
+card (for example `ARGS='-a SHARED'`); ARGS replaces that whole card.
+OVERRIDE adds a complete qualified DD card.
 PREVIEW shows and validates the exact JCL without creating a job. SUBMIT or PF10
 publishes that preview once. Enter alone refreshes; changing submission fields
 requires another preview. After an attempt, use NEW plus PREVIEW only for a

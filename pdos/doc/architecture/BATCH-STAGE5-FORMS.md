@@ -24,8 +24,11 @@ parser, allocator, runner or output store.
 Submit accepts DECK dataset/member, or PROC CRXC/CRXCG/CRXCL/CRXLGO with SRC,
 OUT where required, PARAMS and up to eight complete DD override cards. PROC
 mode derives load/procedure libraries, RXBIN prefix and volume from SITE.
-PARAMS is bounded to 67 printable execution characters on one continuation
-card. The generator inserts SRC among ordered common-procedure DD overrides;
+ARGS accepts program arguments, quotes embedded apostrophes for both PROC substitution and RUN PARM and generates
+the bounded `ARGS='...'` procedure card. An empty ARGS command supplies empty
+arguments; an oversized expansion preserves the previous value and preview.
+PARAMS remains the advanced complete parameter card interface, bounded to
+67 printable execution characters on one continuation card. The generator inserts SRC among ordered common-procedure DD overrides;
 the converter rejects duplicate, unsupported, unordered and oversized input.
 All earlier full JCL syntax remains accessible through a supplied DECK.
 

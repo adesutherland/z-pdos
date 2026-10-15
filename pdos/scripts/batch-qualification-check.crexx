@@ -1,0 +1,65 @@
+/* SPDX-License-Identifier: MIT; host failure controls, no guest or media. */
+options levelb
+import rxfnsb
+main: procedure=.int
+  arg args=.string[]
+  if args.0<>0 then return 2
+  work="build/pdos/batch-result"
+  address crexx "run test ! -L :work"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  base=work||"/raw.json";expected=work||"/expected.json"
+  changed=work||"/changed.json";summary=work||"/summary.json"
+  files=.string[];files.1=base;files.2=expected;files.3=changed;files.4=summary
+  address crexx "run rm -f :files[]"
+  if rc<>0 then return rc
+  call lineout base,'{"source_core_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","checks":{"complete":true,"outcome":true},"pass":true,"error":null}'
+  call lineout base
+  call lineout expected,'{"input_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","checks":["complete","outcome"]}'
+  call lineout expected
+  helper="pdos/scripts/batch-qualification.crexx"
+  quiet=.string[];rows=.string[];mutations=.string[];filter=.string;i=.int
+  address crexx "run crexx --nooptimize -nokeep :helper --args collect :base :summary" output quiet
+  if rc<>0 then return 1
+  address crexx "run crexx --nooptimize -nokeep :helper --args assert :summary :expected" output quiet
+  if rc<>0 then return 1
+  /* Existing output must never be overwritten. */
+  address crexx "run crexx --nooptimize -nokeep :helper --args collect :base :summary" output quiet
+  if rc=0 then return 1
+  mutations.1='del(.checks.outcome)'
+  mutations.2='.checks.outcome=false'
+  mutations.3='.input_sha256="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"'
+  mutations.4='.checks={}'
+  mutations.5='.checks.outcome="true"'
+  mutations.6='.phase="submitted"'
+  mutations.7='.pass=false'
+  mutations.8='.error="timeout"'
+  do i=1 to mutations.0
+    filter=mutations[i]
+    address crexx "run jq :filter :summary" output rows
+    if rc<>0 then return 1
+    address crexx "run rm -f :changed"
+    if rc<>0 then return rc
+    do j=1 to rows.0
+      call lineout changed,rows[j]
+    end
+    call lineout changed
+    address crexx "run crexx --nooptimize -nokeep :helper --args assert :changed :expected" output quiet
+    if rc=0 then return 1
+  end
+  /* A raw submission acknowledgement cannot even become a collected result. */
+  address crexx "run rm -f :changed"
+  if rc<>0 then return rc
+  call lineout changed,'{"pass":true,"job":"JOB12345"}'
+  call lineout changed
+  address crexx "run rm -f :summary"
+  if rc<>0 then return rc
+  address crexx "run crexx --nooptimize -nokeep :helper --args collect :changed :summary" output quiet
+  if rc=0 then return 1
+  address crexx "run test ! -e :summary"
+  if rc<>0 then return 1
+  address crexx "run rm -f :files[]"
+  if rc<>0 then return rc
+  say "PD033 result controls PASS: exact result accepted; 10 incomplete/stale/failed/overwrite cases refused."
+  return 0
