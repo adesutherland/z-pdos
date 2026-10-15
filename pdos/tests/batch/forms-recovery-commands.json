@@ -1,0 +1,169 @@
+[
+  [
+    "VERSION",
+    "PDIO1"
+  ],
+  [
+    "FOWNER",
+    "PCOMM END 1 RC=0",
+    [],
+    [
+      "PD033 OWNER PARENT REFUSED FORM=16 SHELL=16",
+      "PD033 OWNER CHILD REFUSED FORM=16 SHELL=16",
+      "PD033 OWNER CHILD PASS EXPECTED=16",
+      "PD033 OWNER FOREGROUND CHILD PASS"
+    ]
+  ],
+  [
+    "BATCH",
+    "PCOMM END 2 RC=0",
+    [
+      [
+        "REVISION 0",
+        "PF(6)",
+        "key"
+      ],
+      [
+        "REVISION 1",
+        "PF(2)",
+        "key"
+      ],
+      [
+        "EDIT CRXCG",
+        "Enter()",
+        "key"
+      ],
+      [
+        "REVISION 2",
+        "PF(5)",
+        "key"
+      ],
+      [
+        "REVISION 3",
+        "DECK LABA01.B33.JCL(OWNER)"
+      ],
+      [
+        "REVISION 4",
+        "RUNHOLD YES"
+      ],
+      [
+        "REVISION 5",
+        "PREVIEW"
+      ],
+      [
+        "REVISION 6",
+        "Clear()",
+        "primary-reconnect"
+      ],
+      [
+        "REVISION 7",
+        ""
+      ],
+      [
+        "REVISION 8",
+        "SUBMIT"
+      ],
+      [
+        "REVISION 9",
+        "Clear()",
+        "primary-reconnect"
+      ],
+      [
+        "REVISION 10",
+        "SUBMIT"
+      ],
+      [
+        "REVISION 11",
+        "RELEASE"
+      ],
+      [
+        "REVISION 12",
+        "PF(4)",
+        "key"
+      ],
+      [
+        "REVISION 13",
+        "OUTPUT"
+      ],
+      [
+        "REVISION 14",
+        "PF(8)",
+        "key"
+      ],
+      [
+        "REVISION 15",
+        "STEP RUN"
+      ],
+      [
+        "REVISION 16",
+        "DD SYSPRINT"
+      ],
+      [
+        "REVISION 17",
+        "DOWN"
+      ],
+      [
+        "REVISION 18",
+        "RIGHT"
+      ],
+      [
+        "REVISION 19",
+        "LEFT"
+      ],
+      [
+        "REVISION 20",
+        "PRINT"
+      ],
+      [
+        "REVISION 21",
+        "JOBS"
+      ],
+      [
+        "REVISION 22",
+        "PURGE"
+      ],
+      [
+        "REVISION 23",
+        "EXIT"
+      ]
+    ],
+    [
+      "Attempt already consumed",
+      "No unused preview",
+      "RIGHT EDGE PD033"
+    ]
+  ],
+  [
+    "FOWNER",
+    "PCOMM END 3 RC=0",
+    [],
+    [
+      "PD033 OWNER PARENT REFUSED FORM=16 SHELL=16",
+      "PD033 OWNER CHILD REFUSED FORM=16 SHELL=16",
+      "PD033 OWNER CHILD PASS EXPECTED=16",
+      "PD033 OWNER FOREGROUND CHILD PASS"
+    ]
+  ],
+  [
+    "BATCH",
+    "PCOMM END 4 RC=0",
+    [
+      [
+        "REVISION 24",
+        "PF(3)",
+        "key"
+      ]
+    ],
+    [
+      "No retained jobs"
+    ]
+  ],
+  [
+    "HELLO",
+    "PCOMM END 5 RC=0"
+  ],
+  [
+    "RXVM -v",
+    "PCOMM END 6 RC=0"
+  ]
+]

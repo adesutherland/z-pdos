@@ -16,7 +16,7 @@ static int contains(const char *p)
 {unsigned int i;char text[133];for(i=0U;i<form.shown;++i){assert(!TJCDEC(form.rows[i],132U,text));text[132]=0;if(strstr(text,p))return 1;}return 0;}
 int main(void)
 {
- unsigned int before,ticket,depth;unsigned char frozen_job[TJB_FULL_BYTES],frozen_dd[TJD_EXT_BYTES];char longfield[110];
+ unsigned int before,ticket,depth;unsigned char frozen_job[TJB_FULL_BYTES],frozen_dd[TJD_EXT_BYTES],wide[132],dd[8];char longfield[133];
  /* Establish the actual console-route descriptor, then compare form preview. */
  assert(!console_protocol_test());memcpy(frozen_job,expected_job,sizeof frozen_job);memcpy(frozen_dd,expected_dd,sizeof frozen_dd);
  start();assert(!event("DECK APP.JCL(CASE)")&&!event("RUNHOLD YES")&&!event("PREVIEW"));
@@ -32,6 +32,15 @@ int main(void)
  assert(!event("RELEASE")&&runs==1U&&!prints);assert(!event("OUTPUT")&&!event("STEP BUILD.RUN")&&!event("DD SYSPRINT"));
  assert(!TBFVIEW(&form,8U,78U)&&contains("RESULT 42"));depth=TJBWORD(TJBFIND(&pool,7U,1U)+24U);
  assert(!TBFVIEW(&form,8U,78U)&&TJBWORD(TJBFIND(&pool,7U,1U)+24U)==depth);
+ /* Both horizontal pages expose the exact retained 132-byte record. */
+ memset(longfield,'X',132U);longfield[132]=0;assert(!TJCENC(longfield,132U,wide));
+ assert(!TJCENC("SYSPRINT",8U,dd));wide[0]=0xc1U;wide[131]=0xe9U;
+ assert(!TJBAPP(&pool,7U,1U,dd,9U,wide,sizeof wide));
+ depth=TJBWORD(TJBFIND(&pool,7U,1U)+24U);
+ assert(!TBFVIEW(&form,8U,78U)&&form.shown==4U&&!memcmp(form.rows[3],wide,78U));
+ assert(!event("RIGHT")&&!TBFVIEW(&form,8U,78U)&&!memcmp(form.rows[3],wide+54U,78U));
+ assert(!event("LEFT")&&!TBFVIEW(&form,8U,78U)&&!memcmp(form.rows[3],wide,78U));
+ assert(TJBWORD(TJBFIND(&pool,7U,1U)+24U)==depth);
  printer_failure=1U;before=runs;assert(event("PRINT")==12&&runs==before&&form.selected==1U);
  printer_failure=0U;assert(!event("PRINT")&&runs==before&&prints==2U);
  assert(!event("PURGE")&&event("CANCEL")==8&&runs==before);

@@ -805,6 +805,7 @@ be K-only and explicitly budgeted rather than consuming low U placement.
 
 - Type: improvement / native compatibility / release qualification
 - Status: In progress
+- Current checkpoint (15 October): Stages 0–5 are accepted; Stage 6 is open. Stage 5 passes 212 assertions across six physical cells, independently reviewed through the Mainframe Operator. Source checkpoint `7f2898f` and Lab `ca598a85` are committed; subsequent qualification recipes/results are local working changes. The console is preserved. See the [Stage 5 result](qualification/BATCH-STAGE5-2026-10-15.md).
 - Target: pdos-zarch K/U, Hercules 3505 reader and 1403 printer, native TSO31 batch/DD services, PCOMM and retained 3270 panels
 - Observation: The current product has a retained Workbench console, semantic line/teletype delivery, a common owned channel engine, scoped native invocations/DDs and bounded 3287 printing. PCOMM command files do not provide a JCL job service, and the 3287 facility is not a 3505/1403 batch route. Native TPUT/TGET and invocation-local DDs do not establish background-TSO or preallocated job-DD compatibility.
 - Direction selected (13 October): Keep the existing console as the human/LLM operator surface. Add the same card-deck/printer transport used for z/OS on Hercules. Card reader, console submission and 3270 Submit/Jobs/Output forms share one job service. Start with serial TSO31 jobs and a strict documented JCL subset for cREXX; preserve existing foreground and native behavior.
@@ -999,18 +1000,22 @@ fixture now includes the batch entry's required SYSTERM DD.
 
 ### Stage 5: Retained 3270 job forms
 
-Status: **In progress**. I authorised the Stage 4 commits and Stage 5
-implementation on 15 October. The accepted product checkpoint is `83283b6`;
-the matching cREXX repair is `a9c080f54` and Lab operation is `73d131ab`.
+Status: **Done**. I authorised the Stage 4 commits, Stage 5 implementation and
+complete operator qualification on 15 October. The source checkpoint is
+committed as `7f2898f` and Lab `ca598a85`; cREXX package repair `a9c080f54`
+is unchanged. Six physical cells pass 212 assertions with independent stopped
+acceptance and clean operator handback. [The result](qualification/BATCH-STAGE5-2026-10-15.md)
+records the reviewed freezes, native byte comparison, repaired test assumptions
+and the separate open Classic stdio observation PD-034. Stage 6 remains open.
 
-The intended outcome is Submit, Jobs and Output forms over the same checked
+The delivered outcome is Submit, Jobs and Output forms over the same checked
 job/DD service, with the existing console and semantic line route preserved.
 The first increment uses the retained panel body and its owned shared editor:
 named fields are selected for editing, then previewed before an explicit
 submit. It adds no persistent layout or scheduler. The selected three-job
 spool remains bounded; larger history stays with PD-030.
 
-Acceptance criteria (all open until their complete checks pass):
+Acceptance criteria (S5-AC01–06 all Done, through combined host and guest checks):
 
 1. **S5-AC01 — preparation:** Submit accepts a checked deck/member or a common
    PROC with source, parameters and DD overrides. Preview shows the exact JCL
@@ -1045,32 +1050,29 @@ Acceptance criteria (all open until their complete checks pass):
 
 Implementation steps:
 
-1. **S5-01 (Done, host increment):** Factor shared prepare/post operations from the
+1. **S5-01 (Done):** Factor shared prepare/post operations from the
    Stage 4 controller, add supplied-storage form state, common-PROC deck
    generation, preview/retry and job/output models with decisive host controls
    (S5-AC01–03/05).
-2. **S5-02 (In progress):** Bind the controller to retained panels, shared editor,
+2. **S5-02 (Done):** Bind the controller to retained panels, shared editor,
    scoped form-key ownership and semantic line input; preserve shell behavior
    and native encoding (S5-AC04/05).
-3. **S5-03 (Done for initial freeze):** Complete normal/sanitizer and Classic build checks, review
+3. **S5-03 (Done):** Complete normal/sanitizer and Classic build checks, review
    the whole selected increment and record a source/input freeze before any
    operator guest replay (S5-AC05).
-4. **S5-04 (Open):** Qualify the remaining model/recovery/identity/result matrix
+4. **S5-04 (Done):** Qualify the complete model/recovery/identity/result matrix
    through the Mainframe Operator, independently review results and retire
-   temporary outputs (S5-AC06). An initial host/source checkpoint does not close
-   Stage 5 or authorize managed-image adoption/release.
+   temporary outputs (S5-AC06). Managed-image adoption and release retain their
+   Stage 6 gates.
 
-First source increment: shared prepare/post, all three form controllers,
-native panel/key/editor binding and source-built K/U are implemented. Normal
-and sanitizer controls, native line re-entry/error cleanup, shared model layouts
-and static analysis pass. [The first result](qualification/BATCH-STAGE5-2026-10-15.md)
-records reviewed PD033-S5-R1 and the independently accepted 29-check model-2
-proof: one actual native CG job, preview/retry guards, physical PF8, filtered
-output, explicit print/purge and ordinary console return. Operator cleanup and
-exact lease handback are complete. R2's forced revision-exhaustion control and
-Classic U build pass; unchanged R1 guest paths are reused by dependency review.
-S5-AC01–05 have selected host/source evidence; complete physical model/recovery
-acceptance remains open under S5-AC06.
+The accepted matrix is model-2 colour full workflow (44), model-2 monochrome
+editor/reconnect/ownership (37), colour models 3/4/5 (31 each), and physical
+3215 line full workflow (38). All four generated PROCs run; retained
+OBJ/LINK/GOLINK bytes match native output. Compiler failure, printing recovery, busy/stale actions,
+non-replaying submission, actual AIDs, full-width output and nested batch
+ADDRESS/TIME pass. Ordinary console return, durable state, zero ownership and
+shutdown are independently checked. All 535 frozen inputs and preserved
+originals match; temporary media/captures and exact maintenance are retired.
 
 - Build Submit, Jobs and Output as U presentation over the established checked service. Submit validates source/member, PROC, parameters and DD overrides and shows the generated JCL; Jobs exposes execution/print status and controls; Output selects expanded step/DD and pages ordered records.
 - Use the existing field, cursor, AID, model, panel and terminal ownership contracts. Preserve Clear/repaint, monochrome, IBM1047 and the semantic teletype path. Display active-job control limitations rather than assuming a concurrent U form controller.
@@ -1094,3 +1096,11 @@ acceptance remains open under S5-AC06.
 - PD-032's scoped native member identity and the ADDRESS/environment ABI remain explicit dependencies of the native DD/command cases. Reuse their exact evidence only if the affected services and package inputs are unchanged.
 - Kernel/job/device/file changes belong to pdos/src/; U converter/forms and small probes belong to the same component. Maintained PDPCLIB belongs to pdpclib/src/, application entry/runtime changes to CREXX or mainframe-cross-sdk, and native output/linker fixes to their owning component. Product automation is cREXX; a required binary/media interface helper may use its existing necessary language.
 - Keep only this item as the live delivery queue. Design changes update architecture/BATCH-JOBS.md; supported behavior goes in user guides only after qualification; dated receipts own exact results. No private correspondence, credentials, guest disks or native reference listings enter the product repository.
+
+## PD-034: Classic stdio marker on mixed-context native reentry
+
+- Type: Qualification gap. Status: Open; investigation is not authorised by the Stage 5 work.
+- Observation (15 October 2026): Stage 5 R6 called FOWNCH in foreground, then under a batch parent, then in foreground again. Both foreground calls returned OS0/RC0 after checking refused FORM/SHELL controls, but only the first emitted its unchecked printf marker. The second parent's checked semantic output and ordinary HELLO/RXVM output remained present.
+- Evidence: [Stage 5 result](qualification/BATCH-STAGE5-2026-10-15.md), R6 child `1faaedf2a414a69eba70615181cd73e760b1ead20b7e06a63405cfd601567085`, unchanged K/U. The omission is observed; cached writable state, C stdio lifecycle and output routing are possible investigation areas, not established causes.
+- Affected target: Classic C31/PDPCLIB native LINK on PDOS after mixed foreground/batch invocation. This does not establish a shared SDK/newlib or cREXX package defect.
+- Acceptance: Reproduce with checked printf/flush results and explicit stream diagnostics; inspect module/runtime state and ownership across each return; identify the owning component before repair, then qualify both invocation orders and ordinary console output. Stage 5's checked neutral-output ownership probe is not a qualification of this broader stdio behavior.

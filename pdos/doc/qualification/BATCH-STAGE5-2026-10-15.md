@@ -1,129 +1,134 @@
-# PD-033 Stage 5 first increment — 15 October 2026
+# PD-033 Stage 5 qualification — 15 October 2026
 
-Stage 4 is committed locally as `83283b6`, with cREXX `a9c080f54` and Lab
-`73d131ab`. This Stage 5 checkpoint records
-the first Submit/Jobs/Output implementation and its bounded checks; it does
-not close the complete Stage 5 acceptance matrix. The
-[design contract](../architecture/BATCH-STAGE5-FORMS.md) and
-[S5-AC01–06](../BACKLOG.md#stage-5-retained-3270-job-forms) own the scope.
+The Stage 5 checkpoint is committed as z-pdos `7f2898f` and Lab `ca598a85`.
+All six physical cells are independently accepted, 212/212 assertions.
+The [plan](../BACKLOG.md#stage-5-retained-3270-job-forms)
+owns S5-AC01–06 and the [form contract](../architecture/BATCH-STAGE5-FORMS.md)
+owns the interface.
 
-## Implemented first increment
+## Accepted matrix
 
-`BATCH` enters retained Submit, Jobs and Output panels while preserving the
-existing console. The common input editor edits selected named fields. Submit
-can preview a supplied deck or generate a common-PROC deck from checked SITE,
-source, parameters and DD overrides. The shared Stage 4 preparation path admits
-the exact cards without publishing. Explicit submission consumes the preview
-before its single publish attempt, including an uncertain acknowledgement.
-NEW is required for deliberate resubmission; edits invalidate preparation.
+| Operator cell | Actual presentation | Checks | Result |
+| --- | --- | --- | --- |
+| Complete generated-job workflow | Model 2 colour, 24×80 | 44/44 | Accepted R3 execution with reviewed R4 oracle correction |
+| Editor, reconnect and ownership | Model 2 monochrome, 24×80 | 37/37 | Accepted R7 |
+| Common CG job | Model 3 colour, 32×80 | 31/31 | Accepted R7 |
+| Common CG job | Model 4 colour, 43×80 | 31/31 | Accepted R7 |
+| Common CG job | Model 5 colour, 27×132 | 31/31 | Accepted R7 |
+| Complete semantic workflow | Physical 3215 line | 38/38 | Accepted R7 |
 
-Jobs acts on real checked identities and the existing execution/print controls.
-Output filters qualified step/DD records and pages them without consuming the
-retained result. Named form-key ownership delivers AIDs to U and returns the
-normal Workbench route on exit/error/unwind. K and U share the same layout
-function; no scheduler, dataset allocator or persistent format is added.
+Every accepted cell has independently checked stopped state, ordered native
+step results, explicit print/purge, durable spool, unchanged bytes outside STORE,
+ordinary console HELLO/RXVM return, normal K shutdown and zero invocation,
+console and interrupt ownership. The operator audits processes, listeners,
+handles and frozen inputs before retiring each phase in the same build slots.
 
-## Host and Classic result
+## Behavior proved
 
-The maintained `batch-jcl-check.crexx` passes the existing 14,653 converter and
-49 procedure controls, migration/controller/DD/temp checks and common deck
-admission, plus these new controls in normal and ASan/UBSan builds:
+The full workflow generates CRXC, CRXCG, CRXCL and CRXLGO from form fields.
+Independently specified FB80 source hashes match actual admitted source.
+Twelve native steps return OS0/RC0; the bad-source compiler returns the expected
+RC2 and dependent steps skip. Real named outputs match accepted native z/OS
+logical bytes:
 
-- Actual form preview descriptors equal the independent console-route result.
-- All four generated PROCs admit with their required outputs; bad/missing
-  fields, malformed or excess overrides and invalid parameters do not submit.
-- Enter and Clear cannot publish; repeated SUBMIT/preview cannot retry a
-  consumed token. An injected error after actual publication cannot replay it.
-- Filtering/repeated output leaves retained bytes intact. Failed PRINT does
-  not rerun the program; stale or overflowing selections cannot act on a job.
-- Native line binding preserves consumed identity through form re-entry and
-  releases key selection after input, capability and key-setup failures.
-- Shared layouts fit models 2–5. These are layout checks, not physical terminal
-  qualification for those models.
+| Output | Bytes | SHA256 |
+| --- | ---: | --- |
+| OBJ | 2,554 | `bfe9c456f2a88e17f681e53fb200674bae714f9407e1d29ff87d632f0f326123` |
+| LINK and GOLINK, each | 6,018 | `7d6d8bf1520b6c55a37c6a93bd14c13cb03700d74c842f7cf1033c0f25e68f95` |
 
-Clang static analysis of portable/native form code reports no findings.
-Classic K/U compile/assemble/link passes without new warnings. K has 533,406
-kernel bytes. Resident U has 470,104 raw RDW bytes in a 479,752-byte container:
-64 header bytes and 9,584 padding bytes, 26 F18452 blocks. All 96 K and 297 U
-build-input hashes match current source.
+The unlinked object requires LIBRARY and returns RC11 without it. Both linked
+outputs run independently with the host VM. The actual native CG/LGO jobs print
+the library marker once each. Output review is non-consuming; physical printer
+failure and recovery deliver the same retained records without re-execution.
 
-Review corrected DD ordering around generated SRC, bounded number formatting,
-malformed action operands, stale preview/purge presentation and early-setup
-cleanup. No selected-increment source finding remains open. The underlying
-native package and card inputs are unchanged from accepted Stage 4; native
-reference and unchanged parser/DD/runtime proof are reused within their scope.
+Required/oversized fields, invalid filters, repeated submission, held/busy and
+stale actions, cancellation and a refused second queued publication pass.
+Seven identities are published in the full workflow; all are explicitly
+purged, with no active job or temporary output residue.
 
-## Reviewed initial freeze
+Monochrome proof includes 26 full physical observations, retained intensity,
+actual PF2/3/4/5/6/8 and a prefilled shared editor. Two primary 3270 connections
+are replaced, before and after publication, with the old terminals reaped.
+Unused preview and consumed attempt identity survive repaint/reconnect;
+repeated submission creates no duplicate. Left/right/left views expose the
+same 132-byte record, which prints exactly once.
 
-| PD033-S5-R1 input | SHA256 |
+Separate native FOWNER/FOWNCH modules prove foreground child FORM/SHELL refusal
+at status16 and batch terminal refusal at status20. Genuine nested BADDR31
+ADDRESS/TIME executes inside OWNER's real SYSIN/SYSPRINT/SYSTERM/SYSTSPRT scope.
+The parent BATCH form then receives its scoped keys and returns to the console.
+
+## Reviewed inputs and checks
+
+Machine: ESAME, model 2064, one CPU, 512 MiB, a fresh 150-cylinder 3390 at 01B9;
+primary 0009, monitor 000A/3215, physical 3505 reader 000C and 1403 printer 000E.
+Text interfaces use IBM1047; cREXX remains UTF-8 internally. Raw SYSOUT is
+copied into views once, and binary datasets are never translated.
+
+| Frozen input | SHA256 |
 | --- | --- |
-| 15 changed/new source, recipe and interface files | `01720336df047c3891f0018b69626db1a3c188f40eb5efb9bad775da8e318cfa` |
-| K `build/pdos/batch-sdk/core/run/image.core` | `a1c8dc15beaef9bda3a0fc6daaa7eb9e722551dfe2b25c3269e756b234525ea6` |
-| U `build/pdos/batch-sdk/command/u-command.bin` | `a3ae335f0691a6cb3d8631034d02f456db0113c242b0dde4cf296771c0b6bf53` |
-| Unchanged 20-artifact native SDK/cREXX package | `1a136ed6bbbaf2442ccca126b15de1a52326161cedadb5a2625c12ac58bd216f` |
-| Unchanged 29 PDOS binary card inputs | `73ddee0f945c4966e28b977d4886ba6833ecf3c09e233d836e39a641cfe52511` |
+| K core | `a1c8dc15beaef9bda3a0fc6daaa7eb9e722551dfe2b25c3269e756b234525ea6` |
+| Resident U command | `15633c67a937e68d2fba6cb9ee79429a3a6c21320780681418996d9ba036d329` |
+| R7 FOWNER | `a733919ecb68f81fcc954d33d7b0998c9e0824022b41fbfcd282decc07f8cfef` |
+| R7 FOWNCH | `a01c50246d727c1b9224216f24339a649f1477485e28a36c9ae543d2cfc4ce88` |
+| Unchanged 20-artifact SDK/cREXX package | `1a136ed6bbbaf2442ccca126b15de1a52326161cedadb5a2625c12ac58bd216f` |
+| Unchanged 29 standard binary card inputs | `73ddee0f945c4966e28b977d4886ba6833ecf3c09e233d836e39a641cfe52511` |
+| Operator wrapper | `a72250f222f26480851e0728a0a94d1dc1ce15751bbafdfb1e71930df4fa9e6e` |
 
-Source aggregation selects sorted unique changed/new paths under `pdos/src`,
-`pdos/scripts`, `pdos/tests/batch` and the console-machine interface, excluding
-Python caches. Hash input is each UTF-8 path, NUL and raw SHA256. The current
-small `build/pdos/batch-jcl/freeze.json` records this review and bounded matrix.
+R7's 28-path source/recipe/test aggregate against Stage4 baseline `83283b6` is
+`31ef74f9a554fb20232efa3f7e14f1d7f13fff25afc37fc411a360218a88b5a4`.
+Aggregation sorts unique selected paths under pdos/src, pdos/scripts,
+pdos/tests/batch and the console-machine/control interfaces, excluding caches;
+each contributes its UTF-8 path, NUL and raw file SHA256.
 
-The operator wrapper's initial `forms 3270` action retains all lease/input/
-staged-hash/binary-mode guards; `forms line` rejects before action because this
-fixture includes actual PF8. The initial matrix previews CG, repeats Enter and
-SUBMIT, releases exactly one held native build/run, pages with PF8, filters
-RUN/SYSPRINT, prints/purges, then runs ordinary HELLO and beta-3 RXVM commands.
-Its dedicated oracle checks actual step/printer records, exact durable spool,
-STORE preservation and clean ownership. A revision marker is only an input
-synchronisation point, never the application pass condition.
+The whole change was reviewed before IPL: supplied-storage C89, shared
+prepare/post admission, consume-before-publication, record pagination,
+ownership/unwind, charset handling and build selection. The normal/ASan/UBSan
+suite passes 14,653 converter and 49 PROC assertions plus controller, DD/temp,
+forms and native-binding checks. Exact horizontal pages and revision-exhaustion
+exit are covered. Clang analysis reports no selected form finding. Classic K/U
+and native probes compile/assemble/link. All 96 K/297 U build inputs and the
+535 operator-reviewed source, producer, package and tool inputs match.
 
-## Accepted initial model-2 result
+K has 533,406 kernel bytes. U has 470,120 raw bytes in a 479,752-byte container:
+64-byte header and 9,568 padding bytes, 26 F18452 blocks. All repairs after the
+checkpoint concern test expectations or test probes; product K/U are unchanged.
+Native Stage4 and unchanged Stage3/4 DD/runtime proof are reused by exact input
+identity; no new native z/OS campaign is claimed.
 
-The initial guest proof passes all 29 assertions. The coordinator independently
-checked actual revisions 0–14, physical s3270 Ascii observations of all three
-forms and JCL preview, one held identity, a refused repeated submission and real
-PF8 paging to the RUN result. Exactly one native CG job completed COMP/ASSEM/RUN
-at RC0. Filtered RUN/SYSPRINT returned the library marker; explicit PRINT reached
-state 2 before purge. The independently read printer has all three normal step
-results, one marker and final job state 4.
+## Corrections and remaining boundary
 
-Actual stopped state has no active job, zero invocation/console/interrupt
-ownership and an empty version-4 spool with last identity 1. Its bytes match
-the durable STORE object; no temporary or named output objects remain. The
-150-cylinder outside-STORE hash is unchanged before/after:
-`e835e7115a387eb6b5d1f2ea6f8e2aac83c9f36bd66a38d3e4e5606bd933da4c`.
-Ordinary console HELLO and beta-3 RXVM return RC0, followed by normal K shutdown
-and Hercules exit. Independent acceptance is recorded in the small Lab
-`build/pd033-stage5-model2-summary.json`. The operator audited all 514 reviewed
-inputs, retired the disposable media/QA and detailed receipts, and released the
-exact maintenance lease. Normal process/listener/handle cleanup passes; original
-producer/package/managed inputs and protected incident records remain intact.
+The first complete run's original R3 receipt was43/44. Its invalid-filter
+assertion was wrong: unknown STEP reports status8, while an oversized DD edit
+preserves the valid filter and record. Reviewed R4 corrects only that oracle.
+Re-evaluation of the held actual data passes44/44 without guest replay.
+R3 source aggregate is
+`fb6b725ad47bace6c1d334370615f041bf6525fbfc38ab7746f2732775f5452e`;
+R4 postprocessing aggregate is
+`30dacb8f19d759c130a7028cfcd986be12705016ac40bbe7d6df9322663a5703`.
 
-## R2 exhaustion repair and source checkpoint
+The ownership probe initially truncated native LINK parameters: the selected
+interface copies fullword values, so its five/seven-byte tails require two
+fenced values. The repaired call then correctly rejected foreground use of a
+batch-entry image with missing standard DDs. The final test separates foreground
+child ownership from genuine batch ADDRESS. Each repair was reviewed, rebuilt
+and frozen before affected replay.
 
-Final acceptance identified an extreme counter case: rejecting every action at
-revision UINT_MAX also rejected PF3 and could trap the native form loop. R2
-invalidates unused preparation and sets exit before returning status 8. A new
-host control forces that value and proves exit, cleared preparation and no
-publication. Normal/ASan/UBSan form and native-binding controls pass, as does
-the Classic U rebuild; all 96 K/297 U input hashes match current source.
+R6 completed every command at RC0 and passed35/37; only the second foreground
+child's unchecked printf marker was missing. R7 uses checked semantic output
+and keeps every ownership assertion mandatory. [PD-034](../BACKLOG.md#pd-034-classic-stdio-marker-on-mixed-context-native-reentry)
+records that separate Classic stdio observation with cause open.
 
-R2's 15-file aggregate is
-`4dceb263be1b543191d83b3cc15e4bb5111407378654d9f85a97510860e86c21`.
-K remains unchanged. U is
-`15633c67a937e68d2fba6cb9ee79429a3a6c21320780681418996d9ba036d329`,
-470,120 raw bytes in the same 479,752-byte/26-block container.
-This changes only the exhausted-revision branch and its host regression.
-The normal form paths, panel/native binding, K, parser/DD services, package
-and cards are unchanged, so the bounded R1 guest result is reused by dependency
-review. No new R2 guest execution is claimed. Detailed temporary builds and
-captures are retired after extracting these summaries. The coordinator verified
-the final R2 source/K/U identities and no open handles, then cleared the normal
-core/command build slots and removed temporary test binaries, fixtures and logs.
-Only empty-slot ownership markers and concise result summaries remain.
+The final audit matched all 535 pinned inputs, 28 source paths, 20 package
+artifacts, 29 card inputs, 44 original producer/controller inputs and nine
+protected records. Guest processes, listeners and handles are gone; exact
+maintenance is released and the fleet ledger is empty. The operator retired
+temporary media, cores, traces, expanded readbacks and detailed receipts.
+After verifying no active consumers, the coordinator cleared temporary host
+core/command/probe/test outputs in the same normal slots. Only concise result
+summaries and required original inputs remain.
 
-This accepts the initial increment, not full Stage 5. Adrian has authorised
-committing this checkpoint and completing qualification through the Mainframe
-Operator. Models 3–5, monochrome, physical line, generated-PROC execution,
-reconnect/repaint, additional error/busy and nested foreground/ADDRESS controls
-remain S5-AC06 work. Managed-image adoption, release and publication are separate.
+S5-AC01–06 and S5-01–04 are Done. Managed-image adoption, the Stage 6
+clean-consumer/release gates and publication are separate. The completion
+recipes and documentation are local working changes after the committed source
+checkpoint; no additional commit or push was performed.

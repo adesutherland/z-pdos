@@ -6,7 +6,7 @@ main: procedure = .int
   arg args=.string[]
   if args.0<>1 then return 2
   work=args.1
-  allowed="build/pdos/batch-sdk/core build/pdos/batch-sdk/controller build/pdos/batch-sdk/command build/pdos/batch-sdk/image build/pdos/batch-sdk/image-inputs build/pdos/batch-sdk/qa"
+  allowed="build/pdos/batch-sdk/core build/pdos/batch-sdk/controller build/pdos/batch-sdk/command build/pdos/batch-sdk/forms-owner build/pdos/batch-sdk/image build/pdos/batch-sdk/image-inputs build/pdos/batch-sdk/qa"
   if wordpos(work,allowed)=0 then return 2
   address crexx "run test ! -L :work"
   if rc<>0 then return 2

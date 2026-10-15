@@ -1,8 +1,9 @@
 # Stage 5 batch forms
 
-This is the source-development contract for the first Stage 5 increment.
-[PD-033](../BACKLOG.md#stage-5-retained-3270-job-forms) owns acceptance; the full
-model/recovery matrix remains open until operator qualification is accepted.
+This is the Stage 5 retained-form contract.
+[PD-033](../BACKLOG.md#stage-5-retained-3270-job-forms) owns acceptance; the
+[qualification result](../qualification/BATCH-STAGE5-2026-10-15.md) records the
+accepted six-cell model, monochrome, line, reconnect and ownership matrix.
 The existing console and its SUBMIT/JOBS/STATUS/OUTPUT commands remain available.
 
 `BATCH` enters retained Submit, Jobs and Output panels inside PCOMM. PF3 returns
@@ -65,7 +66,9 @@ nor proof of successful execution. The initial 3270 probe waits for each
 revision, verifies one actual held/started/completed job, repeats SUBMIT, uses
 real PF8, reviews a filtered library record, prints and purges it, then runs
 ordinary console programs. Its oracle checks actual step/printer results and
-stopped durable state. That probe does not replace the broader S5-AC06 matrix.
+stopped durable state. The complete suite adds all four generated PROCs, exact
+native dataset comparison, printer failure/recovery, real editor/reconnect,
+132-column output and nested foreground/batch ADDRESS ownership checks.
 
 ## Ownership and text
 

@@ -69,6 +69,59 @@ def expected_outputs(texts,cases):
         if any(text not in section for text in case[3]):return False
     return True
 
+def close_terminal(terminal,script):
+    """Reap the owned terminal even if its scripting endpoint is broken."""
+    try:terminal_action(script,"Quit()")
+    except (OSError,subprocess.TimeoutExpired):pass
+    try:terminal.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        try:terminal.terminate()
+        except ProcessLookupError:pass
+        try:terminal.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            try:terminal.kill()
+            except ProcessLookupError:pass
+            terminal.wait(timeout=5)
+
+def start_terminal(a,out,proc,log,port,script,trace_name):
+    if (out/trace_name).exists():raise ValueError("refuse to replace a terminal trace")
+    terminal=subprocess.Popen(["s3270","-model",("3279-" if a.colour else "3278-")+str(a.model),*(["-oversize",a.oversize] if a.oversize else []),*(["-clear","extendedDataStream"] if a.basic else []),"-codepage","cp930" if a.stage3=="dbcs" else "cp1047","-scriptport",str(script),"-trace","-tracefile",str(out/trace_name),"-tracefilesize","16M"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    try:
+        until(lambda:terminal_action(script,"Query(ConnectionState)").returncode==0,proc,log,10)
+        until(lambda:terminal_action(script,f"Connect(127.0.0.1:{port})").returncode==0,proc,log,20)
+        if terminal_action(script,"Set(aidWait,false)").returncode:raise RuntimeError("3270 nonblocking AID mode rejected")
+        return terminal
+    except BaseException:
+        close_terminal(terminal,script)
+        raise
+
+def form_observation(out,script,prompt,ordinal,epoch):
+    """Full physical state; wire deltas alone need not repeat panel titles."""
+    data={}
+    for name,action in (("ascii","Ascii()"),("buffer","ReadBuffer(Ascii)"),("geometry","Query(ScreenCurSize)"),("cursor","Query(Cursor)")):
+        result=terminal_action(script,action)
+        if result.returncode:raise RuntimeError("form observation failed: "+action)
+        data[name]=result.stdout
+    stem="form-%03d"%ordinal
+    (out/(stem+".screen")).write_text(data["ascii"])
+    (out/(stem+".buffer")).write_text(data["buffer"])
+    chroma=bool(set(re.findall(r"42=([0-9a-f]+)",data["buffer"]))&set(("f1","f2","f3","f4","f5","f6")))
+    return {"prompt":prompt,"epoch":epoch,"screen":stem+".screen","buffer":stem+".buffer","geometry":" ".join(data["geometry"].split()),"cursor":data["cursor"].strip(),"has_colour":chroma}
+
+def primary_connections(log):
+    return len(re.findall(r"0:0009 COMM: client [^\r\n]*: connected\r?$",log.read_text(errors="replace"),re.M))
+
+def validate_responses(cases,forms_profile,forms_complete,line_primary,monitor):
+    for case in cases:
+        if not isinstance(case,list) or len(case)<2 or not all(isinstance(x,str) for x in case[:2]):raise ValueError('complete command/marker required')
+        for response in case[2] if len(case)>2 else []:
+            if not isinstance(response,list) or len(response)<2 or not all(isinstance(x,str) for x in response[:2]):raise ValueError('complete response prompt/text required')
+            text=response[1];source=response[2] if len(response)>2 else 'primary'
+            if source not in ('primary','jcl','job','batch','disconnect','reconnect','monitor','key','forms-device','primary-reconnect'):raise ValueError('unknown response source: '+str(source))
+            if source=='forms-device' and (not forms_complete or text not in ('printer-offline','printer-restore')):raise ValueError('selected complete-forms printer action required')
+            if source=='primary-reconnect' and (not forms_profile or not monitor or text not in ('','Clear()') or line_primary and text):raise ValueError('checked primary reconnect requires forms/monitor and optional3270 Clear')
+            if source=='key' and (line_primary or not (re.fullmatch(r'PF\((?:[1-9]|1[0-2])\)',text) or forms_profile and text in ('Clear()','Enter()'))):raise ValueError('checked physical3270 key required')
+
 class LineClient:
     def __init__(self,port,device):
         self.socket=socket.create_connection(("127.0.0.1",port),timeout=10)
@@ -179,21 +232,27 @@ def parse_transcript(raw):
             "sha256":hashlib.sha256(data).hexdigest()}
 
 def run(a):
-    if a.batch_forms and not a.normal:raise ValueError("batch forms require normal console proof")
-    if a.batch_forms and (a.batch_devices or a.batch_jobs or a.batch_dd):raise ValueError("choose forms or a descriptor matrix")
+    forms_profile=a.batch_forms or a.batch_forms_complete or a.batch_forms_recovery
+    if sum((a.batch_forms,a.batch_forms_complete,a.batch_forms_recovery))>1:raise ValueError("choose one forms profile")
+    if forms_profile and not a.normal:raise ValueError("batch forms require normal console proof")
+    if forms_profile and (a.batch_devices or a.batch_jobs or a.batch_dd):raise ValueError("choose forms or a descriptor matrix")
     if a.job_cut and not (a.batch_jobs and a.normal):raise ValueError("job cut requires explicit normal batch proof")
     if a.batch_data and not (a.batch_dd and a.normal):raise ValueError("batch data requires explicit normal DD proof")
     if a.batch_jcl and not (a.batch_dd and a.normal):raise ValueError("batch JCL requires explicit normal DD proof")
     if a.batch_sdk and not (a.batch_dd and a.normal):raise ValueError("batch SDK requires explicit normal DD proof")
     if sum((a.batch_sdk,a.batch_data,a.batch_jcl))>1:raise ValueError("choose one DD matrix")
     if sum((a.batch_devices,a.batch_jobs,a.batch_dd))>1:raise ValueError("choose one batch fixture")
+    selected_cases=None
+    if a.normal and not a.rootfault:
+        selected_cases=json.loads(Path(a.commands).read_text()) if a.commands else [["VERSION","PDIO1"],["CMS RUN 31 RXVM -v","PCOMM END 1 RC=0"],["RXVM -v","PCOMM END 2 RC=0"],["MISSING","PCOMM END 3 OS=28 RC=unavailable"],["RXVM -v","PCOMM END 4 RC=0"]]
+        validate_responses(selected_cases,forms_profile,a.batch_forms_complete,a.line_primary,a.monitor)
     out=Path(a.output).resolve();out.mkdir(exist_ok=False)
-    if a.batch_sdk or a.batch_jcl:(out/".pd033-build").write_text("pd033-batch-build-v1\n")
+    if a.batch_sdk or a.batch_jcl or forms_profile:(out/".pd033-build").write_text("pd033-batch-build-v1\n")
     disk=Path(a.disk).resolve();core=Path(a.core).resolve();herc=Path(a.hercules).resolve()
     port=unused_loopback_port();script=unused_loopback_port();before=digest(disk)
     primary="3215 noprompt" if a.line_primary else "3270"
     cfg="ARCHLVL ESAME\nMAINSIZE 512\nNUMCPU 1\nCPUMODEL 2064\nDIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\nCODEPAGE 819/1047\n"
-    if a.batch_devices or a.batch_jobs or a.batch_dd or a.batch_forms:cfg+="LEGACYSENSEID ON\n"
+    if a.batch_devices or a.batch_jobs or a.batch_dd or forms_profile:cfg+="LEGACYSENSEID ON\n"
     cfg+=f"CNSLPORT 127.0.0.1:{port}\n01B9 3390 {disk}\n0009 {primary}\n"
     attachments=[]
     for option,address in (("cms_exchange","01BA"),("fixture_exchange","01BB")):
@@ -216,7 +275,7 @@ def run(a):
         sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"batch"))
         from actor import prepare as batch_prepare
         cfg+=batch_prepare(out)
-    if a.batch_jobs or a.batch_dd or a.batch_forms:
+    if a.batch_jobs or a.batch_dd or forms_profile:
         sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"batch"))
         from job_actor import prepare as job_prepare
         cfg+=job_prepare(out)
@@ -225,6 +284,7 @@ def run(a):
     proc=subprocess.Popen(cmd,cwd=out,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
     lines=[];events=queue.Queue();thread=threading.Thread(target=drain_output,args=(proc.stdout,lines,events),daemon=True);thread.start()
     terminal=None;client=None;monitor=None;error=None;screens=[];monitor_parts=[];cases=[]
+    primary_parts=[];terminal_traces=[];form_observations=[];primary_reconnects=[];primary_epoch=0
     idle_wait_observed=False
     stage3_resources={"monitor":None,"printer":None};stage3_checks={}
     log=out/"console.log"
@@ -236,11 +296,8 @@ def run(a):
         until(listener,proc,log,10)
         if a.line_primary:client=LineClient(port,9)
         else:
-            terminal=subprocess.Popen(["s3270","-model",("3279-" if a.colour else "3278-")+str(a.model),*( ["-oversize",a.oversize] if a.oversize else []),*( ["-clear","extendedDataStream"] if a.basic else []),"-codepage","cp930" if a.stage3=="dbcs" else "cp1047","-scriptport",str(script),
-                                       "-trace","-tracefile",str(out/"3270.trace"),"-tracefilesize","16M"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-            until(lambda:terminal_action(script,"Query(ConnectionState)").returncode==0,proc,log,10)
-            until(lambda:terminal_action(script,f"Connect(127.0.0.1:{port})").returncode==0,proc,log,20)
-            terminal_action(script,"Set(aidWait,false)")
+            terminal=start_terminal(a,out,proc,log,port,script,"3270.trace")
+            terminal_traces.append("3270.trace")
         if a.monitor:monitor=LineClient(port,10)
         stage3_resources["monitor"]=monitor
         if a.stage3 in ("family","dbcs"):
@@ -322,7 +379,7 @@ def run(a):
         elif a.normal and not a.rootfault:
             if client:until(lambda:"welcome to pcomm" in client.text(),proc,log)
             else:until(lambda:"welcome to pcomm" in terminal_action(script,"Ascii()").stdout,proc,log,60)
-            cases=json.loads(Path(a.commands).read_text()) if a.commands else [["VERSION","PDIO1"],["CMS RUN 31 RXVM -v","PCOMM END 1 RC=0"],["RXVM -v","PCOMM END 2 RC=0"],["MISSING","PCOMM END 3 OS=28 RC=unavailable"],["RXVM -v","PCOMM END 4 RC=0"]]
+            cases=selected_cases
             for case in cases:
                 command,marker=case[:2]
                 if len(case)>5:
@@ -346,6 +403,8 @@ def run(a):
                 for response in responses:
                     prompt,text=response[:2]
                     source=response[2] if len(response)>2 else "primary"
+                    if source not in ("primary","jcl","job","batch","disconnect","reconnect","monitor","key","forms-device","primary-reconnect"):
+                        raise ValueError("unknown response source: "+source)
                     def input_ready():
                         shown=client.text() if client else terminal_action(script,"Ascii()").stdout
                         if prompt in shown and not (len(response)>3 and isinstance(response[3],int) and prompt_capture.text().count(prompt)<response[3]):
@@ -356,6 +415,38 @@ def run(a):
                             raise RuntimeError("application ended before input: "+prefix[0])
                         return False
                     until(input_ready,proc,log,matrix_limit)
+                    if forms_profile and not client and (form_case or command=="FOWNER"):
+                        until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
+                        form_observations.append(form_observation(out,script,prompt,len(form_observations)+1,primary_epoch))
+                    if source=="forms-device":
+                        if not a.batch_forms_complete or text not in ("printer-offline","printer-restore"):
+                            raise ValueError("forms-device requires complete profile and selected printer action")
+                        from job_actor import action as job_action
+                        job_action(text,proc,log,out)
+                        continue
+                    if source=="primary-reconnect":
+                        if not forms_profile or not monitor or text not in ("","Clear()") or client and text:
+                            raise ValueError("primary reconnect requires forms, monitor and optional 3270 Clear")
+                        connected=primary_connections(log)
+                        if client:
+                            primary_parts.append(client.text());client.close();client=None
+                            client=LineClient(port,9)
+                        else:
+                            until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
+                            old_pid=terminal.pid;old_script=script
+                            close_terminal(terminal,script);terminal=None
+                            script=unused_loopback_port()
+                            trace_name="3270-reconnect-%d.trace"%(primary_epoch+1)
+                            terminal=start_terminal(a,out,proc,log,port,script,trace_name)
+                            terminal_traces.append(trace_name)
+                        until(lambda:primary_connections(log)>connected,proc,log,20)
+                        primary_epoch+=1
+                        event={"epoch":primary_epoch,"prompt":prompt,"device":"0009","transport":"3215" if client else "3270","fresh_device_connection":True}
+                        if not client:event.update(old_terminal_pid=old_pid,old_script_port=old_script,new_terminal_pid=terminal.pid,new_script_port=script,old_terminal_reaped=True)
+                        primary_reconnects.append(event)
+                        prompt_capture=client if client else monitor
+                        if text and terminal_action(script,text).returncode:raise RuntimeError("primary reconnect Clear rejected")
+                        continue
                     if source=="jcl":
                         if not a.batch_jcl:raise ValueError("JCL response requires explicit profile")
                         from jcl_actor import action as jcl_action
@@ -381,10 +472,10 @@ def run(a):
                         if not monitor:raise ValueError("monitor input source unavailable")
                         monitor.enter(text)
                     elif source=="key":
-                        if client or not re.fullmatch(r"PF\((?:[1-9]|10)\)",text):
-                            raise ValueError("checked 3270 PF1-PF10 action required")
+                        if client or not (re.fullmatch(r"PF\((?:[1-9]|1[0-2])\)",text) or forms_profile and text in ("Clear()","Enter()")):
+                            raise ValueError("checked 3270 PF1-PF12 or scoped forms Clear/Enter required")
                         until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
-                        terminal_action(script,text)
+                        if terminal_action(script,text).returncode:raise RuntimeError("3270 key action rejected")
                     elif client:client.enter(text)
                     else:
                         until(lambda:terminal_action(script,"Query(KeyboardLock)").stdout.strip()=="false",proc,log,60)
@@ -491,7 +582,7 @@ def run(a):
             time.sleep(.05)
     except (OSError,RuntimeError,TimeoutError,ValueError,subprocess.TimeoutExpired) as exc:error=str(exc)
     finally:
-        if a.batch_jobs:
+        if a.batch_jobs or forms_profile:
             from job_actor import close as job_close
             job_close()
         if error and a.normal and not a.rootfault and proc.poll() is None:
@@ -511,14 +602,8 @@ def run(a):
             try:proc.wait(timeout=30)
             except subprocess.TimeoutExpired:proc.terminate();proc.wait(timeout=10)
         if terminal:
-            try:terminal_action(script,"Quit()")
-            except (OSError,subprocess.TimeoutExpired):pass
-            try:terminal.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                terminal.terminate()
-                try:terminal.wait(timeout=5)
-                except subprocess.TimeoutExpired:terminal.kill();terminal.wait(timeout=5)
-        if client:(out/"primary.txt").write_text(client.text());client.close()
+            close_terminal(terminal,script)
+        if client:primary_parts.append(client.text());client.close()
         if a.stage3:monitor=stage3_resources["monitor"]
         if monitor:monitor_parts.append(monitor.text());monitor.close()
         printer=stage3_resources["printer"]
@@ -528,8 +613,13 @@ def run(a):
                 printer.terminate()
                 try:printer.wait(timeout=5)
                 except subprocess.TimeoutExpired:printer.kill();printer.wait(timeout=5)
-        if monitor_parts:(out/"monitor.txt").write_text("".join(monitor_parts))
         thread.join(timeout=2)
+        try:
+            if primary_parts:(out/"primary.txt").write_text("".join(primary_parts))
+            if monitor_parts:(out/"monitor.txt").write_text("".join(monitor_parts))
+            if form_observations:(out/"form-observations.json").write_text(json.dumps(form_observations,indent=2)+"\n")
+            if primary_reconnects:(out/"primary-reconnects.json").write_text(json.dumps(primary_reconnects,indent=2)+"\n")
+        except OSError as exc:error=error or "console export failed: "+str(exc)
     checks={"guest_event_sequence_completed":error is None,"hercules_exit_zero":proc.returncode==0}
     raw=(out/"result.core").read_bytes() if (out/"result.core").exists() else b"";transcript=None;metrics=None;service_cost=None
     if len(raw)==REAL:
@@ -547,7 +637,8 @@ def run(a):
             checks["input_and_screen_leases_released"]=transcript["read_owner"]==transcript["screen_owner"]==0
             texts=[e["text"] for e in transcript["events"] if e["type"]==2]
             if a.workbench or a.workbench_normal and not client:
-                checks["submitted_field_clear_resets_locked_cursor"]=submitted_cursor_resets(received_records((out/"3270.trace").read_text()))
+                wire="\n".join((out/name).read_text() for name in terminal_traces)
+                checks["submitted_field_clear_resets_locked_cursor"]=submitted_cursor_resets(received_records(wire))
             if a.job_cut:
                 checks.pop("final_observed_invocation_depth_zero",None)
                 checks.pop("native_console_app_rc_zero",None)
@@ -661,15 +752,26 @@ def run(a):
         except Exception as exc:
             checks["native_batch_dd_capture_complete"]=False
             if error is None:error=repr(exc)
-    if a.batch_forms:
+    if forms_profile:
         try:
-            from forms_actor import inspect as forms_inspect
+            if a.batch_forms_complete:from forms_complete_actor import inspect as forms_inspect
+            elif a.batch_forms_recovery:from forms_recovery_actor import inspect as forms_inspect
+            else:from forms_actor import inspect as forms_inspect
             checks.update(forms_inspect(out,raw))
         except Exception as exc:
             checks["batch_forms_capture_complete"]=False
             if error is None:error=repr(exc)
     receipt={"profile":{"model":a.model,"colour":a.colour,"basic":a.basic,"editor":a.editor,"oversize":a.oversize,"workbench":a.workbench,"transfer":a.transfer,"workbench_normal":a.workbench_normal,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw,"stage3":a.stage3,"batch_devices":a.batch_devices,"batch_jobs":a.batch_jobs,"batch_dd":a.batch_dd,"batch_data":a.batch_data,"batch_sdk":a.batch_sdk,"batch_jcl":a.batch_jcl,"job_cut":a.job_cut},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
-    receipt["profile"]["batch_forms"]=a.batch_forms
+    receipt["profile"].update(batch_forms=a.batch_forms,batch_forms_complete=a.batch_forms_complete,batch_forms_recovery=a.batch_forms_recovery)
+    if forms_profile and not a.line_primary:
+        geometry="%d %d"%({2:(24,80),3:(32,80),4:(43,80),5:(27,132)}[a.model])
+        checks["forms_full_physical_observations"]=bool(form_observations) and all(x["geometry"]==geometry for x in form_observations)
+        checks["forms_physical_colour_matches_request"]=bool(form_observations) and any(x["has_colour"] for x in form_observations)==a.colour
+    planned=sum(len(response)>2 and response[2]=="primary-reconnect" for case in cases for response in (case[2] if len(case)>2 else []))
+    if planned:
+        checks["primary_connection_cycles_completed"]=len(primary_reconnects)==planned and all(x["fresh_device_connection"] and (x["transport"]=="3215" or x["old_terminal_reaped"]) for x in primary_reconnects)
+    receipt["pass"]=all(checks.values())
+    receipt["primary_reconnects"]=primary_reconnects
     if service_cost is not None:receipt["service_cost"]=service_cost
     if a.normal and transcript is not None and any(e.get("text","").startswith("PD25 ") for e in transcript["events"]):
         from io_benchmark_check import observations
@@ -679,6 +781,7 @@ def run(a):
         except ValueError as exc:checks["pd025_native_report"]=False;receipt["error"]=str(exc)
         receipt["pass"]=all(checks.values())
     if (out/"3270.trace").exists():receipt["terminal_trace_sha256"]=digest(out/"3270.trace")
+    if terminal_traces:receipt["terminal_traces"]={name:digest(out/name) for name in terminal_traces}
     if attachments:receipt["attachments"]=[dict(row,stopped_sha256=digest(Path(row["path"]))) for row in attachments]
     before_store=disk.parent.parent/"store-before.json"
     if transcript is not None and before_store.exists():
@@ -709,8 +812,10 @@ def run(a):
         if a.batch_sdk:
             from sdk_actor import stored as sdk_stored
             checks.update(sdk_stored(out,stored["files"]))
-        if a.batch_forms:
-            from forms_actor import stored as forms_stored
+        if forms_profile:
+            if a.batch_forms_complete:from forms_complete_actor import stored as forms_stored
+            elif a.batch_forms_recovery:from forms_recovery_actor import stored as forms_stored
+            else:from forms_actor import stored as forms_stored
             checks.update(forms_stored(out,stored["files"]))
         (out/"store-after.json").write_text(json.dumps(stored,indent=2)+"\n");flat.unlink()
         receipt["pass"]=all(checks.values())
@@ -733,6 +838,8 @@ if __name__=="__main__":
     p.add_argument("--batch-sdk",action="store_true")
     p.add_argument("--batch-jcl",action="store_true")
     p.add_argument("--batch-forms",action="store_true")
+    p.add_argument("--batch-forms-complete",action="store_true")
+    p.add_argument("--batch-forms-recovery",action="store_true")
     p.add_argument("--job-cut",action="store_true")
     p.add_argument("--stage3",choices=("graph","family","dbcs","recovery","policy"))
     for name in ("cms-exchange","fixture-exchange","tape-input"):p.add_argument("--"+name)

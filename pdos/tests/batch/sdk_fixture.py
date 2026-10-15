@@ -46,7 +46,9 @@ def header(work):
         lines.append("#define "+macro+" "+",".join(str(x) for x in body))
     (work/"sdk-source.h").write_text("\n".join(lines)+"\n")
 
-def prepare(media,package,controller,probe,packer,extractor):
+def prepare(media,package,controller,probe,packer,extractor,owners=None):
+    if owners is not None and owners.resolve()!=Path('build/pdos/batch-sdk/forms-owner').resolve():
+        raise ValueError('selected native ownership-probe build only')
     ctl=media/"ctl.txt";source=ctl.read_text().splitlines()
     if source[0]!="PDOS00 3390-1 100":raise ValueError("expected unchanged base geometry")
     source[0]="PDOS00 3390-1 150"
@@ -72,6 +74,12 @@ def prepare(media,package,controller,probe,packer,extractor):
             subprocess.run(["python3","-B",str(extractor),str(address),str(rdw),"--member","BADDR31","--amode","31"],check=True)
             subprocess.run([str(packer),str(rdw),str(media/"BADDR31.bin")],check=True)
             out.append("TSO31.BADDR31 SEQ BADDR31.bin CYL 1 1 0 PS F 18452 18452")
+            if owners is not None:
+                for name in ('FOWNER','FOWNCH'):
+                    binary=owners/(name+'.bin');body=binary.read_bytes()
+                    if not body or len(body)%18452:raise ValueError('complete ownership-probe blocks required')
+                    shutil.copyfile(binary,media/(name+'.bin'))
+                    out.append(f'TSO31.{name} SEQ {name}.bin CYL 1 1 0 PS F 18452 18452')
             (media/"BYTES.bin").write_bytes(bytes(range(256)))
             out.extend(["PD4.BYTES SEQ BYTES.bin TRK 1 1 0 PS FB 256 256",
                         "PD4.RESULT EMPTY TRK 1 1 0 PS VB 260 264",

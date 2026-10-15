@@ -1,8 +1,9 @@
 # Submit a batch job and review its output
 
-This is the Stage 4 source-development interface. Managed-image adoption and
-complete Stage 5 form qualification have separate gates. The existing PCOMM console remains the
-entry point on both a line terminal and a model-2 3270.
+Use SUBMIT from PCOMM, or BATCH for the Submit, Jobs and Output forms.
+The development profile is qualified on colour 3270 models 2–5, model-2
+monochrome and physical line input. The console remains the common entry point.
+Managed-image adoption and release have their own gates.
 
 The operator installs the checked native programs, common procedures and one
 FB80 `PDOS.BATCH.SITE`. Its LOADLIB, PROCLIB, LIBPREFIX and VOLUME must match
@@ -45,9 +46,9 @@ An OS failure has no valid application RC; never interpret an unavailable RC as 
 
 ## Development job forms
 
-The Stage 5 source candidate adds `BATCH` without removing these console
-commands. Its first model-2 workflow is qualified; the complete model, line
-and recovery matrix remains open in the [Stage 5 result](../qualification/BATCH-STAGE5-2026-10-15.md).
+`BATCH` opens the retained forms alongside these console commands. The
+[Stage 5 result](../qualification/BATCH-STAGE5-2026-10-15.md) records the
+complete physical model, line and recovery qualification.
 The forms retain named fields in the panel body and edit the selected field
 through the common input area. PF5/PF6 select a field; PF2 prepares `EDIT value`
 there; Enter accepts it. Direct field commands work in that same area.
@@ -59,14 +60,17 @@ PREVIEW shows and validates the exact JCL without creating a job. SUBMIT or PF10
 publishes that preview once. Enter alone refreshes; changing submission fields
 requires another preview. After an attempt, use NEW plus PREVIEW only for a
 deliberate new submission. If acknowledgement fails, review JOBS first.
+Read the job and step return codes in JOBS; command completion confirms the
+interaction. Rejected oversized edits preserve the previous field value.
+On a line console, type these field/action commands instead of PF keys.
 
 JOBS/PF11 selects the job view; SELECT takes an actual job identity. RELEASE,
 CANCEL, PRINT and PURGE use the existing checked actions. QUEUEHOLD delays a
 queued job; HOLD YES/NO sets the submission's output policy. OUTPUT/PF12 opens
 retained records; STEP and DD set its filters. PF7/PF8 page and LEFT/RIGHT expose
 wide records. PF3 returns from preview to Submit, or from a main form to the
-console. EXIT returns directly. The initial form workflow includes normal
-console HELLO/RXVM execution after leaving the forms.
+console. EXIT returns directly. Reconnect and repaint preserve submission
+identity, and ordinary console commands remain available after leaving forms.
 
 ## Cards, console frames and execution hold
 

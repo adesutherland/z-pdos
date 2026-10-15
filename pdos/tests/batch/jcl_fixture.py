@@ -15,6 +15,14 @@ CASES = 'C CG CL LGO LGODEF BAD RC8 COND PARSE INLINE CPROBE SPINBLD SPIN NOPROC
 PROCS = 'CRXC CRXCG CRXCL CRXLGO'.split()
 SOURCES = 'LIBRARY BAD PARSE SPIN'.split()
 HLQ = 'LABA01.B33'
+OWNER_JCL = """//OWNER JOB CLASS=A,MSGCLASS=A,REGION=0M
+//RUN EXEC PGM=BTEST31,PARM='BATCH',REGION=256M
+//SYSIN DD DUMMY
+//SYSPRINT DD SYSOUT=*,DCB=(RECFM=FB,LRECL=132,BLKSIZE=132)
+//SYSTERM DD SYSOUT=*,DCB=(RECFM=FB,LRECL=132,BLKSIZE=132)
+//SYSTSPRT DD SYSOUT=*,DCB=(RECFM=FB,LRECL=132,BLKSIZE=132)
+//
+"""
 
 def fixed(text):
     table = Path('pdos/scripts/ibm1047.table').read_text().splitlines()
@@ -44,8 +52,9 @@ def site(root,hlq,volume):
     write(root/'SYSIN.fb80',fixed('Input café!\n\n'))
     write(root/'BYTES.fb256',bytes(range(256)))
 
-def prepare(media,fixtures):
+def prepare(media,fixtures,owners=None):
     """Extend the checked SDK fresh-media manifest, never an installed disk."""
+    if owners is not None and str(owners)!='forms-owner':raise ValueError('selected ownership fixture only')
     ctl = media/'ctl.txt'; rows = ctl.read_text().splitlines()
     if rows[0] != 'PDOS00 3390-1 150': raise ValueError('selected SDK geometry')
     rename = {'PD4.'+a:HLQ+'.'+b for a,b in
@@ -59,6 +68,10 @@ def prepare(media,fixtures):
             for name in ('SITE','SYSIN'):
                 data = (fixtures/(name+'.fb80')).read_bytes()
                 if not data or len(data)%80: raise ValueError('complete native records')
+                if name=='SITE' and owners is not None:
+                    old=fixed('BTEST31 BTEST31\n');new=fixed('BTEST31 FOWNER\n')
+                    if data.count(old)!=1:raise ValueError('one original BTEST31 site binding required')
+                    data=data.replace(old,new)
                 write(media/(name+'.fb80'),data)
                 dsn = 'PDOS.BATCH.SITE' if name == 'SITE' else HLQ+'.SYSIN'
                 result.append(f'{dsn} SEQ {name}.fb80 TRK 1 1 0 PS FB 80 3120')
@@ -68,6 +81,7 @@ def prepare(media,fixtures):
     if seen != set(rename): raise ValueError('all and only SDK task outputs must be renamed')
     if len([r for r in result if r.startswith('PDOS.BATCH.SITE ')]) != 1: raise ValueError('one site binding')
     write(ctl, ('\n'.join(result)+'\n').encode())
+    if owners is not None:write(media/'OWNER.fb80',fixed(OWNER_JCL))
 
 def fb_pds(raw,dsn,items,writer,audit):
     loc,full,meta = writer.locate(raw,dsn)
@@ -98,7 +112,9 @@ def fb_pds(raw,dsn,items,writer,audit):
     record = records(raw,loc[0],loc[1])[loc[2]]
     return [(512+first*TRACK,512+(last+1)*TRACK),(record[2]+8+98,record[2]+8+101)]
 
-def stage(work,herc,fixtures,lab):
+def stage(work,herc,fixtures,lab,owners=None):
+    if owners is not None and owners.resolve()!=(work.parent/(work.name+'-inputs')/'media').resolve():
+        raise ValueError('selected derived ownership fixture path only')
     sys.path.insert(0,str(lab/'tools'))
     import pdos_host_stage as writer
     import pdos64_crexx_pds_audit as audit
@@ -110,6 +126,10 @@ def stage(work,herc,fixtures,lab):
     groups = [('PROCLIB',{n:(fixtures/(n+'.fb80')).read_bytes() for n in PROCS}),
               ('SRC',{n:(fixtures/('SRC-'+n+'.fb80')).read_bytes() for n in SOURCES}),
               ('JCL',{n:(fixtures/(n+'.fb80')).read_bytes() for n in CASES})]
+    if owners is not None:
+        body=(owners/'OWNER.fb80').read_bytes()
+        if body!=fixed(OWNER_JCL):raise ValueError('exact ownership deck required')
+        groups[-1][1]['OWNER']=body
     for suffix,items in groups: spans += fb_pds(raw,HLQ+'.'+suffix,items,writer,audit)
     at = 0
     for lo,hi in sorted(spans):

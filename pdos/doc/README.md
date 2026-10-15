@@ -48,9 +48,9 @@ and an application's service call.
   procedures and console/card submission, accepted on native z/OS and both
   PDOS console routes.
 - [Stage 5 form contract](architecture/BATCH-STAGE5-FORMS.md) and
-  [first increment](qualification/BATCH-STAGE5-2026-10-15.md): Submit, Jobs and
-  Output source with an accepted 29-check initial model-2 proof. The full
-  model/recovery qualification gate remains open.
+  [qualification](qualification/BATCH-STAGE5-2026-10-15.md): Submit, Jobs and
+  Output over the same service; 212 checks across colour models 2–5, model-2
+  monochrome and physical line input, including reconnect and native ownership.
 - [Development guide](development/README.md): source map and change contracts.
 - [Build contract](development/BUILD-CONTRACT.md): recorded acceptance stages.
 - [0.1 guest qualification](qualification/QUALIFICATION.md): exact historical
