@@ -4,14 +4,14 @@ import json
 from pathlib import Path
 import struct
 import subprocess
-from job_actor import decode
+from job_actor import decode, snapshot
 from console_machine import text1047
 
 RC=[[0],[0,0,0,0],[0,0,0],[0,0],[2,None],[2],[8],[16],[0],[0,0,0],[0,0,0]]
 def inspect(out,raw):
     magic,_,_,_,_,_,_,real,failed=struct.unpack_from(">9I",raw,0x3ba00)
-    if magic!=0x50444a32 or not 0x1000000<=real<=len(raw)-262144:raise ValueError("SDK spool missing")
-    data=raw[real:real+262144];spool=decode(data)
+    if magic!=0x50444a32:raise ValueError("SDK spool missing")
+    data=snapshot(raw,real);spool=decode(data)
     (out/"job-spool.bin").write_bytes(data);(out/"job-spool.json").write_text(json.dumps(spool,indent=2)+"\n")
     printed=(out/"job-first.txt").read_bytes().decode("latin1").splitlines()
     status=[x for x in printed if x.startswith(("JOB BEGIN ","STEP BEGIN ","STEP OS ","STEP RC ","STEP SKIP ","JOB END STATE "))]

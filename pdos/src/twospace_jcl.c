@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <string.h>
 #include "twospace_jcl.h"
+#include "twospace_digest.h"
 /* Printable repertoire from the maintained pdos/scripts/ibm1047.table.
  * Lookup by execution character, never by an assumed ASCII character value. */
 static const char printable[]=
@@ -82,7 +83,7 @@ static int statement(TJCWORK *w,const unsigned char *deck,unsigned int cards,
    first_card=w->card;
    start=2U;
    if(line[start]!=' '){for(n=0U;start<71U&&line[start]!=' ';++start){
-      if(n==sizeof w->name-1U)return fail(w,e,TJC_LIMIT,TJC_TEXT);w->name[n++]=line[start];}w->name[n]=0;}
+   if(n==sizeof w->name-1U)return fail(w,e,TJC_LIMIT,TJC_TEXT);w->name[n++]=line[start];}w->name[n]=0;}
    while(start<71U&&line[start]==' ')++start;
    for(n=0U;start<71U&&line[start]!=' ';++start){if(n==8U)return fail(w,e,TJC_FEATURE,TJC_TEXT);w->operation[n++]=line[start];}
    w->operation[n]=0;while(start<71U&&line[start]==' ')++start;
@@ -144,14 +145,14 @@ static int operand(TJCWORK *w,unsigned int *cursor,char *key,char *value,
  for(;w->expanded[i];++i){char c=w->expanded[i];
   if(c=='\''){if(quote&&w->expanded[i+1U]=='\''){++i;continue;}quote=!quote;}
   else if(!quote){if(c=='(')++depth;else if(c==')'){if(!depth)return fail(w,e,TJC_SYNTAX,i);--depth;}
-   else if(c==','&&!depth)break;else if(c=='='&&!depth){if(equal!=TJC_TEXT)return fail(w,e,TJC_SYNTAX,i);equal=i;}
+   else if(c==','&&!depth)break;else if(c=='='&&!depth&&equal==TJC_TEXT)equal=i;
    else if(c==' ')return fail(w,e,TJC_SYNTAX,i);}
  }
  if(quote||depth||i==start)return fail(w,e,TJC_SYNTAX,start);
- if(equal!=TJC_TEXT){if(equal==start||equal-start>8U)return fail(w,e,TJC_FEATURE,start);
+ if(equal!=TJC_TEXT){if(equal==start||equal-start>17U)return fail(w,e,TJC_FEATURE,start);
   memcpy(key,w->expanded+start,equal-start);key[equal-start]=0;start=equal+1U;}
  else key[0]=0;
- n=i-start;if(!n||n>=TJC_TEXT)return fail(w,e,TJC_SYNTAX,start);
+ n=i-start;if((!n&&equal==TJC_TEXT)||n>=TJC_TEXT)return fail(w,e,TJC_SYNTAX,start);
  memcpy(value,w->expanded+start,n);value[n]=0;
  if(w->expanded[i]){if(!w->expanded[i+1U])return fail(w,e,TJC_SYNTAX,i);++i;}
  *cursor=i;return 0;
@@ -159,7 +160,7 @@ static int operand(TJCWORK *w,unsigned int *cursor,char *key,char *value,
 static int unquote(char *p)
 {
  unsigned int i,n=0U,len=(unsigned int)strlen(p);
- if(!len)return 0;if(p[0]!='\'')return strchr(p,'\'')==0;
+ if(!len)return 1;if(p[0]!='\'')return strchr(p,'\'')==0;
  if(len<2U||p[len-1U]!='\'')return 0;
  for(i=1U;i<len-1U;++i){if(p[i]=='\''){if(i+1U>=len-1U||p[i+1U]!='\'')return 0;++i;}p[n++]=p[i];}
  p[n]=0;return 1;
@@ -174,7 +175,7 @@ static int parameter(char *p)
 }
 static int set_symbol(TJCWORK *w,TJCERROR *e)
 {
- char key[9],value[TJC_TEXT];unsigned int at=0U,where=0U,i;int rc;
+ char key[18],value[TJC_TEXT];unsigned int at=0U,where=0U,i;int rc;
  rc=operand(w,&at,key,value,&where,e);if(rc)return rc==1?fail(w,e,TJC_SYNTAX,0U):rc;
  if(w->expanded[at]||!ident(key,8U,1)||!unquote(value)||strlen(value)>100U)return fail(w,e,TJC_SYMBOL,where);
  for(i=0U;i<w->symbols&&strcmp(key,w->symbol[i].name);++i){}
@@ -183,7 +184,7 @@ static int set_symbol(TJCWORK *w,TJCERROR *e)
 }
 static int job(TJCWORK *w,TJCERROR *e)
 {
- char key[9],value[TJC_TEXT];unsigned int at=0U,where=0U,positional=0U,seen=0U,bit;int rc;
+ char key[18],value[TJC_TEXT];unsigned int at=0U,where=0U,positional=0U,seen=0U,bit;int rc;
  if(w->started||!ident(w->name,8U,0))return fail(w,e,TJC_SYNTAX,0U);
  while((rc=operand(w,&at,key,value,&where,e))==0){
   if(!key[0]){if(seen||++positional>2U)return fail(w,e,TJC_SYNTAX,where);continue;}
@@ -194,19 +195,21 @@ static int job(TJCWORK *w,TJCERROR *e)
   else return fail(w,e,TJC_FEATURE,where);
   if(seen&bit)return fail(w,e,TJC_SYNTAX,where);seen|=bit;
  }
- if(rc!=1)return rc;w->started=1U;TJBPUT(w->result.job,1U);TJBPUT(w->result.job+4U,TJB_DESC_BYTES);
+ if(rc!=1)return rc;w->started=1U;TJBPUT(w->result.job,2U);TJBPUT(w->result.job+4U,TJB_FULL_BYTES);
  native_name(w->result.job+8U,8U,w->name);TJBPUT(w->result.job+20U,TJB_PRINT_BYTES);return 0;
 }
 static int exec_step(TJCWORK *w,TJCERROR *e)
 {
- char key[9],value[TJC_TEXT];unsigned int at=0U,where=0U,seen=0U,bit,i;int rc;
+ char key[18],value[TJC_TEXT];unsigned int at=0U,where=0U,seen=0U,bit,i;int rc;
  TJCSTEP *s;unsigned char *d;
  if(!ident(w->name,8U,0))return fail(w,e,TJC_SYNTAX,0U);
  if(w->result.steps==TJB_STEPS)return fail(w,e,TJC_LIMIT,0U);
- for(i=0U;i<w->result.steps;++i)if(!strcmp(w->result.step[i].name,w->name))return fail(w,e,TJC_SYNTAX,0U);
  s=&w->result.step[w->result.steps];d=w->result.job+32U+w->result.steps*TJB_STEP_BYTES;
- strcpy(s->name,w->name);s->card=w->card;
- s->library_count=w->joblibs;memcpy(s->libraries,w->joblib,sizeof w->joblib);native_name(d,8U,w->name);
+ strcpy(s->local,w->name);s->card=w->card;s->procedure=w->proc.active?w->proc.index:0U;
+ if(w->proc.active){strcpy(s->name,w->proc.call);strcat(s->name,".");strcat(s->name,w->name);}else strcpy(s->name,w->name);
+ for(i=0U;i<w->result.steps;++i)if(!strcmp(w->result.step[i].name,s->name))return fail(w,e,TJC_SYNTAX,0U);
+ s->library_count=w->joblibs;memcpy(s->libraries,w->joblib,sizeof w->joblib);
+ {char internal[9];strcpy(internal,"S0000001");internal[7]=(char)('1'+w->result.steps);native_name(d,8U,internal);}
  while((rc=operand(w,&at,key,value,&where,e))==0){
   if(!strcmp(key,"PGM")){bit=1U;if(!ident(value,8U,1))return fail(w,e,TJC_SYNTAX,where);strcpy(s->program,value);}
   else if(!strcmp(key,"PARM")){unsigned int n;bit=2U;
@@ -218,6 +221,10 @@ static int exec_step(TJCWORK *w,TJCERROR *e)
   if(seen&bit)return fail(w,e,TJC_SYNTAX,where);seen|=bit;
  }
  if(rc!=1)return rc;if(!(seen&1U))return fail(w,e,TJC_FEATURE,0U);
+ if(w->proc.active&&w->proc.parameter_set){unsigned int n=0U;
+  memset(d+24U,0,100U);if(w->result.steps==w->proc.first_step){n=(unsigned int)strlen(w->proc.parameter);TJCENC(w->proc.parameter,n,d+24U);w->proc.parameter_used=1U;}TJBPUT(d+16U,n);}
+ if(w->proc.active)for(i=0U;i<w->proc.parms;++i)if(!strcmp(w->proc.parm_step[i],s->local)){
+  unsigned int n=(unsigned int)strlen(w->proc.parm_value[i]);memset(d+24U,0,100U);TJBPUT(d+16U,n);TJCENC(w->proc.parm_value[i],n,d+24U);w->proc.parm_used|=1U<<i;}
  ++w->result.steps;return 0;
 }
 static int dataset(char *text,TJCDECL *d)
@@ -246,6 +253,17 @@ static int dcb(TJCWORK *w,char *text,TJCATTR *a,unsigned int where,TJCERROR *e)
   if(seen&bit)return fail(w,e,TJC_SYNTAX,where);seen|=bit;if(!end)break;p=end+1U;if(!*p)return fail(w,e,TJC_SYNTAX,where);
  }return 0;
 }
+static int space(TJCWORK *w,char *text,TJCDECL *d,unsigned int where,TJCERROR *e)
+{
+ char *unit,*primary,*secondary,*at;unsigned int n=(unsigned int)strlen(text),tracks;
+ if(n<11U||text[0]!='('||text[n-1U]!=')'||text[n-2U]!=')')return fail(w,e,TJC_SYNTAX,where);
+ text[n-2U]=0;unit=text+1U;at=strchr(unit,',');if(!at||at[1]!='(')return fail(w,e,TJC_SYNTAX,where);*at=0;primary=at+2;
+ at=strchr(primary,',');if(!at)return fail(w,e,TJC_SYNTAX,where);*at=0;secondary=at+1;
+ if(!strcmp(unit,"TRK"))d->space_unit=1U;else if(!strcmp(unit,"CYL"))d->space_unit=15U;else return fail(w,e,TJC_FEATURE,where);
+ if(!number(primary,37U,&d->space_primary)||!d->space_primary||!number(secondary,0U,&d->space_secondary))return fail(w,e,TJC_FEATURE,where);
+ tracks=d->space_primary*d->space_unit;if(tracks>TJD_TEMP_LIMIT/56664U)return fail(w,e,TJC_LIMIT,where);
+ d->quota=tracks*56664U;return 0;
+}
 static int inline_data(TJCWORK *w,const unsigned char *deck,unsigned int cards,
                        unsigned int *next,TJCDECL *d,const char *dlm,
                        unsigned int data,TJCERROR *e)
@@ -263,7 +281,7 @@ static int inline_data(TJCWORK *w,const unsigned char *deck,unsigned int cards,
    * contract requires its explicit delimiter, so reject that ambiguous deck.
    * DD DATA may carry // records as actual data. */
   if(data==1U&&p[0]==0x61U&&p[1]==0x61U)return fail(w,e,TJC_END,0U);
-  if(w->inline_at>TJD_BYTES-82U)return fail(w,e,TJC_LIMIT,0U);
+  if(w->inline_at>TJD_EXT_BYTES-82U)return fail(w,e,TJC_LIMIT,0U);
   w->result.dd[w->inline_at]=0U;w->result.dd[w->inline_at+1U]=80U;
   memcpy(w->result.dd+w->inline_at+2U,p,80U);w->inline_at+=82U;
  }
@@ -272,7 +290,7 @@ static int inline_data(TJCWORK *w,const unsigned char *deck,unsigned int cards,
 static int dd(TJCWORK *w,const unsigned char *deck,unsigned int cards,
                unsigned int *next,TJCERROR *e)
 {
- TJCDECL d,*old;TJCSTEP *s=0;char key[9],value[TJC_TEXT],dlm[3];
+ TJCDECL d,*old;TJCSTEP *s=0;char key[18],value[TJC_TEXT],dlm[3];
  unsigned int at=0U,where=0U,seen=0U,bit,data=0U,i,lib=0U;int rc;
  memset(&d,0,sizeof d);strcpy(dlm,"/*");d.card=w->card;d.column=1U;d.step=w->result.steps;
  if(w->result.steps)s=&w->result.step[w->result.steps-1U];
@@ -295,13 +313,18 @@ static int dd(TJCWORK *w,const unsigned char *deck,unsigned int cards,
   else if(!strcmp(key,"SYSOUT")){bit=1U;if(strcmp(value,"A")&&strcmp(value,"*"))return fail(w,e,TJC_FEATURE,where);d.kind=TJD_SYSOUT;d.attributes.direction=TJD_OUTPUT;}
   else if(!strcmp(key,"DISP")){bit=2U;
    if(!strcmp(value,"SHR"))d.status=3U;else if(!strcmp(value,"OLD"))d.status=TJD_OLD;
-   else if(!strcmp(value,"(NEW,PASS,DELETE)")){d.status=TJD_NEW;d.disposition=TJD_PASS;}
+   else if(!strcmp(value,"(NEW,PASS,DELETE)")||!strcmp(value,"(NEW,KEEP,DELETE)")){d.status=TJD_NEW;d.disposition=TJD_PASS;}
+   else if(!strcmp(value,"(NEW,DELETE,DELETE)")){d.status=TJD_NEW;d.disposition=TJD_DELETE;}
    else if(!strcmp(value,"(OLD,DELETE,DELETE)")){d.status=TJD_OLD;d.disposition=TJD_DELETE;}
-   else if(!strcmp(value,"(OLD,PASS,DELETE)")){d.status=TJD_OLD;d.disposition=TJD_PASS;}
+   else if(!strcmp(value,"(OLD,PASS,DELETE)")||!strcmp(value,"(OLD,KEEP,DELETE)")){d.status=TJD_OLD;d.disposition=TJD_PASS;}
    else return fail(w,e,TJC_FEATURE,where);
   }else if(!strcmp(key,"DCB")){bit=4U;rc=dcb(w,value,&d.attributes,where,e);if(rc)return rc;}
   else if(!strcmp(key,"DLM")){bit=8U;if(!unquote(value)||strlen(value)!=2U)return fail(w,e,TJC_SYNTAX,where);
    if(strchr(value,'&'))return fail(w,e,TJC_FEATURE,where);strcpy(dlm,value);}
+  else if(!strcmp(key,"UNIT")){bit=16U;if(strcmp(value,"3390")&&strcmp(value,"SYSDA"))return fail(w,e,TJC_FEATURE,where);d.unit=1U;}
+  else if(!strcmp(key,"VOL")||!strcmp(key,"VOLUME")){bit=32U;
+   if(strncmp(value,"SER=",4U)||strlen(value+4U)!=6U||!ident(value+4U,6U,1))return fail(w,e,TJC_FEATURE,where);strcpy(d.volume,value+4U);}
+  else if(!strcmp(key,"SPACE")){bit=64U;rc=space(w,value,&d,where,e);if(rc)return rc;}
   else return fail(w,e,TJC_FEATURE,where);
   if(seen&bit)return fail(w,e,TJC_SYNTAX,where);seen|=bit;
  }
@@ -318,9 +341,12 @@ static int dd(TJCWORK *w,const unsigned char *deck,unsigned int cards,
   if(*count==TJC_LIBS)return fail(w,e,TJC_LIMIT,0U);strcpy(list[(*count)++].dsn,d.dsn);w->last_library=lib;return 0;
  }
  if(d.kind==TJD_DATASET){if(d.disposition||!d.status)return fail(w,e,TJC_FEATURE,0U);}
- else if(d.kind==TJD_TEMP){if(!d.disposition||d.status==3U)return fail(w,e,TJC_FEATURE,0U);d.quota=TJD_TEMP_LIMIT;}
- else if(d.status||d.disposition)return fail(w,e,TJC_FEATURE,0U);
- if(w->result.dds==TJD_COUNT)return fail(w,e,TJC_LIMIT,0U);
+ else if(d.kind==TJD_TEMP){if(!d.disposition||d.status==3U)return fail(w,e,TJC_FEATURE,0U);if(!d.quota)d.quota=TJD_TEMP_LIMIT;}
+ else if(d.status||d.disposition||d.unit||d.volume[0])return fail(w,e,TJC_FEATURE,0U);
+ /* On an existing OLD/SHR dataset SPACE does not allocate or resize storage;
+  * catalog/site admission still checks that the target exists. */
+ if(d.space_unit&&d.kind!=TJD_DATASET&&(d.kind!=TJD_TEMP||d.status!=TJD_NEW))return fail(w,e,TJC_FEATURE,0U);
+ if(w->result.dds==TJD_MAX_COUNT)return fail(w,e,TJC_LIMIT,0U);
  if(!d.ordinal){unsigned int count=0U;
   for(i=0U;i<w->result.dds;++i)if(w->declaration[i].step==d.step&&!w->declaration[i].ordinal)++count;
   if(count==8U)return fail(w,e,TJC_LIMIT,0U);}
@@ -328,20 +354,28 @@ static int dd(TJCWORK *w,const unsigned char *deck,unsigned int cards,
  if(data){rc=inline_data(w,deck,cards,next,&d,dlm,data,e);if(rc)return rc;}
  w->declaration[w->result.dds++]=d;w->last_library=0U;return 0;
 }
+#include "twospace_jclproc.inc"
 static int attributes_equal(const TJCATTR *before,const TJCATTR *after)
 {return (!before->direction||before->direction==after->direction)&&
  (!before->recfm||before->recfm==after->recfm)&&(!before->lrecl||before->lrecl==after->lrecl)&&
  (!before->blksize||before->blksize==after->blksize);}
 static int resolve(TJCWORK *w,const TJCSITE *site,TJCERROR *e)
 {
- unsigned int i;int rc;TJCRESULT *r=&w->result;
- TJBPUT(r->job+16U,r->steps);TJBPUT(r->dd,2U);TJBPUT(r->dd+4U,TJD_BYTES);
+ unsigned int i,k;int rc;TJCRESULT *r=&w->result;unsigned char *m=r->job+TJB_DESC_BYTES;
+ TJBPUT(r->job+16U,r->steps);TJBPUT(r->dd,3U);TJBPUT(r->dd+4U,TJD_EXT_BYTES);
  TJBPUT(r->dd+8U,r->dds);TJBPUT(r->dd+12U,r->steps);TJBPUT(r->dd+16U,1U);
  for(i=0U;i<r->steps;++i){w->card=r->step[i].card;w->column=1U;
+  native_name(m+48U+18U*i,18U,r->step[i].name);TJBPUT(m+192U+4U*i,r->step[i].card|(r->step[i].procedure<<16));
   if(!site->program||site->program(site->context,&r->step[i],r->job+40U+i*TJB_STEP_BYTES))return fail(w,e,TJC_RESOLVE,TJC_TEXT);}
  for(i=0U;i<r->dds;++i){TJCDECL *d=&w->declaration[i];TJCATTR a=d->attributes;unsigned char *out=r->dd+32U+i*TJD_ENTRY;
   w->card=d->card;w->column=d->column;
+  if(d->kind==TJD_TEMP){TJCDECL *old=0;
+   for(k=0U;k<i;++k)if(w->declaration[k].kind==TJD_TEMP&&!strcmp(w->declaration[k].dsn,d->dsn))old=&w->declaration[k];
+   if(d->status==TJD_NEW){if(old&&old->disposition!=TJD_DELETE)return fail(w,e,TJC_RESOLVE,TJC_TEXT);}
+   else {if(!old||old->step>=d->step||old->disposition==TJD_DELETE||!attributes_equal(&a,&old->attributes))return fail(w,e,TJC_RESOLVE,TJC_TEXT);
+    a.recfm=old->attributes.recfm;a.lrecl=old->attributes.lrecl;a.blksize=old->attributes.blksize;d->quota=old->quota;}}
   if(!site->dd||site->dd(site->context,&r->step[d->step-1U],d,&a)||!attributes_equal(&d->attributes,&a))return fail(w,e,TJC_RESOLVE,TJC_TEXT);
+  d->attributes=a;
   TJBPUT(out,d->step);TJBPUT(out+4U,d->kind);TJBPUT(out+8U,a.direction);TJBPUT(out+12U,a.recfm);
   TJBPUT(out+16U,a.lrecl);TJBPUT(out+20U,a.blksize);native_name(out+32U,8U,d->name);
   if(d->kind==TJD_DATASET||d->kind==TJD_TEMP){native_name(out+40U,44U,d->dsn);if(d->member[0])native_name(out+84U,8U,d->member);}
@@ -349,18 +383,19 @@ static int resolve(TJCWORK *w,const TJCSITE *site,TJCERROR *e)
   if(d->kind==TJD_TEMP)TJBPUT(out+24U,d->quota);
   TJBPUT(out+92U,d->ordinal|(d->disposition<<8)|(d->kind==TJD_TEMP?d->status<<16:0U));
  }
- rc=TJBCHECK(r->job,TJB_DESC_BYTES);if(!rc)rc=TJDCHK(r->dd,r->steps);
+ rc=TJBCHECK(r->job,TJB_FULL_BYTES);if(!rc)rc=TJDCHK(r->dd,r->steps);
  if(rc)return fail(w,e,TJC_DESCRIPTOR,TJC_TEXT);r->valid=1U;return 0;
 }
 int TJCCONV(TJCWORK *w,const unsigned char *deck,unsigned int bytes,
             const TJCSITE *site,TJCRESULT *out,TJCERROR *e)
 {
- unsigned int next=0U,cards,i;int rc;
+ unsigned int next=0U,cards,i,pgm;int rc;unsigned char *m;
  if(out)memset(out,0,sizeof *out);if(e)memset(e,0,sizeof *e);
  if(!w||!deck||!site||!out||!e)return 8;
- memset(w,0,sizeof *w);w->card=w->column=1U;w->inline_at=TJD_DATA;
+ memset(w,0,sizeof *w);w->card=w->column=1U;w->inline_at=TJD_EXT_DATA;
  if(!bytes||bytes%80U)return fail(w,e,TJC_END,TJC_TEXT);
  cards=bytes/80U;if(cards>TJC_CARDS)return fail(w,e,TJC_LIMIT,TJC_TEXT);
+ m=w->result.job+TJB_DESC_BYTES;TJBPUT(m,0x544a4d31U);TJBPUT(m+4U,TJB_META_BYTES);TJBPUT(m+8U,1U);TJBPUT(m+12U,cards);TJJHASH(deck,bytes,m+16U);
  while(next<cards){
   rc=statement(w,deck,cards,&next,e);if(rc)return rc;
   if(w->ended){if(!w->started||!w->result.steps)return fail(w,e,TJC_SYNTAX,TJC_TEXT);
@@ -370,7 +405,14 @@ int TJCCONV(TJCWORK *w,const unsigned char *deck,unsigned int bytes,
   if(!strcmp(w->operation,"JOB"))rc=job(w,e);
   else if(!w->started)rc=fail(w,e,TJC_SYNTAX,0U);
   else if(!strcmp(w->operation,"SET")){if(w->name[0])rc=fail(w,e,TJC_SYNTAX,0U);else rc=set_symbol(w,e);}
-  else if(!strcmp(w->operation,"EXEC"))rc=exec_step(w,e);
+  else if(!strcmp(w->operation,"JCLLIB"))rc=procedure_libraries(w,e);
+  else if(!strcmp(w->operation,"EXEC")){
+   if(!ident(w->name,8U,1))return fail(w,e,TJC_SYNTAX,0U);
+   if(w->calls==TJB_STEPS)return fail(w,e,TJC_LIMIT,0U);
+   for(i=0U;i<w->calls;++i)if(!strcmp(w->call_name[i],w->name))return fail(w,e,TJC_SYNTAX,0U);
+   strcpy(w->call_name[w->calls++],w->name);rc=execution_kind(w,&pgm,e);if(rc)return rc;
+   rc=pgm?exec_step(w,e):proc_exec(w,deck,cards,&next,site,e);
+  }
   else if(!strcmp(w->operation,"DD"))rc=dd(w,deck,cards,&next,e);
   else rc=fail(w,e,TJC_FEATURE,0U);
   if(rc)return rc;

@@ -19,6 +19,7 @@
 #ifdef PDOS_TWO_SPACE
 #include "twospace_ui.h"
 #include "twospace_command_router.h"
+#include "twospace_submit.h"
 #endif
 
 static char buf[200];
@@ -332,6 +333,12 @@ static void processInput(void)
 #ifdef PDOS_TWO_SPACE
     if(!len)return;
     if(len&&TUIJOB((const unsigned char *)buf,(unsigned int)len)){printf("PCOMM: console command state unavailable\n");return;}
+    if(TJFKNOW(buf)){
+        ++commandNumber;TUIEXT();TUICTRL(1U);
+        printf("PCOMM BEGIN %u %s\n",commandNumber,buf);fflush(stdout);TUICTRL(0U);
+        rc=TJFENTRY(buf);TUICTRL(1U);printf("PCOMM END %u RC=%d\n",commandNumber,rc);
+        fflush(stdout);TUICTRL(0U);TUIEND(0U,1U,(unsigned int)rc);return;
+    }
     {
         unsigned int status=TCMDISP(TCM_PDOS,(const unsigned char *)buf,
                                     (unsigned int)len,pcommHost,&rc);
@@ -870,6 +877,9 @@ static void dohelp(char *topic)
     printf("z/PDOS PCOMM: first steps\n");
 #ifdef PDOS_TWO_SPACE
     printf("CONSOLE STATUS; HELP EDIT; HELP UTILITIES; HELP TSO\n");
+#ifdef PDOS_TWO_SPACE
+    printf("SUBMIT dataset(member)|READER; JOBS; STATUS; OUTPUT; HELP BATCH\n");
+#endif
 #endif
     printf("VERSION  show release version, interface and build-identity location\n");
     printf("DIR      list datasets, dates, formats and extents\n");

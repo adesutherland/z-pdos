@@ -8,6 +8,12 @@ software on your host computer.
 The default source-built K/U route and its accepted scope are described in
 [the K/U operator guide](TWO-SPACE.md).
 
+For the current source-development batch interface, use
+[submit a batch job and review its output](BATCH.md). It covers the shared
+JCL procedures, dataset/card/console submission, retained output, return codes
+and printer recovery. The release image above predates this Stage 4 interface;
+its guest qualification is recorded separately.
+
 ## Boot the supplied image
 
 You need Hercules and a 3270 terminal client on your computer. The recorded

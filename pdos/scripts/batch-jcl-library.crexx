@@ -1,0 +1,41 @@
+/* SPDX-License-Identifier: MIT; meaningful linked-LIBRARY reference.
+   The exact frozen package is read-only; outputs use one normal work path. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>2 then return 2
+  host=args.1;package=args.2
+  work="build/pdos/batch-jcl"
+  compiler=host||"/bin/rxc";classicas=host||"/bin/rxas"
+  linker=host||"/bin/rxlink";vm=host||"/bin/rxvm"
+  shared=package||"/shared"
+  source="pdos/tests/batch/sdk_library.crexx";stem=work||"/library"
+  asm=stem||".rxas";object=stem||".rxbin";linked=work||"/library-linked.rxbin"
+  lib=shared||"/library.rxbin"
+  rows=.string[]
+  errors=.string[]
+  address crexx "run :compiler -n -i :shared -o :stem :source"
+  if rc<>0 then return rc
+  address crexx "run rg 'settpcall.*rxfnsb.changestr' :asm" output rows
+  if rc<>0 | rows.0<>1 then return 2
+  address crexx "run :classicas -o :object :asm"
+  if rc<>0 then return rc
+  address crexx "run :linker -o :linked :object :lib"
+  if rc<>0 then return rc
+  address crexx "run :vm --no-autoload :object -a SHARED" output rows error errors
+  if rc<>11 then do
+    say "Expected unlinked RC11; observed" rc
+    return 2
+  end
+  found=0
+  do i=1 to errors.0
+    if pos("FUNCTION_NOT_FOUND",errors[i])>0 then found=1
+  end
+  if found<>1 then return 2
+  call arraydrop rows
+  address crexx "run :vm --no-autoload :linked -a SHARED" output rows error errors
+  if rc<>0 | rows.0<>1 then return 2
+  if rows.1<>"PD033 STAGE4 LIBRARY new payload" then return 2
+  say "PD033 LIBRARY dependency PASS: unlinked RC11, linked RC0 and exact marker"
+  return 0

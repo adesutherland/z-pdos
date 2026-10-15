@@ -25,7 +25,7 @@ typedef struct {
 } SFFILE;
 /* Step allocations live above the invocation-local tables. Only OPEN files
  * and dynamic allocations enter the invocation resource ledger. */
-static SFDD sf_dd[SF_LOCAL_DDS+TJD_COUNT];
+static SFDD sf_dd[SF_LOCAL_DDS+TJD_MAX_COUNT];
 static TJTPOOL sf_temps;
 static unsigned int sf_temp_ready;
 static SFFILE sf_file[TSV_MAX_DEPTH*SFFILES];
@@ -44,7 +44,7 @@ static int media_busy(unsigned int device)
 {
     unsigned int i,j;
     if(!device)return 0;
-    for(i=SF_LOCAL_DDS;i<SF_LOCAL_DDS+TJD_COUNT;++i)
+    for(i=SF_LOCAL_DDS;i<SF_LOCAL_DDS+TJD_MAX_COUNT;++i)
         if(sf_dd[i].token&&sf_dd[i].device==device)return 1;
     for(i=0U;i<TSV_MAX_DEPTH*SFFILES;++i)
         if(sf_file[i].token&&sf_dd[sf_file[i].dd].device==device)return 1;
@@ -90,7 +90,7 @@ static SFDD *sf_find_dd(const unsigned char name[8])
 {
     SFDD *dd=sf_find_local(name);unsigned int i;
     if(dd||!job_dd_scope())return dd;
-    for(i=SF_LOCAL_DDS;i<SF_LOCAL_DDS+TJD_COUNT;++i)
+    for(i=SF_LOCAL_DDS;i<SF_LOCAL_DDS+TJD_MAX_COUNT;++i)
         if(sf_dd[i].token&&!sf_dd[i].part&&sf_equal(sf_dd[i].dd,name,8U))return &sf_dd[i];
     return 0;
 }
@@ -100,7 +100,7 @@ static SFDD *sf_visible(unsigned int index)
     if(!f)return 0;
     for(i=0U;i<SF_LOCAL_DDS;++i)if(sf_dd[i].token==f->token)
         {if(n++==index)return &sf_dd[i];}
-    if(job_dd_scope())for(i=SF_LOCAL_DDS;i<SF_LOCAL_DDS+TJD_COUNT;++i)
+    if(job_dd_scope())for(i=SF_LOCAL_DDS;i<SF_LOCAL_DDS+TJD_MAX_COUNT;++i)
         if(sf_dd[i].token&&!sf_dd[i].part&&!sf_find_local(sf_dd[i].dd))
             {if(n++==index)return &sf_dd[i];}
     return 0;
@@ -361,7 +361,7 @@ static int sf_batch_member(SFDD *dd,SFFILE *file)
     file->head=(dd->extent.start_head+track)%15U;file->record=ttr[2U]-1U;return 0;
 }
 static void sf_batch_end(void)
-{unsigned int i;for(i=SF_LOCAL_DDS;i<SF_LOCAL_DDS+TJD_COUNT;++i)sf_dd[i].token=0U;}
+{unsigned int i;for(i=SF_LOCAL_DDS;i<SF_LOCAL_DDS+TJD_MAX_COUNT;++i)sf_dd[i].token=0U;}
 static int sf_temp_acquire(void *unused,unsigned int slot,unsigned int bytes,unsigned char **data)
 {
     unsigned int real;(void)unused;
@@ -380,7 +380,7 @@ static unsigned int sf_temp_end(void)
 static unsigned int sf_temp_step(void)
 {
     unsigned int i;
-    for(i=SF_LOCAL_DDS;i<SF_LOCAL_DDS+TJD_COUNT;++i)if(sf_dd[i].token&&sf_dd[i].batch&&
+    for(i=SF_LOCAL_DDS;i<SF_LOCAL_DDS+TJD_MAX_COUNT;++i)if(sf_dd[i].token&&sf_dd[i].batch&&
         TJDWORD(sf_dd[i].batch+4U)==TJD_TEMP&&((TJDWORD(sf_dd[i].batch+92U)>>8)&3U)==TJD_DELETE){
         TJTSLOT *s=&sf_temps.slot[sf_dd[i].temp];if(s->live&&TJTDROP(&sf_temps,s))return 12U;}
     return 0U;
@@ -392,7 +392,7 @@ static unsigned int sf_batch_begin(const unsigned char *descriptor,unsigned int 
     if(!descriptor||!TJDWORD(descriptor))return 0U;
     for(i=0U;i<TJDWORD(descriptor+8U);++i){
         const unsigned char *e=descriptor+32U+i*TJD_ENTRY;SFDD *dd;
-        if(TJDWORD(e)!=step)continue;if(n==TJD_COUNT)goto fail;
+        if(TJDWORD(e)!=step)continue;if(n==TJD_MAX_COUNT)goto fail;
         dd=&sf_dd[SF_LOCAL_DDS+n++];
         dd->bytes=dd->device=dd->tape=0U;dd->batch=e;
         dd->inline_data=TJDWORD(e+4U)==TJD_INLINE?descriptor+TJDWORD(e+24U):0;

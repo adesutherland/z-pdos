@@ -1,13 +1,13 @@
 """Independent stopped native-DD spool and closed 1403 byte oracle."""
 import json
 import struct
-from job_actor import decode
+from job_actor import decode, snapshot
 
 def inspect(out, raw):
     magic, _, _, _, _, _, _, real, failed = struct.unpack_from(">9I", raw, 0x3ba00)
-    if magic != 0x50444a32 or not 0x1000000 <= real <= len(raw)-262144:
+    if magic != 0x50444a32:
         raise ValueError("K job snapshot missing")
-    data = raw[real:real+262144]
+    data = snapshot(raw,real)
     spool = decode(data)
     (out/"job-spool.bin").write_bytes(data)
     (out/"job-spool.json").write_text(json.dumps(spool, indent=2)+"\n")

@@ -2,7 +2,7 @@
 import hashlib
 import json
 import struct
-from job_actor import decode
+from job_actor import decode, snapshot
 
 CASES = [
     [("DATASETS WRITE PASS", 0, 0), ("DATASETS READ PASS", 0, 0)],
@@ -21,9 +21,9 @@ CASES = [
 
 def inspect(out, raw):
     magic, _, _, _, _, _, _, real, failed = struct.unpack_from(">9I", raw, 0x3ba00)
-    if magic != 0x50444a32 or not 0x1000000 <= real <= len(raw)-262144:
+    if magic != 0x50444a32:
         raise ValueError("K job snapshot missing")
-    data = raw[real:real+262144]
+    data = snapshot(raw,real)
     spool = decode(data)
     (out/"job-spool.bin").write_bytes(data)
     (out/"job-spool.json").write_text(json.dumps(spool, indent=2)+"\n")
@@ -43,7 +43,7 @@ def inspect(out, raw):
     return {
         "data_exact_twelve_job_printer_reports": printed == expected,
         "data_jobs_explicitly_purged": spool["last_id"] == len(CASES) and not spool["jobs"] and not spool["active_id"],
-        "data_extended_envelope_version": struct.unpack_from(">I", data, 4)[0] == 3,
+        "data_extended_envelope_version": struct.unpack_from(">I", data, 4)[0] == 4,
         "data_spool_commit_not_failed": failed == 0,
         "data_interrupt_and_cleanup_flags_clear": struct.unpack_from(">3I", raw, 0x4fb4) == (0, 0, 0),
     }

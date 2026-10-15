@@ -3,7 +3,7 @@ options levelb
 import rxfnsb
 main: procedure = .int
   arg args=.string[]
-  if args.0<>9 then return 2
+  if args.0<>9 & args.0<>10 then return 2
   work=args.1;prior=args.2;core=args.3;controller=args.4;package=args.5;probe=args.6;herc=args.7;primary=args.8;lab=args.9
   if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
   if work<>"build/pdos/batch-sdk/image" then return 2
@@ -27,6 +27,13 @@ main: procedure = .int
   extractor="/Users/adrian/CLionProjects/mainframe-cross-sdk/sdk/scripts/pdos64_xmit_unload.py"
   address crexx "run python3 -B pdos/tests/batch/sdk_fixture.py prepare :media :package :controller :probe :packer :extractor"
   if rc<>0 then return rc
+  fixtures=.string
+  if args.0=10 then do
+    fixtures=args.10
+    if fixtures<>"build/pdos/batch-jcl/fixtures/pdos" then return 2
+    address crexx "run python3 -B pdos/tests/batch/jcl_fixture.py prepare :media :fixtures"
+    if rc<>0 then return rc
+  end
   from=prior||"/launch.bin"
   address crexx "run cmake -E copy :from :input"
   if rc<>0 then return rc
@@ -39,4 +46,8 @@ main: procedure = .int
   address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :input :configured :herc 150"
   if rc<>0 then return rc
   address crexx "run python3 -B pdos/tests/batch/sdk_fixture.py stage :work :herc :package :lab"
+  if rc<>0 then return rc
+  if args.0=10 then do
+    address crexx "run python3 -B pdos/tests/batch/jcl_fixture.py stage :work :herc :fixtures :lab"
+  end
   return rc

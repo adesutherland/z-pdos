@@ -1,0 +1,7 @@
+[
+  ["VERSION", "PDIO1"],
+  ["HELP BATCH", "PCOMM END 1 RC=0", [], ["[HOLD]", "[RUNHOLD]", "[STEP=name]", "[DD=name]"]],
+  ["JOBS", "PCOMM END 2 RC=0"],
+  ["HELLO", "PCOMM END 3 RC=0"],
+  ["RXVM -v", "PCOMM END 4 RC=0"]
+]

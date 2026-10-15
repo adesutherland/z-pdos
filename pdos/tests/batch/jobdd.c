@@ -45,8 +45,8 @@ int main(void)
  assert(!TJBINIT(&p,pool,sizeof pool));memset(job,0,sizeof job);put(job,1U);put(job+4U,sizeof job);ebname(job+8U,0xd1U);put(job+16U,2U);put(job+20U,4096U);
  for(i=0U;i<2U;++i){ebname(job+32U+i*TJB_STEP_BYTES,0xc1U+i);ebname(job+40U+i*TJB_STEP_BYTES,0xd7U);}
  assert(!TJBSUB(&p,7U,job,sizeof job,&id));assert(TJBBIND(&p,8U,id,d,sizeof d)==8);
- assert(!TJBBIND(&p,7U,id,d,sizeof d)&&TJBWORD(pool+4U)==2U);assert(TJBBIND(&p,7U,id,d,sizeof d)==16);
- put(pool+4U,1U);assert(TJBLOAD(&p,pool,sizeof pool)==8);put(pool+4U,2U);
+ assert(!TJBBIND(&p,7U,id,d,sizeof d)&&TJBWORD(pool+4U)==4U);assert(TJBBIND(&p,7U,id,d,sizeof d)==16);
+ put(pool+4U,1U);assert(TJBLOAD(&p,pool,sizeof pool)==8);put(pool+4U,4U);
  memcpy(saved,pool,sizeof pool);dd=TJBDDS(&p,id);dd[92U+32U]=1U;
  assert(TJBLOAD(&p,pool,sizeof pool)==8&&!memcmp(pool+TJB_BASE,saved+TJB_BASE,TJB_SLOT_BYTES));
  memcpy(pool,saved,sizeof pool);assert(!TJBLOAD(&p,pool,sizeof pool));assert(TJBWORD(TJBFIND(&p,7U,id)+8U)==TJB_HELD);
@@ -75,8 +75,8 @@ int main(void)
  memset(e+40U,0x40,44U);e[40U]=0xe3U;put(e+92U,TJD_NEW<<16|TJD_KEEP<<8);assert(!TJDCHK(d,2U));
  put(e+24U,TJD_TEMP_LIMIT+1U);assert(TJDCHK(d,2U)==8);put(e+24U,64U);
  put(e+8U,TJD_INPUT);assert(TJDCHK(d,2U)==8);put(e+92U,TJD_OLD<<16|TJD_DELETE<<8);assert(!TJDCHK(d,2U));
- assert(!TJBSUB(&p,7U,job,sizeof job,&id)&&!TJBBIND(&p,7U,id,d,sizeof d)&&TJBWORD(pool+4U)==3U);
+ assert(!TJBSUB(&p,7U,job,sizeof job,&id)&&!TJBBIND(&p,7U,id,d,sizeof d)&&TJBWORD(pool+4U)==4U);
  assert(!TJBLOAD(&p,pool,sizeof pool));assert(!TJBACT(&p,7U,id,3U)&&!TJBACT(&p,7U,id,4U));
- e=entry(TJD_DUMMY,TJD_FB,80U,80U);assert(!TJBSUB(&p,7U,job,sizeof job,&id)&&!TJBBIND(&p,7U,id,d,sizeof d)&&TJBWORD(pool+4U)==3U);
+ e=entry(TJD_DUMMY,TJD_FB,80U,80U);assert(!TJBSUB(&p,7U,job,sizeof job,&id)&&!TJBBIND(&p,7U,id,d,sizeof d)&&TJBWORD(pool+4U)==4U);
  puts("batch DD descriptor, FB/VB, binary, empty, persistence and ownership controls passed");return 0;
 }

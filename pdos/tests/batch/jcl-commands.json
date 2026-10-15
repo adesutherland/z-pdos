@@ -1,0 +1,512 @@
+[
+  [
+    "VERSION",
+    "PDIO1"
+  ],
+  [
+    "HELP BATCH",
+    "PCOMM END 1 RC=0",
+    [],
+    [
+      "SUBMIT dataset(member)|READER"
+    ]
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(C)",
+    "PCOMM END 2 RC=0",
+    [],
+    []
+  ],
+  [
+    "STATUS 1",
+    "PCOMM END 3 RC=0",
+    [],
+    [
+      "STEP BUILD.COMP STATE=2 OS=0 RC=0",
+      "STEP BUILD.ASSEM STATE=2 OS=0 RC=0"
+    ]
+  ],
+  [
+    "PURGE 1",
+    "PCOMM END 4 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(CG) RUNHOLD",
+    "PCOMM END 5 RC=0",
+    [],
+    []
+  ],
+  [
+    "JOBS",
+    "PCOMM END 6 RC=0",
+    [],
+    [
+      "STATE=2"
+    ]
+  ],
+  [
+    "STATUS 2",
+    "PCOMM END 7 RC=0",
+    [],
+    [
+      "SOURCE SHA256",
+      "BUILD.RUN"
+    ]
+  ],
+  [
+    "RELEASE 2",
+    "PCOMM END 8 RC=0",
+    [],
+    []
+  ],
+  [
+    "OUTPUT 2 STEP=BUILD.RUN DD=SYSPRINT",
+    "PCOMM END 9 RC=0",
+    [],
+    [
+      "PD033 STAGE4 LIBRARY new payload"
+    ]
+  ],
+  [
+    "PURGE 2",
+    "PCOMM END 10 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT READER RUNHOLD",
+    "PCOMM END 11 RC=0",
+    [],
+    [],
+    "",
+    [
+      "reader-CG"
+    ]
+  ],
+  [
+    "STATUS 3",
+    "PCOMM END 12 RC=0",
+    [],
+    [
+      "SOURCE SHA256",
+      "BUILD.RUN"
+    ]
+  ],
+  [
+    "RELEASE 3",
+    "PCOMM END 13 RC=0",
+    [],
+    []
+  ],
+  [
+    "PURGE 3",
+    "PCOMM END 14 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT * PROOF RUNHOLD",
+    "PCOMM END 15 RC=0",
+    [
+      [
+        "JOB INPUT:",
+        "frame-CG",
+        "jcl"
+      ]
+    ],
+    []
+  ],
+  [
+    "STATUS 4",
+    "PCOMM END 16 RC=0",
+    [],
+    [
+      "SOURCE SHA256",
+      "BUILD.RUN"
+    ]
+  ],
+  [
+    "RELEASE 4",
+    "PCOMM END 17 RC=0",
+    [],
+    []
+  ],
+  [
+    "PURGE 4",
+    "PCOMM END 18 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(CL)",
+    "PCOMM END 19 RC=0",
+    [],
+    []
+  ],
+  [
+    "STATUS 5",
+    "PCOMM END 20 RC=0",
+    [],
+    [
+      "STATE=4"
+    ]
+  ],
+  [
+    "PURGE 5",
+    "PCOMM END 21 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(LGO)",
+    "PCOMM END 22 RC=0",
+    [],
+    []
+  ],
+  [
+    "STATUS 6",
+    "PCOMM END 23 RC=0",
+    [],
+    [
+      "STATE=4"
+    ]
+  ],
+  [
+    "PURGE 6",
+    "PCOMM END 24 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(LGODEF)",
+    "PCOMM END 25 RC=0",
+    [],
+    []
+  ],
+  [
+    "STATUS 7",
+    "PCOMM END 26 RC=0",
+    [],
+    [
+      "STATE=4"
+    ]
+  ],
+  [
+    "PURGE 7",
+    "PCOMM END 27 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(BAD)",
+    "PCOMM END 28 RC=0",
+    [],
+    []
+  ],
+  [
+    "STATUS 8",
+    "PCOMM END 29 RC=0",
+    [],
+    [
+      "STATE=4",
+      "STEP BUILD.COMP STATE=2 OS=0 RC=2",
+      "STEP BUILD.ASSEM STATE=3",
+      "STEP BUILD.RUN STATE=3"
+    ]
+  ],
+  [
+    "PURGE 8",
+    "PCOMM END 30 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(RC8)",
+    "PCOMM END 31 RC=0",
+    [],
+    []
+  ],
+  [
+    "STATUS 9",
+    "PCOMM END 32 RC=0",
+    [],
+    [
+      "STATE=4",
+      "STEP BUILD.RUN STATE=2 OS=0 RC=8"
+    ]
+  ],
+  [
+    "PURGE 9",
+    "PCOMM END 33 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(COND)",
+    "PCOMM END 34 RC=0",
+    [],
+    []
+  ],
+  [
+    "STATUS 10",
+    "PCOMM END 35 RC=0",
+    [],
+    [
+      "STATE=4",
+      "STEP FIRST STATE=2 OS=0 RC=8",
+      "STEP BUILD.COMP STATE=3"
+    ]
+  ],
+  [
+    "PURGE 10",
+    "PCOMM END 36 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(PARSE)",
+    "PCOMM END 37 RC=0",
+    [],
+    []
+  ],
+  [
+    "STATUS 11",
+    "PCOMM END 38 RC=0",
+    [],
+    [
+      "STATE=4"
+    ]
+  ],
+  [
+    "PURGE 11",
+    "PCOMM END 39 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(INLINE)",
+    "PCOMM END 40 RC=0",
+    [],
+    []
+  ],
+  [
+    "STATUS 12",
+    "PCOMM END 41 RC=0",
+    [],
+    [
+      "STATE=4"
+    ]
+  ],
+  [
+    "PURGE 12",
+    "PCOMM END 42 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(CPROBE)",
+    "PCOMM END 43 RC=0",
+    [],
+    []
+  ],
+  [
+    "STATUS 13",
+    "PCOMM END 44 RC=0",
+    [],
+    [
+      "STATE=4"
+    ]
+  ],
+  [
+    "PURGE 13",
+    "PCOMM END 45 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(WORK7)",
+    "PCOMM END 46 RC=0",
+    [],
+    []
+  ],
+  [
+    "STATUS 14",
+    "PCOMM END 47 RC=0",
+    [],
+    [
+      "STATE=4"
+    ]
+  ],
+  [
+    "PURGE 14",
+    "PCOMM END 48 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(SPINBLD)",
+    "PCOMM END 49 RC=0",
+    [],
+    []
+  ],
+  [
+    "STATUS 15",
+    "PCOMM END 50 RC=0",
+    [],
+    [
+      "STATE=4"
+    ]
+  ],
+  [
+    "PURGE 15",
+    "PCOMM END 51 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(SPIN)",
+    "PCOMM END 52 RC=0",
+    [
+      [
+        "SUBMITTED JOB 16",
+        "spin-interrupt",
+        "jcl"
+      ],
+      [
+        "JOB CONTROL:",
+        "STATUS"
+      ],
+      [
+        "JOB ACTIVE;",
+        "NOPE"
+      ],
+      [
+        "BUSY: USE",
+        "CANCEL"
+      ]
+    ],
+    []
+  ],
+  [
+    "STATUS 16",
+    "PCOMM END 53 RC=0",
+    [],
+    [
+      "STATE=6"
+    ]
+  ],
+  [
+    "PURGE 16",
+    "PCOMM END 54 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(CG) HOLD",
+    "PCOMM END 55 RC=0",
+    [],
+    [
+      "OUTPUT HELD"
+    ]
+  ],
+  [
+    "STATUS 17",
+    "PCOMM END 56 RC=0",
+    [],
+    [
+      "OUTPUT POLICY=HELD",
+      "PRINT=0"
+    ]
+  ],
+  [
+    "OUTPUT 17 STEP=BUILD.RUN DD=SYSPRINT",
+    "PCOMM END 57 RC=0",
+    [],
+    [
+      "PD033 STAGE4 LIBRARY new payload"
+    ]
+  ],
+  [
+    "PRINT 17",
+    "PCOMM END 58 RC=0",
+    [],
+    []
+  ],
+  [
+    "STATUS 17",
+    "PCOMM END 59 RC=0",
+    [],
+    [
+      "PRINT=2"
+    ]
+  ],
+  [
+    "PURGE 17",
+    "PCOMM END 60 RC=0",
+    [],
+    []
+  ],
+  [
+    "SUBMIT * ABORTED",
+    "PCOMM END 61 RC=16",
+    [
+      [
+        "JOB INPUT:",
+        "ABORT ABORTED"
+      ]
+    ],
+    []
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(NOPROC)",
+    "PCOMM END 62 RC=8",
+    [],
+    [
+      "JCL ERROR"
+    ]
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(NOLIB)",
+    "PCOMM END 63 RC=8",
+    [],
+    [
+      "JCL ERROR"
+    ]
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(WORK8)",
+    "PCOMM END 64 RC=8",
+    [],
+    [
+      "JCL ERROR"
+    ]
+  ],
+  [
+    "SUBMIT LABA01.B33.JCL(QUOTA)",
+    "PCOMM END 65 RC=20",
+    [],
+    [
+      "JCL ERROR"
+    ]
+  ],
+  [
+    "JOBS",
+    "PCOMM END 66 RC=0",
+    [],
+    []
+  ],
+  [
+    "HELLO",
+    "PCOMM END 67 RC=0",
+    [],
+    []
+  ],
+  [
+    "RXVM -v",
+    "PCOMM END 68 RC=0",
+    [],
+    []
+  ]
+]

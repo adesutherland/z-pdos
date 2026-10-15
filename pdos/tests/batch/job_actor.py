@@ -90,7 +90,7 @@ def close():
 
 def decode(raw):
     word=lambda p:struct.unpack_from(">I",raw,p)[0]
-    if len(raw)!=262144 or word(0)!=0x50444a32 or word(4) not in (1,2,3):raise ValueError("job envelope identity")
+    if word(0)!=0x50444a32 or len(raw)!={1:262144,2:262144,3:262144,4:294912}.get(word(4)):raise ValueError("job envelope identity")
     jobs=[]
     for i in range(3):
         at=32+2048*i
@@ -104,10 +104,17 @@ def decode(raw):
         jobs.append({"header":header,"records":records})
     return {"last_id":word(8),"active_id":word(12),"jobs":jobs,"sha256":hashlib.sha256(raw).hexdigest()}
 
+def snapshot(raw,real):
+    if not 0x1000000<=real<=len(raw)-8:raise ValueError("K job snapshot address")
+    version=struct.unpack_from(">I",raw,real+4)[0]
+    size={1:262144,2:262144,3:262144,4:294912}.get(version)
+    if size is None or real+size>len(raw):raise ValueError("K job snapshot size")
+    return raw[real:real+size]
+
 def inspect(out,raw,cut=False):
     magic,_,_,_,_,_,depth,real,failed=struct.unpack_from(">9I",raw,0x3ba00)
-    if magic!=0x50444a32 or not 0x1000000<=real<=len(raw)-262144:raise ValueError("K job snapshot missing")
-    data=raw[real:real+262144];spool=decode(data)
+    if magic!=0x50444a32:raise ValueError("K job snapshot missing")
+    data=snapshot(raw,real);spool=decode(data)
     (out/"job-spool.bin").write_bytes(data);(out/"job-spool.json").write_text(json.dumps(spool,indent=2)+"\n")
     if cut:
         return {"intentional_cut_has_one_running_job":len(spool["jobs"])==1 and spool["jobs"][0]["header"][2]==3 and spool["active_id"]!=0,

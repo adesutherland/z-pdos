@@ -864,7 +864,11 @@ __PDPCLIB_API__ void abort(void)
 
 /* hopefully we can unconditionally do this, which is useful
    for when setjmp/longjmp have not been implemented yet */
-#if !defined(__EMX__) && !defined(__GNUC__) && !defined(__gnu_linux__) \
+#if defined(__GNUC__) && defined(__PDOS390__) && defined(__MVS__)
+/* The selected mainframe profile has real termination and longjmp paths.
+   Other bootstrap ports may deliberately return from their incomplete exit. */
+void __exit(int status) __attribute__((noreturn));
+#elif !defined(__EMX__) && !defined(__GNUC__) && !defined(__gnu_linux__) \
     && !(defined(__ARM__) && !defined(__WIN32__)) \
     || defined(WATLIN) \
     || (defined(__ARM__) && defined(__64BIT__)) \

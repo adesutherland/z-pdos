@@ -29,7 +29,7 @@ static int dd(void *context,const TJCSTEP *s,const TJCDECL *d,TJCATTR *a)
  if(!a->recfm)a->recfm=TJD_FB;if(!a->lrecl)a->lrecl=80U;if(!a->blksize)a->blksize=a->lrecl;
  if(tamper)++a->lrecl;return 0;}
 static int convert(void)
-{TJCSITE site;site.context=0;site.program=program;site.dd=dd;
+{TJCSITE site;memset(&site,0,sizeof site);site.context=0;site.program=program;site.dd=dd;
  return TJCCONV(&work,deck,cards*80U,&site,&result,&error);}
 static int rejected(unsigned int reason)
 {unsigned int i;const unsigned char *p=(const unsigned char *)&result;
@@ -47,7 +47,7 @@ int main(void)
  begin();card("//RUN EXEC PGM=RXVM,PARM='-v',REGION=256M");card("//SYSIN DD DUMMY");
  card("//SYSPRINT DD SYSOUT=A");card("//SYSTERM DD SYSOUT=*");card("//");
  CHECK(!convert()&&result.valid&&result.steps==1U&&result.dds==3U&&program_calls==1U&&dd_calls==3U);
- CHECK(!TJBCHECK(result.job,TJB_DESC_BYTES)&&!TJDCHK(result.dd,1U));
+ CHECK(!TJBCHECK(result.job,TJB_FULL_BYTES)&&!TJDCHK(result.dd,1U));
  CHECK(TJBWORD(result.job+48U)==2U&&result.job[56U]==0x60U&&result.job[57U]==0xa5U);
  CHECK(TJDWORD(entry(0)+4U)==TJD_DUMMY&&TJDWORD(entry(0)+8U)==TJD_INPUT);
  CHECK(TJDWORD(entry(1)+4U)==TJD_SYSOUT&&TJDWORD(entry(1)+8U)==TJD_OUTPUT);
@@ -81,9 +81,9 @@ int main(void)
  CHECK(TJDWORD(entry(1)+12U)==TJD_VB&&TJDWORD(entry(1)+16U)==84U);
  begin();card("//RUN EXEC PGM=RXVM");card("//SYSIN DD DATA,DLM='@@'");card("// input, not JCL");card("/*");card("@@");card("//");
  CHECK(!convert()&&TJDWORD(entry(0)+28U)==164U);
- CHECK(result.dd[TJD_DATA]==0U&&result.dd[TJD_DATA+1U]==80U&&result.dd[TJD_DATA+2U]==0x61U&&result.dd[TJD_DATA+3U]==0x61U);
+ CHECK(result.dd[TJD_EXT_DATA]==0U&&result.dd[TJD_EXT_DATA+1U]==80U&&result.dd[TJD_EXT_DATA+2U]==0x61U&&result.dd[TJD_EXT_DATA+3U]==0x61U);
  begin();card("//RUN EXEC PGM=RXVM");card("//SYSIN DD *");card("");card("/*");card("//");
- CHECK(!convert()&&TJDWORD(entry(0)+28U)==82U&&result.dd[TJD_DATA+2U]==0x40U);
+ CHECK(!convert()&&TJDWORD(entry(0)+28U)==82U&&result.dd[TJD_EXT_DATA+2U]==0x40U);
  begin();card("//A EXEC PGM=RXVM");card("//SYSGO DD DSN=&&OBJ,DISP=(NEW,PASS,DELETE)");
  card("//B EXEC PGM=RXVM,COND=(0,NE)");card("//SYSIN DD DSN=&&OBJ,DISP=(OLD,DELETE,DELETE)");card("//");
  CHECK(!convert()&&TJDWORD(entry(0)+4U)==TJD_TEMP&&TJDWORD(entry(0)+92U)==0x10100U&&TJDWORD(entry(1)+92U)==0x20200U);
@@ -100,7 +100,7 @@ int main(void)
  begin();card("//RUN EXEC PGM=RXVM,PARM='&MISSING'");card("//");CHECK(rejected(TJC_SYMBOL)&&error.card==2U&&error.column==27U);
  begin();card("// SET LONG='1234567890123456789012345678901234567890'");
  card("//RUN EXEC PGM=RXVM,PARM='&LONG&LONG&LONG'");card("//");CHECK(rejected(TJC_LIMIT));
- begin();card("//RUN EXEC PROC=CRXCG");card("//");CHECK(rejected(TJC_FEATURE));
+ begin();card("//RUN EXEC PROC=CRXCG");card("//");CHECK(rejected(TJC_RESOLVE));
  begin();card("//RUN EXEC PGM=RXVM,COND=(4,GT)");card("//");CHECK(rejected(TJC_FEATURE));
  begin();card("//RUN EXEC PGM=RXVM,PARM=(A,B)");card("//");CHECK(rejected(TJC_FEATURE));
  begin();card("//RUN EXEC PGM=RXVM");card("//SYSIN DD DATA,DLM='&&'");card("&&");card("//");CHECK(rejected(TJC_FEATURE));
@@ -116,7 +116,7 @@ int main(void)
  begin();card("//RUN EXEC PGM=RXVM");card("//SYSIN DD DUMMY");card("// DD DSN=APP.SRC,DISP=SHR");card("//");CHECK(rejected(TJC_FEATURE));
  begin();card("//RUN EXEC PGM=RXVM");card("//SYSIN DD DUMMY,DCB=(RECFM=FB,LRECL=80,LRECL=80)");card("//");CHECK(rejected(TJC_SYNTAX));
  begin();card("//RUN EXEC PGM=RXVM");card("//SYSIN DD DUMMY,DCB=(RECFM=FB,LRECL=999999999999999999999)");card("//");CHECK(rejected(TJC_SYNTAX));
- begin();card("//RUN EXEC PGM=RXVM");card("//SYSIN DD *");for(i=0U;i<19U;++i)card("data");card("/*");card("//");CHECK(rejected(TJC_LIMIT));
+ begin();card("//RUN EXEC PGM=RXVM");card("//SYSIN DD *");for(i=0U;i<(TJD_EXT_BYTES-TJD_EXT_DATA)/82U+1U;++i)card("data");card("/*");card("//");CHECK(rejected(TJC_LIMIT));
  begin();for(i=0U;i<9U;++i){char line[40];strcpy(line,"//S0 EXEC PGM=RXVM");line[3]=(char)('0'+i);card(line);}card("//");CHECK(rejected(TJC_LIMIT));
  begin();card("//RUN EXEC PGM=RXVM");for(i=0U;i<9U;++i){char line[40];strcpy(line,"//D0 DD DUMMY");line[3]=(char)('0'+i);card(line);}card("//");CHECK(rejected(TJC_LIMIT));
  begin();card("//RUN EXEC PGM=RXVM");card("//SYSIN DD DSN=APP.ONE,DISP=SHR");
@@ -139,7 +139,7 @@ int main(void)
     unsigned int k;const unsigned char *p=(const unsigned char *)&result;
     deck[at]=(unsigned char)value;program_calls=dd_calls=0U;rc=convert();
     if(rc){CHECK(!result.valid&&error.reason&&error.card&&error.column);for(k=0U;k<sizeof result&&p[k]==0U;++k){}CHECK(k==sizeof result);}
-    else CHECK(result.valid&&!TJBCHECK(result.job,TJB_DESC_BYTES)&&!TJDCHK(result.dd,result.steps));
+    else CHECK(result.valid&&!TJBCHECK(result.job,TJB_FULL_BYTES)&&!TJDCHK(result.dd,result.steps));
    }deck[at]=old;}}
  printf("PD033 JCL PASS %u checks; workspace %u bytes\n",checks,(unsigned int)sizeof work);return 0;
 }

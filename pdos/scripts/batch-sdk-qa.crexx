@@ -3,11 +3,22 @@ options levelb
 import rxfnsb
 main: procedure = .int
   arg args=.string[]
-  if args.0<>4 then return 2
+  if args.0<>4 & args.0<>5 then return 2
   media=args.1;herc=args.2;work=args.3;primary=args.4
   if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
   if work<>"build/pdos/batch-sdk/qa" then return 2
   if primary<>"line" & primary<>"3270" then return 2
+  commands="pdos/tests/batch/sdk-commands.json";profile=.string[]
+  profile.1="--batch-dd";profile.2="--batch-sdk";ui=.int;ui=0
+  if args.0=5 then do
+    if args.5="jcl" then do
+      commands="pdos/tests/batch/jcl-commands.json";profile.2="--batch-jcl"
+    end
+    else if args.5="ui" then do
+      commands="pdos/tests/batch/jcl-ui-commands.json";call arraydrop profile;ui=1
+    end
+    else return 2
+  end
   address crexx "run crexx -nokeep pdos/scripts/batch-clean.crexx --args :work"
   if rc<>0 then return rc
   /* The machine controller creates its output directory itself. */
@@ -17,5 +28,21 @@ main: procedure = .int
   flags=.string[]
   if primary="line" then flags.1="--line-primary"
   else flags.1="--colour"
-  address crexx "run python3 -B pdos/tests/two-space/console_machine.py :disk :core :hercules :work --normal --monitor --workbench-normal --model 2 --commands pdos/tests/batch/sdk-commands.json --batch-dd --batch-sdk :flags[]"
-  return rc
+  address crexx "run python3 -B pdos/tests/two-space/console_machine.py :disk :core :hercules :work --normal --monitor --workbench-normal --model 2 --commands :commands :profile[] :flags[]"
+  result=rc
+  if ui then do
+    /* The generic console actor creates the same owned QA directory. Mark it
+       even after a failed run so ordinary guarded cleanup can retire it. */
+    address crexx "run test -d :work"
+    if rc=0 then do
+      marker=work||"/.pd033-build"
+      address crexx "run test ! -L :work"
+      if rc<>0 then return 2
+      address crexx "run test ! -L :marker"
+      if rc<>0 then return 2
+      call lineout marker,"pd033-batch-build-v1"
+      call lineout marker
+    end
+    else if rc<>1 then return rc
+  end
+  return result

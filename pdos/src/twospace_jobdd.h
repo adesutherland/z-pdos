@@ -5,6 +5,9 @@
 #define TJD_COUNT 16U
 #define TJD_ENTRY 96U
 #define TJD_DATA (32U+TJD_COUNT*TJD_ENTRY)
+#define TJD_EXT_BYTES 8192U
+#define TJD_MAX_COUNT 32U
+#define TJD_EXT_DATA (32U+TJD_MAX_COUNT*TJD_ENTRY)
 #define TJD_DATASET 1U
 #define TJD_INLINE 2U
 #define TJD_DUMMY 3U
@@ -33,6 +36,7 @@
  * records. No implicit conversion, trimming or newline interpretation. */
 unsigned int TJDWORD(const unsigned char *);
 int TJDNAME(const unsigned char *);
+int TJDDSN(const unsigned char *);
 int TJDCHK(const unsigned char *,unsigned int steps);
 /* Form a native BSAM block. Advance the cursor only on complete success.
  * Return 1 for EOF; an empty VB record is a successful RDW of length four. */

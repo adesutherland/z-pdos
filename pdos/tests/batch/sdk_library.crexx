@@ -1,0 +1,13 @@
+/*
+ Stage 4 requires a non-inlined linked library function.
+*/
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>1 then return 8
+  if args.1<>"SHARED" then return 8
+  text=changestr("old","old payload","new")
+  if text<>"new payload" then return 42
+  say "PD033 STAGE4 LIBRARY" text
+  return 0

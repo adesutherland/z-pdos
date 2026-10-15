@@ -73,7 +73,7 @@ static unsigned int job_attach(void)
     job_pool.bytes=(unsigned char *)TSF_KAPERTURE_VA+job_real;
     rc=TSSREAD(&native_store,0x50444a32U,job_key,sizeof job_key,job_pool.bytes,TJB_BYTES,&n);
     if(rc==TSS_ABSENT){if(TJBINIT(&job_pool,job_pool.bytes,TJB_BYTES))return 12U;}
-    else if(rc||TJBLOAD(&job_pool,job_pool.bytes,n)){job_failed=1U;return 12U;}
+    else if(rc||TJBUP(&job_pool,job_pool.bytes,TJB_BYTES,n)){job_failed=1U;return 12U;}
     /* One operator domain. Persisted ownership is rebound only after the
        checked restart has held queued jobs and interrupted uncertain work. */
     {unsigned int i;for(i=0U;i<TJB_SLOTS;++i){unsigned char *j=job_pool.bytes+TJB_BASE+i*TJB_SLOT_BYTES;
@@ -213,6 +213,25 @@ static unsigned int job_interrupt(void)
     /* Preserve every interrupted U register; C's status is not an app RC. */
     *(volatile unsigned int *)0x4f54U=1U;return 0U;
 }
+static unsigned int job_print_label(unsigned char *j,const unsigned char *r,TBCENDPOINT *e)
+{
+    unsigned char text[132],digits[10];unsigned int n=0U,k=0U,i,id=TJBWORD(j),step=TJBWORD(r+4U),length=8U;
+    const unsigned char *label=TJBSTEP(j,step-1U);TSCSTATE *c=&batch_channels[1U];
+    static const unsigned char jobtext[]="JOB ",steptext[]=" STEP ",ddtext[]=" DD ",seqtext[]=" SEQ ";
+    /* Version-one explicit controllers retain their established report bytes. */
+    if(!TJBWORD(j+TJB_META_BASE))return 0U;
+    for(i=0U;i<sizeof jobtext-1U;++i)text[n++]=jobtext[i];
+    do{digits[k++]=(unsigned char)(0xf0U+id%10U);id/=10U;}while(id&&k<10U);
+    while(k)text[n++]=digits[--k];for(i=0U;i<sizeof steptext-1U;++i)text[n++]=steptext[i];
+    if(TJBWORD(j+TJB_META_BASE)){label=j+TJB_META_BASE+48U+18U*(step-1U);length=18U;}
+    while(length&&label[length-1U]==0x40U)--length;
+    for(i=0U;i<length;++i)text[n++]=label[i];for(i=0U;i<sizeof ddtext-1U;++i)text[n++]=ddtext[i];
+    length=8U;while(length&&r[16U+length-1U]==0x40U)--length;for(i=0U;i<length;++i)text[n++]=r[16U+i];
+    for(i=0U;i<sizeof seqtext-1U;++i)text[n++]=seqtext[i];id=TJBWORD(r);k=0U;
+    do{digits[k++]=(unsigned char)(0xf0U+id%10U);id/=10U;}while(id&&k<10U);
+    while(k)text[n++]=digits[--k];
+    for(i=0U;i<n;++i)TSCDATA(c)[i]=text[i];return batch_transfer(e,9U,n);
+}
 static unsigned int job_print(unsigned char *j,TBCENDPOINT *e)
 {
     unsigned int at=0U,n,i,rc=0U;unsigned char *out=TJBOUT(&job_pool,TJBWORD(j));TSCSTATE *c;
@@ -222,15 +241,42 @@ static unsigned int job_print(unsigned char *j,TBCENDPOINT *e)
     if(job_commit())return 12U;c=&batch_channels[1U];
     while(at<TJBWORD(j+24U)){
         if(c->occupied||c->quarantined){rc=16U;break;}n=TJBWORD(out+at+8U);
+        rc=job_print_label(j,out+at,e);if(rc)break;
         for(i=0U;i<n;++i)TSCDATA(c)[i]=out[at+24U+i];
         rc=batch_transfer(e,TJBWORD(out+at+12U),n);if(rc)break;at+=24U+n;
     }
     TJBPUT(j+28U,rc?TJB_PRINT_FAILED:TJB_PRINT_DONE);
     if(job_commit()){TJBPUT(j+28U,TJB_PRINT_FAILED);return 12U;}return rc;
 }
+/* Read-only catalog/member admission. No loader entry, allocation, write or
+   terminal service is performed. The selected volume is an explicit site fact. */
+static unsigned int job_query(unsigned char *h)
+{
+    SFDD dd;unsigned char dscb[96],key[52],ttr[3];unsigned int i,n=44U,bytes,device;const unsigned char *label;
+    int rc;
+    if(!TJDDSN(h+40U)||(h[84U]&&!TJDNAME(h+84U)))return 8U;
+    while(n&&h[40U+n-1U]==0x40U)--n;
+    device=media_selected_device?media_selected_device:*(volatile const unsigned int *)0x40bcU;
+    for(i=0U;i<sizeof dd;++i)((unsigned char *)&dd)[i]=0U;
+    if(TSKDSCB(sf_volume_record,&device,h+40U,n,&dd.extent,dscb)!=TSK_OK)return 4U;
+    dd.device=device;dd.bytes=n;for(i=0U;i<44U;++i)dd.dsn[i]=h[40U+i];
+    if(h[84U]){
+        if(dd.extent.organisation!=0x0200U)return 8U;
+        for(i=0U;i<52U;++i)key[i]=h[40U+i];
+        rc=store_attach();if(rc!=TSS_OK)return 12U;
+        rc=TSSSIZE(&native_store,sf_store_profile(&dd),key,52U,&bytes);
+        if(rc==TSS_DELETED)return 4U;
+        if(rc==TSS_ABSENT){rc=sf_member(&dd,h+84U,ttr);if(rc!=1)return rc==0?4U:12U;}
+        else if(rc!=TSS_OK)return 12U;
+    }
+    TJBPUT(h+96U,dd.extent.organisation);TJBPUT(h+100U,dd.extent.record_format);
+    TJBPUT(h+104U,dd.extent.logical_length);TJBPUT(h+108U,dd.extent.block_length);
+    if(sf_volume_record(&device,0U,0U,3U,80U,&label)<14||!label)return 12U;
+    for(i=0U;i<6U;++i)h[116U+i]=label[8U+i];TJBPUT(h+112U,1U);return 0U;
+}
 static unsigned int job_service(TSGREQUEST *request)
 {
-    const TSVFRAME *f=TSVTOP(&native_invocations);unsigned char h[TJB_REQUEST_BYTES],descriptor[TJD_BYTES],data[132],*j,*s;
+    const TSVFRAME *f=TSVTOP(&native_invocations);unsigned char h[TJB_REQUEST_BYTES],descriptor[TJB_FULL_BYTES],allocation[TJD_EXT_BYTES],data[132],*j,*s;
     unsigned int op=request->direction,owner,id,n,offset,rc,i,selector;TSPADDR payload;TBCENDPOINT *e;
     if(!f||request->length!=sizeof h||*(volatile const unsigned int *)0x3000U||*(volatile const unsigned int *)0x3010U||
        tc_span(request->address,sizeof h,TSG_READ,h,0U)||tc_span(request->address,sizeof h,TSG_WRITE,h,0U)||
@@ -248,11 +294,23 @@ static unsigned int job_service(TSGREQUEST *request)
         TJBPUT(h+8U,job_id);TJBPUT(h+32U,n);return tc_span(request->address,sizeof h,TSG_WRITE,h,1U);
     }
     if(job_id)return 16U;owner=native_invocations.frame[0U].token;
+    if(op==TSA_IO_JOB_QUERY){
+        if(id||selector||n||offset||TJBWORD(h+20U)||payload.hi||payload.lo)return 8U;
+        for(i=92U;i<sizeof h;++i)if(h[i])return 8U;
+        rc=job_query(h);if(rc)return rc;return tc_span(request->address,sizeof h,TSG_WRITE,h,1U);
+    }
     if(op==TSA_IO_JOB_SUBMIT){
-        if(id||selector||offset||TJBWORD(h+20U)||n!=TJB_DESC_BYTES||batch_overlap(request->address,sizeof h,payload,n)||tc_span(payload,n,TSG_READ,descriptor,1U))return 8U;
-        rc=(unsigned int)TJBCHECK(descriptor,n);if(rc)return rc;
+        unsigned int jobbytes=selector?TJB_FULL_BYTES:n;TSPADDR ddpayload=payload;
+        if(id||selector>1U||offset||TJBWORD(h+20U)||(selector?n!=TJB_FULL_BYTES+TJD_EXT_BYTES:(n!=TJB_DESC_BYTES&&n!=TJB_FULL_BYTES))||batch_overlap(request->address,sizeof h,payload,n)||
+           tc_span(payload,n,TSG_READ,descriptor,0U)||tc_span(payload,jobbytes,TSG_READ,descriptor,1U))return 8U;
+        rc=(unsigned int)TJBCHECK(descriptor,jobbytes);if(rc)return rc;
+        if(selector){ddpayload.lo+=TJB_FULL_BYTES;if(ddpayload.lo<payload.lo)++ddpayload.hi;
+            if(tc_span(ddpayload,TJD_EXT_BYTES,TSG_READ,allocation,1U))return 8U;
+            if(TJDWORD(allocation+4U)!=TJD_EXT_BYTES)return 8U;
+            rc=(unsigned int)TJDCHK(allocation,TJBWORD(descriptor+16U));if(rc)return rc;}
         rc=job_attach();if(rc)return rc;
-        rc=(unsigned int)TJBSUB(&job_pool,owner,descriptor,n,&id);if(rc)return rc;
+        rc=(unsigned int)TJBSUB(&job_pool,owner,descriptor,jobbytes,&id);if(rc)return rc;
+        if(selector&&TJBBIND(&job_pool,owner,id,allocation,TJD_EXT_BYTES)){job_failed=1U;return 12U;}
         if(job_commit())return 12U;j=TJBFIND(&job_pool,owner,id);job_status(h,j);return tc_span(request->address,sizeof h,TSG_WRITE,h,1U);
     }
     rc=job_attach();if(rc)return rc;
@@ -266,9 +324,12 @@ static unsigned int job_service(TSGREQUEST *request)
     }
     j=TJBFIND(&job_pool,owner,id);if(!j)return 8U;
     if(op==TSA_IO_JOB_BIND){
-        if(selector||offset||TJBWORD(h+20U)||n!=TJD_BYTES||batch_overlap(request->address,sizeof h,payload,n)||tc_span(payload,n,TSG_READ,descriptor,1U))return 8U;
-        rc=(unsigned int)TJBBIND(&job_pool,owner,id,descriptor,n);if(rc)return rc;
+        if(selector||offset||TJBWORD(h+20U)||(n!=TJD_BYTES&&n!=TJD_EXT_BYTES)||batch_overlap(request->address,sizeof h,payload,n)||tc_span(payload,n,TSG_READ,allocation,1U))return 8U;
+        rc=(unsigned int)TJBBIND(&job_pool,owner,id,allocation,n);if(rc)return rc;
         if(job_commit())return 12U;
+    }else if(op==TSA_IO_JOB_SOURCE){
+        if(selector||offset||TJBWORD(h+20U)||n!=TJB_META_BYTES||batch_overlap(request->address,sizeof h,payload,n)||tc_span(payload,n,TSG_WRITE,j+TJB_META_BASE,1U))return 8U;
+        TJBPUT(h+32U,n);
     }else if(op==TSA_IO_JOB_STATUS){
         if(TJBWORD(h+20U)||offset)return 8U;
         if(selector){if(selector>TJBWORD(j+16U)||n!=TJB_STEP_BYTES||batch_overlap(request->address,sizeof h,payload,n)||tc_span(payload,n,TSG_WRITE,descriptor,0U))return 8U;

@@ -40,7 +40,8 @@ main: procedure = .int
   hashes = .string[]
   do i = 1 to files.0
     source = files[i]
-    if right(source,4) = ".bin" | right(source,4) = ".sys" | right(source,4) = ".exe" | right(source,7) = "ctl.txt" then do
+    /* Complete native card files are inputs to SEQ datasets as well. */
+    if right(source,4) = ".bin" | right(source,4) = ".sys" | right(source,4) = ".exe" | right(source,5) = ".fb80" | right(source,7) = "ctl.txt" then do
       address crexx "run cmake -E copy :source :media"
       if rc <> 0 then return rc
       address crexx "run shasum -a 256 :source" output hashes

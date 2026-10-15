@@ -13,10 +13,19 @@ main: procedure = .int
   outputs=.string[]
   consumers=.string[]
   binary=.string
+  label=.string
+  suite=.int
+  checks=.string
   call arrayappend outputs,work||"/jcl-test"
   call arrayappend outputs,work||"/jcl-test-sanitize"
   call arrayappend outputs,work||"/jcl.obj"
   call arrayappend outputs,work||"/jcl.asm"
+  call arrayappend outputs,work||"/cases-test"
+  do suite=1 to words("proc upgrade submit submitui job jobdd jobtemp")
+    label=word("proc upgrade submit submitui job jobdd jobtemp",suite)
+    call arrayappend outputs,work||"/"||label||"-test"
+    call arrayappend outputs,work||"/"||label||"-test-sanitize"
+  end
   do i=1 to outputs.0
     binary=outputs[i]
     address crexx "run test ! -L :binary"
@@ -32,17 +41,50 @@ main: procedure = .int
   end
   source="pdos/src/twospace_jcl.c"
   job="pdos/src/twospace_job.c";dd="pdos/src/twospace_jobdd.c"
+  digest="pdos/src/twospace_digest.c"
   checks="pdos/tests/batch/jcl.c"
   binary=outputs.1
-  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src :source :job :dd :checks -o :binary"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src :digest :source :job :dd :checks -o :binary"
   if rc<>0 then return rc
   address crexx "run :binary"
   if rc<>0 then return rc
   binary=outputs.2
-  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src :source :job :dd :checks -o :binary"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src :digest :source :job :dd :checks -o :binary"
   if rc<>0 then return rc
   address crexx "run :binary"
   if rc<>0 then return rc
+  sources=.string[]
+  flags=.string[]
+  do suite=1 to words("proc upgrade submit submitui job jobdd jobtemp")
+    label=word("proc upgrade submit submitui job jobdd jobtemp",suite)
+    checks="pdos/tests/batch/"||label||".c"
+    call arraydrop sources
+    call arraydrop flags
+    call arrayappend sources,job
+    call arrayappend sources,dd
+    if label="proc" | label="submit" | label="submitui" then do
+      call arrayappend sources,digest
+      call arrayappend sources,source
+    end
+    if label="proc" then checks="pdos/tests/batch/jcl_proc.c"
+    if label="upgrade" then checks="pdos/tests/batch/job_upgrade.c"
+    if label="submit" | label="submitui" then call arrayappend sources,"pdos/src/twospace_submit.c"
+    if label="submitui" then do
+      checks="pdos/tests/batch/submit_ui.c"
+      call arrayappend flags,"-DTJF_PCOMM"
+    end
+    if label="jobtemp" then call arrayappend sources,"pdos/src/twospace_jobtemp.c"
+    binary=work||"/"||label||"-test"
+    address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic :flags[] -I pdos/src :sources[] :checks -o :binary"
+    if rc<>0 then return rc
+    address crexx "run :binary"
+    if rc<>0 then return rc
+    binary=work||"/"||label||"-test-sanitize"
+    address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer :flags[] -I pdos/src :sources[] :checks -o :binary"
+    if rc<>0 then return rc
+    address crexx "run :binary"
+    if rc<>0 then return rc
+  end
   cc="build/compiler/mvs/gcc/mf-classic-cc"
   classicas="build/tools/assembler/mf-classic-as"
   asm=work||"/jcl.asm";object=work||"/jcl.obj"
@@ -55,6 +97,13 @@ main: procedure = .int
   end
   else if rc<>1 then return rc
   address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+  if rc<>0 then return rc
+  address crexx "run crexx -nokeep pdos/scripts/batch-jcl-fixtures.crexx --args pdos LABA01.B33 PDOS00"
+  if rc<>0 then return rc
+  binary=work||"/cases-test";checks="pdos/tests/batch/jcl_cases.c"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src :digest :source :job :dd :checks -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary build/pdos/batch-jcl/fixtures/pdos"
   if rc<>0 then return rc
   say "PD033 JCL host checks and Classic compile/assemble PASS; guest integration remains open"
   return 0

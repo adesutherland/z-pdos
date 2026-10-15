@@ -42,6 +42,19 @@ main: procedure = .int
     if rc <> 0 then return rc
     objects[i] = object
   end
+  sources[9] = "pdos/src/twospace_submit.c"; flags[9] = "-DTJF_PCOMM"
+  sources[10] = "pdos/src/twospace_jcl.c"; flags[10] = ""
+  sources[11] = "pdos/src/twospace_digest.c"; flags[11] = ""
+  sources[12] = "pdos/src/twospace_job.c"; flags[12] = ""
+  sources[13] = "pdos/src/twospace_jobdd.c"; flags[13] = ""
+  do i = 9 to 13
+    source = sources[i]; flag = flags[i]; asm = work || "/part" || i || ".asm"; object = work || "/part" || i || ".obj"
+    address system quote(cc) || " -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ " || flag || " -S -I pdpclib/src -I pdos/src " || quote(source) || " -o " || quote(asm)
+    if rc <> 0 then return rc
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+    if rc <> 0 then return rc
+    objects[i] = object
+  end
   source = "pdpclib/src/stdlib.c"; asm = work || "/stdlib.asm"; object = work || "/stdlib.obj"
   address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR -DMULMEM -DPDP_HEAP_CHUNK_BYTES=16769024 -S -I pdpclib/src :source -o :asm"
   if rc <> 0 then return rc
@@ -58,6 +71,9 @@ main: procedure = .int
   do i = 1 to words(common)
     native[i+10] = base || "/c/objects/" || word(common,i) || ".obj"
   end
+  do i = 9 to 13
+    call arrayappend native,objects[i]
+  end
   module = work || "/PCOMM.rdw"; map = work || "/PCOMM.map"
   address crexx "run :linker --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@CRT0 -Map :map -o :module :native[]"
   if rc <> 0 then return rc
@@ -71,6 +87,12 @@ main: procedure = .int
   inputs[inputs.0+1] = "pdos/scripts/two-space-command.crexx"
   inputs[inputs.0+1] = "pdos/src/twospace_ui.h"
   inputs[inputs.0+1] = "pdos/src/twospace_command_router.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_submit.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_jcl.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_jclproc.inc"
+  inputs[inputs.0+1] = "pdos/src/twospace_digest.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_job.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_jobdd.h"
   inputs[inputs.0+1] = "pdos/src/twospace_abi.h"
   inputs[inputs.0+1] = "pdos/src/twospace_tso.h"
   inputs[inputs.0+1] = "pdos/src/twospace_tso.c"

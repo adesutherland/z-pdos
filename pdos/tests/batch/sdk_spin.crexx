@@ -1,0 +1,5 @@
+options levelb
+say "PD033 STAGE4 SPIN READY"
+do forever
+  nop
+end

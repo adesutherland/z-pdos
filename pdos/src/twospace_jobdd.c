@@ -16,7 +16,7 @@ int TJDNAME(const unsigned char *p)
 {unsigned int i,blank=0U;if(!p||!letter(p[0]))return 0;
  for(i=0U;i<8U;++i){unsigned int c=p[i];if(c==0x40U){blank=1U;continue;}
   if(blank||!(letter(c)||(i&&c>=0xf0U&&c<=0xf9U)))return 0;}return 1;}
-static int dataset(const unsigned char *p)
+int TJDDSN(const unsigned char *p)
 {unsigned int i,part=0U,blank=0U;
  for(i=0U;i<44U;++i){unsigned int c=p[i];
   if(c==0x40U){if(!part)return 0;blank=1U;continue;}
@@ -37,12 +37,14 @@ static int records(const unsigned char *e,const unsigned char *p,unsigned int n)
  }return 0;}
 int TJDCHK(const unsigned char *d,unsigned int steps)
 {
- unsigned int i,k,count,data=TJD_DATA,per[8];
- if(!d||!steps||steps>8U||(TJDWORD(d)!=1U&&TJDWORD(d)!=2U)||TJDWORD(d+4U)!=TJD_BYTES||
+ unsigned int i,k,count,data,limit,size,version,per[8];
+ if(!d)return 8;version=TJDWORD(d);size=TJDWORD(d+4U);
+ if(!steps||steps>8U||version<1U||version>3U||size!=(version==3U?TJD_EXT_BYTES:TJD_BYTES)||
     TJDWORD(d+12U)!=steps||TJDWORD(d+16U)!=1U)return 8;
- count=TJDWORD(d+8U);if(count>TJD_COUNT||!empty(d+20U,12U))return 8;
+ limit=version==3U?TJD_MAX_COUNT:TJD_COUNT;data=32U+limit*TJD_ENTRY;
+ count=TJDWORD(d+8U);if(count>limit||!empty(d+20U,12U))return 8;
  for(i=0U;i<8U;++i)per[i]=0U;
- for(i=0U;i<TJD_COUNT;++i){const unsigned char *e=d+32U+i*TJD_ENTRY;
+ for(i=0U;i<limit;++i){const unsigned char *e=d+32U+i*TJD_ENTRY;
   unsigned int step,kind,mode,off,n,flags,ordinal;int rc;
   if(i>=count){if(!empty(e,TJD_ENTRY))return 8;continue;}
   step=TJDWORD(e);kind=TJDWORD(e+4U);mode=TJDWORD(e+8U);
@@ -60,10 +62,10 @@ int TJDCHK(const unsigned char *d,unsigned int steps)
    if(!ordinal&&TJDWORD(old)==step&&same(old+32U,e+32U,8U))return 8;}
   if(kind!=TJD_TEMP&&(flags&~TJD_CONCAT))return 8;
   if(kind==TJD_DATASET){
-   if(off||n||!dataset(e+40U)||(!empty(e+84U,8U)&&!TJDNAME(e+84U)))return 8;
+   if(off||n||!TJDDSN(e+40U)||(!empty(e+84U,8U)&&!TJDNAME(e+84U)))return 8;
   }else if(kind==TJD_TEMP){
    unsigned int status=(flags>>16)&3U,disp=(flags>>8)&3U;
-   if(TJDWORD(d)!=2U||!off||off>TJD_TEMP_LIMIT||n||!TJDNAME(e+40U)||
+   if(version<2U||!off||off>TJD_TEMP_LIMIT||n||!TJDNAME(e+40U)||
       !empty(e+84U,8U)||!disp||!status||status>2U||
       (mode==TJD_INPUT&&status!=TJD_OLD))return 8;
    for(k=48U;k<84U;++k)if(e[k]!=0x40U)return 8;
@@ -73,14 +75,14 @@ int TJDCHK(const unsigned char *d,unsigned int steps)
   }else{
    if(!empty(e+40U,52U))return 8;
    if(kind==TJD_INLINE){
-    if(mode!=TJD_INPUT||off!=data||n>TJD_BYTES-data)return 8;
+    if(mode!=TJD_INPUT||off!=data||n>size-data)return 8;
     rc=records(e,d+off,n);if(rc)return rc;data+=n;
    }else if(kind==TJD_DUMMY){if(off||n)return 8;
    }else if(kind==TJD_SYSOUT){
     if(mode!=TJD_OUTPUT||off||n||TJDWORD(e+16U)>(TJDWORD(e+12U)==TJD_FB?132U:136U))return 8;
    }else return 20;
   }
- }return empty(d+data,TJD_BYTES-data)?0:8;
+ }return empty(d+data,size-data)?0:8;
 }
 int TJDBLOCK(const unsigned char *e,const unsigned char *p,unsigned int n,
              unsigned int *cursor,unsigned char *block,unsigned int cap,unsigned int *actual)

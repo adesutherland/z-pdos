@@ -3026,7 +3026,7 @@ static unsigned int service_request(TSGREQUEST *request)
     if(request->svc==246U&&TSVTOP(&native_invocations)&&env_current()&&env_current()->active)
         return env_finish(1U);
     if(request->svc==TSA_IO_SVC){
-        if(request->direction>=TSA_IO_JOB_SUBMIT&&request->direction<=TSA_IO_JOB_BIND)return job_service(request);
+        if(request->direction>=TSA_IO_JOB_SUBMIT&&request->direction<=TSA_IO_JOB_QUERY)return job_service(request);
         if(request->direction>=TSA_IO_BATCH_OPEN&&request->direction<=TSA_IO_BATCH_STATUS)return batch_device_service(request);
         return console_v1_service(request);
     }

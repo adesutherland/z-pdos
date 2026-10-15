@@ -1,0 +1,59 @@
+/* SPDX-License-Identifier: MIT; render the common native/PDOS FB80 inputs.
+   This makes host files only; all media and guest work belongs to the operator. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>3 then return 2
+  target=args.1;hlq=args.2;volume=args.3
+  if target<>"pdos" & target<>"zos" then return 2
+  if hlq<>"LABA01.B33" | length(volume)<>6 then return 2
+  root="build/pdos/batch-jcl/fixtures/"||target
+  address crexx "run mkdir -p :root"
+  if rc<>0 then return rc
+  names="C CG CL LGO LGODEF BAD RC8 COND PARSE INLINE CPROBE SPINBLD SPIN NOPROC NOLIB WORK7 WORK8 QUOTA"
+  name=.string;source=.string;output=.string;row=.string;native=.string
+  i=.int;inline=.string
+  do i=1 to words(names)
+    name=word(names,i);source="pdos/tests/batch/jclcases/"||name||".jcl"
+    output=root||"/"||name||".jcl";native=root||"/"||name||".fb80"
+    address crexx "run test ! -L :output"
+    if rc<>0 then return 2
+    address crexx "run rm -f :output"
+    if rc<>0 then return rc
+    do while lines(source)>0
+      row=linein(source)
+      if row="@SOURCE@" then do
+        inline="pdos/tests/batch/sdk_library.crexx"
+        do while lines(inline)>0
+          row=linein(inline)
+          if row="@@" then return 2
+          call lineout output,row
+        end
+        call linein inline
+      end
+      else do
+        row=changestr("@HLQ@",row,hlq);row=changestr("@VOLUME@",row,volume)
+        call lineout output,row
+      end
+    end
+    call linein source;call lineout output
+    address crexx "run python3 -B pdos/tests/batch/jcl_fixture.py encode :output :native"
+    if rc<>0 then return rc
+  end
+  do i=1 to words("CRXC CRXCG CRXCL CRXLGO")
+    name=word("CRXC CRXCG CRXCL CRXLGO",i)
+    source="pdos/src/procs/"||name||".jcl";native=root||"/"||name||".fb80"
+    address crexx "run python3 -B pdos/tests/batch/jcl_fixture.py encode :source :native"
+    if rc<>0 then return rc
+  end
+  do i=1 to words("LIBRARY BAD PARSE SPIN")
+    name=word("LIBRARY BAD PARSE SPIN",i)
+    source="pdos/tests/batch/sdk_"||lower(name)||".crexx";native=root||"/SRC-"||name||".fb80"
+    address crexx "run python3 -B pdos/tests/batch/jcl_fixture.py encode :source :native"
+    if rc<>0 then return rc
+  end
+  address crexx "run python3 -B pdos/tests/batch/jcl_fixture.py site :root :hlq :volume"
+  if rc<>0 then return rc
+  say "PD033 common JCL/PROC native-card inputs ready:" root
+  return 0

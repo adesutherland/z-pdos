@@ -27,7 +27,10 @@ and an application's service call.
 - [Card-reader batch jobs and 3270 job forms](architecture/BATCH-JOBS.md):
   selected console-preserving design; [PD-033](BACKLOG.md#pd-033-card-reader-batch-jobs-and-3270-job-forms)
   owns the staged implementation and qualification gates; the checkpoints
-  below distinguish the delivered subsets from later DD/JCL/forms work.
+  below distinguish the successive delivered subsets from later forms work.
+- [Submit and review batch output](user/BATCH.md): current source-development
+  command sequence, output HOLD versus execution RUNHOLD, actual job identities,
+  retained step/DD output and printer recovery.
 - [Initial batch contracts and reader/printer proof](qualification/BATCH-STAGE1-2026-10-13.md):
   locally qualified Stage 1 neutral devices on model 2 and plain line consoles;
   native prebound DD/batch runtime, JCL and forms remain later stages.
@@ -37,8 +40,13 @@ and an application's service call.
   prebound bindings, native BSAM input/SYSOUT and nested DD ownership pass 52
   local checks.
 - [Native datasets, concatenation and temporary data](qualification/BATCH-STAGE3-DATA-2026-10-14.md):
-  the next Stage 3 increment passes 99 checks; shared-package/native-reference
-  qualification, JCL and job forms remain open.
+  that Stage 3 increment passes 99 checks.
+- [Shared Stage 3 batch package](qualification/BATCH-STAGE3-PACKAGE-2026-10-14.md):
+  accepted native z/OS and PDOS results for the pinned common SDK/cREXX package.
+- [Stage 4 JCL contract](architecture/BATCH-STAGE4-JCL.md) and
+  [current qualification](qualification/BATCH-STAGE4-2026-10-15.md): common
+  procedures and console/card submission; the result records the open guest
+  gate and any accepted increments. Stage 5 job forms remain separate.
 - [Development guide](development/README.md): source map and change contracts.
 - [Build contract](development/BUILD-CONTRACT.md): recorded acceptance stages.
 - [0.1 guest qualification](qualification/QUALIFICATION.md): exact historical

@@ -816,6 +816,7 @@ be K-only and explicitly budgeted rather than consuming low U placement.
 - Stage 3 package accepted (14 October): The reviewed shared TSO31 SDK/cREXX package passed native z/OS 1.5 first, then all 30 PDOS line and 34 model 2 assertions. Independent durable VB decoding matched all five binary/compiled/linked/ADDRESS/PARSE outputs exactly to z/OS; expected RC 2/8/16 and dependent skip, compiler exits, command output, normal shutdown and resource handback passed. [The result summary](qualification/BATCH-STAGE3-PACKAGE-2026-10-14.md) records the XMIT/CLI repairs, fixture/watchdog corrections and current resident PCOMM/router requirement. Reuse normal SDK `build/tso-batch`, cREXX `build/mainframe-batch` and PDOS `build/pdos/batch-sdk` paths, retaining result summaries only. All guest configurations and operations go through the Mainframe Operator. This closes selected Stage 3; PD-033 remains In progress for Stages 4–6, with managed adoption, push and release separate.
 - Overall acceptance: Submit common cREXX JCL through the actual virtual reader on PDOS and a named z/OS/Hercules guest; execute the pinned native package with prebound DDs and real batch I/O; collect complete job/step/DD printer reports and exact dataset outputs; reproduce the same job behavior through the PDOS console and 3270 forms. Distinguish application RC, OS/service failure, execution completion and print delivery. Recover the console and all resources after success, failure and cancellation. Close only the selected qualified profile, with wider services and released artifacts separately identified.
 - Publication and continuation authorised (15 October): Commit and publish the accepted Stage 3 source in its owning repositories, then implement Stage 4 JCL, procedures and console submission. Stage 5 forms, managed-image adoption and a release remain separate gates. Guest configurations and qualification continue through the Mainframe Operator.
+- Stage 4 accepted (15 October): Baseline `945de26` is committed locally. Shared JCL/PROCs, checked site/DD admission and dataset/reader/framed-console submission pass native z/OS 1.5 first, then full PDOS line/model-2 matrices (33/37 assertions, each 68 commands and 17 jobs). All five output hashes match native z/OS. The final console-label IBM1047 repair passes focused line/model-2 checks (16/20 assertions), with UTF-8 application text and binary boundaries explicit. Independent stopped-state/readback acceptance, normal shutdown, cleanup and exact lease handback close selected S4-AC01–05. [The dated result](qualification/BATCH-STAGE4-2026-10-15.md) records the reviewed freezes, repairs, reuse and limits. Stage 5 forms and Stage 6 adoption/release remain open.
 - Stage 0/1 checkpoint (13 October): Initial capacities, entry/reference cases and neutral device ABI are selected. The implemented 3505/1403 subset passes four host control groups, a fresh complete native build and 46 harness checks across model 2 and plain 3215 guest runs. Independent stopped endpoint/record/transcript readback and normal cleanup pass. [The dated result](qualification/BATCH-STAGE1-2026-10-13.md) pins review freezes, repairs, exact inputs and limits. This closes the selected Stage 0 contract and Stage 1 local device proof, not the complete PD-033 item or a release.
 - Transport finding: The installed Hercules reader presents EOF for a truncated EBCDIC host file. The host adapter rejects non-80-byte framing before configuration/devinit. Physical partial-transfer rejection is checked in the portable/actual-provider host controls; it is not claimed as a Hercules partial-card guest result.
 - Stage 2 checkpoint (14 October): The serial descriptor service, bounded STORE spool, owned-allocation admission, distinct execution/print results, interrupt-key STATUS/CANCEL/CONTINUE and interrupted-job recovery are implemented and locally qualified. Two normal console profiles, exact stopped-disk recovery and two deliberate cuts pass 93 harness checks. Independent endpoint/channel state, durable spool/transcript readback and normal handback pass. [The dated result](qualification/BATCH-STAGE2-2026-10-14.md) pins freezes, test-controller repairs and evidence reuse. This closes the selected Stage 2 gate; native prebound DD/batch runtime, JCL, forms, paired z/OS work and release remain open.
@@ -896,35 +897,48 @@ console profiles. JCL and job forms are later stages.
 
 ### Stage 4: JCL, procedures and console submission
 
+Status: **Done (selected source-development qualification).**
+
 I authorised this stage on 15 October after publishing the accepted Stage 3
 checkpoint. The intended outcome is an ordinary shared JCL deck submitted from
 cards or the existing console, expanded through common cREXX procedures and
 executed by the checked job/DD service. The console keeps its present role;
 Stage 5 adds forms over this same implementation.
 
+Continuation authorised (15 October): Commit the checked converter baseline
+(`945de26`) and complete Stage 4, including its native-first operator gate.
+The selected extension keeps legacy job and 3 KiB DD inputs readable, adds a
+version-3 8 KiB DD descriptor with 32 physical entries, and uses a version-4
+288 KiB spool envelope within the existing STORE slot. A checked in-place
+upgrade validates all older 256 KiB contents before moving their DD regions;
+uncertain execution remains interrupted rather than replayed. Version-2 job
+descriptors add bounded persisted source/qualified-step metadata without
+changing the native eight-byte program/step ABI. These are source-development
+changes; managed image adoption, Stage 5 forms and release remain separate.
+
 Acceptance criteria:
 
-1. **S4-AC01 — conversion:** A supplied-storage C89 U converter accepts complete
+1. **S4-AC01 — conversion (Done):** A supplied-storage C89 U converter accepts complete
    IBM1047 cards, selected JOB/EXEC/SET/DD syntax, continuation/quoting and
    explicit end/data framing. It returns checked job/DD descriptors only after
    the whole input validates. Malformed, unsupported and oversized input reports
    the original card/column and starts no program. Host sanitizer controls and
    a Classic compile/assemble check verify the portable core.
-2. **S4-AC02 — procedures:** Common CRXC, CRXCG, CRXCL and CRXLGO source procedures
+2. **S4-AC02 — procedures (Done):** Common CRXC, CRXCG, CRXCL and CRXLGO source procedures
    expand defaults, symbols and step-qualified overrides with truthful RXBIN
    outputs. Missing/recursive procedures, undefined symbols and expansion limits
    fail admission. Independent expanded-job expectations verify each procedure.
-3. **S4-AC03 — allocation and search:** Explicit site bindings and checked
+3. **S4-AC03 — allocation and search (Done):** Explicit site bindings and checked
    program/procedure library order select actual members. DD concatenation,
    native record attributes, selected SPACE/DISP/temporary semantics and
    COND=(0,NE) retain the Stage 3 ownership and dependent-skip rules. Missing
    libraries and quota failures cannot publish a runnable partial job.
-4. **S4-AC04 — submission and control:** Reader, SUBMIT dataset/member and
+4. **S4-AC04 — submission and control (Done):** Reader, SUBMIT dataset/member and
    explicitly framed console input use that converter and existing job service.
    HELP, JOBS, STATUS, OUTPUT step/DD selection, HOLD/RELEASE, CANCEL and PURGE
    act on checked identities. Truncation, active-job/busy behavior, cleanup and
    print failure preserve the existing console/input ownership contracts.
-5. **S4-AC05 — native and guest result:** The Mainframe Operator qualifies the
+5. **S4-AC05 — native and guest result (Done):** The Mainframe Operator qualifies the
    shared procedures/decks on native z/OS first and then on PDOS line/model 2.
    Reader and console produce equivalent expanded jobs, step results and exact
    datasets for fresh build/link/go and expected failure/skip cases. Independent
@@ -932,48 +946,56 @@ Acceptance criteria:
 
 Implementation sequence:
 
-1. **S4-01 (host increment complete, integration open):** Implement the portable direct-JCL conversion core,
+Accepted implementation (15 October): Four shared procedures, 32-entry DDs,
+checked spool upgrade, source fingerprints, site/catalog admission and all
+three submission routes pass their complete selected gates. The 14,653 direct
+checks and 49 procedure controls pass in normal and sanitizer builds, alongside
+migration/controller/DD/temp and native console-encoding controls, common deck
+admission and Classic builds. Native z/OS 1.5 and both full PDOS matrices pass
+independent acceptance with exact paired outputs. Reviewed R6 changes only
+controller-label encoding in the product and reuses unchanged R5 job/DD proof;
+focused line/model-2 UI checks pass, followed by final cleanup and lease handback.
+[The Stage 4 result](qualification/BATCH-STAGE4-2026-10-15.md) records exact
+inputs and the dependency review. S4-AC01–05 are complete for this profile.
+The output-review requirement includes creation-time held native output,
+repeat retrieval, PDOS output HOLD distinct from execution RUNHOLD, step/DD
+selection, printer retry without rerun, and operator-owned cleanup. The
+[batch user guide](user/BATCH.md) and native runbook own the repeatable sequence.
+The sequence below is complete; the initial host-only checkpoint follows as history.
+
+1. **S4-01 (Done):** Implement the portable direct-JCL conversion core,
    source diagnostics and independent malformed/bounds controls (S4-AC01;
    foundation for S4-AC03). Keep catalog/program resolution as explicit read-only
    admission callbacks; do not guess DD direction from DISP.
-2. **S4-02 (open):** Add supplied-storage PROC expansion, scoped symbols,
+2. **S4-02 (Done):** Add supplied-storage PROC expansion, scoped symbols,
    qualified overrides and common procedure sources (S4-AC02/03), building on
    S4-01. Freeze only supported native semantics and retain precise rejection.
-3. **S4-03 (open):** Integrate reader and console intake/control/output over the
+3. **S4-03 (Done):** Integrate reader and console intake/control/output over the
    existing K service, including durable expanded-step/source identity
    (S4-AC03/04). Reconcile the eight-byte descriptor step name with procedure
    qualified display names explicitly; do not truncate or silently collide.
-4. **S4-04 (open):** Complete source review, focused checks and input freeze,
+4. **S4-04 (Done):** Complete source review, focused checks and input freeze,
    then request native-first operator qualification (S4-AC05). Repairs return to
    review/refreeze before affected replay; unchanged Stage 3 checks are reused.
 
-All acceptance criteria remain open until their complete checks pass. A host
-converter increment does not establish PROC, console or guest JCL acceptance.
-
-S4-01 result (15 October): The [direct converter contract](architecture/BATCH-STAGE4-JCL.md)
+Initial S4-01 result (15 October): The [direct converter contract](architecture/BATCH-STAGE4-JCL.md)
 and [host result](qualification/BATCH-STAGE4-JCL-2026-10-15.md) record 14,653
 assertions in normal and ASan/UBSan builds, no static-analyzer findings, and
 Classic C31 compile/assembly. The 22,012-byte supplied workspace returns checked
 job/DD descriptors only after complete validation and read-only site admission.
-S4-AC01's host portion passes; U service integration and S4-AC02–05 remain open.
+At that checkpoint only S4-AC01's host portion passed; integration and the other
+criteria were still open. The accepted complete result above supersedes that boundary.
 
-The operator's read-only Stage 4 review identified a descriptor capacity gap:
-the present job-wide 16 DD entries cannot hold the qualified four-step CRXLGO
-layout (19 before library concatenations). S4-02/03 must select and review an
-explicit versioned descriptor/persisted-spool capacity change. The direct
-converter keeps current bounds and rejects overflow. Also retain separate
+The initial operator review identified a descriptor capacity gap: the old
+job-wide 16 DD entries could not hold four-step CRXLGO (19 before library
+concatenations). The selected versioned 32-entry descriptor and checked spool
+migration resolve that gap; overflow is still rejected. Retain separate
 JCLLIB, native JOBLIB/STEPLIB and cREXX RXBIN library roles; STEPLIB replaces
 JOBLIB for its step. Supply in-stream procedure input via caller overrides for
 the historical z/OS reference, keep compiler exits enabled by default, and
 qualify any IKJEFT01/CALL interpretation explicitly. Stage 3's direct ADDRESS
 execution did not qualify that launcher. The older direct-version syntax
 fixture now includes the batch entry's required SYSTERM DD.
-
-- Implement supplied-storage JCL conversion/expansion in U into the checked job descriptor. Admit only the frozen JOB, EXEC PGM/PARM/PROC, symbols/overrides and DD subset, including actual continuation/quoting and in-stream delimiters needed by the shared decks.
-- Resolve the configured procedure and program-library search order. Support explicit site/library bindings, DD concatenation, stepname.ddname overrides, selected temporary datasets/dispositions and stop conditions. Unsupported operands produce precise card/column diagnostics before execution.
-- Deliver common CRXC/CRXCG and the reviewed CRXCL/CRXLGO variants with their truthful RXBIN outputs. Distinguish native load libraries from bytecode libraries; document launchers, DDs and supported storage requests.
-- Add console HELP and job commands through the same service. Proposed operations are SUBMIT dataset/member, JOBS, STATUS, OUTPUT with step/DD selection, HOLD/RELEASE, CANCEL and explicit PURGE. An in-stream console submit uses explicit framing and cannot execute an accidentally truncated deck.
-- Gate: Reader and console submissions of the same job produce the same expanded descriptors, steps and dataset results. Run fresh build/link/go plus expected failure/skip cases. Reject malformed/incomplete decks, unsupported JCL, bad PROC/symbols, missing libraries and resource limits without partial execution. This is the first unattended cREXX batch checkpoint.
 
 ### Stage 5: Retained 3270 job forms
 

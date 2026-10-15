@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MIT; supplied-storage serial job and spool core. */
 #ifndef PDOS_TWO_SPACE_JOB_H
 #define PDOS_TWO_SPACE_JOB_H
-#define TJB_BYTES 262144U
+#define TJB_LEGACY_BYTES 262144U
+#define TJB_BYTES 294912U
 #define TJB_SLOTS 3U
 #define TJB_SLOT_BYTES 2048U
 #define TJB_PRINT_BYTES 81920U
@@ -11,6 +12,10 @@
 #define TJB_STEPS 8U
 #define TJB_STEP_BYTES 160U
 #define TJB_DESC_BYTES (32U+TJB_STEPS*TJB_STEP_BYTES)
+#define TJB_META_BYTES 512U
+#define TJB_OUTPUT_HOLD 1U
+#define TJB_FULL_BYTES (TJB_DESC_BYTES+TJB_META_BYTES)
+#define TJB_META_BASE (TJB_STEP_BASE+TJB_STEPS*TJB_STEP_BYTES)
 #define TJB_REQUEST_BYTES 128U
 #define TJB_STEP_BASE 128U
 #define TJB_FREE 0U
@@ -52,6 +57,9 @@ void TJBPUT(unsigned char *p,unsigned int value);
 int TJBINIT(TJBPOOL *pool,unsigned char *bytes,unsigned int size);
 /* Validate an entire persisted envelope before recovery mutates it. */
 int TJBLOAD(TJBPOOL *pool,unsigned char *bytes,unsigned int size);
+/* Validate the complete older envelope before upgrading within caller capacity. */
+int TJBUP(TJBPOOL *,unsigned char *,unsigned int capacity,unsigned int used);
+int TJBMCHK(const unsigned char *,unsigned int steps);
 int TJBCHECK(const unsigned char *descriptor,unsigned int size);
 unsigned char *TJBFIND(TJBPOOL *pool,unsigned int owner,unsigned int id);
 unsigned char *TJBSTEP(unsigned char *job,unsigned int step);
