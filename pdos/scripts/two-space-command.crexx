@@ -47,7 +47,9 @@ main: procedure = .int
   sources[11] = "pdos/src/twospace_digest.c"; flags[11] = ""
   sources[12] = "pdos/src/twospace_job.c"; flags[12] = ""
   sources[13] = "pdos/src/twospace_jobdd.c"; flags[13] = ""
-  do i = 9 to 13
+  sources[14] = "pdos/src/twospace_batchui.c"; flags[14] = "-DTBF_PCOMM"
+  sources[15] = "pdos/src/twospace_workbench.c"; flags[15] = "-DTWB_LAYOUT_ONLY"
+  do i = 9 to 15
     source = sources[i]; flag = flags[i]; asm = work || "/part" || i || ".asm"; object = work || "/part" || i || ".obj"
     address system quote(cc) || " -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ " || flag || " -S -I pdpclib/src -I pdos/src " || quote(source) || " -o " || quote(asm)
     if rc <> 0 then return rc
@@ -71,7 +73,7 @@ main: procedure = .int
   do i = 1 to words(common)
     native[i+10] = base || "/c/objects/" || word(common,i) || ".obj"
   end
-  do i = 9 to 13
+  do i = 9 to 15
     call arrayappend native,objects[i]
   end
   module = work || "/PCOMM.rdw"; map = work || "/PCOMM.map"
@@ -88,6 +90,11 @@ main: procedure = .int
   inputs[inputs.0+1] = "pdos/src/twospace_ui.h"
   inputs[inputs.0+1] = "pdos/src/twospace_command_router.h"
   inputs[inputs.0+1] = "pdos/src/twospace_submit.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_batchui.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_workbench.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_surface.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_history.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_3270.h"
   inputs[inputs.0+1] = "pdos/src/twospace_jcl.h"
   inputs[inputs.0+1] = "pdos/src/twospace_jclproc.inc"
   inputs[inputs.0+1] = "pdos/src/twospace_digest.h"

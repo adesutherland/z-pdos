@@ -999,6 +999,79 @@ fixture now includes the batch entry's required SYSTERM DD.
 
 ### Stage 5: Retained 3270 job forms
 
+Status: **In progress**. I authorised the Stage 4 commits and Stage 5
+implementation on 15 October. The accepted product checkpoint is `83283b6`;
+the matching cREXX repair is `a9c080f54` and Lab operation is `73d131ab`.
+
+The intended outcome is Submit, Jobs and Output forms over the same checked
+job/DD service, with the existing console and semantic line route preserved.
+The first increment uses the retained panel body and its owned shared editor:
+named fields are selected for editing, then previewed before an explicit
+submit. It adds no persistent layout or scheduler. The selected three-job
+spool remains bounded; larger history stays with PD-030.
+
+Acceptance criteria (all open until their complete checks pass):
+
+1. **S5-AC01 — preparation:** Submit accepts a checked deck/member or a common
+   PROC with source, parameters and DD overrides. Preview shows the exact JCL
+   and admits it through the Stage 4 converter without publishing a job. Tests
+   compare expanded descriptors with the console route and reject invalid or
+   oversized edits before mutation.
+2. **S5-AC02 — submission identity:** Only explicit submission of a current
+   preview may publish. An attempt consumes its token before the service call;
+   repeated Enter, repaint or reconnect cannot retry it. Editing invalidates
+   preview, and deliberate resubmission requires NEW plus another preview.
+   Failed acknowledgement leaves an explicit uncertain result for JOBS review.
+3. **S5-AC03 — job/output control:** Jobs selects actual non-reused identities,
+   reports execution/print and qualified-step results, and uses checked existing
+   actions. Output filters step/DD and pages retained records without consuming
+   them. Stale selections, busy actions, invalid filters and failed printing
+   preserve results and do not rerun a job.
+4. **S5-AC04 — presentation and ownership:** Retained panels adapt to models
+   2–5 and monochrome. Explicit application key ownership supplies form AIDs,
+   Clear/repaint and editor focus while ordinary Workbench/console behavior
+   returns on every exit/error. IBM1047 interface text and UTF-8 application
+   text remain distinct; raw SYSOUT is not translated again. The line route
+   supports the same state transitions through plain text.
+5. **S5-AC05 — checked implementation:** Supplied-storage C89 controller,
+   generator, pagination and retry/error controls pass normal and sanitizer
+   checks. Classic K/U build/link and complete source review precede the
+   recorded guest freeze. Reuse unchanged native/package proof explicitly.
+6. **S5-AC06 — guest qualification:** The Mainframe Operator proves actual
+   forms-generated JCL and dataset results, models 2–5, monochrome and line,
+   repeated actions, invalid/long fields, cursor/AIDs, reconnect/repaint,
+   failure/busy/console return and affected nested foreground/ADDRESS ownership.
+   Independent stopped state/readback and clean handback close the stage.
+
+Implementation steps:
+
+1. **S5-01 (Done, host increment):** Factor shared prepare/post operations from the
+   Stage 4 controller, add supplied-storage form state, common-PROC deck
+   generation, preview/retry and job/output models with decisive host controls
+   (S5-AC01–03/05).
+2. **S5-02 (In progress):** Bind the controller to retained panels, shared editor,
+   scoped form-key ownership and semantic line input; preserve shell behavior
+   and native encoding (S5-AC04/05).
+3. **S5-03 (Done for initial freeze):** Complete normal/sanitizer and Classic build checks, review
+   the whole selected increment and record a source/input freeze before any
+   operator guest replay (S5-AC05).
+4. **S5-04 (Open):** Qualify the remaining model/recovery/identity/result matrix
+   through the Mainframe Operator, independently review results and retire
+   temporary outputs (S5-AC06). An initial host/source checkpoint does not close
+   Stage 5 or authorize managed-image adoption/release.
+
+First source increment: shared prepare/post, all three form controllers,
+native panel/key/editor binding and source-built K/U are implemented. Normal
+and sanitizer controls, native line re-entry/error cleanup, shared model layouts
+and static analysis pass. [The first result](qualification/BATCH-STAGE5-2026-10-15.md)
+records reviewed PD033-S5-R1 and the independently accepted 29-check model-2
+proof: one actual native CG job, preview/retry guards, physical PF8, filtered
+output, explicit print/purge and ordinary console return. Operator cleanup and
+exact lease handback are complete. R2's forced revision-exhaustion control and
+Classic U build pass; unchanged R1 guest paths are reused by dependency review.
+S5-AC01–05 have selected host/source evidence; complete physical model/recovery
+acceptance remains open under S5-AC06.
+
 - Build Submit, Jobs and Output as U presentation over the established checked service. Submit validates source/member, PROC, parameters and DD overrides and shows the generated JCL; Jobs exposes execution/print status and controls; Output selects expanded step/DD and pages ordered records.
 - Use the existing field, cursor, AID, model, panel and terminal ownership contracts. Preserve Clear/repaint, monochrome, IBM1047 and the semantic teletype path. Display active-job control limitations rather than assuming a concurrent U form controller.
 - Bind submission retry tokens and job actions to real identities. Repeated Enter/reconnect must not submit an unintended second job or act on a stale job; deliberate resubmission is distinct. Purge refuses active or owned records.

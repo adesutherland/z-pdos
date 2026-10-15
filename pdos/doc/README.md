@@ -45,8 +45,12 @@ and an application's service call.
   accepted native z/OS and PDOS results for the pinned common SDK/cREXX package.
 - [Stage 4 JCL contract](architecture/BATCH-STAGE4-JCL.md) and
   [current qualification](qualification/BATCH-STAGE4-2026-10-15.md): common
-  procedures and console/card submission; the result records the open guest
-  gate and any accepted increments. Stage 5 job forms remain separate.
+  procedures and console/card submission, accepted on native z/OS and both
+  PDOS console routes.
+- [Stage 5 form contract](architecture/BATCH-STAGE5-FORMS.md) and
+  [first increment](qualification/BATCH-STAGE5-2026-10-15.md): Submit, Jobs and
+  Output source with an accepted 29-check initial model-2 proof. The full
+  model/recovery qualification gate remains open.
 - [Development guide](development/README.md): source map and change contracts.
 - [Build contract](development/BUILD-CONTRACT.md): recorded acceptance stages.
 - [0.1 guest qualification](qualification/QUALIFICATION.md): exact historical

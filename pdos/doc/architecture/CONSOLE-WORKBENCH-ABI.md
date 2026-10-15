@@ -75,6 +75,11 @@ successful flush/erase counts. Flag 2 supplies continuation prefix length at
 12 (0–198) and pending boolean at 24. Control Text (103) selects ordinary output
 (flag 0), controller text excluded from the program pane (1), or shell-history
 text (2). Each retains ordered semantic teletype/transcript delivery.
+The Stage 5 source extension adds named FORM/SHELL key selections (flags 3/4)
+without changing that text mode. FORM binds application AIDs to the current
+controller token; SHELL releases that binding. Payload length/pointers must be
+zero, and a child cannot borrow its parent's selection. Controller close and
+invocation unwind clear the binding.
 Input (99, flag 0 primary or 1 monitor) selects
 one source at a completed boundary; called-program changes restore on unwind.
 TTY Mode (102) accepts plain mode 0; other modes return 20.
@@ -83,6 +88,11 @@ Line Key (3) returns bytes plus AID; PCOMM owns PF5/PF6 recall policy.
 Workbench actions are consumed by the controller; unassigned AIDs, including
 PF3/PF4 and PA, reach the semantic key caller. Raw session input retains its
 complete AID and cursor contract.
+With FORM key selection, application AIDs reach Line Key after common draft
+capture; Enter and Clear keep the existing submission/repaint behavior. Normal
+Workbench routing returns when the form releases selection. The
+[Stage 5 result](../qualification/BATCH-STAGE5-2026-10-15.md) records the initial
+model-2 proof and the remaining model/recovery gate.
 Existing Line Read (2) returns Enter submissions. Line Set (4) explicitly replaces the
 dock after an AID: cursor offset 8, length/pointer 12/16/20, generation 28.
 Pending attention prevents replacement. Ordinary output, scroll and focus

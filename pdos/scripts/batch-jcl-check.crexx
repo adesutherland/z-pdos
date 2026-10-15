@@ -21,8 +21,8 @@ main: procedure = .int
   call arrayappend outputs,work||"/jcl.obj"
   call arrayappend outputs,work||"/jcl.asm"
   call arrayappend outputs,work||"/cases-test"
-  do suite=1 to words("proc upgrade submit submitui job jobdd jobtemp")
-    label=word("proc upgrade submit submitui job jobdd jobtemp",suite)
+  do suite=1 to words("proc upgrade submit submitui forms formsui job jobdd jobtemp")
+    label=word("proc upgrade submit submitui forms formsui job jobdd jobtemp",suite)
     call arrayappend outputs,work||"/"||label||"-test"
     call arrayappend outputs,work||"/"||label||"-test-sanitize"
   end
@@ -55,23 +55,31 @@ main: procedure = .int
   if rc<>0 then return rc
   sources=.string[]
   flags=.string[]
-  do suite=1 to words("proc upgrade submit submitui job jobdd jobtemp")
-    label=word("proc upgrade submit submitui job jobdd jobtemp",suite)
+  do suite=1 to words("proc upgrade submit submitui forms formsui job jobdd jobtemp")
+    label=word("proc upgrade submit submitui forms formsui job jobdd jobtemp",suite)
     checks="pdos/tests/batch/"||label||".c"
     call arraydrop sources
     call arraydrop flags
     call arrayappend sources,job
     call arrayappend sources,dd
-    if label="proc" | label="submit" | label="submitui" then do
+    if label="proc" | label="submit" | label="submitui" | label="forms" | label="formsui" then do
       call arrayappend sources,digest
       call arrayappend sources,source
     end
     if label="proc" then checks="pdos/tests/batch/jcl_proc.c"
     if label="upgrade" then checks="pdos/tests/batch/job_upgrade.c"
-    if label="submit" | label="submitui" then call arrayappend sources,"pdos/src/twospace_submit.c"
+    if label="submit" | label="submitui" | label="forms" | label="formsui" then call arrayappend sources,"pdos/src/twospace_submit.c"
+    if label="forms" | label="formsui" then call arrayappend sources,"pdos/src/twospace_batchui.c"
+    if label="formsui" then do
+      checks="pdos/tests/batch/forms_ui.c"
+      call arrayappend sources,"pdos/src/twospace_workbench.c"
+      call arrayappend flags,"-DTBF_PCOMM"
+      call arrayappend flags,"-DTWB_LAYOUT_ONLY"
+    end
     if label="submitui" then do
       checks="pdos/tests/batch/submit_ui.c"
       call arrayappend flags,"-DTJF_PCOMM"
+      call arrayappend sources,"pdos/src/twospace_batchui.c"
     end
     if label="jobtemp" then call arrayappend sources,"pdos/src/twospace_jobtemp.c"
     binary=work||"/"||label||"-test"

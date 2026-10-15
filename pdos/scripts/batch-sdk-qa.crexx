@@ -17,6 +17,9 @@ main: procedure = .int
     else if args.5="ui" then do
       commands="pdos/tests/batch/jcl-ui-commands.json";call arraydrop profile;ui=1
     end
+    else if args.5="forms" then do
+      commands="pdos/tests/batch/forms-commands.json";call arraydrop profile;profile.1="--batch-forms";ui=1
+    end
     else return 2
   end
   address crexx "run crexx -nokeep pdos/scripts/batch-clean.crexx --args :work"

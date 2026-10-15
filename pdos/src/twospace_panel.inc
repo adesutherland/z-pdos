@@ -17,6 +17,7 @@ typedef struct {
 static TPPANEL tp_windows[TP_WINDOWS];
 static unsigned int tp_real,tp_controller,tp_next_handle,tp_source,tp_waiting,tp_focus,tp_help,tp_flushes,tp_erases;
 static unsigned int tp_job,tp_phase,tp_os,tp_rc_valid,tp_rc,tp_external,tp_known,tp_gap,tp_shell_controller,tp_control,tp_joined;
+static unsigned int tp_form_keys;
 typedef struct {unsigned int phase,os,valid,rc,name_bytes;unsigned char name[198];} TPCONTEXT;
 static TPCONTEXT tp_saved[TSV_MAX_DEPTH+1U];
 static unsigned int tp_saved_source[TSV_MAX_DEPTH+1U];
@@ -194,6 +195,7 @@ static void console_panel_begin(const TSVFRAME *frame)
 static void console_panel_end(unsigned int token,const unsigned char *result)
 {
     unsigned int d=tp_depth(token),i;
+    if(tp_form_keys==token)tp_form_keys=0U;
     if(!tp_controller)return;
     if(d){tp_draft_owner[d]=tp_draft_bytes[d]=tp_cursor_valid[d]=0U;}
     for(i=0U;i<TP_WINDOWS;++i)if(tp_windows[i].owner==token)tp_windows[i].handle=0U;
@@ -235,6 +237,10 @@ static unsigned int console_panel_key(unsigned int owner,const unsigned char *te
     if(aid==0x7dU){tp_draft_bytes[d]=tp_cursor_valid[d]=0U;tp_waiting=0U;return 0U;}
     if(text){tp_copy(tp_draft[d],text,bytes);tp_draft_bytes[d]=bytes;tp_cursor[d]=cursor;tp_cursor_valid[d]=cursor<tc_cap.rows*tc_cap.columns;}
     else{rc=tp_capture(owner,tc_input_field);if(rc)return rc;}
+    /* A retained form explicitly owns its AIDs until it returns. Clear and
+     * Enter retain the common editor/repaint behavior above. Child callers
+     * cannot borrow the parent's key ownership. */
+    if(tp_form_keys==owner)return 20U;
     v=tp_focus?&tp_program:&tp_shell;width=tp_focus?tp_plan.body_width:tp_plan.shell_width;height=tp_focus?tp_plan.body_rows:tp_plan.shell_rows;
     if(aid==0xf1U)tp_help=!tp_help;
     else if(aid==0xf2U){
@@ -284,7 +290,7 @@ static unsigned int console_panel_service(TSGREQUEST *request)
             if(tc_raw_owner&&tc_raw_owner!=f->token)return 16U;
             if(device_raw_handle){rc=console_device_close(f->token,device_raw_handle);if(rc)return rc;}
             else if(tc_raw_owner){rc=console_device_geometry(&base);if(rc)return rc;}
-            tc_raw_owner=tc_screen_owner=tc_input_owner=0U;tp_known=0U;tc_display_known=0U;if(tp_controller==f->token)tp_controller=0U;return 0U;
+            tc_raw_owner=tc_screen_owner=tc_input_owner=0U;tp_known=0U;tc_display_known=0U;if(tp_controller==f->token)tp_controller=0U;if(tp_form_keys==f->token)tp_form_keys=0U;return 0U;
         }
         n=cms_word(h+12U);p.hi=cms_word(h+16U);p.lo=cms_word(h+20U);
         if(cms_word(h+8U)||!n||n>132U||tc_span(p,n,TSG_READ,data,1U))return 8U;
@@ -304,7 +310,12 @@ static unsigned int console_panel_service(TSGREQUEST *request)
     if(op<TSA_IO_PANEL_CREATE){
         if(f->token!=tp_controller&&op!=TSA_IO_UI_INPUT)return 16U;
         n=cms_word(h+12U);p.hi=cms_word(h+16U);p.lo=cms_word(h+20U);flags=cms_word(h+8U);
-        if(op==TSA_IO_UI_CONTROL){if(flags>2U||n||p.hi||p.lo)return 8U;tp_control=flags;return 0U;}
+        if(op==TSA_IO_UI_CONTROL){
+            if(n||p.hi||p.lo)return 8U;
+            if(flags==TSA_UI_KEYS_FORM){tp_form_keys=f->token;return 0U;}
+            if(flags==TSA_UI_KEYS_SHELL){if(tp_form_keys==f->token)tp_form_keys=0U;return 0U;}
+            if(flags>2U)return 8U;tp_control=flags;return 0U;
+        }
         if(op==TSA_IO_UI_ACTION){if(flags>0xffU)return 8U;rc=console_panel_key(f->token,0,0U,flags,0xffffffffU);return rc;}
         if(op==TSA_IO_UI_INPUT){if(flags>1U||tc_read_owner||tc_attention_pending||tc_raw_owner||flags&&!tc_monitor_ssid)return 16U;
             tc_other_status(0U);if(tc_attention_pending)return 16U;if(flags&&!tc_monitor_interactive)return 20U;

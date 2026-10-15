@@ -1,0 +1,24 @@
+[
+  ["VERSION", "PDIO1"],
+  ["BATCH", "PCOMM END 1 RC=0", [
+    ["REVISION 0", "DECK LABA01.B33.JCL(CG)"],
+    ["REVISION 1", "RUNHOLD YES"],
+    ["REVISION 2", "PREVIEW"],
+    ["REVISION 3", ""],
+    ["REVISION 4", "SUBMIT"],
+    ["REVISION 5", "SUBMIT"],
+    ["REVISION 6", "RELEASE"],
+    ["REVISION 7", "PF(8)", "key"],
+    ["REVISION 8", "OUTPUT"],
+    ["REVISION 9", "STEP BUILD.RUN"],
+    ["REVISION 10", "DD SYSPRINT"],
+    ["REVISION 11", "PRINT"],
+    ["REVISION 12", "JOBS"],
+    ["REVISION 13", "PURGE"],
+    ["REVISION 14", "EXIT"]
+  ], ["BATCH / SUBMIT", "BATCH / JCL PREVIEW", "BATCH / JOBS", "BATCH / OUTPUT",
+      "No unused preview", "PD033 STAGE4 LIBRARY new payload"]],
+  ["JOBS", "PCOMM END 2 RC=0"],
+  ["HELLO", "PCOMM END 3 RC=0"],
+  ["RXVM -v", "PCOMM END 4 RC=0"]
+]

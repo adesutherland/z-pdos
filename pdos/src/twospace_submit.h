@@ -17,8 +17,14 @@ typedef struct {
  unsigned char header[128],meta[TJB_META_BYTES];
  char loadlib[45],proclib[45],prefix[45],volume[7],mapping[6][9];
  TJFOPS ops;
+ unsigned int source_bytes;
 } TJFSTATE;
 int TJFKNOW(const char *);
 int TJFCMD(TJFSTATE *,const TJFOPS *,const char *);
+/* Preparation is read-only. PLAN owns a snapshot of the exact FB80 source;
+ * POST consumes that prepared result before the single publish attempt. */
+int TJFCONFIG(TJFSTATE *,const TJFOPS *);
+int TJFPLAN(TJFSTATE *,const char *,const unsigned char *,unsigned int);
+int TJFPOST(TJFSTATE *,unsigned int,unsigned int,unsigned int *);
 int TJFENTRY(const char *);
 #endif

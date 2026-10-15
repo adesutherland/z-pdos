@@ -179,6 +179,8 @@ def parse_transcript(raw):
             "sha256":hashlib.sha256(data).hexdigest()}
 
 def run(a):
+    if a.batch_forms and not a.normal:raise ValueError("batch forms require normal console proof")
+    if a.batch_forms and (a.batch_devices or a.batch_jobs or a.batch_dd):raise ValueError("choose forms or a descriptor matrix")
     if a.job_cut and not (a.batch_jobs and a.normal):raise ValueError("job cut requires explicit normal batch proof")
     if a.batch_data and not (a.batch_dd and a.normal):raise ValueError("batch data requires explicit normal DD proof")
     if a.batch_jcl and not (a.batch_dd and a.normal):raise ValueError("batch JCL requires explicit normal DD proof")
@@ -191,7 +193,7 @@ def run(a):
     port=unused_loopback_port();script=unused_loopback_port();before=digest(disk)
     primary="3215 noprompt" if a.line_primary else "3270"
     cfg="ARCHLVL ESAME\nMAINSIZE 512\nNUMCPU 1\nCPUMODEL 2064\nDIAG8CMD DISABLE\nSHCMDOPT DISABLE\nECPSVM NO\nCODEPAGE 819/1047\n"
-    if a.batch_devices or a.batch_jobs or a.batch_dd:cfg+="LEGACYSENSEID ON\n"
+    if a.batch_devices or a.batch_jobs or a.batch_dd or a.batch_forms:cfg+="LEGACYSENSEID ON\n"
     cfg+=f"CNSLPORT 127.0.0.1:{port}\n01B9 3390 {disk}\n0009 {primary}\n"
     attachments=[]
     for option,address in (("cms_exchange","01BA"),("fixture_exchange","01BB")):
@@ -214,7 +216,7 @@ def run(a):
         sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"batch"))
         from actor import prepare as batch_prepare
         cfg+=batch_prepare(out)
-    if a.batch_jobs or a.batch_dd:
+    if a.batch_jobs or a.batch_dd or a.batch_forms:
         sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"batch"))
         from job_actor import prepare as job_prepare
         cfg+=job_prepare(out)
@@ -330,7 +332,8 @@ def run(a):
                 # D4JOB executes eleven jobs, including repeated 192 MiB
                 # allocation/zero/free cycles. This is a hang backstop for
                 # the complete matrix, not a per-step performance gate.
-                matrix_limit=900 if (a.batch_sdk and command=="D4JOB") or a.batch_jcl else 180
+                form_case=command=="BATCH" or command.startswith("BATCH ")
+                matrix_limit=900 if (a.batch_sdk and command=="D4JOB") or a.batch_jcl or form_case else 180
                 responses=case[2] if len(case)>2 else []
                 prompt_case=len(case)>4 and case[4]=="prompt"
                 prompt_capture=client if client else monitor
@@ -397,7 +400,7 @@ def run(a):
                     return None
                 # Success still requires the observed native BEGIN/END result.
                 # A larger allocation example has an explicit failure watchdog.
-                limit=matrix_limit if (a.batch_sdk and command=="D4JOB") or a.batch_jcl else 180 if command=="HELLO --memory-check" else 60
+                limit=matrix_limit if (a.batch_sdk and command=="D4JOB") or a.batch_jcl or form_case else 180 if command=="HELLO --memory-check" else 60
                 shown=until(completed,proc,log,limit)
                 screens.append(shown)
                 if a.editor and command=="VERSION" and not client:
@@ -658,7 +661,15 @@ def run(a):
         except Exception as exc:
             checks["native_batch_dd_capture_complete"]=False
             if error is None:error=repr(exc)
+    if a.batch_forms:
+        try:
+            from forms_actor import inspect as forms_inspect
+            checks.update(forms_inspect(out,raw))
+        except Exception as exc:
+            checks["batch_forms_capture_complete"]=False
+            if error is None:error=repr(exc)
     receipt={"profile":{"model":a.model,"colour":a.colour,"basic":a.basic,"editor":a.editor,"oversize":a.oversize,"workbench":a.workbench,"transfer":a.transfer,"workbench_normal":a.workbench_normal,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw,"stage3":a.stage3,"batch_devices":a.batch_devices,"batch_jobs":a.batch_jobs,"batch_dd":a.batch_dd,"batch_data":a.batch_data,"batch_sdk":a.batch_sdk,"batch_jcl":a.batch_jcl,"job_cut":a.job_cut},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
+    receipt["profile"]["batch_forms"]=a.batch_forms
     if service_cost is not None:receipt["service_cost"]=service_cost
     if a.normal and transcript is not None and any(e.get("text","").startswith("PD25 ") for e in transcript["events"]):
         from io_benchmark_check import observations
@@ -698,6 +709,9 @@ def run(a):
         if a.batch_sdk:
             from sdk_actor import stored as sdk_stored
             checks.update(sdk_stored(out,stored["files"]))
+        if a.batch_forms:
+            from forms_actor import stored as forms_stored
+            checks.update(forms_stored(out,stored["files"]))
         (out/"store-after.json").write_text(json.dumps(stored,indent=2)+"\n");flat.unlink()
         receipt["pass"]=all(checks.values())
     (out/"receipt.json").write_text(json.dumps(receipt,indent=2)+"\n")
@@ -718,6 +732,7 @@ if __name__=="__main__":
     p.add_argument("--batch-data",action="store_true")
     p.add_argument("--batch-sdk",action="store_true")
     p.add_argument("--batch-jcl",action="store_true")
+    p.add_argument("--batch-forms",action="store_true")
     p.add_argument("--job-cut",action="store_true")
     p.add_argument("--stage3",choices=("graph","family","dbcs","recovery","policy"))
     for name in ("cms-exchange","fixture-exchange","tape-input"):p.add_argument("--"+name)

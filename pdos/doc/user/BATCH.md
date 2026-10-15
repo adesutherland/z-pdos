@@ -1,7 +1,7 @@
 # Submit a batch job and review its output
 
 This is the Stage 4 source-development interface. Managed-image adoption and
-the Stage 5 forms have separate gates. The existing PCOMM console remains the
+complete Stage 5 form qualification have separate gates. The existing PCOMM console remains the
 entry point on both a line terminal and a model-2 3270.
 
 The operator installs the checked native programs, common procedures and one
@@ -42,6 +42,31 @@ Job states are 1 queued, 2 execution-held, 3 running, 4 complete, 5 failed,
 and 3 failed. Step states are 0 pending, 1 active, 2 normal, 3 skipped, 4 error,
 5 cancelled and 6 interrupted. OUTPUT POLICY explains whether delivery is held.
 An OS failure has no valid application RC; never interpret an unavailable RC as 0.
+
+## Development job forms
+
+The Stage 5 source candidate adds `BATCH` without removing these console
+commands. Its first model-2 workflow is qualified; the complete model, line
+and recovery matrix remains open in the [Stage 5 result](../qualification/BATCH-STAGE5-2026-10-15.md).
+The forms retain named fields in the panel body and edit the selected field
+through the common input area. PF5/PF6 select a field; PF2 prepares `EDIT value`
+there; Enter accepts it. Direct field commands work in that same area.
+
+Start with `DECK dataset(member)`, or choose `PROC CRXCG` and `SRC dataset(member)`
+to generate a common procedure call. CRXC/CRXCL also require OUT. PARAMS supplies
+a bounded parameter card, and OVERRIDE adds a complete qualified DD card.
+PREVIEW shows and validates the exact JCL without creating a job. SUBMIT or PF10
+publishes that preview once. Enter alone refreshes; changing submission fields
+requires another preview. After an attempt, use NEW plus PREVIEW only for a
+deliberate new submission. If acknowledgement fails, review JOBS first.
+
+JOBS/PF11 selects the job view; SELECT takes an actual job identity. RELEASE,
+CANCEL, PRINT and PURGE use the existing checked actions. QUEUEHOLD delays a
+queued job; HOLD YES/NO sets the submission's output policy. OUTPUT/PF12 opens
+retained records; STEP and DD set its filters. PF7/PF8 page and LEFT/RIGHT expose
+wide records. PF3 returns from preview to Submit, or from a main form to the
+console. EXIT returns directly. The initial form workflow includes normal
+console HELLO/RXVM execution after leaving the forms.
 
 ## Cards, console frames and execution hold
 

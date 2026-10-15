@@ -6,6 +6,9 @@
 #include "twospace_submit.h"
 #include "twospace_abi.h"
 #include "twospace_digest.h"
+#ifdef TJF_PCOMM
+#include "twospace_batchui.h"
+#endif
 static const char *programs[]={"RXC","RXAS","RXLINK","RXVM","BTEST31","BADDR31"};
 static void init(unsigned char *h,unsigned int n)
 {memset(h,0,n);TJBPUT(h,1U);TJBPUT(h+4U,n);}
@@ -202,9 +205,40 @@ static int console_cards(TJFSTATE *s,const char *identity,unsigned int *bytes)
   if(!bad){memset(s->deck+total,0x40,80U);memcpy(s->deck+total,raw,n);total+=80U;}
  }
 }
+int TJFCONFIG(TJFSTATE *s,const TJFOPS *ops)
+{
+ if(!s||!ops||!ops->load||!ops->service||!ops->input||!ops->line||!ops->record)return 8;
+ s->ops=*ops;s->result.valid=0U;
+ if(site(s)){say(s,"SUBMIT: invalid or unavailable PDOS.BATCH.SITE");return 8;}return 0;
+}
+int TJFPLAN(TJFSTATE *s,const char *source,const unsigned char *cards,unsigned int n)
+{
+ unsigned int rc;char text[180];TJCERROR error;TJCSITE callbacks;
+ if(!s||!s->ops.service)return 8;s->result.valid=0U;s->source_bytes=0U;
+ if(source){if(cards||n)return 8;rc=(unsigned int)load_cards(s,source,s->deck,sizeof s->deck,&n);if(rc)return (int)rc;}
+ else {if(!cards||!n||n>sizeof s->deck||n%80U)return 8;memmove(s->deck,cards,n);}
+ s->source_bytes=n;memset(&callbacks,0,sizeof callbacks);callbacks.context=s;callbacks.program=program_input;callbacks.dd=dd_input;callbacks.procedure=proc_input;
+ rc=(unsigned int)TJCCONV(&s->work,s->deck,n,&callbacks,&s->result,&error);
+ if(rc){strcpy(text,"JCL ERROR");field(text," CARD=",error.card);field(text," COLUMN=",error.column);strcat(text," ");strcat(text,TJCMSG(error.reason));say(s,text);}return (int)rc;
+}
+int TJFPOST(TJFSTATE *s,unsigned int held,unsigned int output_held,unsigned int *identity)
+{
+ unsigned int id,rc;char text[80];
+ if(identity)*identity=0U;if(!s||!identity||!s->result.valid||held>1U||output_held>1U)return 8;
+ /* Never retry a prepared publication, including an uncertain service error. */
+ s->result.valid=0U;
+ if(output_held)TJBPUT(s->result.job+TJB_DESC_BYTES+228U,TJB_OUTPUT_HOLD);
+ init(s->header,128U);TJBPUT(s->header+12U,1U);TJBPUT(s->header+16U,TJB_FULL_BYTES+TJD_EXT_BYTES);
+ rc=s->ops.service(s->ops.context,TSA_IO_JOB_SUBMIT,128U,s->header,s->result.job);if(rc)return (int)rc;
+ id=TJBWORD(s->header+8U);if(!id)return 12;*identity=id;strcpy(text,"SUBMITTED JOB ");append_number(text,id);say(s,text);
+ if(held){rc=action(s,id,TSA_IO_JOB_HOLD);if(!rc)summary(s);return (int)rc;}
+ rc=action(s,id,TSA_IO_JOB_RUN);if(rc){say(s,"JOB retained; execution not started");return (int)rc;}summary(s);
+ rc=(unsigned int)delivery(s,id);if(rc)say(s,"JOB execution retained; print delivery failed; OUTPUT remains available");
+ if(!action(s,id,TSA_IO_JOB_STATUS))summary(s);return (int)rc;
+}
 static int submit(TJFSTATE *s,char *source,char *next)
 {
- unsigned int n=0U,id,rc,held=0U,output_held=0U;char *arg,*identity=0,text[180];TJCERROR error;TJCSITE callbacks;
+ unsigned int n=0U,id,rc,held=0U,output_held=0U;char *arg,*identity=0;
  if(!source)return 8;
  if(!strcmp(source,"*")){identity=token(&next);if(!identity)return 8;}
  while((arg=token(&next))!=0){upper(arg);
@@ -215,19 +249,10 @@ static int submit(TJFSTATE *s,char *source,char *next)
  /* Once console framing is requested, consume to its explicit end even if
     site admission will fail. Remaining cards must never become shell commands. */
  if(!strcmp(source,"*")){rc=(unsigned int)console_cards(s,identity,&n);if(rc)return (int)rc;}
- if(site(s)){say(s,"SUBMIT: invalid or unavailable PDOS.BATCH.SITE");return 8;}
+ if(TJFCONFIG(s,&s->ops))return 8;
  rc=(unsigned int)(!strcmp(source,"READER")?reader(s,&n):!strcmp(source,"*")?0:load_cards(s,source,s->deck,sizeof s->deck,&n));
- if(rc)return (int)rc;memset(&callbacks,0,sizeof callbacks);callbacks.context=s;callbacks.program=program_input;callbacks.dd=dd_input;callbacks.procedure=proc_input;
- rc=(unsigned int)TJCCONV(&s->work,s->deck,n,&callbacks,&s->result,&error);
- if(rc){strcpy(text,"JCL ERROR");field(text," CARD=",error.card);field(text," COLUMN=",error.column);strcat(text," ");strcat(text,TJCMSG(error.reason));say(s,text);return (int)rc;}
- if(output_held)TJBPUT(s->result.job+TJB_DESC_BYTES+228U,TJB_OUTPUT_HOLD);
- init(s->header,128U);TJBPUT(s->header+12U,1U);TJBPUT(s->header+16U,TJB_FULL_BYTES+TJD_EXT_BYTES);
- rc=s->ops.service(s->ops.context,TSA_IO_JOB_SUBMIT,128U,s->header,s->result.job);if(rc)return (int)rc;
- id=TJBWORD(s->header+8U);strcpy(text,"SUBMITTED JOB ");append_number(text,id);say(s,text);
- if(held){rc=action(s,id,TSA_IO_JOB_HOLD);if(!rc)summary(s);return (int)rc;}
- rc=action(s,id,TSA_IO_JOB_RUN);if(rc){say(s,"JOB retained; execution not started");return (int)rc;}summary(s);
- rc=(unsigned int)delivery(s,id);if(rc)say(s,"JOB execution retained; print delivery failed; OUTPUT remains available");
- if(!action(s,id,TSA_IO_JOB_STATUS))summary(s);return (int)rc;
+ if(rc)return (int)rc;rc=(unsigned int)TJFPLAN(s,0,s->deck,n);if(rc)return (int)rc;
+ return TJFPOST(s,held,output_held,&id);
 }
 static int output(TJFSTATE *s,unsigned int id,char *next)
 {
@@ -255,6 +280,7 @@ int TJFKNOW(const char *command)
  char text[199],*at,*first,*second;unsigned int n;if(!command)return 0;n=(unsigned int)strlen(command);if(n>=sizeof text)return 0;
  strcpy(text,command);at=text;first=token(&at);if(!first)return 0;upper(first);
  if(!strcmp(first,"HELP")){second=token(&at);if(!second)return 0;upper(second);return !strcmp(second,"SUBMIT")||!strcmp(second,"JOBS")||!strcmp(second,"BATCH");}
+ if(!strcmp(first,"BATCH"))return 1;
  return !strcmp(first,"SUBMIT")||!strcmp(first,"JOBS")||!strcmp(first,"STATUS")||!strcmp(first,"OUTPUT")||!strcmp(first,"HOLD")||!strcmp(first,"RELEASE")||!strcmp(first,"CANCEL")||!strcmp(first,"PURGE")||!strcmp(first,"PRINT");
 }
 int TJFCMD(TJFSTATE *s,const TJFOPS *ops,const char *command)
@@ -311,5 +337,8 @@ static void native_line(void *context,const char *p)
 static void native_record(void *context,const unsigned char *p,unsigned int n)
 {(void)context;TUILINE(p,n);}
 int TJFENTRY(const char *command)
-{TJFOPS ops;memset(&ops,0,sizeof ops);ops.load=native_load;ops.service=native_service;ops.input=native_input;ops.line=native_line;ops.record=native_record;return TJFCMD(&native_state,&ops,command);}
+{TJFOPS ops;char text[199];memset(&ops,0,sizeof ops);ops.load=native_load;ops.service=native_service;ops.input=native_input;ops.line=native_line;ops.record=native_record;
+ if(!command||strlen(command)>=sizeof text)return 8;strcpy(text,command);upper(text);
+ if(!strncmp(text,"BATCH",5U)&&(!text[5]||text[5]==' '))return TBFENTRY(&native_state,&ops,text[5]?command+6U:"");
+ return TJFCMD(&native_state,&ops,command);}
 #endif

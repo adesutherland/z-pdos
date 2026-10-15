@@ -12,6 +12,7 @@ int TWBLAYOUT(unsigned int rows,unsigned int cols,TWBPLAN *p)
     else{p->position=p->heading-4U;p->body_rows=p->position-p->body;p->shell_column=1U;p->shell_row=p->position+2U;p->shell_rows=2U;p->shell_width=cols-2U;p->body_width=cols-2U;}
     return p->body_rows&&p->body_rows<=TPH_VIEW_ROWS?0:-1;
 }
+#ifndef TWB_LAYOUT_ONLY
 typedef struct {unsigned char data[256];unsigned int bytes;} LABEL;
 static int label(LABEL *l,const char *s)
 {unsigned int n;if(TWDLabel(s,l->data+l->bytes,sizeof l->data-l->bytes,&n))return -1;l->bytes+=n;return 0;}
@@ -87,3 +88,4 @@ int TWBCOMPOSE(TWFSURFACE *s,const TWBPLAN *p,const TWBCONTEXT *c,const TPHSTATE
     }
     return 0;
 }
+#endif
