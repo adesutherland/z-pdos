@@ -1,0 +1,60 @@
+/* SPDX-License-Identifier: MIT; fixed-path host and Classic converter checks.
+   No guest configuration, submission, device operation or image construction. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>0 then return 2
+  work="build/pdos/batch-jcl"
+  address crexx "run test ! -L :work"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  outputs=.string[]
+  consumers=.string[]
+  binary=.string
+  call arrayappend outputs,work||"/jcl-test"
+  call arrayappend outputs,work||"/jcl-test-sanitize"
+  call arrayappend outputs,work||"/jcl.obj"
+  call arrayappend outputs,work||"/jcl.asm"
+  do i=1 to outputs.0
+    binary=outputs[i]
+    address crexx "run test ! -L :binary"
+    if rc<>0 then return 2
+    address crexx "run test -e :binary"
+    if rc=0 then do
+      address crexx "run lsof -t :binary" output consumers
+      if rc<>1 then do
+        say "Refusing to replace an active or unchecked converter test:" binary
+        return 2
+      end
+    end
+  end
+  source="pdos/src/twospace_jcl.c"
+  job="pdos/src/twospace_job.c";dd="pdos/src/twospace_jobdd.c"
+  checks="pdos/tests/batch/jcl.c"
+  binary=outputs.1
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -I pdos/src :source :job :dd :checks -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary"
+  if rc<>0 then return rc
+  binary=outputs.2
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src :source :job :dd :checks -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary"
+  if rc<>0 then return rc
+  cc="build/compiler/mvs/gcc/mf-classic-cc"
+  classicas="build/tools/assembler/mf-classic-as"
+  asm=work||"/jcl.asm";object=work||"/jcl.obj"
+  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdpclib/src -I pdos/src :source -o :asm"
+  if rc<>0 then return rc
+  address crexx "run test -e :object"
+  if rc=0 then do
+    address crexx "run rm :object"
+    if rc<>0 then return rc
+  end
+  else if rc<>1 then return rc
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+  if rc<>0 then return rc
+  say "PD033 JCL host checks and Classic compile/assemble PASS; guest integration remains open"
+  return 0

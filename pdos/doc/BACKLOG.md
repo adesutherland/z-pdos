@@ -896,6 +896,79 @@ console profiles. JCL and job forms are later stages.
 
 ### Stage 4: JCL, procedures and console submission
 
+I authorised this stage on 15 October after publishing the accepted Stage 3
+checkpoint. The intended outcome is an ordinary shared JCL deck submitted from
+cards or the existing console, expanded through common cREXX procedures and
+executed by the checked job/DD service. The console keeps its present role;
+Stage 5 adds forms over this same implementation.
+
+Acceptance criteria:
+
+1. **S4-AC01 — conversion:** A supplied-storage C89 U converter accepts complete
+   IBM1047 cards, selected JOB/EXEC/SET/DD syntax, continuation/quoting and
+   explicit end/data framing. It returns checked job/DD descriptors only after
+   the whole input validates. Malformed, unsupported and oversized input reports
+   the original card/column and starts no program. Host sanitizer controls and
+   a Classic compile/assemble check verify the portable core.
+2. **S4-AC02 — procedures:** Common CRXC, CRXCG, CRXCL and CRXLGO source procedures
+   expand defaults, symbols and step-qualified overrides with truthful RXBIN
+   outputs. Missing/recursive procedures, undefined symbols and expansion limits
+   fail admission. Independent expanded-job expectations verify each procedure.
+3. **S4-AC03 — allocation and search:** Explicit site bindings and checked
+   program/procedure library order select actual members. DD concatenation,
+   native record attributes, selected SPACE/DISP/temporary semantics and
+   COND=(0,NE) retain the Stage 3 ownership and dependent-skip rules. Missing
+   libraries and quota failures cannot publish a runnable partial job.
+4. **S4-AC04 — submission and control:** Reader, SUBMIT dataset/member and
+   explicitly framed console input use that converter and existing job service.
+   HELP, JOBS, STATUS, OUTPUT step/DD selection, HOLD/RELEASE, CANCEL and PURGE
+   act on checked identities. Truncation, active-job/busy behavior, cleanup and
+   print failure preserve the existing console/input ownership contracts.
+5. **S4-AC05 — native and guest result:** The Mainframe Operator qualifies the
+   shared procedures/decks on native z/OS first and then on PDOS line/model 2.
+   Reader and console produce equivalent expanded jobs, step results and exact
+   datasets for fresh build/link/go and expected failure/skip cases. Independent
+   readback and resource handback close this stage, with summaries only.
+
+Implementation sequence:
+
+1. **S4-01 (host increment complete, integration open):** Implement the portable direct-JCL conversion core,
+   source diagnostics and independent malformed/bounds controls (S4-AC01;
+   foundation for S4-AC03). Keep catalog/program resolution as explicit read-only
+   admission callbacks; do not guess DD direction from DISP.
+2. **S4-02 (open):** Add supplied-storage PROC expansion, scoped symbols,
+   qualified overrides and common procedure sources (S4-AC02/03), building on
+   S4-01. Freeze only supported native semantics and retain precise rejection.
+3. **S4-03 (open):** Integrate reader and console intake/control/output over the
+   existing K service, including durable expanded-step/source identity
+   (S4-AC03/04). Reconcile the eight-byte descriptor step name with procedure
+   qualified display names explicitly; do not truncate or silently collide.
+4. **S4-04 (open):** Complete source review, focused checks and input freeze,
+   then request native-first operator qualification (S4-AC05). Repairs return to
+   review/refreeze before affected replay; unchanged Stage 3 checks are reused.
+
+All acceptance criteria remain open until their complete checks pass. A host
+converter increment does not establish PROC, console or guest JCL acceptance.
+
+S4-01 result (15 October): The [direct converter contract](architecture/BATCH-STAGE4-JCL.md)
+and [host result](qualification/BATCH-STAGE4-JCL-2026-10-15.md) record 14,653
+assertions in normal and ASan/UBSan builds, no static-analyzer findings, and
+Classic C31 compile/assembly. The 22,012-byte supplied workspace returns checked
+job/DD descriptors only after complete validation and read-only site admission.
+S4-AC01's host portion passes; U service integration and S4-AC02–05 remain open.
+
+The operator's read-only Stage 4 review identified a descriptor capacity gap:
+the present job-wide 16 DD entries cannot hold the qualified four-step CRXLGO
+layout (19 before library concatenations). S4-02/03 must select and review an
+explicit versioned descriptor/persisted-spool capacity change. The direct
+converter keeps current bounds and rejects overflow. Also retain separate
+JCLLIB, native JOBLIB/STEPLIB and cREXX RXBIN library roles; STEPLIB replaces
+JOBLIB for its step. Supply in-stream procedure input via caller overrides for
+the historical z/OS reference, keep compiler exits enabled by default, and
+qualify any IKJEFT01/CALL interpretation explicitly. Stage 3's direct ADDRESS
+execution did not qualify that launcher. The older direct-version syntax
+fixture now includes the batch entry's required SYSTERM DD.
+
 - Implement supplied-storage JCL conversion/expansion in U into the checked job descriptor. Admit only the frozen JOB, EXEC PGM/PARM/PROC, symbols/overrides and DD subset, including actual continuation/quoting and in-stream delimiters needed by the shared decks.
 - Resolve the configured procedure and program-library search order. Support explicit site/library bindings, DD concatenation, stepname.ddname overrides, selected temporary datasets/dispositions and stop conditions. Unsupported operands produce precise card/column diagnostics before execution.
 - Deliver common CRXC/CRXCG and the reviewed CRXCL/CRXLGO variants with their truthful RXBIN outputs. Distinguish native load libraries from bytecode libraries; document launchers, DDs and supported storage requests.
