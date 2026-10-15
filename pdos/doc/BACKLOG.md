@@ -734,6 +734,7 @@ be K-only and explicitly budgeted rather than consuming low U placement.
 - Type: improvement
 - Status: Open
 - Target: A separate U editor application and shared 3270/line presentation API; later than 0.2.1
+- Further assessment (15 October): The requested PD-033 manual makes fullscreen source editing useful now. THE's wider C99/platform/driver/macro surface is disproportionate for the first increment. Recommend a small C record editor using the existing EDIT model and VM/CE Community Edition's MECAFF EE as the interaction/source-reuse reference. Assess selective attributed reuse before importing code; EE's CMS file/console calls are not PDOS services. Start with one buffer, genuinely editable 3270 rows and line commands, paging/find/change/undo and safe SAVE/CANCEL; keep the line/LLM route over the same model. Qualify dataset/member open/save/reopen and failed-save preservation before claiming the manual edit path. This is the proposed next increment after baseline commits `0564424` / Lab `d0a2e6ed`, not a THE or EE port result.
 - Observation: PDOS now has retained panels/history and checked device/input sessions, but no interactive file editor. The maintained THE CREXX fork separates its logical editor model from curses and LLM drivers. Its supported platforms are currently macOS, Linux/POSIX and native Windows, with C99 code, runtime-loaded drivers and a crexxsaa macro bridge; none of those facts establishes a PDOS port.
 - Direction (10 October): I want an editor in a later release, possibly a reduced build profile of our THE fork. VM/370 CMS EDIT and VM/CE's MECAFF EE are also relevant precedents/candidates. EE is a C fullscreen editor written by Hans-Walter Latz and released to the public domain; assess its CMS record-file/console dependencies and fsio/fullscreen adapter against our checked PDOS services before choosing the port. Its existing 3270 support may reduce the display work, but there is no PDOS port result yet. Assess reuse in the owning THE repository, add a block-mode 3270 driver and explicit record-file/platform adapter, and select a named mainframe compiler/runtime. Start with open/edit/find/change/save/undo and useful XEDIT/THE commands; retain a semantic line/LLM route. A statically selected driver and optional features can bound the first profile without maintaining a copied editor fork in PDOS. cREXX macros and ADDRESS THE can follow the source-script/host integration in PD-026.
 - Evidence: THE's maintained README and doc/architecture.md describe the driver-neutral editor/LLM model; doc/crexx.md describes the existing compile/cache and ADDRESS THE bridge. [VM/CE V1R1.2](https://www.vm370.org/node/4) identifies the shipped MECAFF EE tools and source. The [MECAFF upstream](https://github.com/devhawala/mecaff), reviewed at 1694fa893eb962ef1dca156247c6c3cca1750ac8, supplies separate eecore/eecmds/eescrn/fsio modules; the core uses CMS file-state/open/read/write/erase and rename operations, so file replacement needs explicit adaptation as well as fullscreen I/O. PD-024 owns the PDOS presentation/input contracts. There is no compile/link/guest proof of THE on PDOS yet.
@@ -1105,6 +1106,20 @@ evidence. Review/check/refreeze the repair before replay; the planned fresh
 does not provide fullscreen member editing; the requested manual/source-edit
 workflow also needs the separately reviewed PD-027 direction. This baseline
 does not close Stage 6 or select a release/managed image.
+
+Post-baseline qualification: the reviewed actor watchdog repair completed the
+physical reader/forms path with 34 true checks and normal shutdown. Its strict
+33-key gate rejected one pre-existing panel-isolation check missing from the
+expectation list. R7 strengthens the lists to 34/32; reviewed host reassertion
+of the untouched R6 receipt passes, reusing unchanged physical execution.
+Guarded same-disk restart then passes 32/32; original JOB 2 output prints
+byte-exact and purges, with no explicit submission or automatic-dispatch path.
+Independent core, durable spool, VB gold, outside-STORE and resource checks
+pass. See the [Stage 6 checkpoint](qualification/BATCH-STAGE6-2026-10-15.md).
+The manual screenshots expose misleading shell PF-key legends during BATCH
+and a source-edit notice after output-filter changes. Repair these before
+Stage 6 closure. The source-editor direction remains PD-027; source editing
+is not established by the installed-source compile/run proof.
 
 | Acceptance | Required result |
 | --- | --- |

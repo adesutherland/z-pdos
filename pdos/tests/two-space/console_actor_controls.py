@@ -14,6 +14,19 @@ import jcl_fixture as jf
 import forms_recovery_actor as recovery
 
 class Controls(unittest.TestCase):
+    def test_reader_walkthrough_waits_for_full_chain_completion(self):
+        plain=SimpleNamespace(batch_sdk=False,batch_jcl=False,batch_walkthrough=False)
+        walkthrough=SimpleNamespace(batch_sdk=False,batch_jcl=False,batch_walkthrough=True)
+        self.assertEqual(cm.command_deadlines(plain,'SUBMIT READER HOLD'),(180,60))
+        self.assertEqual(cm.command_deadlines(walkthrough,'SUBMIT READER HOLD'),(900,900))
+        self.assertEqual(cm.command_deadlines(plain,'BATCH'),(900,900))
+        self.assertEqual(cm.command_deadlines(plain,'BATCH CRXLGO'),(900,900))
+        self.assertEqual(cm.command_deadlines(plain,'HELLO --memory-check'),(180,180))
+        self.assertEqual(cm.command_deadlines(plain,'VERSION'),(180,60))
+        for flag,command in (('batch_jcl','SUBMIT READER HOLD'),('batch_sdk','D4JOB')):
+            profile=SimpleNamespace(**vars(plain));setattr(profile,flag,True)
+            self.assertEqual(cm.command_deadlines(profile,command),(900,900))
+
     def test_complete_fixture_valid_on_physical_line(self):
         cases=json.loads(Path('pdos/tests/batch/forms-complete-commands.json').read_text())
         cm.validate_responses(cases,True,True,True,True)

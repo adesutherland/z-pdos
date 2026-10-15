@@ -50,6 +50,17 @@ def ordered_results(texts,cases):
     observed=[text for text in texts if re.match(r"^PCOMM END [0-9]+ ",text)]
     return observed==expected
 
+def command_deadlines(a,command):
+    """Hang backstops; completion still requires the actual guest event.
+
+    Reader submission executes the full compiler chain before returning even
+    when the caller is the walkthrough rather than the earlier JCL profile.
+    Keep response and final-completion deadlines selected by the same policy.
+    """
+    batch=(a.batch_sdk and command=="D4JOB") or a.batch_jcl or a.batch_walkthrough or command=="BATCH" or command.startswith("BATCH ")
+    if batch:return 900,900
+    return 180,180 if command=="HELLO --memory-check" else 60
+
 def submitted_cursor_resets(records):
     """The field-clear write itself positions the locked cursor at its start."""
     clears=[r for r in records if len(r) in (9,13) and r[:3]==b"\xf1\xc1\x11" and r[5]==0x3c and r[8]==0]
@@ -396,7 +407,7 @@ def run(a):
                 # allocation/zero/free cycles. This is a hang backstop for
                 # the complete matrix, not a per-step performance gate.
                 form_case=command=="BATCH" or command.startswith("BATCH ")
-                matrix_limit=900 if (a.batch_sdk and command=="D4JOB") or a.batch_jcl or form_case else 180
+                matrix_limit,limit=command_deadlines(a,command)
                 responses=case[2] if len(case)>2 else []
                 prompt_case=len(case)>4 and case[4]=="prompt"
                 prompt_capture=client if client else monitor
@@ -497,7 +508,6 @@ def run(a):
                     return None
                 # Success still requires the observed native BEGIN/END result.
                 # A larger allocation example has an explicit failure watchdog.
-                limit=matrix_limit if (a.batch_sdk and command=="D4JOB") or a.batch_jcl or form_case else 180 if command=="HELLO --memory-check" else 60
                 shown=until(completed,proc,log,limit)
                 screens.append(shown)
                 if a.batch_walkthrough:
