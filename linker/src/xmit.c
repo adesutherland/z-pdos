@@ -69,7 +69,7 @@ unsigned char *xmit_write_segments (const unsigned char *pos, unsigned char *sta
         
         change = (diff >= 253) ? 0xff : (diff + 2);
         
-        if (change < 0xff) {
+        if (diff <= 253) {
             start_pos[1] |= SEGMENT_LAST_REC_SEG;
         }
 

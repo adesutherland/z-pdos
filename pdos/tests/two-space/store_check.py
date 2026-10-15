@@ -30,7 +30,7 @@ def records(track):
 def inspect(path):
     raw = Path(path).read_bytes()
     tracks=(len(raw)-512)//TRACK
-    if len(raw) != 512+tracks*TRACK or tracks not in (1500,7680):
+    if len(raw) != 512+tracks*TRACK or tracks not in (1500,2250,7680):
         raise ValueError("not the selected flat 3390")
     large=tracks==7680
     bank_blocks=LARGE_BANK_BLOCKS if large else 115

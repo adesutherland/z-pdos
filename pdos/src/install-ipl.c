@@ -9,11 +9,17 @@
 
 #define TRACK 56832
 #define HEADS 15
+#ifndef IPL_CYLINDERS
 #if defined(TSF_LARGE_FILES)
-#define TRACKS (512 * HEADS)
+#define IPL_CYLINDERS 512
 #else
-#define TRACKS (100 * HEADS)
+#define IPL_CYLINDERS 100
 #endif
+#endif
+#if IPL_CYLINDERS != 100 && IPL_CYLINDERS != 150 && IPL_CYLINDERS != 512
+#error Unsupported checked IPL geometry
+#endif
+#define TRACKS (IPL_CYLINDERS * HEADS)
 #define REQUIRE(x) do { if (!(x)) { \
     fprintf(stderr,"IPL image:%d: %s\n",__LINE__,#x); exit(1); } } while (0)
 static unsigned char track[TRACK], compare[TRACK];

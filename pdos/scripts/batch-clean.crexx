@@ -1,0 +1,25 @@
+/* SPDX-License-Identifier: MIT; clean only this profile's fixed build slots.
+ * The caller/operator checks active consumers before rebuilding guest media. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>1 then return 2
+  work=args.1
+  allowed="build/pdos/batch-sdk/core build/pdos/batch-sdk/controller build/pdos/batch-sdk/command build/pdos/batch-sdk/image build/pdos/batch-sdk/image-inputs build/pdos/batch-sdk/qa"
+  if wordpos(work,allowed)=0 then return 2
+  address crexx "run test ! -L :work"
+  if rc<>0 then return 2
+  marker=work||"/.pd033-build"
+  address crexx "run test ! -e :work"
+  if rc<>0 then do
+    address crexx "run test -f :marker"
+    if rc<>0 then return 2
+    address crexx "run cmake -E rm -rf :work"
+    if rc<>0 then return rc
+  end
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  call lineout marker,"pd033-batch-build-v1"
+  call lineout marker
+  return 0

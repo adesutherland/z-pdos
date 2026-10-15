@@ -190,6 +190,23 @@ static unsigned int env_host(unsigned int op,unsigned int address,unsigned int n
         cms_put_word(word,clock[0]);cms_put_word(word+4U,clock[1]);return sf_span(address,n,1U,word,1U);
     }
     if(op==TCM_WRITE){
+        if(job_dd_scope()){
+            static const unsigned char output[8]={0xe2,0xe8,0xe2,0xe3,0xe2,0xd7,0xd9,0xe3};
+            SFDD *dd=sf_find_dd(output);unsigned char block[140];unsigned int length,k;
+            if(!dd||!dd->batch||TJDWORD(dd->batch+4U)!=TJD_SYSOUT||
+               TJDWORD(dd->batch+8U)!=TJD_OUTPUT||n>132U||
+               (n&&sf_span(address,n,0U,bytes,1U)))return 20U;
+            if(TJDWORD(dd->batch+12U)==TJD_FB){
+                length=TJDWORD(dd->batch+16U);if(n>length)return 20U;
+                for(k=0U;k<length;++k)block[k]=k<n?bytes[k]:0x40U;
+            }else{
+                length=n+8U;if(n+4U>TJDWORD(dd->batch+16U))return 20U;
+                sf_put_half(block,length);block[2]=block[3]=0U;
+                sf_put_half(block+4U,n+4U);block[6]=block[7]=0U;
+                for(k=0U;k<n;++k)block[8U+k]=bytes[k];
+            }
+            return job_native_output(dd->batch,block,length);
+        }
         if(n>TCM_MAX||(n&&sf_span(address,n,0U,bytes,0U)))return 8U;
         if(!n)return console_v1_line(bytes,0U);
         for(i=0U;i<n;i+=256U){unsigned int take=n-i<256U?n-i:256U;
@@ -260,6 +277,7 @@ static unsigned int env_service(TSGREQUEST *request)
     unsigned int op=request->length;
     if(!f||native_caller(*(volatile const unsigned int *)0x308cU)!=f||f->amode!=31U||
        (*(volatile const unsigned int *)0x3080U&0x04f10001U)!=0x04810000U)return 8U;
+    if(job_active() && (op==4U || op==TCM_MEDIA || op==TCM_RUN || op==TCM_STAT_CMS))return 20U;
     if(op==TCM_DONE)return env_finish(0U);
     if(op>=TCM_CLOCK){unsigned int rc;
         if(request->address.hi)return 8U;

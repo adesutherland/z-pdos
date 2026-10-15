@@ -1,0 +1,38 @@
+/* SPDX-License-Identifier: MIT; build the PDOS controller, not shared tools. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>6 then return 2
+  work=args.1;base=args.2;command=args.3;cc=args.4;classicas=args.5;ld=args.6
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  if work<>"build/pdos/batch-sdk/controller" then return 2
+  address crexx "run crexx -nokeep pdos/scripts/batch-clean.crexx --args :work"
+  if rc<>0 then return rc
+  address crexx "run python3 -B pdos/tests/batch/sdk_fixture.py header :work"
+  if rc<>0 then return rc
+  header=work||"/sdk-source.h";asm=work||"/D4JOB.asm";obj=work||"/D4JOB.obj"
+  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR -S -I pdpclib/src -I pdos/src -include :header pdos/tests/batch/sdk_probe.c -o :asm"
+  if rc<>0 then return rc
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :obj"
+  if rc<>0 then return rc
+  native=.string[]
+  native.1=command||"/part5.obj";native.2=command||"/part1.obj";native.3=command||"/part2.obj";native.4=command||"/part6.obj";native.5=base||"/support/MVSSUPA.obj";native.6=command||"/stdlib.obj"
+  common="START CTYPE STRING TIME ERRNO ASSERT LOCALE MATH SETJMP SIGNAL MEMMGR"
+  i=.int
+  do i=1 to words(common)
+    native[native.0+1]=base||"/c/objects/"||word(common,i)||".obj"
+  end
+  do i=1 to 3
+    name=word("ui job jobdd",i);src="pdos/src/twospace_"||name||".c";asm=work||"/"||name||".asm";unit=work||"/"||name||".obj"
+    address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src :src -o :asm"
+    if rc<>0 then return rc
+    address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :unit"
+    if rc<>0 then return rc
+    native[native.0+1]=unit
+  end
+  module=work||"/D4JOB.rdw";map=work||"/D4JOB.map";stage=work||"/D4JOB.bin";packer=command||"/pack-tso"
+  address crexx "run :ld --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@CRT0 -Map :map -o :module :native[] :obj"
+  if rc<>0 then return rc
+  address crexx "run :packer :module :stage classic31"
+  return rc

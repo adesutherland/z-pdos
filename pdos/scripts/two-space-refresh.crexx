@@ -7,15 +7,27 @@ import rxfnsb
 main: procedure = .int
   arg args = .string[]
   i = .int
-  if args.0 <> 4 then do
+  if args.0 <> 4 & args.0 <> 5 then do
     say "usage: crexx -nokeep pdos/scripts/two-space-refresh.crexx --args FRESH-build/pdos/work ABSOLUTE_SOURCE_IMAGE_BUILD ABSOLUTE_CORE ABSOLUTE_HERCULES_BIN"
     return 2
   end
   work = args.1; prior = args.2; core = args.3; herc = args.4
+  cylinders=100
+  if args.0=5 then do
+    if args.5<>"150" then return 2
+    cylinders=150
+  end
   if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
   if left(prior,1) <> "/" | left(core,1) <> "/" | left(herc,1) <> "/" then return 2
+  if work="build/pdos/batch-sdk/image" then do
+    if pos(work||"/",prior)>0 | pos(work||"/",core)>0 | pos(work||"/",herc)>0 then return 2
+    address crexx "run crexx -nokeep pdos/scripts/batch-clean.crexx --args :work"
+    if rc<>0 then return rc
+  end
+  else do
   address crexx "run test ! -e :work"
   if rc <> 0 then return 2
+  end
   lines = .string[]
   address crexx "pwd" output lines
   root = strip(lines.1); out = root || "/" || work; media = out || "/media"
@@ -42,10 +54,10 @@ main: procedure = .int
   call checked "env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pack_core.py " || quote(core) || " " || quote(launch) || " " || quote(package), out || "/package.log"
   address crexx "cd :media"
   call checked quote(herc || "/dasdload") || " -bz2 ctl.txt datasets.cckd", out || "/dasdload.log"
-  call checked quote(herc || "/cckd2ckd") || " -q -cyls 100 datasets.cckd datasets.ckd", out || "/unpack.log"
+  call checked quote(herc || "/cckd2ckd") || " -q -cyls "||cylinders||" datasets.cckd datasets.ckd", out || "/unpack.log"
   call checked quote(installer) || " datasets.ckd pdos00.ckd pload.sys pdos.sys command.exe config.sys kcore.bin", out || "/install.log"
-  call checked quote(herc || "/ckd2cckd") || " -q -bz2 -cyls 100 pdos00.ckd pdos00.cckd", out || "/compress.log"
-  call checked quote(herc || "/cckd2ckd") || " -q -cyls 100 pdos00.cckd readback.ckd", out || "/readback.log"
+  call checked quote(herc || "/ckd2cckd") || " -q -bz2 -cyls "||cylinders||" pdos00.ckd pdos00.cckd", out || "/compress.log"
+  call checked quote(herc || "/cckd2ckd") || " -q -cyls "||cylinders||" pdos00.cckd readback.ckd", out || "/readback.log"
   call checked quote(installer) || " --compare pdos00.ckd readback.ckd pload.sys pdos.sys command.exe config.sys kcore.bin", out || "/compare.log"
   call checked "env PYTHONDONTWRITEBYTECODE=1 python3 " || quote(root || "/pdos/tests/two-space/store_check.py") || " readback.ckd " || quote(out || "/store-before.json"), out || "/store-before.log"
   call checked "shasum -a 256 pdos00.ckd pdos00.cckd kcore.bin", out || "/outputs.sha256"

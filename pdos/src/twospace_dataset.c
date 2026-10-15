@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "twospace_dataset.h"
 #include "twospace_fileprofile.h"
-#if defined(TSF_LARGE_FILES)
+#if defined(TSF_LARGE_FILES) || defined(TSF_BATCH_PACKAGE)
 #include "twospace_dasd.h"
 #endif
 
@@ -48,7 +48,7 @@ int TSKDSCB(TSKREAD read_record, void *context,
     head=word16(record+17U);
     number=record[19U];
     if (cylinder != 1U || head >= 15U || !number) return TSK_CORRUPT;
-#if defined(TSF_LARGE_FILES)
+#if defined(TSF_LARGE_FILES) || defined(TSF_BATCH_PACKAGE)
     {
         unsigned int tracks;
         count=read_record(context,1U,0U,1U,140U,&record);

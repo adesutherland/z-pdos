@@ -3011,15 +3011,17 @@ static unsigned int service_request(TSGREQUEST *request)
     int result;
     if (!request) return 0xffffffffU;
     if (attach()) return 0xfffffffaU;
-    if(request->svc==197U)return job_interrupt();
+    if(request->svc==TCM_SVC && job_active() &&
+       *(volatile const unsigned int *)0x309cU==3U &&
+       *(volatile const unsigned short *)0x86U==0x40U)return job_interrupt();
     if(job_active()&&request->svc==TSA_IO_SVC){
         if(request->direction==TSA_IO_JOB_EMIT)return job_service(request);
         if(request->direction>=TSA_IO_BATCH_OPEN&&request->direction<=TSA_IO_BATCH_STATUS)return batch_device_service(request);
         return 20U;
     }
-    /* A batch step has no terminal lease. Native terminal and command entry
-       remains a Stage 3 prerequisite, rather than disguised spool output. */
-    if(job_active()&&(request->svc==93U||request->svc==94U||request->svc==202U||request->svc==204U||request->svc==205U||request->svc==TCM_SVC))return 20U;
+    /* Batch terminal entry is refused. The selected native TSO facility
+       instead uses its explicit command-output DD below. */
+    if(job_active()&&(request->svc==93U||request->svc==94U||request->svc==202U||request->svc==204U||request->svc==205U))return 20U;
     if(request->svc==TCM_SVC)return env_service(request);
     if(request->svc==246U&&TSVTOP(&native_invocations)&&env_current()&&env_current()->active)
         return env_finish(1U);

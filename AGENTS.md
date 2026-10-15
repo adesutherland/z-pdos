@@ -93,6 +93,26 @@ qualified and released.
 
 ## Engineering and qualification
 
+Use normal build paths and rebuild in one stable location per target. Remove
+failed or obsolete generated outputs in place after checking ownership and
+active consumers; do not create numbered run directories or duplicate SDKs
+and disks for routine retries. All z/OS and PDOS guest configuration changes
+and guest operations go through the Mainframe Operator. Development tasks
+handle host product source and builds and request guest work through the
+operator, including devices, images, IPL, consoles and guest qualification.
+
+Keep result summaries at most. Generated disk copies, memory dumps, terminal
+traces, expanded readbacks, detailed receipts and superseded build trees are
+temporary working files, not retained qualification evidence. Remove them once
+the result is extracted or the immediate failure is resolved. Check free space
+before a large run and clean superseded outputs from this work. Keep only the
+current runnable candidate and minimum inputs for unfinished work; remove these
+at completion. Check processes and guest leases before deleting files. Preserve
+active guest disks, unique source, original reference media and release assets.
+A concise summary of source/input versions, commands, outcomes and limits is
+sufficient for qualification reuse; a source freeze need not preserve a copied
+source tree or a per-file receipt archive.
+
 Complete the final code review before expensive qualification runs. Review
 the whole change against the approved scope, architecture/ABI and acceptance
 criteria, including error paths, ownership, cleanup, shared-code reuse,

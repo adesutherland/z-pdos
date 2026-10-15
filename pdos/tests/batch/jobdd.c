@@ -37,6 +37,11 @@ int main(void)
  memcpy(d+32U+TJD_ENTRY,e,TJD_ENTRY);put(d+8U,2U);put(d+32U+TJD_ENTRY+4U,TJD_DUMMY);
  put(d+32U+TJD_ENTRY+24U,0U);put(d+32U+TJD_ENTRY+28U,0U);assert(TJDCHK(d,2U)==8);
  put(d+32U+TJD_ENTRY,2U);assert(!TJDCHK(d,2U));
+ /* Removing a DD must also clear its unused descriptor slot. */
+ memcpy(block,d+32U+TJD_ENTRY,TJD_ENTRY);put(d+8U,1U);
+ assert(TJDCHK(d,2U)==8);
+ memset(d+32U+TJD_ENTRY,0,TJD_ENTRY);assert(!TJDCHK(d,2U));
+ memcpy(d+32U+TJD_ENTRY,block,TJD_ENTRY);put(d+8U,2U);
  assert(!TJBINIT(&p,pool,sizeof pool));memset(job,0,sizeof job);put(job,1U);put(job+4U,sizeof job);ebname(job+8U,0xd1U);put(job+16U,2U);put(job+20U,4096U);
  for(i=0U;i<2U;++i){ebname(job+32U+i*TJB_STEP_BYTES,0xc1U+i);ebname(job+40U+i*TJB_STEP_BYTES,0xd7U);}
  assert(!TJBSUB(&p,7U,job,sizeof job,&id));assert(TJBBIND(&p,8U,id,d,sizeof d)==8);

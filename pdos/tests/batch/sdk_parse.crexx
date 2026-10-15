@@ -1,0 +1,8 @@
+options levelb
+main: procedure = .int
+  first = .string
+  second = .string
+  parse value "ALPHA BETA" with first second
+  if first <> "ALPHA" | second <> "BETA" then return 4
+  say "PD033 CREXX PARSE PASS"
+  return 0

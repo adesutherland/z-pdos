@@ -12,6 +12,10 @@
 #define TSFP_OBJECT_LIMIT 0x00200000U
 #define TSFP_CMS_INPUT_LIMIT 0x00300000U
 #define TSFP_LAYOUT 1U
+#if defined(TSF_BATCH_PACKAGE)
+#define TSFP_CYLINDERS 150U
+#else
 #define TSFP_CYLINDERS 100U
+#endif
 #endif
 #endif

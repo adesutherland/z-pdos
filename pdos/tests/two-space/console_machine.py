@@ -181,8 +181,11 @@ def parse_transcript(raw):
 def run(a):
     if a.job_cut and not (a.batch_jobs and a.normal):raise ValueError("job cut requires explicit normal batch proof")
     if a.batch_data and not (a.batch_dd and a.normal):raise ValueError("batch data requires explicit normal DD proof")
+    if a.batch_sdk and not (a.batch_dd and a.normal):raise ValueError("batch SDK requires explicit normal DD proof")
+    if a.batch_sdk and a.batch_data:raise ValueError("choose one DD matrix")
     if sum((a.batch_devices,a.batch_jobs,a.batch_dd))>1:raise ValueError("choose one batch fixture")
     out=Path(a.output).resolve();out.mkdir(exist_ok=False)
+    if a.batch_sdk:(out/".pd033-build").write_text("pd033-batch-build-v1\n")
     disk=Path(a.disk).resolve();core=Path(a.core).resolve();herc=Path(a.hercules).resolve()
     port=unused_loopback_port();script=unused_loopback_port();before=digest(disk)
     primary="3215 noprompt" if a.line_primary else "3270"
@@ -319,6 +322,10 @@ def run(a):
             cases=json.loads(Path(a.commands).read_text()) if a.commands else [["VERSION","PDIO1"],["CMS RUN 31 RXVM -v","PCOMM END 1 RC=0"],["RXVM -v","PCOMM END 2 RC=0"],["MISSING","PCOMM END 3 OS=28 RC=unavailable"],["RXVM -v","PCOMM END 4 RC=0"]]
             for case in cases:
                 command,marker=case[:2]
+                # D4JOB executes eleven jobs, including repeated 192 MiB
+                # allocation/zero/free cycles. This is a hang backstop for
+                # the complete matrix, not a per-step performance gate.
+                matrix_limit=900 if a.batch_sdk and command=="D4JOB" else 180
                 responses=case[2] if len(case)>2 else []
                 prompt_case=len(case)>4 and case[4]=="prompt"
                 prompt_capture=client if client else monitor
@@ -340,7 +347,7 @@ def run(a):
                         if prefix and (prefix[0] in shown or prefix[0] in captured):
                             raise RuntimeError("application ended before input: "+prefix[0])
                         return False
-                    until(input_ready,proc,log)
+                    until(input_ready,proc,log,matrix_limit)
                     if source=="job":
                         if not a.batch_jobs:raise ValueError("job action requires explicit profile")
                         from job_actor import action as job_action
@@ -380,7 +387,7 @@ def run(a):
                     return None
                 # Success still requires the observed native BEGIN/END result.
                 # A larger allocation example has an explicit failure watchdog.
-                limit=180 if command=="HELLO --memory-check" else 60
+                limit=matrix_limit if a.batch_sdk and command=="D4JOB" else 180 if command=="HELLO --memory-check" else 60
                 shown=until(completed,proc,log,limit)
                 screens.append(shown)
                 if a.editor and command=="VERSION" and not client:
@@ -629,7 +636,9 @@ def run(a):
             if error is None:error=repr(exc)
     if a.batch_dd:
         try:
-            if a.batch_data:
+            if a.batch_sdk:
+                from sdk_actor import inspect as dd_inspect
+            elif a.batch_data:
                 from dd_data_actor import inspect as dd_inspect
             else:
                 from dd_actor import inspect as dd_inspect
@@ -637,7 +646,7 @@ def run(a):
         except Exception as exc:
             checks["native_batch_dd_capture_complete"]=False
             if error is None:error=repr(exc)
-    receipt={"profile":{"model":a.model,"colour":a.colour,"basic":a.basic,"editor":a.editor,"oversize":a.oversize,"workbench":a.workbench,"transfer":a.transfer,"workbench_normal":a.workbench_normal,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw,"stage3":a.stage3,"batch_devices":a.batch_devices,"batch_jobs":a.batch_jobs,"batch_dd":a.batch_dd,"batch_data":a.batch_data,"job_cut":a.job_cut},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
+    receipt={"profile":{"model":a.model,"colour":a.colour,"basic":a.basic,"editor":a.editor,"oversize":a.oversize,"workbench":a.workbench,"transfer":a.transfer,"workbench_normal":a.workbench_normal,"line_primary":a.line_primary,"monitor":a.monitor,"handoff":a.handoff,"raw":a.raw,"stage3":a.stage3,"batch_devices":a.batch_devices,"batch_jobs":a.batch_jobs,"batch_dd":a.batch_dd,"batch_data":a.batch_data,"batch_sdk":a.batch_sdk,"job_cut":a.job_cut},"source_core_sha256":digest(core),"disk_before":before,"disk_after":digest(disk),"hercules_sha256":digest(herc),"checks":checks,"pass":all(checks.values()),"error":error,"storage_observations":metrics,"capture_qualified":transcript is not None and transcript["gaps"]==0}
     if service_cost is not None:receipt["service_cost"]=service_cost
     if a.normal and transcript is not None and any(e.get("text","").startswith("PD25 ") for e in transcript["events"]):
         from io_benchmark_check import observations
@@ -653,7 +662,7 @@ def run(a):
         flat=out/"stopped.ckd"
         initial=json.loads(before_store.read_text())
         cylinders=initial.get("cylinders",100)
-        if cylinders not in (100,512):
+        if cylinders not in (100,512) and not (a.batch_sdk and cylinders==150):
             raise ValueError("unsupported stopped STORE geometry")
         subprocess.run([str(herc.parent/"cckd2ckd"),"-q","-cyls",str(cylinders),str(disk),str(flat)],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         stored=inspect(flat)
@@ -671,6 +680,9 @@ def run(a):
         if a.batch_data:
             from dd_data_actor import stored as data_stored
             checks.update(data_stored(stored["files"]))
+        if a.batch_sdk:
+            from sdk_actor import stored as sdk_stored
+            checks.update(sdk_stored(out,stored["files"]))
         (out/"store-after.json").write_text(json.dumps(stored,indent=2)+"\n");flat.unlink()
         receipt["pass"]=all(checks.values())
     (out/"receipt.json").write_text(json.dumps(receipt,indent=2)+"\n")
@@ -689,6 +701,7 @@ if __name__=="__main__":
     p.add_argument("--batch-jobs",action="store_true")
     p.add_argument("--batch-dd",action="store_true")
     p.add_argument("--batch-data",action="store_true")
+    p.add_argument("--batch-sdk",action="store_true")
     p.add_argument("--job-cut",action="store_true")
     p.add_argument("--stage3",choices=("graph","family","dbcs","recovery","policy"))
     for name in ("cms-exchange","fixture-exchange","tape-input"):p.add_argument("--"+name)

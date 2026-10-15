@@ -754,7 +754,10 @@ static int sf_member(SFDD *dd,const unsigned char member[8],unsigned char ttr[3]
                 if(used-at<12U)return -1;
                 if(sf_equal(block+at,member,8U)){
                     for(i=0U;i<3U;++i)ttr[i]=block[at+8U+i];
-                    if(!ttr[2U]||sf_half(ttr)>=128U)return -1;return 1;
+                    i=sf_half(ttr);
+                    if(!ttr[2U]||!TSKWITHIN(&dd->extent,
+                       dd->extent.start_cylinder+(dd->extent.start_head+i)/15U,
+                       (dd->extent.start_head+i)%15U))return -1;return 1;
                 }
                 size=12U+2U*(block[at+11U]&31U);if(size>used-at)return -1;
             }

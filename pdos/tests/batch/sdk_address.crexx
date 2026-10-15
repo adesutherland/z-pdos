@@ -1,0 +1,6 @@
+options levelb
+main: procedure = .int
+  address TSO "TIME"
+  if rc <> 0 then return 4
+  say "PD033 CREXX ADDRESS TSO PASS"
+  return 0

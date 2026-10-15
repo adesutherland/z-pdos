@@ -8,12 +8,19 @@ main: procedure = .int
   if args.0 <> 5 then return 2
   work = args.1; base = args.2; cc = args.3; classicas = args.4; linker = args.5
   if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
+  if work="build/pdos/batch-sdk/command" then do
+    if pos(work||"/",base)>0 then return 2
+    address crexx "run crexx -nokeep pdos/scripts/batch-clean.crexx --args :work"
+    if rc<>0 then return rc
+  end
+  else do
   address crexx "run test ! -e :work"
   if rc <> 0 then return 2
   address crexx "run mkdir -p :work"
   if rc <> 0 then return rc
+  end
   sources = .string[]; flags = .string[]; objects = .string[]
-  sources[1] = base || "/check/source/pdpclib/stdio.c"
+  sources[1] = "pdpclib/src/stdio.c"
   flags[1] = "-D__aopen=tsuopen -D__aread=tsuread -D__awrite=tsuwrite -D__aclose=tsuclose -D__dynal=tsudyn"
   sources[2] = "pdos/src/twospace_pcomm.c"; flags[2] = "-DTSU_NATIVE_FILES"
   sources[3] = "pdos/src/pcomm.c"; flags[3] = "-DPDOS_TWO_SPACE"

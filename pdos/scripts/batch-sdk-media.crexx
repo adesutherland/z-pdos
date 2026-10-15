@@ -1,0 +1,42 @@
+/* SPDX-License-Identifier: MIT; disposable shared-package proof, no adoption. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>9 then return 2
+  work=args.1;prior=args.2;core=args.3;controller=args.4;package=args.5;probe=args.6;herc=args.7;primary=args.8;lab=args.9
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  if work<>"build/pdos/batch-sdk/image" then return 2
+  if primary<>"line" & primary<>"3270" then return 2
+  location=.string[]
+  address crexx "pwd" output location
+  root=strip(location.1);input=root||"/"||work||"-inputs";media=input||"/media";support=input||"/base"
+  slot=work||"-inputs"
+  address crexx "run crexx -nokeep pdos/scripts/batch-clean.crexx --args :slot"
+  if rc<>0 then return rc
+  address crexx "run mkdir -p :media :support"
+  if rc<>0 then return rc
+  from=prior||"/media"
+  address crexx "run cmake -E copy_directory :from :media"
+  if rc<>0 then return rc
+  /* Native ADDRESS needs the current resident U command descriptor/router. */
+  from=root||"/build/pdos/batch-sdk/command/u-command.bin"
+  address crexx "run cmake -E copy :from :media"
+  if rc<>0 then return rc
+  packer=root||"/build/pdos/release-021-image3/command/pack-tso"
+  extractor="/Users/adrian/CLionProjects/mainframe-cross-sdk/sdk/scripts/pdos64_xmit_unload.py"
+  address crexx "run python3 -B pdos/tests/batch/sdk_fixture.py prepare :media :package :controller :probe :packer :extractor"
+  if rc<>0 then return rc
+  from=prior||"/launch.bin"
+  address crexx "run cmake -E copy :from :input"
+  if rc<>0 then return rc
+  installer=support||"/install-ipl"
+  address crexx "run clang -std=c90 -Wall -Wextra -Werror -pedantic -O2 -DIPL_CYLINDERS=150 pdos/src/install-ipl.c -o :installer"
+  if rc<>0 then return rc
+  configured=input||"/normal.core"
+  address crexx "run python3 -B pdos/tests/two-space/normal_core.py configure :core :configured 2 :primary monitor"
+  if rc<>0 then return rc
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :input :configured :herc 150"
+  if rc<>0 then return rc
+  address crexx "run python3 -B pdos/tests/batch/sdk_fixture.py stage :work :herc :package :lab"
+  return rc

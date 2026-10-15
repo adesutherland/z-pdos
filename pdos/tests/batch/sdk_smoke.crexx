@@ -1,0 +1,9 @@
+/* Shared exact source for native TSO31 batch qualification. */
+options levelb
+main: procedure = .int
+  arg args = .string[]
+  if args.0 <> 1 | args.1 <> "SHARED" then return 8
+  answer = .int
+  answer = 7 * 6
+  say "PD033 CREXX BATCH" answer
+  return 0
