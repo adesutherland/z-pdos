@@ -5,15 +5,21 @@ main: procedure = .int
   arg args=.string[]
   if args.0<9 | args.0>12 then return 2
   work=args.1;prior=args.2;core=args.3;controller=args.4;package=args.5;probe=args.6;herc=args.7;primary=args.8;lab=args.9
+  editor=.string
   model="2"
   if args.0>=11 then model=args.11
   if model<>"2" & model<>"3" & model<>"4" & model<>"5" then return 2
   if primary="line" & model<>"2" then return 2
-  owner_args=.string[];owner_prepare=.string[];owner_stage=.string[]
+  owner_args=.string[];owner_prepare=.string[];owner_stage=.string[];editor_args=.string[];editor_mode=.int;editor_mode=0
   if args.0=12 then do
-    if args.12<>"forms-owner" then return 2
-    owner_args.1="build/pdos/batch-sdk/forms-owner"
-    owner_prepare.1="forms-owner"
+    if args.12="forms-owner" then do
+      owner_args.1="build/pdos/batch-sdk/forms-owner"
+      owner_prepare.1="forms-owner"
+    end
+    else if args.12="editor" then do
+      editor_args.1="--probe";editor_mode=1
+    end
+    else return 2
   end
   if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
   if work<>"build/pdos/batch-sdk/image" then return 2
@@ -21,7 +27,9 @@ main: procedure = .int
   location=.string[]
   address crexx "pwd" output location
   root=strip(location.1);input=root||"/"||work||"-inputs";media=input||"/media";support=input||"/base"
-  if args.0=12 then owner_stage.1=media
+  if args.0=12 then do
+    if args.12="forms-owner" then owner_stage.1=media
+  end
   slot=work||"-inputs"
   address crexx "run crexx -nokeep pdos/scripts/batch-clean.crexx --args :slot"
   if rc<>0 then return rc
@@ -45,6 +53,12 @@ main: procedure = .int
     address crexx "run python3 -B pdos/tests/batch/jcl_fixture.py prepare :media :fixtures :owner_prepare[]"
     if rc<>0 then return rc
   end
+  /* Pin the current native application instead of inheriting an old EDIT. */
+  if editor_mode then do
+    editor=root||"/build/pdos/batch-sdk/apps/edit.bin"
+    address crexx "run python3 -B pdos/tests/editor/payload.py prepare :media :editor :editor_args[]"
+    if rc<>0 then return rc
+  end
   from=prior||"/launch.bin"
   address crexx "run cmake -E copy :from :input"
   if rc<>0 then return rc
@@ -60,5 +74,10 @@ main: procedure = .int
   if rc<>0 then return rc
   if args.0>=10 then do
     address crexx "run python3 -B pdos/tests/batch/jcl_fixture.py stage :work :herc :fixtures :lab :owner_stage[]"
+    if rc<>0 then return rc
+  end
+  if editor_mode then do
+    address crexx "run python3 -B pdos/tests/editor/payload.py verify :work :herc :editor :editor_args[]"
+    if rc<>0 then return rc
   end
   return rc

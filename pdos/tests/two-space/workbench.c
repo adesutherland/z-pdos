@@ -35,6 +35,12 @@ int main(void)
         if(i==1U){assert(plan.input==23U*132U+4U&&plan.body_rows==18U&&plan.body_width==85U&&plan.shell_column==89U);}
         context.help=1U;assert(!TWBCOMPOSE(&surface,&plan,&context,&log,&program,&shell,scratch,sizeof scratch));
         assert(contains(&surface,"PF10 toggles output and shell focus.")&&!contains(&surface,"PF11")&&!contains(&surface,"PF12"));context.help=0U;
+        context.form_keys=1U;context.phase=TWB_DISPATCH;context.input_program=1U;
+        assert(!TWBCOMPOSE(&surface,&plan,&context,&log,&program,&shell,scratch,sizeof scratch));
+        assert(contains(&surface,"FORM OPEN")&&contains(&surface,"FORM INPUT"));
+        assert(contains(&surface,"PF3 Return")&&contains(&surface,"PF12 Output"));
+        assert(!contains(&surface,"OS=PENDING")&&!contains(&surface,"Enter Run")&&!contains(&surface,"Focus: SHELL"));
+        context.form_keys=0U;context.phase=TWB_DONE;context.input_program=0U;
         context.joined=7U;assert(!TWBCOMPOSE(&surface,&plan,&context,&log,&program,&shell,scratch,sizeof scratch));
         assert(!TWDLabel("CONTINUE COMMAND",text,sizeof text,&n)&&!memcmp(surface.text+plan.heading*g.columns+1U,text,n));context.joined=0U;
     }

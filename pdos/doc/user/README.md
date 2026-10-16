@@ -60,6 +60,11 @@ line editor, utilities and examples, and bundles pinned cREXX TSO31 commands.
 See [APPLICATIONS](APPLICATIONS.md) for EDIT, safe SAVE AS, C examples and
 the RXC → RXAS → RXVM source workflow.
 
+The development editor increment adds fullscreen source rows, line commands
+and checked journal saves for supported dataset members. See the current
+[editor contract](../architecture/RECORD-EDITOR.md) and its qualification
+summary before treating that development capability as part of a release.
+
 The [0.2.1 release record](../qualification/RELEASE-0.2.1.md) distinguishes
 local operator acceptance from the hosted image archive and host packages.
 The bundled P6 record describes its exact reviewed K/U workload evidence.

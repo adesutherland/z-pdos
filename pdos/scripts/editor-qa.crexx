@@ -1,0 +1,13 @@
+/* SPDX-License-Identifier: MIT; one reviewed Operator editor cell. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>4 then return 2
+  cell=args.1;hercules=args.2;freeze=args.3;lease=args.4
+  if wordpos(cell,"model2 restart model5 mono line")=0 then return 2
+  /* All mutation authority is checked by the adapter before launching. The
+     existing QA directory must first be retired by the Operator after review;
+     this entry never removes previous results merely to get a fresh slot. */
+  address crexx "run python3 -B pdos/tests/editor/run.py :cell :hercules :freeze :lease"
+  return rc

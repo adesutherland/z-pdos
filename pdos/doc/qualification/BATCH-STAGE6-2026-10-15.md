@@ -1,8 +1,10 @@
 # PD-033 Stage 6 qualification checkpoint - 15 October 2026
 
 The selected physical reader, forms and restart slice is independently
-accepted. **Stage 6 remains In progress** for the manual usability repairs
-and the source-editor decision. This result does not select a managed image,
+accepted. The subsequent small C editor/form increment is also accepted at
+175/175; see the [editor result](EDITOR-2026-10-15.md). Both illustrated
+manuals are complete. Operator cleanup and lease handback are complete. Selected S6-AC01–07 are
+closed for this bounded development profile. This result does not select a managed image,
 installation, published package or release. All guest work was performed
 through the Mainframe Operator.
 
@@ -94,10 +96,12 @@ arguments, preview, both pairs of step results, output and console return.
 Their full 24-by-80 text grids independently equal the Ascii captures; the raw
 x3270 HTML's stray closing bold tag does not change the captured terminal text.
 
-Current EDIT cannot edit PDS members or safely replace source. Fullscreen
-editing is a separate proposed PD-027 increment. BATCH also exposes two manual
-findings: inherited shell key legends and a misleading source-edit message for
-STEP/DD filter changes. These remain required repairs before Stage 6 closure.
+The baseline manual exposed missing fullscreen member editing, inherited shell
+key legends and a misleading source-edit notice for STEP/DD filters. The
+subsequent approved PD-027 increment repairs those findings and independently
+qualifies the edited-source workflow. The revised PDOS manual contains nine
+actual screenshots across nine visually reviewed pages. Native manual inputs
+and results are unchanged.
 
 Unchanged Stage 3/4 DD/error/library/cancellation/resource proofs and Stage 5's
 212 geometry/monochrome/line/reconnect/ownership checks retain their original

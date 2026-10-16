@@ -135,8 +135,10 @@ static unsigned int tp_compose(unsigned int staged)
     c.cursor=tp_cursor[d];c.cursor_valid=tp_draft_owner[d]==(f?f->token:0U)&&tp_cursor_valid[d]&&tp_cursor[d]<g.cells;
     c.job=tp_job;c.phase=tp_phase;c.os=tp_os;c.rc_valid=tp_rc_valid;c.rc=tp_rc;c.focus=tp_focus;c.source=tp_source;
     c.input_program=f&&(!tp_shell_controller||f->token!=tp_controller);c.waiting=tp_waiting;c.help=tp_help;c.capture_gap=tp_gap;c.joined=tp_joined;
+    c.form_keys=f&&tp_form_keys==f->token;
     c.input_name=f?tc_headers[native_invocations.depth]:0;c.input_name_bytes=f?tc_header_lengths[native_invocations.depth]:0U;
-    if(tp_shell_controller&&!c.input_program){static const unsigned char shell_name[]={0xd7U,0xc3U,0xd6U,0xd4U,0xd4U};c.input_name=shell_name;c.input_name_bytes=sizeof shell_name;}
+    if(c.form_keys){c.input_name=tp_name;c.input_name_bytes=tp_name_bytes;}
+    if(tp_shell_controller&&!c.input_program&&!c.form_keys){static const unsigned char shell_name[]={0xd7U,0xc3U,0xd6U,0xd4U,0xd4U};c.input_name=shell_name;c.input_name_bytes=sizeof shell_name;}
     if(TWBCOMPOSE(&tp_surface,&tp_plan,&c,&tp_history,&tp_program,&tp_shell,tp_scratch,TWF_MAX_CELLS))return 8U;
     if(!tp_help)for(i=0U;i<TP_WINDOWS;++i)if(tp_windows[i].handle&&tp_layer(&tp_windows[i],staged&&tp_windows[i].staged&&tp_windows[i].owner==(f?f->token:0U)))return 8U;
     return 0U;

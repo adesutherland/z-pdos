@@ -107,7 +107,8 @@ static int edit(TBFSTATE *s,unsigned int index,const char *value)
  if(index==4U&&strlen(value)>67U)return failure(s,"PARAMS is limited to 67 characters per card");
  if(index<=4U)invalidate(s);else s->page=0U;
  strcpy(p,value);if(index!=4U)upper(p);
- if(index==1U)s->deck[0]=0;strcpy(s->notice,"Field updated; PREVIEW is required after source edits");return 0;
+ if(index==1U)s->deck[0]=0;
+ strcpy(s->notice,index<5U?"Job field updated; PREVIEW required":"Output filter updated; OUTPUT/REFRESH reviews retained records");return 0;
 }
 int TBFEVENT(TBFSTATE *s,const char *text,unsigned int aid)
 {

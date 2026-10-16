@@ -729,17 +729,20 @@ be K-only and explicitly budgeted rather than consuming low U placement.
 - Evidence: PD-003/016 and the normal K/U workload qualification establish the existing native execution and compile/run paths. The console stage 3 qualification preserves native output, input and child return, but does not qualify a source-script command or a Rexx ADDRESS host environment.
 - Acceptance: One documented command compiles, assembles and runs a source program, passes exact arguments and imports, distinguishes compilation/loading/OS errors from application RC, and preserves console ownership and caller state. Qualify file read/write, interactive and line/LLM input, explicit text/binary records, failed compilation and repeat execution without stale outputs. Define the supported cREXX language level instead of implying unrestricted classic Rexx compatibility. Qualify ADDRESS callbacks separately when added; no macro or VM policy moves into K.
 
-## PD-027: U-space text editor, assessing a reduced THE profile
+## PD-027: Small C fullscreen and line record editor
 
 - Type: improvement
-- Status: Open
+- Status: Done (approved small C increment; bounded development qualification)
 - Target: A separate U editor application and shared 3270/line presentation API; later than 0.2.1
+- Implementation checkpoint (15 October): Shared fullscreen/line controller, actual editable fields, safe native journal member saves and truthful BATCH form guidance are implemented. The full five-cell physical matrix is independently accepted at 175/175 through the Mainframe Operator, including two saved-source four-step native compile/run chains. Both manuals are complete; Operator cleanup and lease handback are complete. [Current result](qualification/EDITOR-2026-10-15.md).
+- Authorised implementation (15 October): Adrian approved the small C fullscreen editor over the existing EDIT core, using VM/CE MECAFF EE as an interaction reference, safe member saves and line-console support, plus the PD-033 form fixes and qualification through the Mainframe Operator. The committed baseline is z-pdos `20826ac` / Lab `dea3d641`. [Design and save contract](architecture/RECORD-EDITOR.md). No THE/EE code is imported.
 - Further assessment (15 October): The requested PD-033 manual makes fullscreen source editing useful now. THE's wider C99/platform/driver/macro surface is disproportionate for the first increment. Recommend a small C record editor using the existing EDIT model and VM/CE Community Edition's MECAFF EE as the interaction/source-reuse reference. Assess selective attributed reuse before importing code; EE's CMS file/console calls are not PDOS services. Start with one buffer, genuinely editable 3270 rows and line commands, paging/find/change/undo and safe SAVE/CANCEL; keep the line/LLM route over the same model. Qualify dataset/member open/save/reopen and failed-save preservation before claiming the manual edit path. This is the proposed next increment after baseline commits `0564424` / Lab `d0a2e6ed`, not a THE or EE port result.
-- Observation: PDOS now has retained panels/history and checked device/input sessions, but no interactive file editor. The maintained THE CREXX fork separates its logical editor model from curses and LLM drivers. Its supported platforms are currently macOS, Linux/POSIX and native Windows, with C99 code, runtime-loaded drivers and a crexxsaa macro bridge; none of those facts establishes a PDOS port.
+- Original observation (10 October): PDOS had retained panels/history and checked device/input sessions, but no interactive file editor at that baseline. The maintained THE CREXX fork separates its logical editor model from curses and LLM drivers. Its supported platforms are currently macOS, Linux/POSIX and native Windows, with C99 code, runtime-loaded drivers and a crexxsaa macro bridge; none of those facts establishes a PDOS port.
 - Direction (10 October): I want an editor in a later release, possibly a reduced build profile of our THE fork. VM/370 CMS EDIT and VM/CE's MECAFF EE are also relevant precedents/candidates. EE is a C fullscreen editor written by Hans-Walter Latz and released to the public domain; assess its CMS record-file/console dependencies and fsio/fullscreen adapter against our checked PDOS services before choosing the port. Its existing 3270 support may reduce the display work, but there is no PDOS port result yet. Assess reuse in the owning THE repository, add a block-mode 3270 driver and explicit record-file/platform adapter, and select a named mainframe compiler/runtime. Start with open/edit/find/change/save/undo and useful XEDIT/THE commands; retain a semantic line/LLM route. A statically selected driver and optional features can bound the first profile without maintaining a copied editor fork in PDOS. cREXX macros and ADDRESS THE can follow the source-script/host integration in PD-026.
 - Evidence: THE's maintained README and doc/architecture.md describe the driver-neutral editor/LLM model; doc/crexx.md describes the existing compile/cache and ADDRESS THE bridge. [VM/CE V1R1.2](https://www.vm370.org/node/4) identifies the shipped MECAFF EE tools and source. The [MECAFF upstream](https://github.com/devhawala/mecaff), reviewed at 1694fa893eb962ef1dca156247c6c3cca1750ac8, supplies separate eecore/eecmds/eescrn/fsio modules; the core uses CMS file-state/open/read/write/erase and rename operations, so file replacement needs explicit adaptation as well as fullscreen I/O. PD-024 owns the PDOS presentation/input contracts. There is no compile/link/guest proof of THE on PDOS yet.
-- Acceptance: Record compiler/runtime/API closure and licensing/source ownership before selecting the port. Run the editor entirely in U, translate real submitted 3270 fields/AIDs/cursor into logical edits, and preserve K-owned session/buffer lifetimes. Open, edit, save and reopen supported FB/VB text without silent record truncation or encoding loss; exercise undo, failed saves, search/change, scrolling and models 2/5 plus monochrome and line/LLM use. Exit and fault recovery must return the intact Workbench and release every owned resource. Preserve THE's GPL notices and keep its maintained source/profile in the owning editor repository. Embedded cREXX/macros need separate native host-bridge qualification.
-
+- Acceptance for the approved small C increment: Record the Classic C31/PDPCLIB build and original-code ownership. Run entirely in U over the existing K services. Apply real 3270 submitted fields/AIDs/cursor to the shared UTF-8 model, preserving field positions and invocation-owned lifetimes. Open, edit, safely save and reopen supported PS/PDS-member FB/VB text without silent truncation or encoding loss; preserve originals/neighbours and dirty buffers on refused saves. Exercise undo, find/change, scrolling, exact blank/trailing-space records, models 2/5, monochrome and the real line console. Verify saved-member restart and actual changed-source cREXX compile/run through the same batch forms/service. Qualify ownership/reconnect and return to the intact console; update and rehearse the illustrated PDOS manual. Host fault injection and physical guest results must be distinguished.
+- Transport follow-up: The current Hercules 3215 receive path substitutes a dot for host bytes rejected by isprint before PDOS sees them. Keep this route printable ASCII with sender preflight; any future eight-bit/Unicode line input needs a separate explicit transport/codepage contract and actual round-trip qualification. The 3270 record-data route already qualifies printable IBM1047 Latin-1.
+- Deferred: A full THE/EE port, cREXX macros and ADDRESS THE are separate increments. Any later THE reuse must retain its GPL notices and maintained source in the owning editor repository; PD-026 owns the native script/host bridge.
 
 ## PD-028: Interim line editor, useful C utilities and examples
 
@@ -805,8 +808,8 @@ be K-only and explicitly budgeted rather than consuming low U placement.
 ## PD-033: Card-reader batch jobs and 3270 job forms
 
 - Type: improvement / native compatibility / release qualification
-- Status: In progress
-- Current checkpoint (15 October): Stages 0–5 are accepted; Stage 6 is In progress. Stage 5 passes 212 assertions across six physical cells, independently reviewed through the Mainframe Operator. Source checkpoint `7f2898f` and Lab `ca598a85` are followed by accepted qualification commits `ca8bc60` and `cb88bd74`. Stage 6 is In progress under the 15 October authorisation, including illustrated manual rehearsals. The console is preserved. See the [Stage 5 result](qualification/BATCH-STAGE5-2026-10-15.md).
+- Status: Done (selected TSO31 development profile; release gates separate)
+- Current checkpoint (15 October): Stages 0–6 are independently accepted through the Mainframe Operator. Stage 5 retains its 212 checks; Stage 6 pairs native z/OS 7/7, PDOS reader/forms 34/34, restart 32/32 and the subsequent approved editor/form increment 175/175. Both illustrated manuals are complete, usability findings repaired, raw/media cleanup and exact maintenance handback complete. [Stage 6 result](qualification/BATCH-STAGE6-2026-10-15.md); [editor result](qualification/EDITOR-2026-10-15.md). The accepted baseline is selected for the authorised 16 October commit; managed adoption, installation, publication and release remain separate.
 - Target: pdos-zarch K/U, Hercules 3505 reader and 1403 printer, native TSO31 batch/DD services, PCOMM and retained 3270 panels
 - Observation: The current product has a retained Workbench console, semantic line/teletype delivery, a common owned channel engine, scoped native invocations/DDs and bounded 3287 printing. PCOMM command files do not provide a JCL job service, and the 3287 facility is not a 3505/1403 batch route. Native TPUT/TGET and invocation-local DDs do not establish background-TSO or preallocated job-DD compatibility.
 - Direction selected (13 October): Keep the existing console as the human/LLM operator surface. Add the same card-deck/printer transport used for z/OS on Hercules. Card reader, console submission and 3270 Submit/Jobs/Output forms share one job service. Start with serial TSO31 jobs and a strict documented JCL subset for cREXX; preserve existing foreground and native behavior.
@@ -1083,7 +1086,8 @@ originals match; temporary media/captures and exact maintenance are retired.
 
 ### Stage 6: Paired qualification and release checkpoint
 
-Status: **In progress** (15 October authorisation). Stages 0–5 remain accepted.
+Status: **Accepted** for the selected TSO31 development profile (15 October).
+S6-AC01–07 are closed; Stages 0–5 remain accepted.
 The Mainframe Operator owns all guest configuration, devices, sessions and
 qualification. Development owns host product changes, builds and independent
 acceptance. Use the existing build slots and retain concise results only.
@@ -1117,9 +1121,12 @@ byte-exact and purges, with no explicit submission or automatic-dispatch path.
 Independent core, durable spool, VB gold, outside-STORE and resource checks
 pass. See the [Stage 6 checkpoint](qualification/BATCH-STAGE6-2026-10-15.md).
 The manual screenshots expose misleading shell PF-key legends during BATCH
-and a source-edit notice after output-filter changes. Repair these before
-Stage 6 closure. The source-editor direction remains PD-027; source editing
-is not established by the installed-source compile/run proof.
+and a source-edit notice after output-filter changes. These baseline findings were subsequently repaired by the approved small C
+PD-027 increment. Its five-cell matrix passes 175/175 with independent native
+source/PS/job/resource checks and two actual edited-source compiler chains.
+The revised nine-page PDOS manual and unchanged ten-page native manual are
+visually accepted. See the [editor result](qualification/EDITOR-2026-10-15.md).
+Operator cleanup and lease handback are complete.
 
 | Acceptance | Required result |
 | --- | --- |

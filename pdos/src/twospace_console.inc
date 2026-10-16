@@ -590,6 +590,7 @@ static unsigned int console_v1_service(TSGREQUEST *request)
     TSPADDR pointer;unsigned int op=request->direction,rc,i,count,n=0U,aid=0U,at=0U,length;
     if(op==TSA_IO_DASD_STATUS)return media_status(request);
     if(op==TSA_IO_RECORD_FILE)return record_file_service(request);
+    if(op==TSA_IO_EDIT_FILE)return edit_file_service(request);
     if(op>=TSA_IO_DEVICE_OPEN&&op<=TSA_IO_DEVICE_QUERY)return console_device_service(request);
     if(op>=TSA_IO_WORKBENCH&&op<=TSA_IO_PANEL_COMMIT)return console_panel_service(request);
     if(!frame||*(volatile const unsigned int *)0x3000U||*(volatile const unsigned int *)0x3010U)return 8U;

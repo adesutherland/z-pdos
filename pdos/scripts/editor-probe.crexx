@@ -1,0 +1,63 @@
+/* SPDX-License-Identifier: MIT; test-only editor client, after freeze/GO.
+ * Reuses the reviewed apps/runtime objects; never rebuilds product inputs. */
+options levelb
+import rxfnsb
+main: procedure = .int
+  arg args=.string[]
+  if args.0<>5 then return 2
+  base=args.1;command=args.2;cc=args.3;classicas=args.4;ld=args.5
+  work="build/pdos/batch-sdk/apps/editor-probe"
+  marker=work||"/.editor-probe"
+  address crexx "run test ! -L :work"
+  if rc<>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then do
+    address crexx "run test -f :marker"
+    if rc<>0 then return 2
+    address crexx "run cmake -E rm -rf :work"
+    if rc<>0 then return rc
+  end
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  call lineout marker,"editor-probe-v1"
+  call lineout marker
+  source="pdos/tests/editor/probe.c";asm=work||"/probe.asm";object=work||"/probe.obj"
+  address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR -S -I pdpclib/src -I pdos/src :source -o :asm"
+  if rc<>0 then return rc
+  address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :asm :object"
+  if rc<>0 then return rc
+  objects=.string[];objects.1=object
+  modules="ui console 3270 workbench surface history display recordio edit_core edit_text edit_session editclient"
+  i=.int
+  do i=1 to words(modules)
+    objects[objects.0+1]="build/pdos/batch-sdk/apps/"||word(modules,i)||".obj"
+  end
+  native=.string[]
+  native.1=command||"/part5.obj";native.2=command||"/part1.obj"
+  native.3=command||"/part2.obj";native.4=command||"/part6.obj"
+  native.5=base||"/support/MVSSUPA.obj";native.6=command||"/stdlib.obj"
+  native.7=command||"/part7.obj";native.8=command||"/part8.obj"
+  modules="START CTYPE STRING TIME ERRNO ASSERT LOCALE MATH SETJMP SIGNAL MEMMGR"
+  do i=1 to words(modules)
+    native[native.0+1]=base||"/c/objects/"||word(modules,i)||".obj"
+  end
+  module=work||"/probe.rdw";map=work||"/probe.map";stage=work||"/probe.bin"
+  address crexx "run :ld --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@CRT0 -Map :map -o :module :native[] :objects[]"
+  if rc<>0 then return rc
+  packer="build/pdos/batch-sdk/apps/pack-tso"
+  address crexx "run :packer :module :stage classic31"
+  if rc<>0 then return rc
+  hashes=.string[];recipe="pdos/scripts/editor-probe.crexx";inputs=.string[]
+  inputs.1="pdos/src/twospace_abi.h";inputs.2="pdos/src/twospace_ui.h"
+  inputs.3="pdos/src/twospace_editfile.h";inputs.4="pdos/src/twospace_editclient.c"
+  inputs.5="pdos/src/apps/edit_core.c";inputs.6="pdos/src/apps/edit_core.h"
+  inputs.7="pdos/src/apps/edit_session.c";inputs.8="pdos/src/apps/edit_session.h"
+  inputs.9="pdos/src/apps/edit_text.c";inputs.10="pdos/src/apps/edit_text.h"
+  inputs.11="pdos/scripts/ibm1047.table"
+  address crexx "run shasum -a 256 :source :recipe :inputs[] :cc :classicas :ld :packer :native[] :objects[]" output hashes
+  if rc<>0 then return rc
+  do i=1 to hashes.0
+    call lineout work||"/inputs.sha256",hashes[i]
+  end
+  call lineout work||"/inputs.sha256"
+  return 0

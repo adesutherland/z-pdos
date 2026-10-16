@@ -27,6 +27,7 @@ All paths in this table are relative to the repository root.
 | Shared operator media | `media_commands.inc`, `twospace_media.inc`, `media_dscb.h` | One-space `pdos.c` consumes the same algorithms; K supplies private buffers and channel completion. |
 | Channel and console | `twospace_channel.c`, `twospace_channel.asm`, `twospace_console.c`, `twospace_console.inc`, `twospace_transcript.c` | Separate low-real workspaces, matching interruptions, terminal/input leases and capture gaps. |
 | U PCOMM and presentation | `pcomm.c`, `twospace_pcomm.c`, `twospace_ui.c` and their native linkage | Existing system/ATTACH behavior and checked terminal capability/screen requests. |
+| Record editor | `apps/edit_core.c`, `apps/edit_session.c`, `apps/edit_screen.c`, `apps/edit_text.c`, `twospace_editclient.c`, `twospace_editfile.inc` | Shared UTF8 model/controller; immutable field events and Read Buffer; strict IBM1047 conversion and checked journal compare-and-save. [Contract](../architecture/RECORD-EDITOR.md). |
 | Runtime | `pdpclib/src/`, `profiles/pdos-zarch/`, `interfaces/` | Shared owner; changes may affect SDK consumers. |
 | Build and distribution | `pdos/scripts/`, root `scripts/`, `.github/workflows/build-release.yml` | [Dependencies](../architecture/DEPENDENCIES.md). |
 
@@ -99,3 +100,14 @@ or account-specific assets.
 Documentation-only changes need editorial and source-reference review, not a
 rebuild or a repeated guest run. Historical qualification records remain exact
 accounts of the inputs actually used.
+
+For the batch/editor development profile, reuse `build/pdos/batch-sdk/core`,
+`command` and `apps`. The service recipe accepts the normal Classic CC/AS/LD
+arguments followed by `normal batch GNU_AS GNU_LD`; those final two tools
+reassemble the current K64 nucleus and includes. Omitting them selects checked
+reuse and refuses changed nucleus includes. Build the command runtime before
+`apps.crexx`, which uses its current assembly veneers. The editor probe and
+physical matrix use `editor-probe.crexx` and `editor-qa.crexx`; only the
+Mainframe Operator stages media, operates the guest and manages the lease.
+The [result summary](../qualification/EDITOR-2026-10-15.md) pins the selected
+inputs and the [fixture guide](../../tests/editor/README.md) fixes its matrix.

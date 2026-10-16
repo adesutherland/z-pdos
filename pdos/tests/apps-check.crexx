@@ -1,4 +1,6 @@
-/* SPDX-License-Identifier: MIT; focused checks before source freeze. */
+/* SPDX-License-Identifier: MIT; focused checks before source freeze.
+ * C90 sprintf remains available on the target. Its bounded call sites are
+ * reviewed; suppress only the newer macOS SDK's deprecation diagnostic. */
 options levelb
 import rxfnsb
 main: procedure = .int
@@ -6,16 +8,33 @@ main: procedure = .int
   if args.0<>1 then return 2
   work=args.1
   if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
-  address crexx "run test ! -e :work"
+  address crexx "run test ! -L :work"
   if rc<>0 then return 2
   address crexx "run mkdir -p :work"
   if rc<>0 then return rc
+  exe=.string
+  outputs="edit-check recordio-check editfile-check session-check"
+  do i=1 to words(outputs)
+    exe=work||"/"||word(outputs,i)
+    address crexx "run test ! -L :exe"
+    if rc<>0 then return 2
+    address crexx "run test -e :exe"
+    if rc=0 then do
+      consumers=.string[]
+      address crexx "run lsof -t :exe" output consumers
+      if rc<>1 then return 2
+    end
+  end
   exe=work||"/edit-check"
-  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/apps/edit_core.c pdos/tests/edit.c -o :exe"
+  address crexx "run clang -std=c89 -Wno-deprecated-declarations -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/src/apps/edit_core.c pdos/tests/edit.c -o :exe"
   if rc<>0 then return rc
   address crexx "run :exe"
   if rc<>0 then return rc
   source="pdos/src/twospace_recordio.inc";target=work||"/recordio-under-test.inc"
+  address crexx "run test ! -L :target"
+  if rc<>0 then return 2
+  address crexx "run rm -f :target"
+  if rc<>0 then return rc
   changed=.int;changed=0;row=.string
   do while lines(source)>0
     row=linein(source)
@@ -28,7 +47,35 @@ main: procedure = .int
   call lineout target
   if changed<>2 then return 3
   exe=work||"/recordio-check"
-  address crexx "run clang -std=c89 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src -I :work pdos/tests/recordio.c -o :exe"
+  address crexx "run clang -std=c89 -Wno-deprecated-declarations -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src -I :work pdos/tests/recordio.c -o :exe"
+  if rc<>0 then return rc
+  address crexx "run :exe"
+  if rc<>0 then return rc
+  source="pdos/src/twospace_editfile.inc";target=work||"/editfile-under-test.inc"
+  address crexx "run test ! -L :target"
+  if rc<>0 then return 2
+  address crexx "run rm -f :target"
+  if rc<>0 then return rc
+  changed=0
+  do while lines(source)>0
+    row=linein(source)
+    if pos("*(volatile const unsigned int *)0x3000U",row)>0 then changed=changed+1
+    if pos("*(volatile const unsigned int *)0x3010U",row)>0 then changed=changed+1
+    if pos("*(volatile const unsigned int *)0x40bcU",row)>0 then changed=changed+1
+    row=changestr("*(volatile const unsigned int *)0x3000U",row,"0U")
+    row=changestr("*(volatile const unsigned int *)0x3010U",row,"0U")
+    row=changestr("*(volatile const unsigned int *)0x40bcU",row,"1U")
+    call lineout target,row
+  end
+  call lineout target
+  if changed<>3 then return 3
+  exe=work||"/editfile-check"
+  address crexx "run clang -std=c89 -Wno-deprecated-declarations -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src -I :work pdos/tests/editfile.c pdos/src/twospace_editfile.c pdos/src/twospace_digest.c pdos/src/twospace_store.c pdos/src/twospace_jobdd.c -o :exe"
+  if rc<>0 then return rc
+  address crexx "run :exe"
+  if rc<>0 then return rc
+  exe=work||"/session-check"
+  address crexx "run clang -std=c89 -Wno-deprecated-declarations -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/tests/edit_session.c pdos/src/apps/edit_core.c pdos/src/apps/edit_session.c pdos/src/apps/edit_screen.c pdos/src/apps/edit_text.c pdos/src/twospace_3270.c -o :exe"
   if rc<>0 then return rc
   address crexx "run :exe"
   return rc

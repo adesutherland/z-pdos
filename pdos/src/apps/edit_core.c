@@ -14,6 +14,9 @@ unsigned int EDCLOAD(EDCSTATE *s,const unsigned char *p,unsigned int bytes)
 }
 unsigned int EDCPACK(const EDCSTATE *s,unsigned char *p,unsigned int cap,
                      unsigned int format,unsigned int lrecl,unsigned int *bytes)
+{return EDCPKPAD(s,p,cap,format,lrecl,(unsigned char)' ',bytes);}
+unsigned int EDCPKPAD(const EDCSTATE *s,unsigned char *p,unsigned int cap,
+                     unsigned int format,unsigned int lrecl,unsigned char pad,unsigned int *bytes)
 {
     unsigned int i,n,used=0U,fixed=(format&0x80U)!=0U;
     if(!bytes||!lrecl||(!fixed&&lrecl<4U))return 8U;
@@ -24,7 +27,7 @@ unsigned int EDCPACK(const EDCSTATE *s,unsigned char *p,unsigned int cap,
     for(i=0U;i<s->count;++i){n=fixed?lrecl:s->line[i].length;
         p[used++]=(unsigned char)(n>>8);p[used++]=(unsigned char)n;
         memcpy(p+used,s->line[i].text,s->line[i].length);
-        if(fixed&&n>s->line[i].length)memset(p+used+s->line[i].length,' ',n-s->line[i].length);
+        if(fixed&&n>s->line[i].length)memset(p+used+s->line[i].length,pad,n-s->line[i].length);
         used+=n;}
     *bytes=used;return 0U;
 }

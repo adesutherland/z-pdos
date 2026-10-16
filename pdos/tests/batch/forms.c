@@ -30,6 +30,7 @@ int main(void)
  assert(event("SUBMIT")==8&&submitted==1U);assert(!event("")&&submitted==1U);
  assert(!TBFEVENT(&form,"",0x6dU)&&form.attempted==ticket);assert(event("PREVIEW")==8&&submitted==1U);
  assert(!event("RELEASE")&&runs==1U&&!prints);assert(!event("OUTPUT")&&!event("STEP BUILD.RUN")&&!event("DD SYSPRINT"));
+ assert(strstr(form.notice,"Output filter updated")&&form.last_id==1U&&submitted==1U&&runs==1U);
  assert(!TBFVIEW(&form,8U,78U)&&contains("RESULT 42"));depth=TJBWORD(TJBFIND(&pool,7U,1U)+24U);
  assert(!TBFVIEW(&form,8U,78U)&&TJBWORD(TJBFIND(&pool,7U,1U)+24U)==depth);
  /* Both horizontal pages expose the exact retained 132-byte record. */

@@ -4,17 +4,23 @@ import rxfnsb
 main: procedure = .int
   arg args=.string[]
   i=.int; j=.int
-  source=.string;object=.string;name=.string;editor=.string;utilities=.string
+  source=.string;object=.string;name=.string;utilities=.string
   if args.0<>6 then do
-    say "usage: apps.crexx NEW-build/pdos/output BASE_BUILD COMMAND_BUILD CLASSIC_CC CLASSIC_AS CLASSIC_LD"
+    say "usage: apps.crexx build/pdos/output BASE_BUILD COMMAND_BUILD CLASSIC_CC CLASSIC_AS CLASSIC_LD"
     return 2
   end
   work=args.1; base=args.2; command=args.3; cc=args.4; classicas=args.5; ld=args.6
   if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  if work="build/pdos/batch-sdk/apps" then do
+    address crexx "run crexx -nokeep pdos/scripts/batch-clean.crexx --args :work"
+    if rc<>0 then return rc
+  end
+  else do
   address crexx "run test ! -e :work"
   if rc<>0 then return 2
   address crexx "run mkdir -p :work"
   if rc<>0 then return rc
+  end
   common=.string[]; sources=.string[]; allsources=.string[]
   modules="ui console 3270 workbench surface history display recordio"
   do i=1 to words(modules)
@@ -22,17 +28,28 @@ main: procedure = .int
     object=compile(source,work||"/"||word(modules,i),cc,classicas)
     common[i]=object;allsources[allsources.0+1]=source
   end
-  source="pdos/src/apps/edit_core.c";editor=compile(source,work||"/edit_core",cc,classicas)
+  editors=.string[]
+  editmodules="edit_core edit_text edit_session edit_screen"
+  do i=1 to words(editmodules)
+    name=word(editmodules,i);source="pdos/src/apps/"||name||".c"
+    editors[editors.0+1]=compile(source,work||"/"||name,cc,classicas)
+    allsources[allsources.0+1]=source
+    allsources[allsources.0+1]="pdos/src/apps/"||name||".h"
+  end
+  source="pdos/src/twospace_editclient.c"
+  editors[editors.0+1]=compile(source,work||"/editclient",cc,classicas)
   allsources[allsources.0+1]=source
+  allsources[allsources.0+1]="pdos/src/twospace_editfile.h"
   source="pdos/src/apps/utilities.c";utilities=compile(source,work||"/utilities",cc,classicas)
   allsources[allsources.0+1]=source
   native=.string[]
   native[1]=command||"/part5.obj";native[2]=command||"/part1.obj"
   native[3]=command||"/part2.obj";native[4]=command||"/part6.obj"
   native[5]=base||"/support/MVSSUPA.obj";native[6]=command||"/stdlib.obj"
+  native[7]=command||"/part7.obj";native[8]=command||"/part8.obj"
   runtime="START CTYPE STRING TIME ERRNO ASSERT LOCALE MATH SETJMP SIGNAL MEMMGR"
   do i=1 to words(runtime)
-    native[i+6]=base||"/c/objects/"||word(runtime,i)||".obj"
+    native[i+8]=base||"/c/objects/"||word(runtime,i)||".obj"
   end
   programs="edit find hex cmp hello recio panel diskmap"
   packer=work||"/pack-tso"
@@ -45,7 +62,9 @@ main: procedure = .int
     do j=1 to common.0
       objects[j+1]=common[j]
     end
-    if name="edit" then objects[objects.0+1]=editor
+    if name="edit" then do j=1 to editors.0
+      objects[objects.0+1]=editors[j]
+    end
     if name="find" | name="hex" | name="cmp" then objects[objects.0+1]=utilities
     module=work||"/"||name||".rdw";map=work||"/"||name||".map";stage=work||"/"||name||".bin"
     address crexx "run :ld --oformat mvs --image-base 0 --amode 31 --rmode ANY -e @@CRT0 -Map :map -o :module :native[] :objects[]"

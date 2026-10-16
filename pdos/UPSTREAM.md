@@ -40,3 +40,11 @@ The October 2026 stateless U command router and K native command-environment
 adapter are original MIT-licensed project work. Native layout facts are cited
 in [the architecture guide](doc/architecture/COMMAND-ENVIRONMENTS.md); no CMS,
 TSO or Rexx implementation source was imported.
+
+The October 2026 fullscreen EDIT increment is original MIT-licensed C90 over
+the existing record editor model. Hans-Walter Latz's public-domain MECAFF EE,
+as distributed with VM/CE Community Edition, is the interaction reference.
+The assessment used upstream `1694fa893eb962ef1dca156247c6c3cca1750ac8`;
+no EE or THE implementation is imported. PDOS adapters own its checked
+native-record, journal and 3270 services. See
+[the editor design](doc/architecture/RECORD-EDITOR.md).

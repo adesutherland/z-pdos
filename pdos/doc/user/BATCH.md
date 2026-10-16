@@ -34,6 +34,13 @@ retained records and does not consume them. Omit STEP/DD to review everything.
 PRINT is optional; use it when physical printer delivery is wanted. Purge only
 after review, retaining a concise result summary rather than bulky captures.
 
+The current serial development spool retains one completed job while another
+can wait. Review and PURGE the completed job before starting the next queued
+job. Command status 4 with a queued job and no STEP BEGIN means execution did
+not start; inspect JOBS/STATUS before creating another submission. HOLD means
+output retention, so it does not bypass this capacity rule. No completed job
+is automatically purged.
+
 Command RC describes admission/dispatch/delivery. Check the job/step RC in
 STATUS to decide whether the application succeeded. For example, a successful
 SUBMIT command can report a compiler RC 2 followed by skipped dependent steps.
@@ -52,6 +59,9 @@ complete physical model, line and recovery qualification.
 The forms retain named fields in the panel body and edit the selected field
 through the common input area. PF5/PF6 select a field; PF2 prepares `EDIT value`
 there; Enter accepts it. Direct field commands work in that same area.
+The Workbench identifies the active form as FORM OPEN and displays its own
+PF-key legends. PF3 returns to the console. STEP/DD edits filter retained
+output and preserve the submitted job; they do not require a new preview.
 
 Start with `DECK dataset(member)`, or choose `PROC CRXCG` and `SRC dataset(member)`
 to generate a common procedure call. CRXC/CRXCL also require OUT.

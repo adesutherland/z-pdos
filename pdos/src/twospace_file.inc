@@ -541,9 +541,9 @@ static unsigned int sf_exit_finish(void)
     *(volatile unsigned int *)0x4f54U=1U;return 0U;
 }
 
-static int sf_record(SFFILE *file,unsigned int capacity,unsigned int *got)
+static int sf_disk_record(SFDD *dd,SFFILE *file,unsigned int capacity,unsigned int *got)
 {
-    SFDD *dd=&sf_dd[file->dd];unsigned int subchannel=dd->device;
+    unsigned int subchannel=dd->device;
     unsigned int attempt;
     for(attempt=0U;attempt<2U;++attempt){
         const unsigned char *ahead;
@@ -571,6 +571,8 @@ static int sf_record(SFFILE *file,unsigned int capacity,unsigned int *got)
     }
     return -1;
 }
+static int sf_record(SFFILE *file,unsigned int capacity,unsigned int *got)
+{return sf_disk_record(&sf_dd[file->dd],file,capacity,got);}
 static unsigned int sf_write_error(SFFILE *file,unsigned int rc)
 {if(file&&sf_dd[file->dd].batch){file->failed=rc;job_native_error(rc);}return rc;}
 static unsigned int sf_buffer_read(SFFILE *file,unsigned int buffer,unsigned int capacity,unsigned int *got)

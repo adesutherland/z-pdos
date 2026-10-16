@@ -12,76 +12,103 @@ returns the next prompt to the primary. Monitor input needs an explicitly
 interactive core configuration and an online monitor. The default monitor
 captures output. PF1 through PF10 are used; F10 switches output/shell focus.
 
-## Small record line editor
+## Small C record editor
 
-`EDIT [dataset]` opens a bounded native text file, or starts an empty buffer.
-The model is inspired by CMS EDIT. It is original C90 code, with editing and
-buffers in U. The same commands and exact submitted bytes work on the
-Workbench and plain teletype/LLM consoles. `HELP` lists:
+This section describes the selected PD-027 development candidate, after the
+committed application baseline. It does not update a published or managed
+image. See the [current qualification](../qualification/EDITOR-2026-10-15.md).
+
+`EDIT [dataset(member)] [LINE]` opens printable IBM1047 FB/VB text, or starts
+an empty buffer. A 3270 opens a fullscreen editor; a line console uses commands.
+`LINE` also selects commands on a 3270. This is original C90 code over the
+existing EDIT model. VM/CE Community Edition's MECAFF EE by Hans-Walter Latz
+is the interaction reference; no EE or THE implementation is imported.
+
+Type over numbered source rows. The two-character prefix accepts `I` to insert
+a blank record after that row, or `D` to delete it. Enter applies the complete
+submitted page. Invalid, duplicate, overlapping or protected fields refuse the
+page without partially changing the buffer. Hidden horizontal columns stay at
+their original byte positions. A submitted page is one undo unit.
+Fullscreen requires the existing Read Buffer facility to recover exact field
+positions; terminals without it use `EDIT name LINE`.
+
+| Key | Action |
+| --- | --- |
+| PF1 | Toggle help |
+| PF2 | SAVE |
+| PF3 | QUIT; refuse unsaved changes |
+| PF7 / PF8 | Page up / down |
+| PF9 | UNDO; repeated presses toggle |
+| PF10 / PF11 | Left / right by 40 native columns |
+
+The command field and line console share these commands:
 
 ```text
 PRINT [first [last]]
-TOP
-BOTTOM
-LOCATE literal
+TOP / BOTTOM
+FIND literal / LOCATE literal
+UP [rows] / DOWN [rows] / LEFT [columns] / RIGHT [columns]
 INPUT [after]
 INSERT after text
 DELETE first [last]
 CHANGE line /old/new/
 UNDO
-SAVE AS dataset
+SAVE
+SAVE AS dataset(member)
+END
 QUIT
-QUIT DISCARD
+CANCEL / QUIT DISCARD
 ```
 
-Line numbers begin at one; `INSERT 0 text` inserts before the first line.
-`INPUT` inserts after the current line until a single `.` is submitted; `..`
-inserts a literal dot. An empty submission creates an empty variable record.
-`CHANGE` replaces the first literal occurrence on the named line. `UNDO`
-swaps the previous editing state; consecutive UNDO commands toggle the change.
-One INPUT group is one undo unit. Invalid/full edits preserve the buffer.
-`QUIT` refuses unsaved changes. `QUIT DISCARD` deliberately abandons them.
+Line numbers start at one. `INSERT 0 text` inserts before the first record.
+`INPUT` inserts after the current line until `.`; `..` inserts a literal dot.
+An empty INPUT creates an empty variable record. One INPUT group is one undo
+unit. `CHANGE` replaces the first literal occurrence on the named line.
+`END` saves and exits. `CANCEL` deliberately discards the unsaved buffer.
+In fullscreen mode PRINT positions the page at the requested first record;
+the line route prints the requested range.
 
-The first editor supports **4096 logical records, each at most 256 bytes**.
-It preserves trailing spaces and FB padding. The file service supports PS
-FB/VB files in a single contiguous cylinder whose data and EOF are on
-the first track. It refuses spanned formats, PDS members and larger files.
-This is a small interim tool; the fullscreen editor remains a later project.
+The buffer holds **4096 records, each at most 256 UTF-8 bytes**. File and 3270
+boundaries use IBM1047, at most 256 native bytes per record and 65536 packed
+native bytes per file. Conversion is strict: unsupported characters, controls,
+invalid UTF-8 and overlong records are refused. Trailing spaces, blank VB
+records and FB padding are preserved. Line commands support printable ASCII
+literals; direct 3270 source fields also preserve printable IBM1047 Latin-1.
+FB saves pad shorter lines to LRECL with IBM1047 spaces.
 
-The installed Hercules 3215 provider accepts at most **148 input characters
-plus CRLF**. EDIT can load, display and preserve 256-byte file records on that
-console, but a single interactive input line must fit the provider's smaller
-buffer. A provider overflow returns an I/O error and exits the application;
-the shell remains available. The 3270 input profile accepts the full 256 bytes.
+The installed Hercules 3215 accepts at most **148 input characters plus CRLF**.
+Loaded records up to the editor limit can be displayed and preserved there;
+interactive commands must fit the provider limit. Use printable ASCII input:
+Hercules can replace host non-ASCII bytes with a dot before PDOS receives them.
+The qualification adapter rejects those bytes before transmission; manual
+clients must use ASCII for this route. A terminal I/O error ends
+the application, so SAVE before deliberately disconnecting a line session.
+No unsaved crash recovery is claimed.
 
-Saves require a **separate empty preallocated dataset on a mounted non-IPL
-volume**. All records, destination geometry and physical track capacity are
-checked before writing. Overlong records are refused. Saving shorter records
-to FB adds native spaces to LRECL; VB retains exact lengths, including zero.
-Data blocks, EOF and VTOC completion are checked, with immediate readback.
-An I/O failure can leave a partial destination; the original and the editing
-buffer remain available. There is no atomic replacement or retry-overwrite.
+On the **IPL volume**, SAVE uses the existing native TSO two-bank journal.
+The dataset must already exist with PS FB/VB attributes, or be a supported PDS
+with a member name. A missing member opens empty and SAVE creates it in the
+journal. Native readers and batch DDs see the saved member. This does not
+rewrite the physical PDS directory, enlarge STORE or create a new dataset.
 
-Use `VOLSER:dataset` to access a registered volume without changing SELECT:
+SAVE compares a SHA256 token for the opened source with its current content
+and attributes. A changed or busy source is refused (16); capacity/admission
+refusals occur before publication. The editing buffer stays available after
+a failed save. I/O error 12 can mean publication is uncertain: retrying SAVE
+reconciles identical committed content, and reopening inspects the current
+version. Device completion/readback does not establish host power-loss safety.
+SAVE AS requires a separate new or empty target; existing nonempty data is
+refused. It adopts the new source only after success.
 
-```text
-MOUNT 01BB FTX001
-SELECT FTX001
-ALLOC DRAFT.TEXT VB 260 2640 1
-SELECT PDOS00
-EDIT EXAMPLE.REXX
-CHANGE 7 /Hello/Welcome/
-SAVE AS FTX001:DRAFT.TEXT
-QUIT
-EDIT FTX001:DRAFT.TEXT
-PRINT 1 10
-QUIT
-```
+The earlier non-IPL exchange route remains available for PS first-track files
+in its supported 100-cylinder layout, through `VOLSER:dataset`. It can SAVE AS
+a separate empty preallocated dataset, with the earlier completion/readback
+checks; an I/O error may leave that destination partial. It does not support
+replacement SAVE or PDS members. `VOLUMES` shows registered volume serials.
 
-The allocator currently works only on the supported 100-cylinder exchange
-layout. `VOLUMES` shows registered serials. File names and volume serials are
-case-insensitive in these C tools; text and literals retain their exact case
-and native IBM1047 bytes. No UTF-8 conversion is performed by the editor.
+The [design and operation 38 contract](../architecture/RECORD-EDITOR.md) records
+the bounded journal scope. Physical qualification and current limits are
+reported separately; a host codec check is not a guest qualification result.
 
 ## Utilities and C examples
 

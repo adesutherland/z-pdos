@@ -7,13 +7,14 @@ main: procedure = .int
   arg args=.string[]
   i=.int;j=.int
   source=.string; expected=.string; row=.string; name=.string
-  if args.0<>5 & args.0<>6 & args.0<>7 then return 2
+  if args.0<>5 & args.0<>6 & args.0<>7 & args.0<>9 then return 2
   if args.0>=6 then if args.6<>"normal" then return 2
   profile=.string[]
-  if args.0=7 then do
+  if args.0>=7 then do
     if args.7<>"batch" then return 2
     profile.1="-DTSF_BATCH_PACKAGE=1"
   end
+  /* Optional arguments8/9 rebuild the normal K64 nucleus with GNU tools. */
   work=args.1; prior=args.2; cc=args.3; classicas=args.4; ld=args.5
   if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
   if work="build/pdos/batch-sdk/core" then do
@@ -28,14 +29,17 @@ main: procedure = .int
   if rc<>0 then return rc
   end
   identities=prior||"/inputs.sha256"; inputs=.string[]; hashes=.string[]
-  rebuilt="twospace_3270.c twospace_3270.h twospace_console.h twospace_history.c twospace_history.h twospace_surface.c twospace_workbench.c twospace_workbench.h twospace_dasd.c twospace_dasd.h twospace_batch.c twospace_batch.h twospace_job.c twospace_job.h twospace_jobdd.c twospace_jobdd.h twospace_jobtemp.c twospace_jobtemp.h twospace_dataset.c twospace_fileprofile.h"
+  rebuilt="twospace_invocation.h twospace_store.h twospace_store.c twospace_channel.c twospace_3270.c twospace_3270.h twospace_console.h twospace_history.c twospace_history.h twospace_surface.c twospace_workbench.c twospace_workbench.h twospace_dasd.c twospace_dasd.h twospace_batch.c twospace_batch.h twospace_job.c twospace_job.h twospace_jobdd.c twospace_jobdd.h twospace_jobtemp.c twospace_jobtemp.h twospace_dataset.c twospace_fileprofile.h"
   do while lines(identities)>0
     row=linein(identities);source=word(row,2);expected=word(row,1)
     changed=.int; changed=0
     do i=1 to words(rebuilt)
       if source="pdos/src/"||word(rebuilt,i) then changed=1
     end
-    if changed=0 & source<>"pdos/src/twospace_service.c" & source<>"pdos/src/twospace_invocation.c" & source<>"pdos/src/twospace_session.c" & source<>"pdos/src/twospace_session.h" & source<>"pdos/src/twospace_abi.h" & right(source,6)<>".crexx" & right(source,4)<>".inc" then do
+    if args.0=9 then do
+      if source="pdos/src/twospace_normal.S" | source="pdos/tests/two-space/service.ld" then changed=1
+    end
+    if changed=0 & source<>"pdos/src/twospace_service.c" & source<>"pdos/src/twospace_invocation.c" & source<>"pdos/src/twospace_session.c" & source<>"pdos/src/twospace_session.h" & source<>"pdos/src/twospace_abi.h" & source<>"pdos/tests/two-space/service_machine.py" & right(source,6)<>".crexx" & (right(source,4)<>".inc" | ((source="pdos/src/twospace_nucleus64.inc" | source="pdos/src/twospace_entry64.inc") & args.0<>9)) then do
       call arraydrop hashes
       address crexx "run shasum -a 256 :source" output hashes
       if rc<>0 then return rc
@@ -60,6 +64,17 @@ main: procedure = .int
   inputs[inputs.0+1]="pdos/src/twospace_jobdd.h"
   inputs[inputs.0+1]="pdos/src/twospace_jobtemp.c"
   inputs[inputs.0+1]="pdos/src/twospace_jobtemp.h"
+  newinputs="editfile.c editfile.h editfile.inc digest.c digest.h"
+  do i=1 to words(newinputs)
+    inputs[inputs.0+1]="pdos/src/twospace_"||word(newinputs,i)
+  end
+  inputs[inputs.0+1]="pdos/scripts/two-space-service-build.crexx"
+  inputs[inputs.0+1]="pdos/tests/two-space/normal_core.py"
+  inputs[inputs.0+1]="pdos/tests/two-space/service_machine.py"
+  inputs[inputs.0+1]="pdos/tests/two-space/machine_profile.py"
+  if args.0=9 then do
+    inputs[inputs.0+1]=args.8;inputs[inputs.0+1]=args.9
+  end
   asm=work||"/TWOSVC.asm"; object=work||"/TWOSVC.obj"
   address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DUSE_MEMMGR :profile[] -S -I pdos/src -I pdpclib/src pdos/src/twospace_service.c -o :asm"
   if rc<>0 then return rc
@@ -80,10 +95,10 @@ main: procedure = .int
   address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :sessionasm :sessionobj"
   if rc<>0 then return rc
   consoleobjects=.string[]
-  modules="3270 history surface workbench dasd batch job jobdd jobtemp"; names="T27 TPH TWF TWB TDA TBC TJB TJD TJT"
+  modules="3270 history surface workbench dasd batch job jobdd jobtemp editfile digest store"; names="T27 TPH TWF TWB TDA TBC TJB TJD TJT TEF TJJ TSS"
   do i=1 to words(modules)
     source="pdos/src/twospace_"||word(modules,i)||".c";name=word(names,i);casm=work||"/"||name||".asm";cobj=work||"/"||name||".obj"
-    address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src :source -o :casm"
+    address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src -I pdpclib/src :source -o :casm"
     if rc<>0 then return rc
     address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :casm :cobj"
     if rc<>0 then return rc
@@ -108,7 +123,7 @@ main: procedure = .int
   if rc<>0 then return rc
   address crexx "run :dstest"
   if rc<>0 then return rc
-  common="TSG TSD TSM TSR TSP TSV TSC TIO TBC TJB TJD TJT TSK TSH TSIF TSI TST TSS TTC T27 TDS TPH TWF TWD TWB TDA TTX TSCH TSTLB TSMKEY"
+  common="TSG TSD TSM TSR TSP TSV TSC TIO TBC TJB TJD TJT TSK TSH TSIF TSI TST TSS TTC T27 TDS TPH TWF TWD TWB TDA TEF TJJ TTX TSCH TSTLB TSMKEY"
   do i=1 to words(common)
     name=word(common,i);source=prior||"/"||name||".obj"
     if name="TSV" then source=invobj
@@ -136,6 +151,13 @@ main: procedure = .int
   end
   call lineout work||"/objects.sha256"
   elf=prior||"/service.elf"; emit=prior||"/dat-emit"; out=work||"/run"
+  if args.0=9 then do
+    gnuas=args.8;gnuld=args.9;asobject=work||"/service.o";elf=work||"/service.elf"
+    address crexx "run :gnuas -m64 -march=z900 pdos/src/twospace_normal.S -o :asobject"
+    if rc<>0 then return rc
+    address crexx "run :gnuld -m elf64_s390 -T pdos/tests/two-space/service.ld :asobject -o :elf"
+    if rc<>0 then return rc
+  end
   if args.0>=6 then address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/normal_core.py :elf :binary :emit :out"
   else address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/two-space/pcomm_core.py :elf :binary :emit :out"
   return rc

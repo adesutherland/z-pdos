@@ -13,7 +13,7 @@ typedef struct {
 typedef struct {
     const unsigned char *title,*name,*volume,*draft,*input_name;
     unsigned int title_bytes,name_bytes,volume_bytes,draft_bytes,cursor,cursor_valid,input_name_bytes;
-    unsigned int job,phase,os,rc_valid,rc,focus,source,input_program,waiting,help,capture_gap,joined;
+    unsigned int job,phase,os,rc_valid,rc,focus,source,input_program,waiting,help,capture_gap,joined,form_keys;
 } TWBCONTEXT;
 int TWBLAYOUT(unsigned int,unsigned int,TWBPLAN *);
 int TWBCOMPOSE(TWFSURFACE *,const TWBPLAN *,const TWBCONTEXT *,const TPHSTATE *,TPHVIEW *,TPHVIEW *,unsigned char *,unsigned int);
