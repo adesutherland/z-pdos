@@ -175,3 +175,5 @@ The [backlog](../BACKLOG.md) owns remaining compatibility and qualification work
 The [shared I/O foundation](IO-FOUNDATION.md) describes the locally qualified
 PD-025 operation lifetime, common U transfers and record grouping used by the
 0.2.1 development candidate.
+
+[Installed cREXX workspace controller](CREXX-DEVELOPMENT.md) describes the PD-035 publication and output-ownership protocol.

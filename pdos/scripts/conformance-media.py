@@ -345,8 +345,8 @@ def parse_vb(blocks):
 
 def directory(disk, dsn):
     _, raw, base, end = dscb(disk, dsn)
-    if raw[82:84] != b'\x02\0' or raw[84] != 0x50:
-        raise ValueError('simple VB PDS required: ' + dsn)
+    if raw[82:84] != b'\x02\0' or raw[84] not in (0x50, 0x90):
+        raise ValueError('simple FB/VB PDS required: ' + dsn)
     found, directory_numbers = {}, []
     for number, (key, data) in records(disk, *base).items():
         if key != b'\xff' * 8:
@@ -411,7 +411,14 @@ def stage_members(disk, dsn, items, media):
         source = (media / item['media_file']).read_bytes()
         if digest(source) != item['sha256']:
             raise ValueError('member source changed')
-        content[item['member']] = vb_blocks(member_values(source, item['kind'], lrecl), lrecl, blksize)
+        values = member_values(source, item['kind'], lrecl)
+        if raw[84] == 0x90:
+            if item['kind'] != 'text' or not lrecl or blksize % lrecl or any(len(value) > lrecl for value in values):
+                raise ValueError('FB text member attributes/width')
+            packed = b''.join(value.ljust(lrecl, b'\x40') for value in values)
+            content[item['member']] = [packed[i:i + blksize] for i in range(0, len(packed), blksize)]
+        else:
+            content[item['member']] = vb_blocks(values, lrecl, blksize)
     if len(content) * 12 + 14 > 256:
         raise ValueError('one-block PDS directory capacity exceeded')
     base_track = base[0] * HEADS + base[1]

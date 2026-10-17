@@ -1,0 +1,13 @@
+# Installed development workspace: retain this disk between sessions.
+# The Mainframe Operator selects ports/device ownership before starting it.
+ARCHMODE z/Arch
+CPUMODEL 2064
+MAINSIZE 512
+NUMCPU 1
+CNSLPORT 127.0.0.1:3270
+CODEPAGE 819/1047
+0009 3270
+000A 3215 noprompt
+000C 3505 reader.cards ebcdic eof
+000E 1403 printer.txt
+01B9 3390 media/pdos00.cckd

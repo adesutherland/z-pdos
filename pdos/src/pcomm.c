@@ -830,10 +830,10 @@ static void dohelp(char *topic)
 {
 #ifdef PDOS_TWO_SPACE
     if (ins_strcmp(topic,"EDIT")==0) {
-        printf("EDIT dataset (optional): 4096 native FB/VB records, 256 bytes each.\n");
+        printf("EDIT member uses the installed cREXX workspace; EDIT dataset(member) is explicit.\n");
         printf("INPUT/INSERT, PRINT, DELETE, CHANGE, LOCATE, UNDO.\n");
-        printf("SAVE AS separate empty exchange dataset; QUIT or QUIT DISCARD.\n");
-        printf("Use VOLSER:dataset for a mounted volume. EDIT HELP lists syntax.\n");
+        printf("SAVE checks the opened member; SAVE AS needs a separate empty target.\n");
+        printf("END saves/exits; QUIT refuses unsaved changes; CANCEL discards. EDIT HELP lists syntax.\n");
         return;
     }
     if (ins_strcmp(topic,"UTILITIES")==0) {
@@ -876,6 +876,7 @@ static void dohelp(char *topic)
     }
     printf("z/PDOS PCOMM: first steps\n");
 #ifdef PDOS_TWO_SPACE
+    printf("PROGRAMS / EDIT member / BUILD member / RUN member [arguments] / OUTPUT\n");
     printf("CONSOLE STATUS; HELP EDIT; HELP UTILITIES; HELP TSO\n");
 #ifdef PDOS_TWO_SPACE
     printf("SUBMIT dataset(member)|READER; JOBS; STATUS; OUTPUT; HELP BATCH\n");

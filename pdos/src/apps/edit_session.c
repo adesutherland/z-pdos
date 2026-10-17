@@ -13,11 +13,12 @@ int TEDINIT(TEDSTATE *s,TEDFILE file)
  s->text=(EDCSTATE *)calloc(1,sizeof *s->text);s->undo=(EDCSTATE *)calloc(1,sizeof *s->undo);
  s->candidate=(EDCSTATE *)calloc(1,sizeof *s->candidate);s->saved=(EDCSTATE *)calloc(1,sizeof *s->saved);
  s->packed=(unsigned char *)malloc(TEF_LIMIT);
- if(!s->text||!s->undo||!s->candidate||!s->saved||!s->packed){TEDFREE(s);return 4;}
+ s->draft=(unsigned char *)malloc(40000U);s->page=(unsigned char *)malloc(40000U);
+ if(!s->text||!s->undo||!s->candidate||!s->saved||!s->packed||!s->draft||!s->page){TEDFREE(s);return 4;}
  strcpy(s->notice,"HELP lists commands; I/D in prefix; SAVE writes; CANCEL discards");return 0;
 }
 void TEDFREE(TEDSTATE *s)
-{free(s->text);free(s->undo);free(s->candidate);free(s->saved);free(s->packed);memset(s,0,sizeof *s);}
+{free(s->text);free(s->undo);free(s->candidate);free(s->saved);free(s->packed);free(s->draft);free(s->page);memset(s,0,sizeof *s);}
 int TEDDIRTY(const TEDSTATE *s){return !EDCEQUAL(s->text,s->saved);}
 void TEDTAKE(TEDSTATE *s)
 {if(!EDCEQUAL(s->text,s->candidate)){*s->undo=*s->text;s->has_undo=1U;*s->text=*s->candidate;}}
@@ -36,7 +37,7 @@ int TEDOPEN(TEDSTATE *s,const char *name)
  if(!rc)rc=(unsigned int)decode(s->candidate);
  if(rc){sprintf(s->notice,"Open refused (%u); supported printable IBM1047 FB/VB text required",rc);return (int)rc;}
  *s->text=*s->candidate;*s->saved=*s->text;memcpy(s->info,info,sizeof info);strcpy(s->source,name);
- s->top=1U;s->left=s->has_undo=s->input_mode=0U;
+ s->top=1U;s->left=s->has_undo=s->input_mode=s->draft_bytes=0U;
  strcpy(s->notice,(TEDWORD(info+36U)&TEF_EXISTS)?"Source opened; SAVE checks for intervening changes":"New member; SAVE creates it in the existing PDS");return 0;
 }
 int TEDSAVE(TEDSTATE *s,const char *target)
@@ -57,7 +58,14 @@ int TEDSAVE(TEDSTATE *s,const char *target)
  }
  if(!rc)rc=EDCPKPAD(s->candidate,s->packed,TEF_LIMIT,TEDWORD(info+20U),TEDWORD(info+24U),0x40U,&bytes);
  if(!rc)rc=s->file(separate?TEF_NEW:TEF_SAVE,target,s->packed,bytes,info);
- if(rc){sprintf(s->notice,"Save refused/failed (%u); buffer retained; 12 may mean publication uncertain",rc);return (int)rc;}
+ if(rc){
+  if(rc==4U)strcpy(s->notice,"Save refused: storage capacity exhausted; buffer retained");
+  else if(rc==8U)strcpy(s->notice,"Save refused: records exceed target format/size; buffer retained");
+  else if(rc==12U)strcpy(s->notice,"Save uncertain: retry SAVE to reconcile, or reopen separately; buffer retained");
+  else if(rc==16U)strcpy(s->notice,"Save refused: target changed or is busy; buffer retained");
+  else if(rc==20U)strcpy(s->notice,"Save refused: unsupported target or character; buffer retained");
+  else sprintf(s->notice,"Save failed (%u); buffer retained",rc);
+  return (int)rc;}
  memcpy(s->info,info,sizeof info);if(separate)strcpy(s->source,target);*s->saved=*s->text;
  sprintf(s->notice,"Saved %u records to %s",TEDWORD(info+32U),target);return 0;
 }

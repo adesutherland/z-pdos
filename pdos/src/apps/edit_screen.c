@@ -6,6 +6,19 @@
 #include "edit_text.h"
 static int geometry(const T27GEOMETRY *g)
 {return g&&g->rows>=24U&&g->rows<=43U&&g->columns>=80U&&g->columns<=132U&&g->cells==g->rows*g->columns;}
+static int same_page(const TEDSTATE *s,const T27GEOMETRY *g)
+{return s->draft_rows==g->rows&&s->draft_columns==g->columns&&s->draft_top==s->top&&s->draft_left==s->left&&s->draft_help==s->help&&s->draft_input==s->input_mode;}
+static void overlay(const TEDSTATE *s,const T27GEOMETRY *g,unsigned int row,unsigned char *cells)
+{
+ T27INPUTEVENT e;T27INPUTFIELD f[128];unsigned int i,c,n,width,k,used;unsigned char text[4];
+ if(!s->draft_bytes||!same_page(s,g)||T27INPUT(g,s->draft,s->draft_bytes,&e,f,128U))return;
+ for(i=0U;i<e.fields;++i){if(f[i].address/g->columns!=row)continue;c=f[i].address%g->columns;
+  if(row==g->rows-3U&&c==7U)width=g->columns-8U;
+  else if(row>=2U&&row<g->rows-3U&&!s->help&&!s->input_mode&&(c==1U||c==10U))width=c==1U?2U:g->columns-11U;
+  else continue;
+  n=f[i].length;if(n>width)n=width;memset(cells+c,0,width);for(k=0U;k<n;++k){unsigned char b=s->draft[f[i].offset+k];cells[c+k]=!b?0U:TEDUTF8(&b,1U,text,sizeof text,&used)?0x6fU:b;}
+ }
+}
 static int puttext(unsigned char *p,unsigned int width,const char *text)
 {unsigned int n=(unsigned int)strlen(text);if(n>width)n=width;return TEDCENC(text,n,p);}
 int TESPAINT(const TEDSTATE *s,const T27GEOMETRY *g,unsigned char *out,unsigned int cap,unsigned int *used,unsigned int cursor)
@@ -23,7 +36,8 @@ int TESPAINT(const TEDSTATE *s,const T27GEOMETRY *g,unsigned char *out,unsigned 
   "SAVE error 12 may mean uncertain publication: buffer stays available.",
   "Retry SAVE reconciles identical content; reopen to inspect externally."};
  if(!geometry(g)||!out||!used||cap<g->cells+g->rows*8U+16U)return 8;
- if(cursor>=g->cells)cursor=(g->rows-3U)*g->columns+7U;
+ if(cursor>=g->cells)cursor=(!s->help&&!s->text->count)?2U*g->columns+10U:(g->rows-3U)*g->columns+7U;
+ if(s->help)cursor=(g->rows-3U)*g->columns+7U;
  out[at++]=0xc3U;out[at++]=0x11U;if(T27ADDR(g,0U,out+at))return 8;at+=2U;width=g->columns-11U;
  for(r=0U;r<g->rows;++r){
   memset(row,0x40U,g->columns);
@@ -41,6 +55,7 @@ int TESPAINT(const TEDSTATE *s,const T27GEOMETRY *g,unsigned char *out,unsigned 
   }else if(r==g->rows-3U){if(puttext(row+1U,5U,s->input_mode?"INP> ":"===> "))return 8;memset(row+7U,0,g->columns-8U);}
   else if(r==g->rows-2U){if(puttext(row+1U,g->columns-2U,s->notice))return 8;}
   else if(puttext(row+1U,g->columns-2U,"PF1 Help PF2 Save PF3 Quit PF7/8 Page PF9 Undo PF10/11 Left/Right"))return 8;
+  overlay(s,g,r,row);
   for(c=0U;c<g->columns;++c){
    offset=r*g->columns+c;
    if(offset==cursor)out[at++]=0x13U;
@@ -55,10 +70,10 @@ static int replace(TEDSTATE *s,unsigned int number,unsigned int width,const unsi
 {
  unsigned char old[EDC_WIDTH],native[EDC_WIDTH],utf8[EDC_WIDTH];unsigned int len=0U,end,k,used;
  EDCLINE *line;
- if(number>s->candidate->count+1U)return n?8:0;
+ while(number>s->candidate->count+1U){if(EDCINSERT(s->candidate,s->candidate->count,(const unsigned char *)"",0U))return 8;}
  if(number<=s->candidate->count){line=&s->candidate->line[number-1U];if(TEDEBC(line->text,line->length,old,sizeof old,&len))return 8;}
  while(n&&!p[n-1U])--n;
- if(!n&&number>s->candidate->count)return 0;
+
  if(s->left>EDC_WIDTH||n>EDC_WIDTH-s->left)return 8;
  end=s->left+width;
  if(len>end){if(end>EDC_WIDTH)return 8;used=len;memcpy(native,old,len);memset(native+s->left,0x40U,width);}
@@ -68,7 +83,7 @@ static int replace(TEDSTATE *s,unsigned int number,unsigned int width,const unsi
  if(number>s->candidate->count)return (int)EDCINSERT(s->candidate,s->candidate->count,utf8,used);
  line=&s->candidate->line[number-1U];memcpy(line->text,utf8,used);line->length=used;return 0;
 }
-int TESINPUT(TEDSTATE *s,const T27GEOMETRY *g,const unsigned char *in,unsigned int bytes,char command[257],unsigned int *aid,unsigned int *cursor)
+static int apply_page(TEDSTATE *s,const T27GEOMETRY *g,const unsigned char *in,unsigned int bytes,char command[257],unsigned int *aid,unsigned int *cursor)
 {
  T27INPUTEVENT e;T27INPUTFIELD f[128];unsigned char prefix[38],seen[77];
  unsigned char text[256];unsigned int i,j,r,c,index,n,number,width,command_seen=0U;char op[3];
@@ -94,7 +109,7 @@ int TESINPUT(TEDSTATE *s,const T27GEOMETRY *g,const unsigned char *in,unsigned i
   }else if(n>width||replace(s,number,width,in+f[i].offset,n))return 8;
  }
  for(r=g->rows-5U;r>0U;--r){number=s->top+r-1U;
-  if(prefix[r-1U]=='I'||prefix[r-1U]=='i'){if(number>s->candidate->count||EDCINSERT(s->candidate,number,(const unsigned char *)"",0U))return 8;}
+  if(prefix[r-1U]=='I'||prefix[r-1U]=='i'){while(number>s->candidate->count){if(EDCINSERT(s->candidate,s->candidate->count,(const unsigned char *)"",0U))return 8;}if(EDCINSERT(s->candidate,number,(const unsigned char *)"",0U))return 8;}
   if(prefix[r-1U]=='D'||prefix[r-1U]=='d'){if(EDCDELETE(s->candidate,number,number))return 8;}
  }
  TEDTAKE(s);*aid=e.aid;*cursor=e.cursor_valid?e.cursor:(g->rows-3U)*g->columns+7U;
@@ -102,6 +117,50 @@ int TESINPUT(TEDSTATE *s,const T27GEOMETRY *g,const unsigned char *in,unsigned i
   if(r>=2U&&r<g->rows-3U&&(c==1U||c==2U||(c>=10U&&c<g->columns-1U))){number=s->top+r-2U;if(number<=s->text->count)s->text->current=number;}
   else *cursor=(g->rows-3U)*g->columns+7U;
  }return 0;
+}
+/* Retain fields, not raw terminal orders. A rejected page remains a draft
+ * against the exact original page until corrected or explicitly discarded. */
+int TESINPUT(TEDSTATE *s,const T27GEOMETRY *g,const unsigned char *in,unsigned int bytes,char command[257],unsigned int *aid,unsigned int *cursor)
+{
+ T27INPUTEVENT e,old;T27INPUTFIELD f[128],prior[128];unsigned char *merged;
+ unsigned int i,j,at=3U,n,r,c;int rc;char discard[257];
+ if(!geometry(g)||T27INPUT(g,in,bytes,&e,f,128U)||e.kind!=T27_EVENT_KEY)return 8;
+ for(i=0U;!s->input_mode&&e.aid==0x7dU&&i<e.fields;++i)if(f[i].address==(g->rows-3U)*g->columns+7U&&f[i].length<=256U){
+  n=f[i].length;while(n&&(!in[f[i].offset+n-1U]||in[f[i].offset+n-1U]==0x40U))--n;
+  if(!TEDCDEC(in+f[i].offset,n,discard)){discard[n]=0;
+   if(!strcmp(discard,"CANCEL")||!strcmp(discard,"cancel")||!strcmp(discard,"QUIT DISCARD")||!strcmp(discard,"quit discard")){
+    s->draft_bytes=0U;strcpy(command,"CANCEL");*aid=0x7dU;*cursor=(g->rows-3U)*g->columns+7U;return 0;}
+  }
+ }
+ if(s->draft_bytes&&!same_page(s,g)){strcpy(s->notice,"Rejected draft retained: restore page geometry or CANCEL to discard");return 16;}
+ merged=s->page;memcpy(merged,in,3U);
+ if(s->draft_bytes){
+  if(T27INPUT(g,s->draft,s->draft_bytes,&old,prior,128U)){return 8;}
+  for(i=0U;i<old.fields;++i){for(j=0U;j<e.fields&&f[j].address!=prior[i].address;++j){}
+   if(j<e.fields)continue;n=prior[i].length;
+   if(at+3U+n>TES_MAX){return 4;}merged[at++]=0x11U;T27ADDR(g,prior[i].address,merged+at);at+=2U;
+   memcpy(merged+at,s->draft+prior[i].offset,n);at+=n;
+  }
+ }
+ for(i=0U;i<e.fields;++i){n=f[i].length;if(at+3U+n>TES_MAX){return 4;}
+  merged[at++]=0x11U;T27ADDR(g,f[i].address,merged+at);at+=2U;memcpy(merged+at,in+f[i].offset,n);at+=n;}
+ rc=apply_page(s,g,merged,at,command,aid,cursor);
+ if(rc){
+  s->draft_bytes=3U;memcpy(s->draft,merged,3U);
+  if(!T27INPUT(g,merged,at,&old,prior,128U))for(i=0U;i<old.fields;++i){
+   r=prior[i].address/g->columns;c=prior[i].address%g->columns;
+   if(!((r==g->rows-3U&&c==7U)||(r>=2U&&r<g->rows-3U&&!s->help&&!s->input_mode&&(c==1U||c==10U))))continue;
+   for(j=i+1U;j<old.fields&&prior[j].address!=prior[i].address;++j){}if(j<old.fields)continue;
+   n=prior[i].length;if(n>(c==1U?2U:c==7U?g->columns-8U:g->columns-11U))continue;
+   s->draft[s->draft_bytes++]=0x11U;T27ADDR(g,prior[i].address,s->draft+s->draft_bytes);s->draft_bytes+=2U;
+   memcpy(s->draft+s->draft_bytes,merged+prior[i].offset,n);s->draft_bytes+=n;
+  }
+  s->draft_rows=g->rows;s->draft_columns=g->columns;
+  s->draft_top=s->top;s->draft_left=s->left;s->draft_help=s->help;s->draft_input=s->input_mode;
+  *cursor=e.cursor_valid?e.cursor:2U*g->columns+1U;
+  strcpy(s->notice,rc==20?"Use Enter/displayed PF keys; typed draft retained":"Page refused: correct prefix/field; typed draft retained; CANCEL discards");
+ }else s->draft_bytes=0U;
+ return rc;
 }
 int TESFULL(const T27GEOMETRY *g,const unsigned char *modified,unsigned int bytes,
  const unsigned char *buffer,unsigned int buffered,unsigned char *out,unsigned int cap,unsigned int *used)

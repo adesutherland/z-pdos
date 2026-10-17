@@ -55,6 +55,31 @@ int main(void)
   m=s.text->count;assert(!TESINPUT(&s,&g,raw,n,command,&aid,&cursor)&&s.text->count==m+1U);
   assert(!cmd(&s,"UNDO")&&s.text->count==m);
  }
+ /* New source: a blank second record needs no guard or seed member. */
+ memset(s.text,0,sizeof *s.text);s.top=1U;s.left=0U;s.help=0U;s.draft_bytes=0U;
+ assert(!T27GEOM(&g,24U,80U,T27_CODED12));
+ n=start(&g,raw,0x7dU,330U);n=field(&g,raw,n,170U,"options levelb");n=field(&g,raw,n,330U,"say 'hello'");
+ assert(!TESINPUT(&s,&g,raw,n,command,&aid,&cursor)&&s.text->count==3U&&s.text->line[1].length==0U);
+ /* Valid typed changes survive an invalid prefix, including the SAVE field.
+  * A corrected prefix applies the page once; UNDO restores all three rows. */
+ prior=*s.text;n=start(&g,raw,0x7dU,161U);n=field(&g,raw,n,170U,"options levelb /* revised */");
+ n=field(&g,raw,n,161U,"X");n=field(&g,raw,n,1687U,"SAVE");
+ assert(TESINPUT(&s,&g,raw,n,command,&aid,&cursor)&&s.draft_bytes&&EDCEQUAL(s.text,&prior));
+ assert(!TESPAINT(&s,&g,screen,sizeof screen,&n,161U)&&!T27WRITE(&g,screen,n));
+ n=start(&g,raw,0x7dU,161U);n=field(&g,raw,n,161U," ");
+ assert(!TESINPUT(&s,&g,raw,n,command,&aid,&cursor)&&!s.draft_bytes&&!strcmp(command,"SAVE"));
+ assert(!EDCFIND(&s.text->line[0],(unsigned char *)"revised",7U,&k));assert(!cmd(&s,"UNDO")&&EDCEQUAL(s.text,&prior));
+ n=start(&g,raw,0x7dU,161U);n=field(&g,raw,n,161U,"X");assert(TESINPUT(&s,&g,raw,n,command,&aid,&cursor));
+ assert(!T27GEOM(&g,27U,132U,T27_CODED12));n=start(&g,raw,0x7dU,2U*g.columns+10U);
+ assert(TESINPUT(&s,&g,raw,n,command,&aid,&cursor)==16&&s.draft_bytes);
+ n=field(&g,raw,n,(g.rows-3U)*g.columns+7U,"CANCEL");assert(!TESINPUT(&s,&g,raw,n,command,&aid,&cursor)&&!strcmp(command,"CANCEL")&&!s.draft_bytes);
+ /* Command-field text never overrides the actual PF action. */
+ n=start(&g,raw,0xf2U,(g.rows-3U)*g.columns+7U);n=field(&g,raw,n,(g.rows-3U)*g.columns+7U,"CANCEL");
+ assert(!TESINPUT(&s,&g,raw,n,command,&aid,&cursor)&&aid==0xf2U&&EDCEQUAL(s.text,&prior));
+ raw[0]=0xf1U;assert(!TESINPUT(&s,&g,raw,n,command,&aid,&cursor)&&aid==0xf1U&&EDCEQUAL(s.text,&prior));
+ assert(!cmd(&s,"INPUT 0"));n=start(&g,raw,0x7dU,(g.rows-3U)*g.columns+7U);n=field(&g,raw,n,(g.rows-3U)*g.columns+7U,"CANCEL");
+ assert(!TESINPUT(&s,&g,raw,n,command,&aid,&cursor)&&s.input_mode&&!strcmp(command,"CANCEL"));
+ assert(!TEDCMD(&s,command)&&s.input_mode&&s.text->line[0].length==6U);assert(!cmd(&s,"."));
  /* An off-screen tail is preserved at the same byte columns. */
  s.left=40U;s.top=1U;memset(native,0xc1U,sizeof native);assert(!TEDUTF8(native,200U,s.text->line[0].text,256U,&n));s.text->line[0].length=n;
  assert(!T27GEOM(&g,24U,80U,T27_CODED12));n=start(&g,raw,0x7dU,170U);n=field(&g,raw,n,170U,"B");

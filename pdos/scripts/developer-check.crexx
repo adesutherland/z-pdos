@@ -1,0 +1,56 @@
+/* SPDX-License-Identifier: MIT; focused host controller/editor checks. */
+options levelb
+import rxfnsb
+main: procedure=.int
+  arg args=.string[]
+  if args.0<>0 then return 2
+  work="build/pdos/developer-check"
+  address crexx "run test ! -L :work"
+  if rc<>0 then return 2
+  address crexx "run mkdir -p :work"
+  if rc<>0 then return rc
+  sources=.string[]
+  checks="editor develop programs nativehelp"
+  do i=1 to words(checks)
+    check=word(checks,i);call arraydrop sources
+    if check="editor" then do
+      call arrayappend sources,"pdos/tests/edit_session.c"
+      call arrayappend sources,"pdos/src/apps/edit_core.c"
+      call arrayappend sources,"pdos/src/apps/edit_text.c"
+      call arrayappend sources,"pdos/src/apps/edit_session.c"
+      call arrayappend sources,"pdos/src/apps/edit_screen.c"
+      call arrayappend sources,"pdos/src/twospace_3270.c"
+    end
+    else do
+      if check="nativehelp" then call arrayappend sources,"pdos/tests/batch/submit_ui.c"
+      else call arrayappend sources,"pdos/tests/batch/"||check||".c"
+      call arrayappend sources,"pdos/src/twospace_develop.c"
+      if check<>"nativehelp" then call arrayappend sources,"pdos/src/twospace_submit.c"
+      call arrayappend sources,"pdos/src/twospace_jcl.c"
+      call arrayappend sources,"pdos/src/twospace_digest.c"
+      call arrayappend sources,"pdos/src/twospace_job.c"
+      call arrayappend sources,"pdos/src/twospace_jobdd.c"
+      call arrayappend sources,"pdos/src/twospace_editfile.c"
+      if check="programs" | check="nativehelp" then do
+        call arrayappend sources,"pdos/src/twospace_programs.c"
+        call arrayappend sources,"pdos/src/twospace_3270.c"
+      end
+    end
+    flags=.string[]
+    if check="nativehelp" then do
+      call arrayappend flags,"-DTJF_PCOMM"
+      call arrayappend flags,"-DTDV_PCOMM"
+      call arrayappend sources,"pdos/src/twospace_batchui.c"
+      call arrayappend sources,"pdos/src/twospace_editclient.c"
+      call arrayappend sources,"pdos/src/apps/edit_text.c"
+    end
+    binary=work||"/"||check
+    address crexx "run clang -std=c89 -Wall -Wextra -Werror -Wno-deprecated-declarations -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src :flags[] :sources[] -o :binary"
+    if rc<>0 then return rc
+    address crexx "run :binary"
+    if rc<>0 then return rc
+  end
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/developer_media.py"
+  if rc<>0 then return rc
+  say "PD035 host editor, publication fault matrix and Programs fields PASS"
+  return 0

@@ -111,3 +111,5 @@ physical matrix use `editor-probe.crexx` and `editor-qa.crexx`; only the
 Mainframe Operator stages media, operates the guest and manages the lease.
 The [result summary](../qualification/EDITOR-2026-10-15.md) pins the selected
 inputs and the [fixture guide](../../tests/editor/README.md) fixes its matrix.
+
+The [installed cREXX developer profile](CREXX-DEVELOPMENT.md) adds a checked normal factory selection and shared Programs/console workflow (PD-035, under qualification).

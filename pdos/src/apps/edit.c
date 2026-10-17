@@ -84,7 +84,7 @@ static int screen(TEDSTATE *s)
    memcpy(record,stream,n);
   }
   if(kind==1U){rc=(unsigned int)TESINPUT(s,&geometry,record,n,command,&aid,&cursor);
-   if(rc)strcpy(s->notice,rc==20U?"Use the displayed PF keys or Enter":"Page refused; invalid/overlapping fields; buffer retained");
+   /* TESINPUT retains rejected fields and supplies the recovery message. */
   }else rc=20U;
   if(rc)continue;
   if(aid!=0x7dU){
@@ -97,6 +97,7 @@ static int screen(TEDSTATE *s)
   if(aid!=0x7dU)s->input_mode=0U;
   action=TEDCMD(s,command);if(action==1)break;
   if(aid!=0x7dU){s->input_mode=input_mode;if(aid==0xf9U)s->input_undo=0U;}
+  if(action==3)cursor=(geometry.rows-3U)*geometry.columns+7U;
   if(action==2){s->top=s->first?s->first:1U;strcpy(s->notice,"PRINT range positioned at its first record");}
  }
  done:
@@ -106,6 +107,8 @@ static int screen(TEDSTATE *s)
 int main(int argc,char **argv)
 {
  TEDSTATE s;unsigned char cap[64];int rc=0,force_line=0;const char *source=0;
+ if(argc>1&&(!strcmp(argv[1],"HELP")||!strcmp(argv[1],"help"))){
+  printf("EDIT dataset(member) [LINE]\nType source; I/D prefixes insert/delete. SAVE writes; END saves/exits.\nINPUT after / . ends input; PRINT / UNDO / HELP; CANCEL discards.\n");return 0;}
  if(argc>3){printf("EDIT [dataset(member)] [LINE]\n");return 8;}
  if(argc>1){if(!strcmp(argv[1],"LINE"))force_line=1;else source=argv[1];}
  if(argc>2){if(strcmp(argv[2],"LINE")){printf("EDIT [dataset(member)] [LINE]\n");return 8;}force_line=1;}

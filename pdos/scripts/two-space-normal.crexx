@@ -17,6 +17,12 @@ main: procedure = .int
   if left(work,11) <> "build/pdos/" | pos("..",work) > 0 then return 2
   address crexx "run test ! -e :work"
   if rc <> 0 then return 2
+  developer=getenv("ZPDOS_CREXX_BATCH_PACKAGE");developer_hash=getenv("ZPDOS_CREXX_BATCH_SHA256")
+  selected_profile=.string[]
+  if developer<>"" then do
+    if args.0<>4 | length(developer_hash)<>64 then return 2
+    selected_profile.1="batch"
+  end
   lines = .string[]
   address crexx "pwd" output lines
   root = strip(lines.1); out = root || "/" || work
@@ -33,7 +39,7 @@ main: procedure = .int
   if rc <> 0 then return rc
   kernel = work || "/kernel"; hercules = herc || "/hercules"
   say "Building K with " || cc || "; GNU tools " || gnuas || " / " || gnuld
-  address crexx "run crexx -verbose3 -nokeep pdos/scripts/two-space-next.crexx --args :kernel :gnuas :gnuld :cc :classicas :linker :hercules normal"
+  address crexx "run crexx -verbose3 -nokeep pdos/scripts/two-space-next.crexx --args :kernel :gnuas :gnuld :cc :classicas :linker :hercules normal :selected_profile[]"
   if rc <> 0 then do
     say "Kernel recipe failed with status " || rc
     return rc
@@ -47,6 +53,13 @@ main: procedure = .int
     apps = work || "/apps"; absolute_command = out || "/command"
     address crexx "run crexx -nokeep pdos/scripts/apps.crexx --args :apps :absolute_base :absolute_command :cc :classicas :linker"
     if rc <> 0 then return rc
+    if developer<>"" then do
+      absolute_bootstrap=out||"/bootstrap-image";absolute_apps=out||"/apps";absolute_command=out||"/command"
+      address crexx "run crexx -nokeep pdos/scripts/developer-image.crexx --args :image :absolute_bootstrap :core :absolute_command :absolute_apps :developer :developer_hash :herc"
+      if rc<>0 then return rc
+      call receipts out,gnuas,gnuld
+      return 0
+    end
     archive = getenv("ZPDOS_CREXX_PACKAGE")
     if archive = "" then do
       archive = out || "/CREXX-v1.0.0-beta.3-mainframe.zip"

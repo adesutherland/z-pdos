@@ -49,7 +49,13 @@ main: procedure = .int
   sources[13] = "pdos/src/twospace_jobdd.c"; flags[13] = ""
   sources[14] = "pdos/src/twospace_batchui.c"; flags[14] = "-DTBF_PCOMM"
   sources[15] = "pdos/src/twospace_workbench.c"; flags[15] = "-DTWB_LAYOUT_ONLY"
-  do i = 9 to 15
+  sources[16] = "pdos/src/twospace_develop.c"; flags[16] = ""
+  sources[17] = "pdos/src/twospace_programs.c"; flags[17] = "-DTDV_PCOMM"
+  sources[18] = "pdos/src/twospace_editclient.c"; flags[18] = ""
+  sources[19] = "pdos/src/apps/edit_text.c"; flags[19] = ""
+  sources[20] = "pdos/src/twospace_3270.c"; flags[20] = ""
+  sources[21] = "pdos/src/twospace_editfile.c"; flags[21] = ""
+  do i = 9 to 21
     source = sources[i]; flag = flags[i]; asm = work || "/part" || i || ".asm"; object = work || "/part" || i || ".obj"
     address system quote(cc) || " -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ " || flag || " -S -I pdpclib/src -I pdos/src " || quote(source) || " -o " || quote(asm)
     if rc <> 0 then return rc
@@ -73,7 +79,7 @@ main: procedure = .int
   do i = 1 to words(common)
     native[i+10] = base || "/c/objects/" || word(common,i) || ".obj"
   end
-  do i = 9 to 15
+  do i = 9 to 21
     call arrayappend native,objects[i]
   end
   module = work || "/PCOMM.rdw"; map = work || "/PCOMM.map"
@@ -90,6 +96,10 @@ main: procedure = .int
   inputs[inputs.0+1] = "pdos/src/twospace_ui.h"
   inputs[inputs.0+1] = "pdos/src/twospace_command_router.h"
   inputs[inputs.0+1] = "pdos/src/twospace_submit.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_develop.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_programs.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_editfile.h"
+  inputs[inputs.0+1] = "pdos/src/apps/edit_text.h"
   inputs[inputs.0+1] = "pdos/src/twospace_batchui.h"
   inputs[inputs.0+1] = "pdos/src/twospace_workbench.h"
   inputs[inputs.0+1] = "pdos/src/twospace_surface.h"

@@ -1,0 +1,60 @@
+/* SPDX-License-Identifier: MIT; installed cREXX profile factory, operator only.
+ * Existing user media is never cleaned/rebuilt by this recipe or at startup. */
+options levelb
+import rxfnsb
+main: procedure=.int
+  arg args=.string[]
+  if args.0<>8 then do
+    say "developer-image: NEW-build/pdos/output BARE_IMAGE CORE COMMAND APPS BATCH_PACKAGE MANIFEST_SHA256 HERC_BIN"
+    return 2
+  end
+  work=args.1;prior=args.2;core=args.3;command=args.4;apps=args.5;package=args.6;expected=args.7;herc=args.8
+  if left(work,11)<>"build/pdos/" | pos("..",work)>0 then return 2
+  address crexx "run test ! -e :work"
+  if rc<>0 then do
+    say "Existing developer workspace preserved. Start its existing configuration; do not rebuild it."
+    return 2
+  end
+  paths=.string[]
+  address crexx "pwd" output paths
+  root=strip(paths.1);out=root||"/"||work;input=out||"-inputs"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/scripts/developer-media.py prepare :prior :command :apps :package :expected :input"
+  if rc<>0 then return rc
+  installer=input||"/base/install-ipl"
+  address crexx "run clang -std=c90 -Wall -Wextra -Werror -pedantic -O2 -DIPL_CYLINDERS=150 pdos/src/install-ipl.c -o :installer"
+  if rc<>0 then return rc
+  address crexx "run crexx -nokeep pdos/scripts/two-space-refresh.crexx --args :work :input :core :herc 150"
+  if rc<>0 then return rc
+  source=out||"/media/pdos00.ckd";target=out||"/media/developer.ckd"
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/scripts/developer-media.py install :source :target :input"
+  if rc<>0 then return rc
+  compressed=out||"/media/pdos00.cckd";compressor=herc||"/ckd2cckd";reader=herc||"/cckd2ckd"
+  address crexx "run cmake -E rm :compressed"
+  if rc<>0 then return rc
+  address crexx "run :compressor -q -bz2 -cyls 150 :target :compressed"
+  if rc<>0 then return rc
+  readback=out||"/media/developer-readback.ckd"
+  address crexx "run :reader -q -cyls 150 :compressed :readback"
+  if rc<>0 then return rc
+  address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/scripts/developer-media.py verify :target :readback"
+  if rc<>0 then return rc
+  sourcefile=input||"/developer.json";destination=out||"/developer.json"
+  address crexx "run cmake -E copy :sourcefile :destination"
+  if rc<>0 then return rc
+  sourcefile=input||"/hercules.cnf";destination=out||"/hercules.cnf"
+  address crexx "run cmake -E copy :sourcefile :destination"
+  if rc<>0 then return rc
+  sourcefile=input||"/reader.cards";destination=out||"/reader.cards"
+  address crexx "run cmake -E copy :sourcefile :destination"
+  if rc<>0 then return rc
+  /* Discard flat disks and duplicated factory payloads after readback. */
+  temporary=.string[]
+  temporary[1]=source;temporary[2]=target;temporary[3]=readback
+  temporary[4]=out||"/media/datasets.ckd";temporary[5]=out||"/media/datasets.cckd";temporary[6]=out||"/media/readback.ckd"
+  address crexx "run cmake -E rm -f :temporary[]"
+  if rc<>0 then return rc
+  address crexx "run cmake -E rm -rf :input"
+  if rc<>0 then return rc
+  say "Installed developer image built and read back; guest qualification is separate."
+  say "Persistent workspace: "||out||"/media/pdos00.cckd"
+  return 0

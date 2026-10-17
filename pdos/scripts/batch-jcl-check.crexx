@@ -68,7 +68,7 @@ main: procedure = .int
     end
     if label="proc" then checks="pdos/tests/batch/jcl_proc.c"
     if label="upgrade" then checks="pdos/tests/batch/job_upgrade.c"
-    if label="submit" | label="submitui" | label="forms" | label="formsui" then call arrayappend sources,"pdos/src/twospace_submit.c"
+    if label="submit" | label="forms" | label="formsui" then call arrayappend sources,"pdos/src/twospace_submit.c"
     if label="forms" | label="formsui" then call arrayappend sources,"pdos/src/twospace_batchui.c"
     if label="formsui" then do
       checks="pdos/tests/batch/forms_ui.c"
@@ -79,7 +79,15 @@ main: procedure = .int
     if label="submitui" then do
       checks="pdos/tests/batch/submit_ui.c"
       call arrayappend flags,"-DTJF_PCOMM"
+      call arrayappend flags,"-Wno-deprecated-declarations"
       call arrayappend sources,"pdos/src/twospace_batchui.c"
+      call arrayappend sources,"pdos/src/twospace_develop.c"
+      call arrayappend sources,"pdos/src/twospace_programs.c"
+      call arrayappend sources,"pdos/src/twospace_editclient.c"
+      call arrayappend sources,"pdos/src/twospace_editfile.c"
+      call arrayappend sources,"pdos/src/apps/edit_text.c"
+      call arrayappend sources,"pdos/src/twospace_3270.c"
+      call arrayappend flags,"-DTDV_PCOMM"
     end
     if label="jobtemp" then call arrayappend sources,"pdos/src/twospace_jobtemp.c"
     binary=work||"/"||label||"-test"

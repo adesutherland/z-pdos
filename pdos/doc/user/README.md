@@ -8,6 +8,8 @@ software on your host computer.
 The default source-built K/U route and its accepted scope are described in
 [the K/U operator guide](TWO-SPACE.md).
 
+For the installed PD-035 source candidate, see [create, build and run a cREXX program](CREXX-DEVELOPMENT.md). Its [factory and lifecycle](../development/CREXX-DEVELOPMENT.md) are separate from released-image adoption.
+
 For the current source-development batch interface, use
 [submit a batch job and review its output](BATCH.md). It covers the shared
 JCL procedures, dataset/card/console submission, retained output, return codes

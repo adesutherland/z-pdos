@@ -8,6 +8,7 @@
 #include "twospace_digest.h"
 #ifdef TJF_PCOMM
 #include "twospace_batchui.h"
+#include "twospace_develop.h"
 #endif
 static const char *programs[]={"RXC","RXAS","RXLINK","RXVM","BTEST31","BADDR31"};
 static void init(unsigned char *h,unsigned int n)
@@ -277,7 +278,11 @@ static int output(TJFSTATE *s,unsigned int id,char *next)
 }
 int TJFKNOW(const char *command)
 {
- char text[199],*at,*first,*second;unsigned int n;if(!command)return 0;n=(unsigned int)strlen(command);if(n>=sizeof text)return 0;
+ char text[199],*at,*first,*second;unsigned int n;
+#ifdef TJF_PCOMM
+ if(TDVKNOW(command))return 1;
+#endif
+ if(!command)return 0;n=(unsigned int)strlen(command);if(n>=sizeof text)return 0;
  strcpy(text,command);at=text;first=token(&at);if(!first)return 0;upper(first);
  if(!strcmp(first,"HELP")){second=token(&at);if(!second)return 0;upper(second);return !strcmp(second,"SUBMIT")||!strcmp(second,"JOBS")||!strcmp(second,"BATCH");}
  if(!strcmp(first,"BATCH"))return 1;
@@ -313,6 +318,7 @@ int TJFCMD(TJFSTATE *s,const TJFOPS *ops,const char *command)
 }
 #ifdef TJF_PCOMM
 #include <stdio.h>
+#include <stdlib.h>
 #include "twospace_ui.h"
 static TJFSTATE native_state;
 static int native_load(void *context,const char *name,unsigned char *data,unsigned int cap,unsigned int *used)
@@ -336,9 +342,32 @@ static void native_line(void *context,const char *p)
  while(at<n){unsigned int take=n-at>130U?130U:n-at;if(TJCENC(p+at,take,encoded))return;TUILINE(encoded,take);at+=take;}}
 static void native_record(void *context,const unsigned char *p,unsigned int n)
 {(void)context;TUILINE(p,n);}
+static TDVSTATE developer;
+static unsigned int developer_file(void *context,unsigned int action,const char *name,unsigned char *p,unsigned int cap,unsigned char *info)
+{(void)context;return TEFFILE(action,name,p,cap,info);}
+static int developer_edit(void *context,const char *name,unsigned int force_line)
+{
+ char command[80];unsigned char caps[64],handoff[32];unsigned int rc;
+ (void)context;rc=TUICAPS(caps);if(rc)return (int)rc;
+ if(TJBWORD(caps+TSA_CAP_DEVICE_CLASS)==TSA_DEVICE_3270){
+  /* Raw CLOSE repaints this controller's semantic input field. Surrender
+   * that lease before a child editor acquires its own raw presentation. */
+  init(handoff,sizeof handoff);rc=TUIIO(sizeof handoff,handoff,TSA_IO_SCREEN_ACQUIRE);if(rc)return (int)rc;
+  init(handoff,sizeof handoff);rc=TUIIO(sizeof handoff,handoff,TSA_IO_SCREEN_RELEASE);if(rc)return (int)rc;
+ }
+ strcpy(command,"EDIT ");strcat(command,name);if(force_line)strcat(command," LINE");return system(command);
+}
+static unsigned int developer_present(void *context,const unsigned char *p,unsigned int n)
+{(void)context;return TUILINE(p,n);}
 int TJFENTRY(const char *command)
 {TJFOPS ops;char text[199];memset(&ops,0,sizeof ops);ops.load=native_load;ops.service=native_service;ops.input=native_input;ops.line=native_line;ops.record=native_record;
  if(!command||strlen(command)>=sizeof text)return 8;strcpy(text,command);upper(text);
+ if(TDVKNOW(command)){TDVOPS dev;unsigned char caps[64];dev.batch=ops;dev.file=developer_file;dev.edit=developer_edit;dev.present=developer_present;
+  if(TDVCONFIG(&developer,&native_state,&dev))return 8;
+  if(!strcmp(text,"PROGRAMS")||!strcmp(text,"CREXX")){
+   if(TUICAPS(caps))return 12;if(TJBWORD(caps+TSA_CAP_DEVICE_CLASS)!=TSA_DEVICE_LINE)return TDVFORM(&developer);
+  }return TDVCMD(&developer,command);
+ }
  if(!strncmp(text,"BATCH",5U)&&(!text[5]||text[5]==' '))return TBFENTRY(&native_state,&ops,text[5]?command+6U:"");
  return TJFCMD(&native_state,&ops,command);}
 #endif

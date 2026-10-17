@@ -7,9 +7,10 @@
 typedef unsigned int (*TEDFILE)(unsigned int,const char *,unsigned char *,unsigned int,unsigned char *);
 typedef struct {
  EDCSTATE *text,*undo,*candidate,*saved;
- unsigned char *packed,info[TEF_BYTES];
+ unsigned char *packed,*draft,*page,info[TEF_BYTES];
  char source[68],notice[160];
  unsigned int has_undo,input_mode,input_undo,top,left,rows,help,first,last;
+ unsigned int draft_bytes,draft_rows,draft_columns,draft_top,draft_left,draft_help,draft_input;
  TEDFILE file;
 } TEDSTATE;
 unsigned int TEDWORD(const unsigned char *);
