@@ -6,6 +6,22 @@ Run, the equivalent console commands, matching native cREXX tools/libraries and
 persistent user members. This is a source candidate, separate from release
 and managed-instance adoption.
 
+**17 October handover correction:** The 254-check result below used the
+automated s3270 provider and physical3215. The subsequently supplied DX3270
+1.7.5 session cannot open fullscreen EDIT: its legacy profile lacks the required
+Read Buffer operation and returns RC20. Programs requires the same operation.
+The human-facing walkthrough was therefore signed off too broadly. PD-035 is
+reopened until the actual visible emulator completes the fullscreen journey,
+including mistakes/recovery, at model5 widescreen. The earlier measurements
+remain valid within their recorded scope; they do not qualify that handover.
+
+The later local DX3270 1.7.5 build20261017.2 repair implements Read Buffer,
+standard Query framing and correct CP1047 input. Its actual visible model5
+journey now completes edit/save/reopen/native Build/Output/Run, stale-run
+refusal and compiler-failure preservation. The Lab's 17 October handover
+correction records that separate bounded GUI result and remaining UI gaps;
+it is not an addition to the 254 named checks below or an upstream release.
+
 The [backlog](../BACKLOG.md#pd-035-installed-crexx-development-profile-and-operator-workflow)
 owns acceptance. See the [user guide](../user/CREXX-DEVELOPMENT.md),
 [factory guide](../development/CREXX-DEVELOPMENT.md) and

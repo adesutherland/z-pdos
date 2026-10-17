@@ -7,17 +7,21 @@
 #include "twospace_abi.h"
 static int label(unsigned char *p,unsigned int width,const char *text)
 {unsigned int n=(unsigned int)strlen(text);if(n>width)n=width;return TJCENC(text,n,p);}
+/* FB132 padding is not another display row. Keep one row for an actual blank
+ * record; the retained record and its bytes remain unchanged. */
+static unsigned int display_width(const unsigned char *p,unsigned int n)
+{while(n>1U&&p[n-1U]==0x40U)--n;return n;}
 unsigned int TDVPAGES(const TDVSTATE *s,const T27GEOMETRY *g)
 {
  unsigned int at=0U,lines=0U,n,width,rows;
  if(!g||g->columns<=2U||g->rows<=4U)return 1U;width=g->columns-2U;rows=g->rows-4U;
  while(at<s->output_bytes){if(s->output_bytes-at<24U)return 1U;n=TJBWORD(s->jobs->output+at+8U);
-  if(!n||n>132U||n>s->output_bytes-at-24U)return 1U;lines+=(n+width-1U)/width;at+=24U+n;}
+  if(!n||n>132U||n>s->output_bytes-at-24U)return 1U;lines+=(display_width(s->jobs->output+at+24U,n)+width-1U)/width;at+=24U+n;}
  return lines?(lines+rows-1U)/rows:1U;
 }
 int TDVPAINT(const TDVSTATE *s,const T27GEOMETRY *g,unsigned char *out,unsigned int cap,unsigned int *used,unsigned int view,unsigned int page)
 {
- unsigned char row[132];char b[160];unsigned int r,c,at=0U,i,n=0U,offset=0U,skip=page*(g->rows-4U),line=0U,part=0U,take;
+ unsigned char row[132];char b[160];unsigned int r,c,at=0U,i,n=0U,offset=0U,skip=page*(g->rows-4U),line=0U,part=0U,take,visible;
  if(!g||g->rows<24U||g->columns<80U||g->columns>132U||cap<g->cells+g->rows*8U+16U)return 8;
  out[at++]=0xc3U;out[at++]=0x11U;if(T27ADDR(g,0U,out+at))return 8;at+=2U;
  for(r=0U;r<g->rows;++r){memset(row,0x40,g->columns);
@@ -28,9 +32,9 @@ int TDVPAINT(const TDVSTATE *s,const T27GEOMETRY *g,unsigned char *out,unsigned 
     const unsigned char *p=s->jobs->output+offset;
     if(s->output_bytes-offset<24U)return 12;
     n=TJBWORD(p+8U);if(!n||n>132U||offset+24U+n>s->output_bytes)return 12;
-    take=n-part;if(take>g->columns-2U)take=g->columns-2U;
+    visible=display_width(p+24U,n);take=visible-part;if(take>g->columns-2U)take=g->columns-2U;
     if(line++>=skip)for(i=0U;i<take;++i)row[1U+i]=p[24U+part+i]<0x40U?0x4bU:p[24U+part+i];
-    part+=take;if(part==n){offset+=24U+n;part=0U;}if(line>skip)break;
+    part+=take;if(part==visible){offset+=24U+n;part=0U;}if(line>skip)break;
    }
    if(r==2U&&offset>=s->output_bytes&&line<=skip)label(row+1U,g->columns-2U,"End of output");
   }else if(!view){

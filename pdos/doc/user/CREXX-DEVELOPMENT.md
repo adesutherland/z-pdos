@@ -6,6 +6,19 @@ guest-qualified source candidate, separate from the public beta.3 release image.
 The existing console, card reader/printer route and advanced BATCH forms remain
 available.
 
+Fullscreen Programs and EDIT require working Read Buffer support. The
+17 October DX3270 1.7.5 handover failed this requirement and returned EDIT RC20;
+it is not a qualified fullscreen terminal for this candidate. The local
+DX3270 1.7.5 build20261017.2 repair implements Read Buffer/standard Query and
+correct CP1047 bracket input. Its actual visible model5, 27-by-132 session
+has completed native edit/save/reopen/build/output/run with arguments, RC0,
+and compiler-failure/stale-artifact recovery. This is a local macOS26
+development app, separate from the unchanged installed copy/upstream release.
+During a native job, wait for Programs to return before another action; the
+temporary console can show an old Ready status. Do not resubmit on that basis.
+In DX3270, Esc alone resets a protected-field `X OERR`; then Tab selects an
+editable field. Option-Esc sends Clear instead.
+
 Enter `PROGRAMS` on a 3270 terminal. Type `HELLO` in **Member**, then choose
 **E** or PF2 to edit it. The editor opens the source member in the configured
 workspace. Enter this program, including the blank lines:
@@ -48,6 +61,11 @@ Back in Programs:
 3. Enter `one two` in **Arguments**, then choose **R** or PF5. RUN invokes only
    RXVM; it supplies the VM switches for you.
 4. Choose **O** to read the program output. Edit, build and run again as needed.
+
+The Output form ignores trailing fixed-record padding when wrapping and
+counting pages. A normal SAY occupies one row when its text fits; a genuine
+blank output record still occupies one blank row. Retained output bytes are
+unchanged by presentation.
 
 The same controller is available from the console, including a physical 3215:
 
