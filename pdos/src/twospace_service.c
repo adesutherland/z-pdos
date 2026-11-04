@@ -20,6 +20,7 @@
 #include "twospace_dasd.h"
 #include "twospace_session.h"
 #include "twospace_workbench.h"
+#include "twospace_workspace.h"
 #include "twospace_display.h"
 #include "twospace_transcript.h"
 #include "twospace_command_router.h"

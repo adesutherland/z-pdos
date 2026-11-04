@@ -77,6 +77,8 @@ unsigned int TUIEND(unsigned int os,unsigned int valid,unsigned int rc)
 {return control(TSA_IO_JOB_END,valid,0,rc,os);}
 unsigned int TUIVOL(const unsigned char *text,unsigned int bytes)
 {return control(TSA_IO_UI_STATUS,1U,text,bytes,0U);}
+unsigned int TUIWORK(const unsigned char *text,unsigned int bytes,unsigned int task)
+{return control(TSA_IO_UI_STATUS,task?TSA_UI_WORKSPACE:TSA_UI_WORKSPACE_END,text,bytes,task);}
 unsigned int TUIPANEL(unsigned int operation,unsigned char *request)
 {return TUIIO(64U,request,operation);}
 

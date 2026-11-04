@@ -83,6 +83,8 @@ main: procedure = .int
       call arrayappend sources,"pdos/src/twospace_batchui.c"
       call arrayappend sources,"pdos/src/twospace_develop.c"
       call arrayappend sources,"pdos/src/twospace_programs.c"
+      call arrayappend sources,"pdos/src/twospace_workspace.c"
+      call arrayappend sources,"pdos/src/twospace_display.c"
       call arrayappend sources,"pdos/src/twospace_editclient.c"
       call arrayappend sources,"pdos/src/twospace_editfile.c"
       call arrayappend sources,"pdos/src/apps/edit_text.c"

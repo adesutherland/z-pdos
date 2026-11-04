@@ -29,7 +29,7 @@ main: procedure = .int
   if rc<>0 then return rc
   end
   identities=prior||"/inputs.sha256"; inputs=.string[]; hashes=.string[]
-  rebuilt="twospace_invocation.h twospace_store.h twospace_store.c twospace_channel.c twospace_3270.c twospace_3270.h twospace_console.h twospace_history.c twospace_history.h twospace_surface.c twospace_workbench.c twospace_workbench.h twospace_dasd.c twospace_dasd.h twospace_batch.c twospace_batch.h twospace_job.c twospace_job.h twospace_jobdd.c twospace_jobdd.h twospace_jobtemp.c twospace_jobtemp.h twospace_dataset.c twospace_fileprofile.h"
+  rebuilt="twospace_invocation.h twospace_store.h twospace_store.c twospace_channel.c twospace_3270.c twospace_3270.h twospace_console.h twospace_history.c twospace_history.h twospace_surface.c twospace_workbench.c twospace_workbench.h twospace_workspace.c twospace_workspace.h twospace_dasd.c twospace_dasd.h twospace_batch.c twospace_batch.h twospace_job.c twospace_job.h twospace_jobdd.c twospace_jobdd.h twospace_jobtemp.c twospace_jobtemp.h twospace_dataset.c twospace_fileprofile.h"
   do while lines(identities)>0
     row=linein(identities);source=word(row,2);expected=word(row,1)
     changed=.int; changed=0
@@ -69,6 +69,9 @@ main: procedure = .int
     inputs[inputs.0+1]="pdos/src/twospace_"||word(newinputs,i)
   end
   inputs[inputs.0+1]="pdos/scripts/two-space-service-build.crexx"
+  inputs[inputs.0+1]="pdos/src/twospace_workspace.c"
+  inputs[inputs.0+1]="pdos/src/twospace_workspace.h"
+  inputs[inputs.0+1]="pdos/src/twospace_workspace.inc"
   inputs[inputs.0+1]="pdos/tests/two-space/normal_core.py"
   inputs[inputs.0+1]="pdos/tests/two-space/service_machine.py"
   inputs[inputs.0+1]="pdos/tests/two-space/machine_profile.py"
@@ -95,10 +98,10 @@ main: procedure = .int
   address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :sessionasm :sessionobj"
   if rc<>0 then return rc
   consoleobjects=.string[]
-  modules="3270 history surface workbench dasd batch job jobdd jobtemp editfile digest store"; names="T27 TPH TWF TWB TDA TBC TJB TJD TJT TEF TJJ TSS"
+  modules="3270 history surface workbench dasd batch job jobdd jobtemp editfile digest store workspace"; names="T27 TPH TWF TWB TDA TBC TJB TJD TJT TEF TJJ TSS TWP"
   do i=1 to words(modules)
     source="pdos/src/twospace_"||word(modules,i)||".c";name=word(names,i);casm=work||"/"||name||".asm";cobj=work||"/"||name||".obj"
-    address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -S -I pdos/src -I pdpclib/src :source -o :casm"
+    address crexx "run :cc -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ -DTWP_BUSY -S -I pdos/src -I pdpclib/src :source -o :casm"
     if rc<>0 then return rc
     address crexx "run :classicas --profile s370 --capacity-profile desktop --macros -I pdpclib/src/profiles/pdos-zarch -I pdpclib/src -I pdpclib/src/interfaces/classic-linkage :casm :cobj"
     if rc<>0 then return rc
@@ -123,7 +126,7 @@ main: procedure = .int
   if rc<>0 then return rc
   address crexx "run :dstest"
   if rc<>0 then return rc
-  common="TSG TSD TSM TSR TSP TSV TSC TIO TBC TJB TJD TJT TSK TSH TSIF TSI TST TSS TTC T27 TDS TPH TWF TWD TWB TDA TEF TJJ TTX TSCH TSTLB TSMKEY"
+  common="TSG TSD TSM TSR TSP TSV TSC TIO TBC TJB TJD TJT TSK TSH TSIF TSI TST TSS TTC T27 TDS TPH TWF TWD TWB TDA TEF TJJ TTX TSCH TSTLB TSMKEY TWP"
   do i=1 to words(common)
     name=word(common,i);source=prior||"/"||name||".obj"
     if name="TSV" then source=invobj

@@ -84,6 +84,19 @@ Input (99, flag 0 primary or 1 monitor) selects
 one source at a completed boundary; called-program changes restore on unwind.
 TTY Mode (102) accepts plain mode 0; other modes return 20.
 
+The PD-035 source increment extends Status (98) with workspace presentation
+flags 3/4, retaining its 32-byte version1 envelope. Flag3 carries 1–68 native
+IBM1047 context bytes at length12/pointer16/20 and a task at24 (Source1,
+Build2, Run3, Output4). Only the controller currently owning a raw session
+may set it, with no read or attention pending. The complete context span and
+characters are checked before state changes. Flag4 clears it and requires
+zero payload/task; it cannot clear a foreign raw owner. Controller unwind
+also clears it. This is presentation state, not a session/input lease.
+Between raw panels K uses the protected common frame; actual native batch
+step events update it. Genuine child/operator input retains its existing
+reply field, with waiting bound to the actual invocation and cleared on
+unwind. It does not imply terminal input is available to ordinary batch tools.
+
 Line Key (3) returns bytes plus AID; PCOMM owns PF5/PF6 recall policy.
 Workbench actions are consumed by the controller; unassigned AIDs, including
 PF3/PF4 and PA, reach the semantic key caller. Raw session input retains its

@@ -4,6 +4,7 @@
 #include <string.h>
 #include "edit_screen.h"
 #include "edit_text.h"
+#include "twospace_workspace.h"
 static int geometry(const T27GEOMETRY *g)
 {return g&&g->rows>=24U&&g->rows<=43U&&g->columns>=80U&&g->columns<=132U&&g->cells==g->rows*g->columns;}
 static int same_page(const TEDSTATE *s,const T27GEOMETRY *g)
@@ -23,7 +24,7 @@ static int puttext(unsigned char *p,unsigned int width,const char *text)
 {unsigned int n=(unsigned int)strlen(text);if(n>width)n=width;return TEDCENC(text,n,p);}
 int TESPAINT(const TEDSTATE *s,const T27GEOMETRY *g,unsigned char *out,unsigned int cap,unsigned int *used,unsigned int cursor)
 {
- unsigned char row[132],native[EDC_WIDTH];char b[160];unsigned int r,c,n,at=0U,width,number,offset;
+ unsigned char row[132],native[EDC_WIDTH],context[68];char b[160];const char *member,*end;unsigned int r,c,n,at=0U,width,number,offset,context_bytes=0U;
  static const char *help[]={"EDIT / small C record editor / one buffer",
   "Type over source; I inserts a blank after a row; D deletes a row.",
   "SAVE checks the opened member; SAVE AS requires a new/empty target.",
@@ -36,12 +37,20 @@ int TESPAINT(const TEDSTATE *s,const T27GEOMETRY *g,unsigned char *out,unsigned 
   "SAVE error 12 may mean uncertain publication: buffer stays available.",
   "Retry SAVE reconciles identical content; reopen to inspect externally."};
  if(!geometry(g)||!out||!used||cap<g->cells+g->rows*8U+16U)return 8;
+ if(s->workspace){member=strrchr(s->source,'(');end=member?strchr(member,')'):0;
+  if(member&&end){++member;context_bytes=(unsigned int)(end-member);}else{member=s->source;context_bytes=(unsigned int)strlen(member);}
+  if(context_bytes>sizeof context||TEDCENC(member,context_bytes,context))return 8;
+ }
  if(cursor>=g->cells)cursor=(!s->help&&!s->text->count)?2U*g->columns+10U:(g->rows-3U)*g->columns+7U;
  if(s->help)cursor=(g->rows-3U)*g->columns+7U;
  out[at++]=0xc3U;out[at++]=0x11U;if(T27ADDR(g,0U,out+at))return 8;at+=2U;width=g->columns-11U;
  for(r=0U;r<g->rows;++r){
   memset(row,0x40U,g->columns);
-  if(!r){sprintf(b,"EDIT / %s",*s->source?s->source:"new buffer");if(puttext(row+1U,g->columns-2U,b))return 8;}
+  if(s->workspace&&(r<2U||r>=g->rows-3U)){
+   sprintf(b,"%s / %u records / top %u / columns %u-%u",TEDDIRTY(s)?"UNSAVED":"saved",s->text->count,s->top,s->left+1U,s->left+width);
+   if(TWPFRAME(g,r,s->help?TWP_HELP:TWP_SOURCE,context,context_bytes,b,s->help?"PF1 or PF3 closes help; your source buffer is retained":s->notice,s->help?"PF1 Close help PF3 Back":"PF1 Help PF2 Save PF3 Back PF7/8 Page PF9 Undo PF10/11 Left/Right",row))return 8;
+   if(r==g->rows-3U){if(s->input_mode&&puttext(row+1U,5U,"INP> "))return 8;memset(row+7U,0,g->columns-8U);}
+  }else if(!r){sprintf(b,"EDIT / %s",*s->source?s->source:"new buffer");if(puttext(row+1U,g->columns-2U,b))return 8;}
   else if(r==1U){sprintf(b,"%s / %u records / top %u / columns %u-%u",TEDDIRTY(s)?"UNSAVED":"saved",s->text->count,s->top,s->left+1U,s->left+width);if(puttext(row+1U,g->columns-2U,b))return 8;}
   else if(r<g->rows-3U){
    if(s->help){if(r-2U<sizeof help/sizeof help[0]&&puttext(row+1U,g->columns-2U,help[r-2U]))return 8;}
@@ -55,6 +64,7 @@ int TESPAINT(const TEDSTATE *s,const T27GEOMETRY *g,unsigned char *out,unsigned 
   }else if(r==g->rows-3U){if(puttext(row+1U,5U,s->input_mode?"INP> ":"===> "))return 8;memset(row+7U,0,g->columns-8U);}
   else if(r==g->rows-2U){if(puttext(row+1U,g->columns-2U,s->notice))return 8;}
   else if(puttext(row+1U,g->columns-2U,"PF1 Help PF2 Save PF3 Quit PF7/8 Page PF9 Undo PF10/11 Left/Right"))return 8;
+  if(s->workspace&&s->help&&r==14U){sprintf(b,"Source: %s",s->source);if(puttext(row+1U,g->columns-2U,b))return 8;}
   overlay(s,g,r,row);
   for(c=0U;c<g->columns;++c){
    offset=r*g->columns+c;

@@ -26,6 +26,8 @@ unsigned int TUILINE(const unsigned char *p,unsigned int n)
 {if(!n||n>130U||n>sizeof wire-used)return 20U;memcpy(wire+used,p,n);used+=n;++lines;return 0U;}
 unsigned int TUICAPS(unsigned char *p)
 {++services;memset(p,0,64U);TJBPUT(p+TSA_CAP_DEVICE_CLASS,device);return cap_error;}
+unsigned int TUIWORK(const unsigned char *p,unsigned int n,unsigned int task)
+{(void)p;(void)n;(void)task;return 0U;}
 int test_editor(const char *command)
 {assert(!strcmp(command,wanted));assert(phase==(device==TSA_DEVICE_3270?2U:0U));++launches;return 23;}
 static void handoff(void)
@@ -33,6 +35,9 @@ static void handoff(void)
  device=TSA_DEVICE_3270;wanted="EDIT PDOS.USER.CREXX(HELLO)";
  services=phase=launches=cap_error=acquire_error=release_error=0U;
  assert(developer_edit(0,"PDOS.USER.CREXX(HELLO)",0U)==23&&services==3U&&launches==1U);
+ developer.form=1U;wanted="EDIT PDOS.USER.CREXX(HELLO) WORKSPACE";services=phase=launches=0U;
+ assert(developer_edit(0,"PDOS.USER.CREXX(HELLO)",0U)==23&&services==3U&&launches==1U);
+ developer.form=0U;wanted="EDIT PDOS.USER.CREXX(HELLO)";
  services=phase=launches=0U;cap_error=8U;
  assert(developer_edit(0,"PDOS.USER.CREXX(HELLO)",0U)==8&&services==1U&&!launches);
  services=phase=0U;cap_error=0U;acquire_error=16U;

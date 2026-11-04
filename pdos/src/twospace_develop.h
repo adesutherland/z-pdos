@@ -19,9 +19,12 @@ typedef struct {
  char source[45],output[45],work[45],registry[45],member[9],arguments[61],notice[160];
  unsigned char profile[32],catalog[TDV_REGISTRY],catalog_info[TEF_BYTES];
  unsigned int catalog_bytes,output_bytes,count,selected,reviewed,kind,ready;
+ unsigned int form,detail_valid,attempt_submitted;
+ unsigned char detail[TJB_SLOT_BYTES];
 } TDVSTATE;
 int TDVCONFIG(TDVSTATE *,TJFSTATE *,const TDVOPS *);
 int TDVKNOW(const char *);
 int TDVCMD(TDVSTATE *,const char *);
 int TDVFORM(TDVSTATE *);
+int TDVDETAIL(TDVSTATE *);
 #endif

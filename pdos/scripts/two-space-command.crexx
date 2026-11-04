@@ -55,7 +55,9 @@ main: procedure = .int
   sources[19] = "pdos/src/apps/edit_text.c"; flags[19] = ""
   sources[20] = "pdos/src/twospace_3270.c"; flags[20] = ""
   sources[21] = "pdos/src/twospace_editfile.c"; flags[21] = ""
-  do i = 9 to 21
+  sources[22] = "pdos/src/twospace_workspace.c"; flags[22] = ""
+  sources[23] = "pdos/src/twospace_display.c"; flags[23] = ""
+  do i = 9 to 23
     source = sources[i]; flag = flags[i]; asm = work || "/part" || i || ".asm"; object = work || "/part" || i || ".obj"
     address system quote(cc) || " -Os -DZARCH -U__CMS__ -D__MVS__ -D__PDOS390__ " || flag || " -S -I pdpclib/src -I pdos/src " || quote(source) || " -o " || quote(asm)
     if rc <> 0 then return rc
@@ -79,7 +81,7 @@ main: procedure = .int
   do i = 1 to words(common)
     native[i+10] = base || "/c/objects/" || word(common,i) || ".obj"
   end
-  do i = 9 to 21
+  do i = 9 to 23
     call arrayappend native,objects[i]
   end
   module = work || "/PCOMM.rdw"; map = work || "/PCOMM.map"
@@ -98,6 +100,8 @@ main: procedure = .int
   inputs[inputs.0+1] = "pdos/src/twospace_submit.h"
   inputs[inputs.0+1] = "pdos/src/twospace_develop.h"
   inputs[inputs.0+1] = "pdos/src/twospace_programs.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_workspace.h"
+  inputs[inputs.0+1] = "pdos/src/twospace_display.h"
   inputs[inputs.0+1] = "pdos/src/twospace_editfile.h"
   inputs[inputs.0+1] = "pdos/src/apps/edit_text.h"
   inputs[inputs.0+1] = "pdos/src/twospace_batchui.h"

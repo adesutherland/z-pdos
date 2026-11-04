@@ -111,6 +111,14 @@
 #define TSA_IO_UI_CONTROL 103U
 #define TSA_UI_KEYS_FORM 3U
 #define TSA_UI_KEYS_SHELL 4U
+/* UI_STATUS presentation context, owned by the shell controller invocation.
+ * Flag3 takes native context at12/16/20 and a task at24. Flag4 clears it. */
+#define TSA_UI_WORKSPACE 3U
+#define TSA_UI_WORKSPACE_END 4U
+#define TSA_WORKSPACE_SOURCE 1U
+#define TSA_WORKSPACE_BUILD 2U
+#define TSA_WORKSPACE_RUN 3U
+#define TSA_WORKSPACE_OUTPUT 4U
 #define TSA_IO_PANEL_CREATE 128U
 #define TSA_IO_PANEL_UPDATE 129U
 #define TSA_IO_PANEL_TEXT 130U

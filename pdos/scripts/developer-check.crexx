@@ -10,10 +10,15 @@ main: procedure=.int
   address crexx "run mkdir -p :work"
   if rc<>0 then return rc
   sources=.string[]
-  checks="editor develop programs nativehelp"
+  binary=.string
+  checks="editor develop programs nativehelp workspace"
   do i=1 to words(checks)
     check=word(checks,i);call arraydrop sources
-    if check="editor" then do
+    if check="workspace" then do
+      call arrayappend sources,"pdos/tests/two-space/workspace.c"
+      call arrayappend sources,"pdos/src/twospace_3270.c"
+    end
+    else if check="editor" then do
       call arrayappend sources,"pdos/tests/edit_session.c"
       call arrayappend sources,"pdos/src/apps/edit_core.c"
       call arrayappend sources,"pdos/src/apps/edit_text.c"
@@ -36,7 +41,10 @@ main: procedure=.int
         call arrayappend sources,"pdos/src/twospace_3270.c"
       end
     end
+    call arrayappend sources,"pdos/src/twospace_workspace.c"
+    call arrayappend sources,"pdos/src/twospace_display.c"
     flags=.string[]
+    if check="workspace" then call arrayappend flags,"-DTWP_BUSY"
     if check="nativehelp" then do
       call arrayappend flags,"-DTJF_PCOMM"
       call arrayappend flags,"-DTDV_PCOMM"
@@ -50,6 +58,11 @@ main: procedure=.int
     address crexx "run :binary"
     if rc<>0 then return rc
   end
+  binary=work||"/workspace-boundary"
+  address crexx "run clang -std=c89 -Wall -Wextra -Werror -Wno-deprecated-declarations -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I pdos/src pdos/tests/batch/workspace_boundary.c pdos/src/twospace_job.c pdos/src/twospace_jobdd.c -o :binary"
+  if rc<>0 then return rc
+  address crexx "run :binary"
+  if rc<>0 then return rc
   address crexx "run env PYTHONDONTWRITEBYTECODE=1 python3 pdos/tests/developer_media.py"
   if rc<>0 then return rc
   say "PD035 host editor, publication fault matrix and Programs fields PASS"

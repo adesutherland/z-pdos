@@ -347,7 +347,7 @@ static unsigned int developer_file(void *context,unsigned int action,const char 
 {(void)context;return TEFFILE(action,name,p,cap,info);}
 static int developer_edit(void *context,const char *name,unsigned int force_line)
 {
- char command[80];unsigned char caps[64],handoff[32];unsigned int rc;
+ char command[90];unsigned char caps[64],handoff[32];unsigned int rc;
  (void)context;rc=TUICAPS(caps);if(rc)return (int)rc;
  if(TJBWORD(caps+TSA_CAP_DEVICE_CLASS)==TSA_DEVICE_3270){
   /* Raw CLOSE repaints this controller's semantic input field. Surrender
@@ -355,7 +355,8 @@ static int developer_edit(void *context,const char *name,unsigned int force_line
   init(handoff,sizeof handoff);rc=TUIIO(sizeof handoff,handoff,TSA_IO_SCREEN_ACQUIRE);if(rc)return (int)rc;
   init(handoff,sizeof handoff);rc=TUIIO(sizeof handoff,handoff,TSA_IO_SCREEN_RELEASE);if(rc)return (int)rc;
  }
- strcpy(command,"EDIT ");strcat(command,name);if(force_line)strcat(command," LINE");return system(command);
+ strcpy(command,"EDIT ");strcat(command,name);if(force_line)strcat(command," LINE");
+ else if(developer.form)strcat(command," WORKSPACE");return system(command);
 }
 static unsigned int developer_present(void *context,const unsigned char *p,unsigned int n)
 {(void)context;return TUILINE(p,n);}

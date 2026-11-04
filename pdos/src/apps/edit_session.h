@@ -9,7 +9,7 @@ typedef struct {
  EDCSTATE *text,*undo,*candidate,*saved;
  unsigned char *packed,*draft,*page,info[TEF_BYTES];
  char source[68],notice[160];
- unsigned int has_undo,input_mode,input_undo,top,left,rows,help,first,last;
+ unsigned int has_undo,input_mode,input_undo,top,left,rows,help,first,last,workspace;
  unsigned int draft_bytes,draft_rows,draft_columns,draft_top,draft_left,draft_help,draft_input;
  TEDFILE file;
 } TEDSTATE;

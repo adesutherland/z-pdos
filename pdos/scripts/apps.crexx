@@ -22,7 +22,7 @@ main: procedure = .int
   if rc<>0 then return rc
   end
   common=.string[]; sources=.string[]; allsources=.string[]
-  modules="ui console 3270 workbench surface history display recordio"
+  modules="ui console 3270 workbench surface history display recordio workspace"
   do i=1 to words(modules)
     source="pdos/src/twospace_"||word(modules,i)||".c"
     object=compile(source,work||"/"||word(modules,i),cc,classicas)
@@ -81,7 +81,7 @@ main: procedure = .int
   allsources[allsources.0+1]="pdos/src/twospace_abi.h"
   allsources[allsources.0+1]="pdos/src/twospace_tso.c"
   allsources[allsources.0+1]="pdos/tests/two-space/tso_pack.c"
-  headers="console 3270 workbench surface history display tso"
+  headers="console 3270 workbench surface history display tso workspace job"
   do i=1 to words(headers)
     allsources[allsources.0+1]="pdos/src/twospace_"||word(headers,i)||".h"
   end

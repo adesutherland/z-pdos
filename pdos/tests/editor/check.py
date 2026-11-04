@@ -86,7 +86,8 @@ class Controls(unittest.TestCase):
             flags=['clang','-std=c89','-Wall','-Wextra','-Werror','-Wno-deprecated-declarations','-pedantic','-I',str(ROOT/'pdos/src')]
             subprocess.run(flags+['-fsyntax-only',str(ROOT/'pdos/tests/editor/probe.c')],check=True)
             sources=['pdos/tests/editor/paint.c','pdos/src/apps/edit_core.c','pdos/src/apps/edit_text.c',
-                     'pdos/src/apps/edit_session.c','pdos/src/apps/edit_screen.c','pdos/src/twospace_3270.c']
+                     'pdos/src/apps/edit_session.c','pdos/src/apps/edit_screen.c','pdos/src/twospace_3270.c',
+                     'pdos/src/twospace_workspace.c','pdos/src/twospace_display.c']
             subprocess.run(flags+['-fsanitize=address,undefined']+[str(ROOT/p) for p in sources]+['-o',str(exe)],check=True)
             for model,rows,cols in ((2,24,80),(5,27,132)):
                 record=subprocess.check_output([str(exe),str(model)])

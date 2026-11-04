@@ -14,14 +14,21 @@ correct CP1047 bracket input. Its actual visible model5, 27-by-132 session
 has completed native edit/save/reopen/build/output/run with arguments, RC0,
 and compiler-failure/stale-artifact recovery. This is a local macOS26
 development app, separate from the unchanged installed copy/upstream release.
-During a native job, wait for Programs to return before another action; the
-temporary console can show an old Ready status. Do not resubmit on that basis.
+The reviewed panel increment uses the same title, context, body, command,
+message and key areas across Programs, Source, Build, Run, Output, Details and
+Help. Its exact qualification boundary is in the
+[17 October panel record](../qualification/CREXX-PANELS-2026-10-17.md).
+Build and Run show real native step state while busy; Finalising means the
+controller is still checking/publishing the result. Input resumes when the
+interactive panel returns. Do not resubmit an uncertain job.
 In DX3270, Esc alone resets a protected-field `X OERR`; then Tab selects an
 editable field. Option-Esc sends Clear instead.
 
 Enter `PROGRAMS` on a 3270 terminal. Type `HELLO` in **Member**, then choose
 **E** or PF2 to edit it. The editor opens the source member in the configured
-workspace. Enter this program, including the blank lines:
+workspace. Letter actions go in the bottom `===>` command field; Tab visits
+Member, Arguments and Command. PF1 opens Help and PF3 goes back one panel.
+Enter this program, including the blank lines:
 
 ```rexx
 options levelb
@@ -55,10 +62,11 @@ or uncertain publication. Retry an uncertain SAVE to reconcile the same content.
 Back in Programs:
 
 1. Choose **B** or PF4 to build. Successful compile, assemble and link steps
-   publish the executable to your separate bytecode collection.
-2. Choose **O** or PF6 to review diagnostics. PF7/PF8 page through output;
+   publish the executable to your separate bytecode collection. The Build
+   panel keeps the real step results and the final publication message.
+2. Press PF6 to review diagnostics. PF7/PF8 page through output;
    PF3 returns. Output is retained until deliberately reviewed and replaced.
-3. Enter `one two` in **Arguments**, then choose **R** or PF5. RUN invokes only
+3. Back in Programs, enter `one two` in **Arguments**, then choose **R** or PF5. RUN invokes only
    RXVM; it supplies the VM switches for you.
 4. Choose **O** to read the program output. Edit, build and run again as needed.
 
@@ -109,7 +117,9 @@ refused on save. Executable publication is limited to 64 KiB including native
 record/block framing. The Arguments field accepts up to 60 characters, subject
 to the native 100-byte PARM limit and checked JCL representation.
 
-**D Details** returns to the console with native job/step status. `BATCH`,
+**D Details** opens a retained panel with checked native job/step status;
+it does not count as Output review. PF3 returns to Programs. From Programs,
+PF3 returns to the existing console. `BATCH`,
 `JOBS`, `STATUS id`, `OUTPUT id`, `PRINT id` and explicit dataset(member) editing
 remain the advanced routes. User collections and runtime libraries are separate.
 This is a small single-user workspace, not ISPF or a general multiuser scheduler.

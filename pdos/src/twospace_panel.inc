@@ -17,7 +17,11 @@ typedef struct {
 static TPPANEL tp_windows[TP_WINDOWS];
 static unsigned int tp_real,tp_controller,tp_next_handle,tp_source,tp_waiting,tp_focus,tp_help,tp_flushes,tp_erases;
 static unsigned int tp_job,tp_phase,tp_os,tp_rc_valid,tp_rc,tp_external,tp_known,tp_gap,tp_shell_controller,tp_control,tp_joined;
-static unsigned int tp_form_keys;
+static unsigned int tp_form_keys,tp_waiting_owner;
+/* Logical workspace chrome survives raw child handoff; it grants no input or
+ * device ownership. Only the controller can set it; unwind always clears it. */
+static unsigned int tp_workspace_owner,tp_workspace_task,tp_workspace_bytes,tp_workspace_has_job;
+static unsigned char tp_workspace_context[68],tp_workspace_job[TJB_SLOT_BYTES];
 typedef struct {unsigned int phase,os,valid,rc,name_bytes;unsigned char name[198];} TPCONTEXT;
 static TPCONTEXT tp_saved[TSV_MAX_DEPTH+1U];
 static unsigned int tp_saved_source[TSV_MAX_DEPTH+1U];
@@ -35,6 +39,7 @@ static TWBPLAN tp_plan;
 static TWFPALETTE tp_palette;
 static void tp_copy(unsigned char *d,const unsigned char *s,unsigned int n)
 {unsigned int i;for(i=0U;i<n;++i)d[i]=s[i];}
+#include "twospace_workspace.inc"
 static unsigned int tp_depth(unsigned int owner)
 {unsigned int i;for(i=0U;i<native_invocations.depth;++i)if(native_invocations.frame[i].token==owner)return i+1U;return 0U;}
 static unsigned int tp_allocate(void)
@@ -62,7 +67,7 @@ static unsigned int console_panel_source(void)
 static void console_panel_primary(void)
 {tp_source=tc_next_input=0U;}
 static void console_panel_waiting(unsigned int waiting)
-{tp_waiting=waiting;}
+{const TSVFRAME *f=TSVTOP(&native_invocations);tp_waiting=waiting;tp_waiting_owner=waiting&&f?f->token:0U;}
 static unsigned int tp_write(unsigned int command,unsigned int n,unsigned int prompt)
 {
     CHANNELCONTEXT context;TCNOTICE notice;unsigned int got;int rc;
@@ -157,6 +162,17 @@ static unsigned int tp_render(unsigned int staged,unsigned int force)
     if(!tp_controller||tc_cap.device_class!=TSA_DEVICE_3270)return 0U;
     if(tc_raw_owner||console_read_phase||tc_submitted||console_channel.quarantined)return 16U;
     if(tc_attention_pending)return staged?16U:0U;
+    if(console_workspace_busy(f,tp_waiting,tp_waiting_owner)){
+        const char *task=tp_workspace_task==TSA_WORKSPACE_SOURCE?"Source":tp_workspace_task==TSA_WORKSPACE_BUILD?"Build":tp_workspace_task==TSA_WORKSPACE_RUN?"Run":"Output";
+        T27GEOMETRY g;
+        if(staged)return 16U;
+        if(T27GEOM(&g,tc_cap.rows,tc_cap.columns,tc_cap.encoding)||
+           TWPBUSY(&g,tp_workspace_context,tp_workspace_bytes,task,tp_workspace_has_job?tp_workspace_job:0,tp_stream,65535U,&n))return 8U;
+        rc=tp_write(13U,n,0U);
+        /* This protected, locked presentation never creates a semantic input
+         * lease. The next raw interactive paint alone restores the keyboard. */
+        tc_input_owner=0U;tp_known=tc_display_known=0U;return rc;
+    }
     full=force||!tp_known||!tc_display_known||tp_confirmed.geometry.rows!=tc_cap.rows||tp_confirmed.geometry.columns!=tc_cap.columns;
     if(full&&tp_known&&tc_input_owner){
         if(!f||tc_input_owner!=f->token)return 16U;
@@ -197,6 +213,8 @@ static void console_panel_begin(const TSVFRAME *frame)
 static void console_panel_end(unsigned int token,const unsigned char *result)
 {
     unsigned int d=tp_depth(token),i;
+    console_workspace_end(token);
+    if(tp_waiting_owner==token){tp_waiting=tp_waiting_owner=0U;}
     if(tp_form_keys==token)tp_form_keys=0U;
     if(!tp_controller)return;
     if(d){tp_draft_owner[d]=tp_draft_bytes[d]=tp_cursor_valid[d]=0U;}
@@ -292,7 +310,7 @@ static unsigned int console_panel_service(TSGREQUEST *request)
             if(tc_raw_owner&&tc_raw_owner!=f->token)return 16U;
             if(device_raw_handle){rc=console_device_close(f->token,device_raw_handle);if(rc)return rc;}
             else if(tc_raw_owner){rc=console_device_geometry(&base);if(rc)return rc;}
-            tc_raw_owner=tc_screen_owner=tc_input_owner=0U;tp_known=0U;tc_display_known=0U;if(tp_controller==f->token)tp_controller=0U;if(tp_form_keys==f->token)tp_form_keys=0U;return 0U;
+            tc_raw_owner=tc_screen_owner=tc_input_owner=0U;tp_known=0U;tc_display_known=0U;if(tp_controller==f->token)tp_controller=0U;if(tp_form_keys==f->token)tp_form_keys=0U;console_workspace_end(f->token);return 0U;
         }
         n=cms_word(h+12U);p.hi=cms_word(h+16U);p.lo=cms_word(h+20U);
         if(cms_word(h+8U)||!n||n>132U||tc_span(p,n,TSG_READ,data,1U))return 8U;
@@ -325,6 +343,7 @@ static unsigned int console_panel_service(TSGREQUEST *request)
             tp_source=tc_next_input=flags;return console_panel_render();}
         if(op==TSA_IO_TTY_MODE)return flags?20U:0U;
         if(op==TSA_IO_UI_STATUS){
+            if(flags==TSA_UI_WORKSPACE||flags==TSA_UI_WORKSPACE_END)return console_workspace_status(f,h);
             if(flags==2U){if(n>198U||p.hi||p.lo||cms_word(h+24U)>1U)return 8U;tp_joined=cms_word(h+24U)?n+1U:0U;return console_panel_render();}
             if(flags==1U){if(n>65U||tc_span(p,n,TSG_READ,data,1U))return 8U;for(i=0U;i<n;++i)if(data[i]<0x40U||data[i]==0xffU)return 8U;tp_copy(tp_volume,data,n);tp_volume_bytes=n;return console_panel_render();}
             if(flags)return 8U;cms_put_word(h+8U,tc_cap.generation);cms_put_word(h+12U,tp_job);cms_put_word(h+16U,tp_phase);cms_put_word(h+20U,tp_source);cms_put_word(h+24U,tp_flushes);cms_put_word(h+28U,tp_erases);return tc_span(request->address,32U,TSG_WRITE,h,1U);

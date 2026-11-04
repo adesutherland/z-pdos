@@ -7,6 +7,14 @@ static TSVCONTEXT job_caller;
 static const unsigned char job_key[11]={0x50U,0x44U,0x30U,0x33U,0x33U,0x2eU,0x53U,0x50U,0x4fU,0x4fU,0x4cU};
 static const unsigned char job_dd[8]={0xd1U,0xc5U,0xe2U,0xd4U,0xe2U,0xc7U,0xd3U,0xc7U};
 static unsigned int job_active(void){return job_id!=0U;}
+static void job_progress(const unsigned char *j)
+{
+    if(!j||tp_workspace_owner!=job_owner||
+       (tp_workspace_task!=TSA_WORKSPACE_BUILD&&tp_workspace_task!=TSA_WORKSPACE_RUN))return;
+    tp_copy(tp_workspace_job,j,TJB_SLOT_BYTES);tp_workspace_has_job=1U;
+    /* Presentation failure cannot replay or change the native job result. */
+    if(console_panel_render())tc_display_known=0U;
+}
 static unsigned int job_dd_scope(void)
 {return job_id&&native_invocations.depth>job_base_depth;}
 static void job_native_error(unsigned int rc)
@@ -101,6 +109,7 @@ static unsigned int job_done(void)
     }
     if(!job_failed)rc=job_commit();else rc=12U;
     if(rc){TJBPUT(j+8U,TJB_INTERRUPTED);TJBPUT(j+32U,12U);TJBPUT(j+36U,0U);TJBPUT(j+40U,0xffffffffU);}
+    job_progress(j);
     for(i=0U;i<sizeof h;++i)h[i]=0U;TJBPUT(h,1U);TJBPUT(h+4U,sizeof h);job_status(h,j);
     command_restore(&job_caller);
     if(tc_span(job_reply,sizeof h,TSG_WRITE,h,1U))rc=12U;
@@ -123,6 +132,7 @@ static unsigned int job_dispatch(void)
         s=TJBSTEP(j,TJBWORD(j+12U));
         if(job_note("STEP BEGIN ",TJBWORD(j+12U)+1U)){job_output_error=4U;}
         if(job_commit()){TJBEND(&job_pool,job_owner,job_id,12U,0U,0U,0U,0U);continue;}
+        job_progress(j);
         command_restore(&job_caller);
         rc=load_native(TSV_TSO,31U,s+8U,&image);
         if(!rc)rc=sf_batch_begin(TJBDDS(&job_pool,job_id),TJBWORD(j+12U)+1U);
@@ -186,7 +196,9 @@ static unsigned int job_control(void)
             static const unsigned char status[]="JOB ACTIVE; SERIAL EXECUTION; OTHER COMMANDS BUSY";
             if(console_v1_line(status,sizeof status-1U))return 12U;continue;
         }
-        if(count==8U&&job_equal(text,"CONTINUE",8U))return 0U;
+        if(count==8U&&job_equal(text,"CONTINUE",8U)){
+            job_progress(TJBFIND(&job_pool,job_owner,job_id));return 0U;
+        }
         if(count==6U&&job_equal(text,"CANCEL",6U)){
             rc=(unsigned int)TJBACT(&job_pool,job_owner,job_id,3U);if(rc)return rc;
             j=TJBFIND(&job_pool,job_owner,job_id);if(!j)return 12U;

@@ -15,6 +15,7 @@ unsigned int TUICTRL(unsigned int);
 unsigned int TUIJOIN(unsigned int,unsigned int);
 unsigned int TUIEND(unsigned int,unsigned int,unsigned int);
 unsigned int TUIVOL(const unsigned char *,unsigned int);
+unsigned int TUIWORK(const unsigned char *,unsigned int,unsigned int);
 unsigned int TUIPANEL(unsigned int,unsigned char [64]);
 unsigned int TUIREAD(unsigned char *text,unsigned int capacity,unsigned int *length);
 unsigned int TUIMON(unsigned char status[TSA_MONITOR_BYTES]);

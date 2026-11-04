@@ -41,6 +41,8 @@ int main(void)
  for(i=0U;i<3U;++i){
   assert(!T27GEOM(&g,models[i][0],models[i][1],T27_CODED12));s.rows=g.rows-5U;s.top=1U;s.left=0U;s.help=0U;
   assert(!TESPAINT(&s,&g,screen,sizeof screen,&n,0xffffffffU));assert(!T27WRITE(&g,screen,n));
+  s.workspace=1U;assert(!TESPAINT(&s,&g,screen,sizeof screen,&n,0xffffffffU)&&!T27WRITE(&g,screen,n));
+  s.help=1U;assert(!TESPAINT(&s,&g,screen,sizeof screen,&n,0xffffffffU)&&!T27WRITE(&g,screen,n));s.help=0U;
   n=start(&g,raw,0x7dU,(g.rows-3U)*g.columns+7U);
   n=field(&g,raw,n,2U*g.columns+10U,"say 'screen'");
   n=field(&g,raw,n,(g.rows-3U)*g.columns+7U,"SAVE");

@@ -89,7 +89,7 @@ static int screen(TEDSTATE *s)
   if(rc)continue;
   if(aid!=0x7dU){
    if(aid==0xf1U)strcpy(command,"HELP");else if(aid==0xf2U)strcpy(command,"SAVE");
-   else if(aid==0xf3U)strcpy(command,"QUIT");else if(aid==0xf7U)strcpy(command,"UP");
+   else if(aid==0xf3U)strcpy(command,s->workspace&&s->help?"HELP":"QUIT");else if(aid==0xf7U)strcpy(command,"UP");
    else if(aid==0xf8U)strcpy(command,"DOWN");else if(aid==0xf9U)strcpy(command,"UNDO");
    else if(aid==0x7aU)strcpy(command,"LEFT");else if(aid==0x7bU)strcpy(command,"RIGHT");
   }
@@ -106,18 +106,23 @@ static int screen(TEDSTATE *s)
 }
 int main(int argc,char **argv)
 {
- TEDSTATE s;unsigned char cap[64];int rc=0,force_line=0;const char *source=0;
+ TEDSTATE s;unsigned char cap[64];int rc=0,force_line=0,workspace=0,i;const char *source=0;
  if(argc>1&&(!strcmp(argv[1],"HELP")||!strcmp(argv[1],"help"))){
   printf("EDIT dataset(member) [LINE]\nType source; I/D prefixes insert/delete. SAVE writes; END saves/exits.\nINPUT after / . ends input; PRINT / UNDO / HELP; CANCEL discards.\n");return 0;}
- if(argc>3){printf("EDIT [dataset(member)] [LINE]\n");return 8;}
- if(argc>1){if(!strcmp(argv[1],"LINE"))force_line=1;else source=argv[1];}
- if(argc>2){if(strcmp(argv[2],"LINE")){printf("EDIT [dataset(member)] [LINE]\n");return 8;}force_line=1;}
+ if(argc>4){printf("EDIT [dataset(member)] [LINE] [WORKSPACE]\n");return 8;}
+ for(i=1;i<argc;++i){
+  if(!strcmp(argv[i],"LINE")&&!force_line)force_line=1;
+  else if(i>1&&!strcmp(argv[i],"WORKSPACE")&&!workspace)workspace=1;
+  else if(!source&&i==1)source=argv[i];
+  else{printf("EDIT [dataset(member)] [LINE] [WORKSPACE]\n");return 8;}
+ }
  if(TEDINIT(&s,files))return 4;
+ s.workspace=workspace?1U:0U;
  if(TUIOPEN((const unsigned char *)"EDIT / record editor",sizeof "EDIT / record editor"-1U)||TUICAPS(cap)){rc=8;goto done;}
  if(source&&TEDOPEN(&s,source)){out(s.notice);rc=8;goto done;}
  if(force_line||TEDWORD(cap+TSA_CAP_DEVICE_CLASS)==TSA_DEVICE_LINE)rc=line(&s,cap);else rc=screen(&s);
  if(rc){out("EDIT: terminal failed; completed or uncertain saves may be on disk");if(TEDDIRTY(&s))out("EDIT: unsaved buffer could not be retained after application exit");}
- else out("EDIT: returned to console");
+ else out(s.workspace?"EDIT: returned to Programs":"EDIT: returned to console");
  done:
  TEDFREE(&s);return rc;
 }

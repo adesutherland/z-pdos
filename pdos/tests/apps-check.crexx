@@ -75,7 +75,7 @@ main: procedure = .int
   address crexx "run :exe"
   if rc<>0 then return rc
   exe=work||"/session-check"
-  address crexx "run clang -std=c89 -Wno-deprecated-declarations -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/tests/edit_session.c pdos/src/apps/edit_core.c pdos/src/apps/edit_session.c pdos/src/apps/edit_screen.c pdos/src/apps/edit_text.c pdos/src/twospace_3270.c -o :exe"
+  address crexx "run clang -std=c89 -Wno-deprecated-declarations -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -I pdos/src pdos/tests/edit_session.c pdos/src/apps/edit_core.c pdos/src/apps/edit_session.c pdos/src/apps/edit_screen.c pdos/src/apps/edit_text.c pdos/src/twospace_3270.c pdos/src/twospace_workspace.c pdos/src/twospace_display.c -o :exe"
   if rc<>0 then return rc
   address crexx "run :exe"
   return rc

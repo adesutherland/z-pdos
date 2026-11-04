@@ -69,6 +69,12 @@ int main(void)
  unsigned int before,n;unsigned char saved[5];char parm[101],purge[40];
  fresh();strcpy(dev.arguments,"one two");assert(!TDVCMD(&dev,"EDIT HELLO")&&!strcmp(dev.arguments,"one two"));{int result=TDVCMD(&dev,"BUILD HELLO");if(result)fprintf(stderr,"%s",messages);assert(!result);}assert(!strcmp(dev.arguments,"one two"));assert(files[1].exists&&files[1].used==5U&&submitted==1U);memcpy(saved,files[1].bytes,5U);
  display_failure=12U;assert(TDVCMD(&dev,"OUTPUT")==12&&!dev.reviewed);display_failure=0U;
+ dev.attempt_submitted=1U;before=submitted;assert(TDVCMD(&dev,"BUILD BAD!")==8&&!dev.attempt_submitted&&submitted==before);
+ /* Details is a read-only native snapshot, not permission to replace output. */
+ before=submitted;assert(!TDVDETAIL(&dev)&&dev.detail_valid&&!dev.reviewed&&submitted==before);
+ assert(!strcmp(dev.notice,"Native step details; PF6 reviews output"));
+ assert(TJBWORD(dev.detail)==dev.selected&&TJBWORD(dev.detail+16U)==3U);
+ dev.catalog[146U]^=1U;assert(TDVDETAIL(&dev)==16&&!dev.detail_valid&&!dev.reviewed&&submitted==before);dev.catalog[146U]^=1U;
  before=submitted;assert(TDVCMD(&dev,"RUN HELLO one two")==16&&submitted==before);review();assert(!TDVCMD(&dev,"RUN HELLO one two"));review();
  /* Syntax/admission errors preserve even reviewed prior output. */
  before=dev.selected;assert(TDVCMD(&dev,"RUN HELLO 1234567890123456789012345678901234567890123456789012345678901")&&dev.selected==before);assert(!TDVCMD(&dev,"EDIT SECOND"));assert(TDVCMD(&dev,"EDIT THIRD"));

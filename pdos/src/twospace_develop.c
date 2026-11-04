@@ -127,6 +127,20 @@ static int result(TDVSTATE *s,unsigned int id,unsigned int expected)
  }
  if(TJBWORD(h+48U)!=TJB_DONE)return fail(s,"Job did not complete normally",8U);return 0;
 }
+int TDVDETAIL(TDVSTATE *s)
+{
+ unsigned char h[128],hash[32];unsigned int i,count,rc;
+ s->detail_valid=0U;memset(s->detail,0,sizeof s->detail);
+ if(!s->selected){say(s,"No selected job; BUILD or RUN creates a result");return 4;}
+ rc=status(s,s->selected,0U,h,0);if(rc)return fail(s,"Job details unavailable",rc);
+ count=TJBWORD(h+56U);
+ if(!count||count>TJB_STEPS||count!=s->kind||TJBWORD(s->catalog+130U)!=s->selected)return fail(s,"Selected job identity unavailable",16U);
+ memcpy(s->detail,h+40U,88U);
+ for(i=0U;i<count;++i){rc=status(s,s->selected,i+1U,h,s->detail+TJB_STEP_BASE+i*TJB_STEP_BYTES);if(rc)return fail(s,"Step details unavailable",rc);}
+ descriptor_hash(s->detail+TJB_STEP_BASE,count,hash);
+ if(memcmp(hash,s->catalog+146U,32U))return fail(s,"Selected job identity changed",16U);
+ s->detail_valid=1U;say(s,"Native step details; PF6 reviews output");return 0;
+}
 static int output(TDVSTATE *s)
 {
  unsigned char h[128];unsigned int at=0U,n,rc,len,sequence=0U;unsigned char empty[17];const unsigned char *r;
@@ -204,6 +218,7 @@ static int execute(TDVSTATE *s,const char *member,unsigned int run,const char *a
 {
  unsigned char before[TEF_BYTES],after[TEF_BYTES],outinfo[TEF_BYTES],workinfo[TEF_BYTES],hash[32],oldhash[32],*data,*old,*e,pair[TDV_PAIR];
  char source[56],target[56];unsigned char jobhash[32];unsigned int rc,id=0U,bytes,old_exists,packed,count;int index,prior;TEFATTR attr;
+ s->attempt_submitted=0U;
  full(source,s->source,member);full(target,s->output,member);index=find(s,member);
  if(index<0){say(s,"Program not registered; EDIT the member first");return 4;}
  if(probe(s,source,before)||!(TJBWORD(before+36U)&TEF_EXISTS)||!TJBWORD(before+32U)){say(s,"Source is missing/empty; EDIT and SAVE it first");return 4;}
@@ -215,7 +230,7 @@ static int execute(TDVSTATE *s,const char *member,unsigned int run,const char *a
  rc=(unsigned int)plan(s,member,run,args);if(rc){say(s,"Request refused: check arguments/profile; prior output preserved");goto done;}
  descriptor_hash(s->jobs->result.job+32U,run?1U:3U,jobhash);
  rc=(unsigned int)room(s);if(rc)goto done;
- rc=(unsigned int)TJFPOST(s->jobs,0U,1U,&id);if(id){s->selected=id;s->reviewed=0U;s->kind=run?1U:3U;
+ rc=(unsigned int)TJFPOST(s->jobs,0U,1U,&id);if(id){s->attempt_submitted=1U;s->selected=id;s->reviewed=0U;s->kind=run?1U:3U;
   TJBPUT(s->catalog+130U,id);TJBPUT(s->catalog+134U,s->kind);memset(s->catalog+138U,0x40,8U);TJCENC(member,(unsigned int)strlen(member),s->catalog+138U);memcpy(s->catalog+146U,jobhash,32U);
   {int saved_status=commit_catalog(s);if(saved_status){rc=(unsigned int)saved_status;goto done;}}
  }
@@ -250,6 +265,7 @@ int TDVKNOW(const char *command)
 int TDVCMD(TDVSTATE *s,const char *command)
 {
  char text[199],*p,*verb,*member,*args,source[56],line[120];unsigned int i,force_line=0U;int rc;unsigned char opened[TEF_BYTES];
+ if(s)s->attempt_submitted=0U;
  if(!s||!s->ready||!command||strlen(command)>=sizeof text)return 8;strcpy(text,command);p=text;verb=word(&p);if(!verb)return 8;upper(verb);
  if(catalog(s))return 8;
  if(!strcmp(verb,"OUTPUT")){if(word(&p))return 8;return output(s);}
