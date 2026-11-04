@@ -1,0 +1,91 @@
+/* SPDX-License-Identifier: MIT; portable preview from a clean source factory.
+ * The operator qualifies an extracted consumer, never a person's workspace. */
+options levelb
+import rxfnsb
+main: procedure=.int
+  arg args=.string[]
+  if args.0<>6 then do
+    say 'usage: package-developer.crexx IMAGE VERSION PDF MARKDOWN SCREENS NOTICES'
+    return 2
+  end
+  image=args.1;version=args.2;pdf=args.3;markdown=args.4;screens=args.5;notices=args.6
+  if image<>'build/pdos/release-3270/image' then return 2
+  if version='' | verify(version,'0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-')<>0 then return 2
+  work='build/release/pdos-3270';payload=work||'/payload';assets=work||'/assets'
+  address crexx 'run test ! -L :work'
+  if rc<>0 then return 2
+  address crexx 'run test ! -e :payload'
+  if rc<>0 then do
+    say 'Existing package staging preserved; check ownership/consumers before cleaning in place.'
+    return 2
+  end
+  inputs=.string[]
+  inputs[1]=image||'/media/pdos00.cckd';inputs[2]=image||'/developer.json'
+  inputs[3]=image||'/hercules.cnf';inputs[4]=pdf;inputs[5]=markdown
+  shots='wide-editor-saved.png wide-build-progress.png wide-build-output.png wide-run-output.png'
+  i=.int;source=.string;target=.string
+  do i=1 to 4
+    inputs[inputs.0+1]=screens||'/'||word(shots,i)
+  end
+  do i=1 to inputs.0
+    source=inputs[i]
+    address crexx 'run test -s :source'
+    if rc<>0 then return 2
+  end
+  licensefile=notices||'/CREXX-LICENSE'
+  address crexx 'run test -s :licensefile'
+  if rc<>0 then return 2
+  screenout=payload||'/screens';noticeout=payload||'/notices';mediaout=payload||'/media'
+  address crexx 'run mkdir -p :screenout :noticeout :mediaout :assets'
+  if rc<>0 then return rc
+  names='media/pdos00.cckd developer.json hercules.cnf WALKTHROUGH.pdf WALKTHROUGH.md'
+  do i=1 to 5
+    source=inputs[i];target=payload||'/'||word(names,i)
+    address crexx 'run cmake -E copy :source :target'
+    if rc<>0 then return rc
+  end
+  do i=1 to 4
+    source=screens||'/'||word(shots,i);target=payload||'/screens/'||word(shots,i)
+    address crexx 'run cmake -E copy :source :target'
+    if rc<>0 then return rc
+  end
+  source=notices;target=payload||'/notices'
+  address crexx 'run cmake -E copy_directory :source :target'
+  if rc<>0 then return rc
+  do i=1 to 3
+    source=word('pdos/LICENSE pdos/UPSTREAM.md pdpclib/LICENSE',i)
+    target=payload||'/'||word('LICENSE UPSTREAM.md notices/PDPCLIB-LICENSE',i)
+    address crexx 'run cmake -E copy :source :target'
+    if rc<>0 then return rc
+  end
+  source='pdos/doc/user/3270-PREVIEW.md';target=payload||'/START-HERE.md'
+  address crexx 'run cmake -E copy :source :target'
+  if rc<>0 then return rc
+  target=payload||'/reader.cards'
+  address crexx 'run cmake -E touch :target'
+  if rc<>0 then return rc
+  files=.string[]
+  address crexx 'run find :payload -type f' output files
+  if rc<>0 then return rc
+  do i=1 to files.0
+    if left(files[i],length(payload)+1)<>payload||'/' then return 2
+    files[i]=substr(files[i],length(payload)+2)
+  end
+  sums=.string[]
+  address crexx 'run cmake -E chdir :payload shasum -a 256 :files[]' output sums
+  if rc<>0 then return rc
+  target=payload||'/SHA256SUMS'
+  do i=1 to sums.0
+    call lineout target,sums[i]
+  end
+  call lineout target
+  paths=.string[]
+  address crexx 'pwd' output paths
+  archive=strip(paths.1)||'/'||assets||'/z-pdos-'||version||'-3270.zip'
+  address crexx 'run test ! -e :archive'
+  if rc<>0 then return 2
+  address crexx 'run cmake -E chdir :payload zip -X -q -r :archive .'
+  if rc<>0 then return rc
+  say 'Preview archive built; exact extracted-image operator acceptance is required.'
+  say archive
+  return 0

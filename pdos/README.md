@@ -5,6 +5,13 @@ PDOS. It boots from a freshly built 3390 disk and supplies the selected
 MVS-style services needed to run native applications. The base system consists
 of PLOAD, the kernel and PCOMM command processor.
 
+The [0.2.2 3270 development preview](doc/user/3270-PREVIEW.md) includes the
+fullscreen editor, shared Programs/Source/Build/Run/Output frame and installed
+cREXX batch tools. Its [download](https://github.com/adesutherland/z-pdos/releases/tag/pdos-3270-preview-2026-11-04)
+contains a clean user workspace, Hercules configuration and illustrated
+walkthrough. See the [exact preview qualification](doc/qualification/RELEASE-0.2.2-PREVIEW.md)
+for accepted checks and limits.
+
 Version 0.2.0 uses **one protected kernel address space (K) and one shared
 application address space (U)**. An AMODE64 assembler nucleus handles
 interruptions and calls Classic C31 services in K. PCOMM runs above 16 MiB in

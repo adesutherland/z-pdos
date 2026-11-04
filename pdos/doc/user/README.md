@@ -5,6 +5,12 @@ The quickest way to explore the system is the **PDOS image ZIP** from the
 The Classic tools downloads are separate packages for building mainframe
 software on your host computer.
 
+For the fullscreen cREXX workflow, download the
+[0.2.2 3270 preview](https://github.com/adesutherland/z-pdos/releases/tag/pdos-3270-preview-2026-11-04)
+and follow its [startup guide](3270-PREVIEW.md) and included illustrated
+walkthrough. That preview includes the matched four-tool batch package, shared
+forms and card/printer route; the base-image instructions below describe 0.2.1.
+
 The default source-built K/U route and its accepted scope are described in
 [the K/U operator guide](TWO-SPACE.md).
 

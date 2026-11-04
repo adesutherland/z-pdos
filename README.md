@@ -17,6 +17,7 @@ and virtual machine exercise loading, storage, files, terminal input and error
 handling together.
 
 [Version 0.2.1](https://github.com/adesutherland/z-pdos/releases/tag/v0.2.1)
+· [0.2.2 3270 development preview](https://github.com/adesutherland/z-pdos/releases/tag/pdos-3270-preview-2026-11-04)
 · [Run z/PDOS](pdos/doc/user/README.md)
 · [Understand the architecture](pdos/doc/architecture/README.md)
 · [Documentation](doc/README.md)
@@ -27,6 +28,14 @@ The default machine has 512 MiB real storage and generous kernel/assembler
 capacities. The [release record](pdos/doc/qualification/RELEASE-0.2.1.md)
 links the bounded console and application qualification. Complete 3270
 conformance, larger files and disk-layout expansion remain separate work.
+
+The [3270 preview](pdos/doc/user/3270-PREVIEW.md) supplies a clean development
+image with matching cREXX batch tools already installed. Create a program in
+the fullscreen editor, save, build, review the output and run it from the common
+workspace. Its download includes an illustrated PDF/Markdown walkthrough and
+portable Hercules configuration. The [preview record](pdos/doc/qualification/RELEASE-0.2.2-PREVIEW.md)
+states the exact image, operator checks and limits; the 0.2.1 base release and
+general host-tool packages remain separately identified.
 
 ## What works today
 

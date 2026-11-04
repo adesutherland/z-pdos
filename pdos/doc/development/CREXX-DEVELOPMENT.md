@@ -59,3 +59,35 @@ The native compiler, assembler and linker builds remain separate from physical
 3270/3215 and persistence qualification. Review the complete change, resolve
 findings, record exact source/input freeze and the bounded matrix, and only then
 ask the operator to run guests. Retain summaries and requested manual screenshots.
+
+## Portable 3270 preview packaging
+
+The [0.2.2 preview record](../qualification/RELEASE-0.2.2-PREVIEW.md) selects
+the unchanged reviewed runtime and matching cREXX payloads. The Operator builds
+its clean factory in `build/pdos/release-3270/image`, leaving the existing
+`build/pdos/developer/image` user workspace untouched. Qualify a disposable
+consumer of that pristine image and capture the actual manual screens.
+
+After rendering and visually checking the PDF and portable Markdown, package
+those exact deliverables from the repository root:
+
+```text
+crexx -nokeep pdos/scripts/package-developer.crexx --args \
+  build/pdos/release-3270/image 0.2.2-preview \
+  PDF MARKDOWN SCREENS CREXX_NOTICES
+```
+
+The four document/notice arguments are existing paths. SCREENS contains the
+four `wide-*.png` files named by the walkthrough; CREXX_NOTICES is the matched
+batch distribution's notices directory. The recipe permits only that release
+image slot and refuses existing staging. It copies no personal workspace or
+terminal trace. Its output is
+`build/release/pdos-3270/assets/z-pdos-0.2.2-preview-3270.zip`, including file
+checksums, portable configuration, component notices and the walkthrough.
+
+Host ZIP/checksum checks precede the Operator's exact-archive extraction and
+boot acceptance. Matching pristine image hashes allow reuse of the full native
+journey; document-only changes do not justify another compiler run. Publication
+uses an explicit preview tag, separate from the general `v*` host-tool release
+workflow. Remove temporary consumers and expanded staging after acceptance;
+retain the download assets, requested manual and concise result summary.
